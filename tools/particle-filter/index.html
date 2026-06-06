@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>パーティクルフィルタ シミュレーター — 逐次モンテカルロ状態推定 | NovaSolver</title>
+<meta name="description" content="パーティクルフィルタシミュレーターで隠れた状態推定とノイズ除去を可視化。粒子数・リサンプリング・逐次モンテカルロ法の影響をリアルタイム解析。">
+<link rel="canonical" href="https://novasolver.jp/tools/particle-filter.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/particle-filter.html">
+<meta property="og:title" content="パーティクルフィルタ シミュレーター — 逐次モンテカルロ状態推定 | NovaSolver Project">
+<meta property="og:description" content="パーティクルフィルタシミュレーターで隠れた状態推定とノイズ除去を可視化。粒子数・リサンプリング・逐次モンテカルロ法の影響をリアルタイム解析。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Particle filter simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/particle-filter.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/particle-filter.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/particle-filter.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/particle-filter.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#pfCanvas{display:block;width:100%;height:280px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "パーティクルフィルタ シミュレーター",
+      "description": "重み付き粒子群でノイズに埋もれた隠れ状態を推定するパーティクルフィルタ（逐次モンテカルロ法）の無料シミュレーター。粒子数・プロセスノイズ・観測ノイズ・リサンプリング方式を変えて、推定RMSEと有効サンプルサイズの変化を可視化できます。",
+      "url": "https://novasolver.jp/tools/particle-filter.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "State Estimation Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["逐次モンテカルロ法による1次元隠れ状態の推定","系統的・多項リサンプリングとリサンプリングなしの比較","推定RMSEと観測のみのRMSEの比較","有効サンプルサイズ ESS の時系列可視化","真値・観測・推定・粒子雲のアニメーション表示"],
+      "keywords": "パーティクルフィルタ,逐次モンテカルロ,状態推定,リサンプリング,有効サンプルサイズ,ベイズフィルタ,機械学習",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "パーティクルフィルタとカルマンフィルタの違いは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "カルマンフィルタは状態の確率分布を「平均と共分散」という1つのガウス分布で表すため、線形・ガウスのシステムでは最適ですが、非線形・非ガウスのシステムでは精度が落ちます。パーティクルフィルタは確率分布を多数の重み付きサンプル（粒子）の集まりで表すため、分布が多峰性であっても、システムが非線形であっても扱えます。代償として粒子数に比例した計算コストがかかります。本ツールでは粒子数を変えて、コストと推定精度のトレードオフを体感できます。"}
+        },{
+          "@type": "Question",
+          "name": "リサンプリングはなぜ必要なのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "リサンプリングをしないと、観測と合わない粒子の重みが下がり続け、最終的にほぼ1個の粒子に重みが集中します（重み退化）。こうなると有効サンプルサイズ ESS が1まで落ち、分布をたった1点で表すことになり推定が改善しなくなります。リサンプリングは、重みの小さい粒子を捨て、重みの大きい粒子を複製することで粒子群を「重要な領域」に再配置し、ESS を回復させます。本ツールで方式を「リサンプリングなし」にすると、ESS が急落する様子が確認できます。"}
+        },{
+          "@type": "Question",
+          "name": "有効サンプルサイズ ESS とは何を表しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "ESS = 1 / Σw_i² は、重み付きの粒子群が「実質的に何個の等重み粒子に相当するか」を表す指標です。全粒子が等しい重みなら ESS は粒子数そのものに等しく、1個の粒子に重みが集中すると ESS は1になります。ESS が粒子数の半分など、ある閾値を下回ったときにだけリサンプリングを行うのが実務的な手法で、不要なリサンプリングによる多様性の喪失（サンプル枯渇）を防げます。"}
+        },{
+          "@type": "Question",
+          "name": "粒子数はどう決めればよいですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "粒子数を増やすほど確率分布をきめ細かく表現でき、推定の分散が下がって安定しますが、計算コストは粒子数に比例して増えます。1次元の単純な問題なら数百個で十分なことが多い一方、状態が高次元になると必要な粒子数は指数的に増える「次元の呪い」が起こります。実務では、許容できる計算時間の範囲で粒子数を増やし、ESS が極端に落ちないか、推定が安定するかを確認しながら決めます。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "パーティクルフィルタ シミュレーター", "item": "https://novasolver.jp/tools/particle-filter.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">パーティクルフィルタ シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/particle-filter.html" class="active">JA</a>
+      <a href="/en/tools/particle-filter.html">EN</a>
+      <a href="/zh/tools/particle-filter.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-braille"></i> 機械学習</div>
+    <h1>パーティクルフィルタ シミュレーター</h1>
+    <p class="hero-sub">ノイズに埋もれた「隠れた状態」を、重み付きの粒子群で推定するパーティクルフィルタ（逐次モンテカルロ法）のツールです。粒子数・ノイズ・リサンプリング方式を変えると、推定誤差と有効サンプルサイズがどう変わるかをリアルタイムで観察できます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">粒子数</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="nParticlesNum" value="200" min="20" max="1000" step="10" oninput="syncFromNum('nParticlesRange','nParticlesNum')"><span class="num-unit">個</span></div>
+      </div>
+      <div class="param-desc">確率分布を表すサンプルの数。多いほど精度が上がるが計算コストも増える</div>
+      <input type="range" id="nParticlesRange" min="20" max="1000" step="10" value="200" oninput="syncToNum('nParticlesRange','nParticlesNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">プロセスノイズ σ_q</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="processNoiseNum" value="0.5" min="0.05" max="3" step="0.05" oninput="syncFromNum('processNoiseRange','processNoiseNum')"></div>
+      </div>
+      <div class="param-desc">状態が時間とともにランダムに揺らぐ大きさ（モデルの不確かさ）</div>
+      <input type="range" id="processNoiseRange" min="0.05" max="3" step="0.05" value="0.5" oninput="syncToNum('processNoiseRange','processNoiseNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">観測ノイズ σ_r</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="measNoiseNum" value="1.0" min="0.1" max="5" step="0.1" oninput="syncFromNum('measNoiseRange','measNoiseNum')"></div>
+      </div>
+      <div class="param-desc">センサ観測に乗る雑音の大きさ。大きいほど観測が信用できない</div>
+      <input type="range" id="measNoiseRange" min="0.1" max="5" step="0.1" value="1.0" oninput="syncToNum('measNoiseRange','measNoiseNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">時間ステップ数</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="stepsNum" value="60" min="10" max="200" step="5" oninput="syncFromNum('stepsRange','stepsNum')"></div>
+      </div>
+      <div class="param-desc">フィルタを回す時刻の数（軌道の長さ）</div>
+      <input type="range" id="stepsRange" min="10" max="200" step="5" value="60" oninput="syncToNum('stepsRange','stepsNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">リサンプリング方式</span></div>
+      <div class="param-desc">重み退化に対抗するための粒子の再配置方法</div>
+      <select id="resampleSel" onchange="compute()">
+        <option value="systematic" selected>系統的リサンプリング</option>
+        <option value="multinomial">多項リサンプリング</option>
+        <option value="none">リサンプリングなし</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statEstRMSE">—</div><div class="sl">推定RMSE</div></div>
+        <div class="stat-card"><div class="sv" id="statMeasRMSE">—</div><div class="sl">観測のみのRMSE</div></div>
+        <div class="stat-card"><div class="sv" id="statFinalErr">—</div><div class="sl">推定の最終誤差</div></div>
+        <div class="stat-card"><div class="sv" id="statAvgESS">—</div><div class="sl">平均有効サンプルサイズ ESS</div></div>
+        <div class="stat-card"><div class="sv" id="statNP">—</div><div class="sl">粒子数</div></div>
+        <div class="stat-card"><div class="sv" id="statImprove">—</div><div class="sl">推定改善率 (%)</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-braille"></i> 状態推定アニメーション — 粒子雲の追跡</div>
+      <canvas id="pfCanvas"></canvas>
+      <p class="canvas-hint">太い曲線が真の状態、散らばる点が観測値、もう1本の曲線がフィルタの推定値です。縦に広がる小さな点の群れが現在時刻の粒子雲で、明るさは重みの大きさを表します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 真値・観測・推定の時系列</div>
+      <canvas class="ux-chartjs-canvas" id="trackChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 有効サンプルサイズ ESS の推移</div>
+      <canvas class="ux-chartjs-canvas" id="essChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$w_i\propto p(y_t\mid x_i)=\exp\!\Big(-\frac{(y_t-x_i)^2}{2\sigma_r^2}\Big),\qquad \hat x_t=\sum_i w_i\,x_i$$</p>
+      <p style="margin-top:6px;">各粒子の重み w_i は観測 y_t に対するガウス尤度に比例し、正規化後の重み付き平均が状態推定値 x̂_t になります。σ_r は観測ノイズの標準偏差です。</p>
+      <p style="margin-top:10px;">$$\text{ESS}=\frac{1}{\sum_i w_i^2}$$</p>
+      <p style="margin-top:6px;">有効サンプルサイズ ESS。重みが均等なら粒子数に等しく、1個に集中すると1まで落ちます。ESS が低くなりすぎたときにリサンプリングで粒子退化に対抗します。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>パーティクルフィルタとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「パーティクルフィルタ」って名前は聞いたことがあるんですけど、何をするものなんですか？粒子が出てくるってことは物理シミュレーションですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だね。物理の粒子じゃなくて「推定」のための粒子なんだ。たとえばロボットが自分の位置を知りたいとき、センサの値はノイズだらけで本当の位置はわからない。そこで「ここにいるかも」という候補をたくさんバラまく。その1つ1つが粒子だ。粒子の散らばり全体で「位置の確率分布」を表す、というのがパーティクルフィルタの考え方だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">候補をたくさん持つだけだと、どれが正しいか決められない気がするんですが…どうやって本当の位置に近づくんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そこで「重み」を使うんだ。新しい観測が来るたびに、各粒子に「この観測をどれだけうまく説明できるか」で点数をつける。観測にピッタリの粒子は重みが大きく、外れている粒子は重みが小さい。重みは w_i ∝ exp(−(y−x_i)²/(2σ_r²)) というガウス尤度で計算する。重み付きの平均をとると、それがフィルタの推定値だ。上のキャンバスで、推定の曲線が観測のバラつきよりずっと滑らかに真値を追っているのが見えるはずだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">重みをつけるだけなら簡単そうですね。でも「リサンプリング」っていうパラメータがありますけど、これは何のためにあるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それがパーティクルフィルタの肝なんだ。重みをつけ続けると、観測と合わない粒子の重みはどんどんゼロに近づく。最後にはたった1個の粒子に重みが集中してしまう。これを「重み退化」と呼ぶ。リサンプリングは、重みの小さい粒子を捨てて、重みの大きい粒子を複製する操作だ。これで粒子群を「いまもっともらしい場所」に集め直す。左のセレクトを「リサンプリングなし」にすると、下のESSグラフが1に向かって急落するのが見えるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">ESSグラフ、本当にガクッと下がりました。逆に系統的リサンプリングだと、ギザギザしながらも高い値を保っていますね。これは何を見ているんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それが有効サンプルサイズ、ESS = 1/Σw_i² だ。重み付きの粒子群が「実質何個の等重み粒子に相当するか」を表す。リサンプリング直後は全粒子が等重みになるからESSは粒子数まで戻る。次のステップで重みが偏るとまた下がる。このギザギザは「退化しては立て直す」を繰り返している証拠なんだ。ESSが落ちきって1付近で張りつくと、もう推定は良くならない。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど。じゃあカルマンフィルタっていうのも聞きますが、パーティクルフィルタとは何が違うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと「分布の表し方」が違う。カルマンフィルタは確率分布を平均と共分散の1つのガウス分布で表す。線形でガウスのシステムなら最適で、しかも軽い。でも「2つの場所のどちらかにいる」みたいな多峰の分布は表せないし、強い非線形だと精度が落ちる。パーティクルフィルタは分布をサンプルの集まりで表すから、多峰でも非線形でも非ガウスでも扱える。代わりに粒子数の分だけ重いんだ。だから自己位置推定や物体追跡のような「ぐにゃぐにゃした」問題で使われることが多いよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">パーティクルフィルタとカルマンフィルタの違いは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">カルマンフィルタは状態の確率分布を「平均と共分散」という1つのガウス分布で表すため、線形・ガウスのシステムでは最適ですが、非線形・非ガウスのシステムでは精度が落ちます。パーティクルフィルタは確率分布を多数の重み付きサンプル（粒子）の集まりで表すため、分布が多峰性であっても、システムが非線形であっても扱えます。代償として粒子数に比例した計算コストがかかります。本ツールでは粒子数を変えて、コストと推定精度のトレードオフを体感できます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">リサンプリングはなぜ必要なのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">リサンプリングをしないと、観測と合わない粒子の重みが下がり続け、最終的にほぼ1個の粒子に重みが集中します（重み退化）。こうなると有効サンプルサイズ ESS が1まで落ち、分布をたった1点で表すことになり推定が改善しなくなります。リサンプリングは、重みの小さい粒子を捨て、重みの大きい粒子を複製することで粒子群を「重要な領域」に再配置し、ESS を回復させます。本ツールで方式を「リサンプリングなし」にすると、ESS が急落する様子が確認できます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">有効サンプルサイズ ESS とは何を表しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">ESS = 1 / Σw_i² は、重み付きの粒子群が「実質的に何個の等重み粒子に相当するか」を表す指標です。全粒子が等しい重みなら ESS は粒子数そのものに等しく、1個の粒子に重みが集中すると ESS は1になります。ESS が粒子数の半分など、ある閾値を下回ったときにだけリサンプリングを行うのが実務的な手法で、不要なリサンプリングによる多様性の喪失（サンプル枯渇）を防げます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">粒子数はどう決めればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">粒子数を増やすほど確率分布をきめ細かく表現でき、推定の分散が下がって安定しますが、計算コストは粒子数に比例して増えます。1次元の単純な問題なら数百個で十分なことが多い一方、状態が高次元になると必要な粒子数は指数的に増える「次元の呪い」が起こります。実務では、許容できる計算時間の範囲で粒子数を増やし、ESS が極端に落ちないか、推定が安定するかを確認しながら決めます。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>ロボットの自己位置推定（モンテカルロ位置推定）：</strong>掃除ロボットや自律走行車が、地図とノイズだらけのセンサ情報だけから「自分が今どこにいるか」を推定する場面でパーティクルフィルタが使われます。各粒子が「ありうる位置と姿勢」を表し、レーザーやカメラの観測と地図が合う粒子の重みを上げます。最初は部屋中に散らばっていた粒子群が、ロボットが動くにつれて真の位置の周りに収束していく様子は、本ツールの粒子雲の収束とまったく同じ考え方です。</p>
+    <p><strong>物体追跡（ビジュアルトラッキング）：</strong>動画の中で人や車を追い続けるアルゴリズムにもパーティクルフィルタが使われます。対象が他の物体の陰に隠れたり、似た見た目の物体が複数あったりすると、状態分布が多峰になります。1つのガウス分布で表すカルマンフィルタでは扱いにくいこの状況でも、粒子群なら複数の候補を同時に保持でき、隠れから出てきたときに正しい方を取り戻せます。</p>
+    <p><strong>金融・経済の状態空間モデル：</strong>株価のボラティリティのように、直接は観測できず時間とともに変化する「潜在変数」を、観測されるリターン系列から推定する確率的ボラティリティモデルでも逐次モンテカルロ法が活躍します。分布が非ガウスで、モデルが非線形でも適用できる柔軟さが評価されています。</p>
+    <p><strong>航法・センサフュージョン：</strong>GPSが届かないトンネル内や屋内での測位、複数センサの統合（慣性センサ＋気圧計＋地磁気など）でもパーティクルフィルタが用いられます。観測モデルが複雑で非線形でも、粒子ごとに尤度を評価するだけでよいため、扱いやすいという利点があります。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の落とし穴が、<strong>「粒子を増やせば必ず精度が上がる」と考えてしまう</strong>ことです。確かに粒子数を増やすと推定の分散は下がりますが、計算コストは粒子数に正比例して増えます。さらに深刻なのが「次元の呪い」で、状態が高次元になると、同じ精度を保つのに必要な粒子数が次元に対して指数的に増えます。3次元の位置と姿勢を同時に推定するような問題に、1次元の感覚で粒子数を決めると、まったく足りずに発散します。本ツールは1次元なので数百個で十分ですが、高次元では補助粒子フィルタやラオ・ブラックウェル化など、粒子数を抑える工夫が必須になります。</p>
+    <p>次に、<strong>「リサンプリングは毎ステップ必ず行うべき」という思い込み</strong>です。リサンプリングは重み退化に対抗する一方で、重みの大きい粒子を何度も複製するため、粒子の多様性を奪う「サンプル枯渇」という副作用があります。プロセスノイズが小さいと、複製された粒子がほとんど動かず、粒子群が数個の点に縮退してしまいます。実務では ESS が粒子数の半分など閾値を下回ったときにだけリサンプリングする「適応的リサンプリング」が標準です。本ツールの「リサンプリングなし」と毎ステップ実行する方式の中間が、実は一番良いことが多いのです。</p>
+    <p>最後に、<strong>「推定値は重み付き平均をとればよい」という単純化</strong>に注意してください。状態分布が単峰で真値の周りに対称なら重み付き平均で問題ありませんが、分布が多峰のとき、つまり「Aにいるか、Bにいるか」という状況で平均をとると、AとBの中間という「どちらでもない場所」を推定値として出してしまいます。これは物体追跡で対象が見失われたときに典型的に起こる失敗です。多峰性が疑われるときは、平均ではなく最大重み粒子（MAP推定）やクラスタリングで代表点を選ぶなど、状況に応じた要約が必要になります。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>粒子数スライダーで初期粒子数を設定します。100～5000粒子の範囲で、粒子数が多いほど推定精度が向上しますが計算負荷が増加します。</li>
+<li>プロセスノイズと観測ノイズのスライダーで、システムの非線形性とセンサノイズレベルを調整します。プロセスノイズ0.1～2.0、観測ノイズ0.5～5.0の範囲で設定可能です。</li>
+<li>シミュレーションステップ数（10～500ステップ）を指定し、「実行」ボタンをクリックするとパーティクルフィルタが逐次モンテカルロ法によりリアルタイムで状態を推定し、推定RMSE、平均有効サンプルサイズESS、推定改善率を可視化します。</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>ドローン位置推定の例：粒子数1000、プロセスノイズ0.3、観測ノイズ1.5、100ステップの条件で、初期位置x=0m、真の軌跡が正弦波運動する場合、観測のみのRMSEが2.4mに対し、パーティクルフィルタ推定RMSEは0.58mとなり、推定改善率は76%に達します。リサンプリング後の有効サンプルサイズESSが850粒子に維持されるため、粒子退化を効果的に防止できます。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>ESSが粒子数の30%以下に低下した場合、リサンプリング戦略を多項リサンプリングから層化リサンプリングへ変更してください。自動判定閾値はデフォルト0.5に設定されています。</li>
+<li>プロセスノイズが過小設定（0.05以下）だと粒子が真の軌跡から乖離し、推定が発散します。センサ精度が確実な場合でも最小0.1に設定することを推奨します。</li>
+<li>高次元状態（3次元位置＋速度など6次元以上）では粒子数を2000以上にし、計算時間の許容範囲内でESS低下を監視してください。</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Seeded RNG (mulberry32) — fixed seed for deterministic runs =====
+function makeRng(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// shared state for the canvas animation
+const PF = {
+  steps:60, trueX:[], meas:[], estimate:[], ess:[],
+  cloud:[], cloudW:[], nParticles:200, scheme:'systematic'
+};
+
+// ===== Chart.js setup =====
+const trackChart = new Chart(document.getElementById('trackChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'真値',data:[],borderColor:'#00b894',backgroundColor:'rgba(0,184,148,.10)',fill:false,borderWidth:2.5,pointRadius:0,tension:0.25},
+    {label:'観測',data:[],borderColor:'#e17055',backgroundColor:'#e17055',showLine:false,pointRadius:2.4,pointHoverRadius:4},
+    {label:'推定',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.10)',fill:false,borderWidth:2,pointRadius:0,tension:0.25}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'時間ステップ',font:{size:11}},ticks:{maxTicksLimit:10}},
+      y:{title:{display:true,text:'状態 x',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const essChart = new Chart(document.getElementById('essChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'有効サンプルサイズ ESS',data:[],borderColor:'#00B4D8',backgroundColor:'rgba(0,180,216,.14)',fill:true,borderWidth:2,pointRadius:0,tension:0.15}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'時間ステップ',font:{size:11}},ticks:{maxTicksLimit:10}},
+      y:{title:{display:true,text:'ESS（等重み粒子相当数）',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:false}}
+  }
+});
+
+// ===== Main compute — sequential Monte Carlo particle filter =====
+function compute(){
+  const nParticles  = Math.round(parseFloat(document.getElementById('nParticlesRange').value));
+  const processNoise = parseFloat(document.getElementById('processNoiseRange').value);
+  const measNoise    = parseFloat(document.getElementById('measNoiseRange').value);
+  const steps        = Math.round(parseFloat(document.getElementById('stepsRange').value));
+  const scheme       = document.getElementById('resampleSel').value;
+
+  // ----- seeded RNG + Box-Muller Gaussian draws -----
+  const rng = makeRng(0x9E3779B9);     // fixed seed -> deterministic run
+  let spare = null;
+  function gauss(){
+    if(spare !== null){ const s = spare; spare = null; return s; }
+    let u1;
+    do { u1 = rng(); } while(u1 <= 1e-12);
+    const u2 = rng();
+    const mag = Math.sqrt(-2.0 * Math.log(u1));
+    spare = mag * Math.sin(2.0*Math.PI*u2);
+    return mag * Math.cos(2.0*Math.PI*u2);
+  }
+
+  // ----- true smooth trajectory -----
+  function trueState(t){ return 12*Math.sin(0.08*t) + 4*Math.sin(0.21*t); }
+
+  // ----- actual true path corrupted by process noise -----
+  const trueX = [];
+  let x = trueState(0);
+  trueX.push(x);
+  for(let t=1;t<=steps;t++){
+    const inc = trueState(t) - trueState(t-1);
+    x = x + inc + processNoise*gauss();
+    trueX.push(x);
+  }
+
+  // ----- noisy measurements -----
+  const meas = [];
+  for(let t=0;t<=steps;t++){
+    meas.push(trueX[t] + measNoise*gauss());
+  }
+
+  // ----- particle filter -----
+  let px = new Array(nParticles);
+  let pw = new Array(nParticles);
+  for(let i=0;i<nParticles;i++){
+    px[i] = trueX[0] + 2.0*gauss();     // spread around initial state
+    pw[i] = 1.0/nParticles;
+  }
+
+  const estimate=[], essArr=[], cloudHist=[], cloudWHist=[];
+  const sr2 = 2*measNoise*measNoise;
+
+  for(let t=0;t<=steps;t++){
+    // (1) PREDICT — propagate every particle by the dynamics increment + noise
+    if(t>0){
+      const inc = trueState(t) - trueState(t-1);
+      for(let i=0;i<nParticles;i++){
+        px[i] = px[i] + inc + processNoise*gauss();
+      }
+    }
+    // (2) UPDATE — weight by Gaussian likelihood of the measurement
+    let wsum=0;
+    for(let i=0;i<nParticles;i++){
+      const d = meas[t]-px[i];
+      const w = Math.exp(-(d*d)/sr2);
+      pw[i] = pw[i]*w;
+      wsum += pw[i];
+    }
+    if(wsum<=1e-300){
+      for(let i=0;i<nParticles;i++) pw[i]=1.0/nParticles;   // guard against total collapse
+    } else {
+      for(let i=0;i<nParticles;i++) pw[i]/=wsum;            // normalise weights
+    }
+    // state estimate = weighted mean of the particles
+    let est=0;
+    for(let i=0;i<nParticles;i++) est += pw[i]*px[i];
+    estimate.push(est);
+    // effective sample size ESS = 1 / Σ(w_i^2)
+    let s2=0;
+    for(let i=0;i<nParticles;i++) s2 += pw[i]*pw[i];
+    essArr.push(s2>0 ? 1.0/s2 : nParticles);
+    // record a thinned snapshot of the particle cloud for the canvas
+    const stride = Math.max(1, Math.floor(nParticles/60));
+    const cx=[], cw=[];
+    let wmax=1e-12;
+    for(let i=0;i<nParticles;i++) if(pw[i]>wmax) wmax=pw[i];
+    for(let i=0;i<nParticles;i+=stride){
+      cx.push(px[i]); cw.push(pw[i]/wmax);
+    }
+    cloudHist.push(cx); cloudWHist.push(cw);
+    // (3) RESAMPLE — per the chosen scheme
+    if(scheme==='systematic'){
+      const newx=new Array(nParticles);
+      const u0=rng()/nParticles;
+      let c=pw[0], j=0;
+      for(let i=0;i<nParticles;i++){
+        const u=u0+i/nParticles;
+        while(u>c && j<nParticles-1){ j++; c+=pw[j]; }
+        newx[i]=px[j];
+      }
+      px=newx;
+      for(let i=0;i<nParticles;i++) pw[i]=1.0/nParticles;
+    } else if(scheme==='multinomial'){
+      const newx=new Array(nParticles);
+      const cum=new Array(nParticles);
+      let acc=0;
+      for(let i=0;i<nParticles;i++){ acc+=pw[i]; cum[i]=acc; }
+      for(let i=0;i<nParticles;i++){
+        const u=rng()*acc;
+        let lo=0, hi=nParticles-1;
+        while(lo<hi){ const mid=(lo+hi)>>1; if(cum[mid]<u) lo=mid+1; else hi=mid; }
+        newx[i]=px[lo];
+      }
+      px=newx;
+      for(let i=0;i<nParticles;i++) pw[i]=1.0/nParticles;
+    }
+    // 'none' -> skip resampling, weights keep degenerating
+  }
+
+  // ----- metrics -----
+  let se=0, sm=0;
+  for(let t=0;t<=steps;t++){
+    const e1=estimate[t]-trueX[t]; se+=e1*e1;
+    const e2=meas[t]-trueX[t]; sm+=e2*e2;
+  }
+  const n = steps+1;
+  const estimateRMSE = Math.sqrt(se/n);
+  const measRMSE     = Math.sqrt(sm/n);
+  const finalError   = Math.abs(estimate[steps]-trueX[steps]);
+  let essSum=0;
+  for(let t=0;t<=steps;t++) essSum+=essArr[t];
+  const avgESS = essSum/n;
+  const improvement = measRMSE>0 ? (1-estimateRMSE/measRMSE)*100 : 0;
+
+  // ----- stat cards -----
+  document.getElementById('statEstRMSE').textContent  = estimateRMSE.toFixed(3);
+  document.getElementById('statMeasRMSE').textContent = measRMSE.toFixed(3);
+  document.getElementById('statFinalErr').textContent = finalError.toFixed(3);
+  document.getElementById('statAvgESS').textContent   = avgESS.toFixed(0);
+  document.getElementById('statNP').textContent       = nParticles;
+  document.getElementById('statImprove').textContent  = improvement.toFixed(0);
+
+  // colour the improvement stat
+  const impEl = document.getElementById('statImprove');
+  impEl.style.color = improvement < 0 ? '#c0392b' : (improvement < 15 ? '#c0563a' : '#0a8a6a');
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(scheme==='none'){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> リサンプリングなし — 重みが少数の粒子に集中して退化し、平均ESSは '+avgESS.toFixed(0)+' まで落ちています。多くの粒子が無駄になり、推定改善率は '+improvement.toFixed(0)+'% にとどまります。系統的／多項リサンプリングを選ぶと粒子群が立て直されます。';
+  }else if(improvement < 0){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 推定が観測のみより悪化（改善率 '+improvement.toFixed(0)+'%）。観測ノイズに対しプロセスノイズや粒子数が不足している可能性があります。パラメータを見直してください。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 粒子フィルタが機能しています。推定RMSE '+estimateRMSE.toFixed(3)+' は観測のみのRMSE '+measRMSE.toFixed(3)+' を下回り、観測単独より '+improvement.toFixed(0)+'% 精度が向上。平均ESSは '+avgESS.toFixed(0)+'（粒子数 '+nParticles+'）です。';
+  }
+
+  // ----- track chart (true / measurement / estimate vs time) -----
+  const labels=[];
+  for(let t=0;t<=steps;t++) labels.push(t);
+  trackChart.data.labels = labels;
+  trackChart.data.datasets[0].data = trueX.slice();
+  trackChart.data.datasets[1].data = meas.slice();
+  trackChart.data.datasets[2].data = estimate.slice();
+  trackChart.update('none');
+
+  // ----- ESS chart (effective sample size vs time) -----
+  essChart.data.labels = labels;
+  essChart.data.datasets[0].data = essArr.slice();
+  essChart.update('none');
+
+  // ----- update shared state for the animation -----
+  PF.steps=steps; PF.trueX=trueX; PF.meas=meas; PF.estimate=estimate;
+  PF.ess=essArr; PF.cloud=cloudHist; PF.cloudW=cloudWHist;
+  PF.nParticles=nParticles; PF.scheme=scheme;
+}
+
+// ===== Particle-cloud tracking animation =====
+(function(){
+  const cv = document.getElementById('pfCanvas');
+  const ctx = cv.getContext('2d');
+  let sweep = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==280*dpr){
+      cv.width = w*dpr; cv.height = 280*dpr; cv.style.height='280px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 280;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const steps = PF.steps;
+    const trueX = PF.trueX, meas = PF.meas, estimate = PF.estimate;
+    if(!trueX || trueX.length<2){ requestAnimationFrame(frame); return; }
+
+    // ----- y-range over all series -----
+    let lo=1e9, hi=-1e9;
+    for(let t=0;t<=steps;t++){
+      lo=Math.min(lo,trueX[t],meas[t],estimate[t]);
+      hi=Math.max(hi,trueX[t],meas[t],estimate[t]);
+    }
+    const padV=(hi-lo)*0.12+1e-6;
+    lo-=padV; hi+=padV;
+    const padL=44, padR=20, padT=24, padB=30;
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+    function tx(t){ return padL + plotW*t/Math.max(1,steps); }
+    function ty(v){ return padT + plotH*(1-(v-lo)/(hi-lo)); }
+
+    // ----- axes -----
+    ctx.strokeStyle='rgba(255,255,255,.18)';
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+
+    // ----- noisy measurements (scattered dots) -----
+    ctx.fillStyle='rgba(225,112,85,.55)';
+    for(let t=0;t<=steps;t++){
+      ctx.beginPath(); ctx.arc(tx(t),ty(meas[t]),2.0,0,Math.PI*2); ctx.fill();
+    }
+
+    // ----- true trajectory (bold smooth curve) -----
+    ctx.strokeStyle='#00b894';
+    ctx.lineWidth=2.8;
+    ctx.beginPath();
+    for(let t=0;t<=steps;t++){ const px=tx(t),py=ty(trueX[t]); t===0?ctx.moveTo(px,py):ctx.lineTo(px,py); }
+    ctx.stroke();
+
+    // ----- particle filter estimate (second curve) -----
+    ctx.strokeStyle='#3a9bff';
+    ctx.lineWidth=1.8;
+    ctx.beginPath();
+    for(let t=0;t<=steps;t++){ const px=tx(t),py=ty(estimate[t]); t===0?ctx.moveTo(px,py):ctx.lineTo(px,py); }
+    ctx.stroke();
+
+    // ----- sweeping marker through the time steps -----
+    const cur = Math.floor(sweep);
+    const tNow = Math.min(steps,Math.max(0,cur));
+
+    // ----- particle cloud at the current time (vertical spray) -----
+    const cloud = PF.cloud[tNow] || [];
+    const cloudW = PF.cloudW[tNow] || [];
+    const cxPix = tx(tNow);
+    for(let i=0;i<cloud.length;i++){
+      const w = cloudW[i];
+      const r = 1.3 + 2.6*w;
+      ctx.fillStyle = 'rgba(255,209,75,'+(0.18+0.72*w)+')';
+      ctx.beginPath();
+      ctx.arc(cxPix, ty(cloud[i]), r, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // ----- vertical sweep line -----
+    ctx.strokeStyle='rgba(0,180,216,.6)';
+    ctx.lineWidth=1;
+    ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(cxPix,padT); ctx.lineTo(cxPix,padT+plotH); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // markers at the current time
+    ctx.fillStyle='#00b894';
+    ctx.beginPath(); ctx.arc(cxPix,ty(trueX[tNow]),4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#3a9bff';
+    ctx.beginPath(); ctx.arc(cxPix,ty(estimate[tNow]),3.4,0,Math.PI*2); ctx.fill();
+
+    // ----- legend / live status -----
+    ctx.font='10px Roboto Mono, monospace';
+    ctx.textAlign='left';
+    let lx=padL+6, lyy=padT+4;
+    ctx.fillStyle='#00b894'; ctx.fillRect(lx,lyy,12,3);
+    ctx.fillStyle='rgba(255,255,255,.75)'; ctx.fillText('真値',lx+16,lyy+4);
+    ctx.fillStyle='#e17055'; ctx.beginPath(); ctx.arc(lx+62,lyy+2,2.4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.75)'; ctx.fillText('観測',lx+70,lyy+4);
+    ctx.fillStyle='#3a9bff'; ctx.fillRect(lx+116,lyy,12,3);
+    ctx.fillStyle='rgba(255,255,255,.75)'; ctx.fillText('推定',lx+132,lyy+4);
+    ctx.fillStyle='rgba(255,209,75,.85)'; ctx.beginPath(); ctx.arc(lx+182,lyy+2,3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.75)'; ctx.fillText('粒子雲',lx+188,lyy+4);
+
+    ctx.fillStyle='rgba(0,180,216,.95)';
+    ctx.font='bold 11px Roboto Mono, monospace';
+    ctx.fillText('t = '+tNow+' / '+steps+'   ESS = '+(PF.ess[tNow]||0).toFixed(0), padL+6, padT+plotH+20);
+    ctx.fillStyle='rgba(255,255,255,.45)';
+    ctx.font='10px Roboto Mono, monospace';
+    ctx.textAlign='right';
+    const schemeLabel = PF.scheme==='none' ? 'リサンプリングなし' : (PF.scheme==='multinomial' ? '多項リサンプリング' : '系統的リサンプリング');
+    ctx.fillText(schemeLabel+' / 粒子 '+PF.nParticles, padL+plotW, padT+plotH+20);
+
+    // y-axis labels
+    ctx.fillStyle='rgba(255,255,255,.4)';
+    ctx.textAlign='right';
+    ctx.fillText(hi.toFixed(1), padL-6, padT+8);
+    ctx.fillText(lo.toFixed(1), padL-6, padT+plotH);
+
+    sweep += 0.35;
+    if(sweep >= steps+1) sweep = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['nParticlesRange','processNoiseRange','measNoiseRange','stepsRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

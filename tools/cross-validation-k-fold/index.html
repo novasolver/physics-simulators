@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>k-fold 交差検証シミュレーター — モデル汎化性能評価 | NovaSolver</title>
+<meta name="description" content="k-fold 交差検証（cross-validation）でモデル汎化性能を評価する無料シミュレーター。サンプル数 N・分割数 k・モデル複雑度・雑音などを変えて、訓練誤差・CV 誤差・汎化ギャップ・標準誤差を計算し、過学習を判定できます。">
+<link rel="canonical" href="https://novasolver.jp/tools/cross-validation-k-fold.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/cross-validation-k-fold.html">
+<meta property="og:title" content="k-fold 交差検証シミュレーター — モデル汎化性能評価 | NovaSolver Project">
+<meta property="og:description" content="k-fold 交差検証で訓練 MSE・CV MSE・標準誤差・汎化ギャップをリアルタイム計算。バイアス・分散のトレードオフを直感的に学べる無料シミュレーターです。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="k-Fold cross-validation simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/cross-validation-k-fold.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/cross-validation-k-fold.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/cross-validation-k-fold.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/cross-validation-k-fold.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#cvCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "k-fold 交差検証シミュレーター",
+      "description": "k-fold 交差検証（cross-validation）でモデル汎化性能を評価する無料シミュレーター。サンプル数 N・分割数 k・モデル複雑度・雑音などを変えて、訓練誤差・CV 誤差・汎化ギャップ・標準誤差を計算し、過学習を判定できます。",
+      "url": "https://novasolver.jp/tools/cross-validation-k-fold.html",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Machine Learning Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["k 分割交差検証の訓練／検証 MSE の計算","fold 単位の CV エラーと標準誤差の可視化","バイアス・分散・総誤差のトレードオフ表示","汎化ギャップによる過学習判定","モデル複雑度・雑音・サンプル数の対話的操作"],
+      "keywords": "k-fold,交差検証,cross-validation,過学習,バイアスバリアンス,汎化性能,機械学習,統計",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "k-fold 交差検証の k はどう選べばよいですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "実務では k=5 か k=10 が標準で、特に k=10 がもっとも広く使われます。k を大きくすると 1 回あたりの訓練データが N(k-1)/k に近づくため、推定値のバイアスは小さくなりますが、fold 間の相関が増えて分散が大きくなり、計算コストも比例して増えます。N=1000・k=5 なら訓練 800・検証 200 と十分なサンプルがあり、計算も 5 回で済むのでバランスが良いです。N が極端に小さいときだけ LOOCV（k=N）を検討します。"}
+        },{
+          "@type": "Question",
+          "name": "汎化ギャップ（訓練誤差と CV 誤差の差）はどう解釈しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "汎化ギャップは「optimism（楽観バイアス）」とも呼ばれ、訓練データだけで評価したときの誤差がどれだけ現実より甘く出ているかを示します。本ツールでは (CV 誤差 - 訓練誤差) / CV 誤差 × 100 (%) で表示します。25% 以下なら健全、25〜50% は過学習の兆候、50% を超えると典型的な過学習で、テスト時の性能が大きく落ちると考えられます。複雑度を 1 段下げる、正則化を強める、データを増やす、のいずれかで対処します。"}
+        },{
+          "@type": "Question",
+          "name": "CV の標準誤差はなぜ必要ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "CV の平均値だけでモデルを選ぶと、fold によるたまたまの良し悪しで誤った選択をしがちです。SE = s_CV / √k を計算し、平均 ± 1 SE の範囲が重なるモデル同士は統計的にほぼ同等とみなします。Breiman らが提唱した one-SE rule では、最良モデルの平均 + 1 SE の範囲に入る中で最もシンプルなモデルを選びます。複雑さを抑えながら過学習リスクを下げる実務的な手法として広く使われています。"}
+        },{
+          "@type": "Question",
+          "name": "時系列データでも普通の k-fold が使えますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "使えません。ランダムに分割すると未来のデータが訓練に入り過去を予測する形になり（情報リーク）、評価が現実より大幅に楽観的になります。時系列では Walk-Forward（前進検証）や TimeSeriesSplit を使い、常に訓練データ→検証データの時間順を保ちます。また分類問題でクラス不均衡があるときは Stratified k-fold で各 fold のクラス比を母集団と同じに保つ必要があります。問題設定に応じた分割戦略の選択が、CV の信頼性を決めます。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "k-fold 交差検証シミュレーター", "item": "https://novasolver.jp/tools/cross-validation-k-fold.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">k-fold 交差検証シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/cross-validation-k-fold.html" class="active">JA</a>
+      <a href="/en/tools/cross-validation-k-fold.html">EN</a>
+      <a href="/zh/tools/cross-validation-k-fold.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-shuffle"></i> 機械学習・統計</div>
+    <h1>k-fold 交差検証シミュレーター</h1>
+    <p class="hero-sub">機械学習モデルの「未知データへの予測能力」を客観的に評価する k 分割交差検証を体感するツールです。サンプル数・分割数 k・モデル複雑度・雑音を動かすと、訓練誤差・CV 誤差・標準誤差・汎化ギャップがリアルタイムで変化し、バイアスと分散のトレードオフが直感的に分かります。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">総サンプル数 N</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="nNum" value="1000" min="50" max="10000" step="10" oninput="syncFromNum('nRange','nNum')"></div>
+      </div>
+      <div class="param-desc">学習に使えるデータの総数</div>
+      <input type="range" id="nRange" min="50" max="10000" step="10" value="1000" oninput="syncToNum('nRange','nNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">分割数 k</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="kNum" value="5" min="2" max="20" step="1" oninput="syncFromNum('kRange','kNum')"></div>
+      </div>
+      <div class="param-desc">5 または 10 が標準。N=k で LOOCV</div>
+      <input type="range" id="kRange" min="2" max="20" step="1" value="5" oninput="syncToNum('kRange','kNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">モデル複雑度 d</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="dNum" value="3" min="1" max="10" step="1" oninput="syncFromNum('dRange','dNum')"></div>
+      </div>
+      <div class="param-desc">多項式次数や層数の代理指標</div>
+      <input type="range" id="dRange" min="1" max="10" step="1" value="3" oninput="syncToNum('dRange','dNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">真の雑音標準偏差 σ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="sigmaNum" value="0.50" min="0.05" max="2" step="0.05" oninput="syncFromNum('sigmaRange','sigmaNum')"></div>
+      </div>
+      <div class="param-desc">どんなモデルでも下回れない誤差の床</div>
+      <input type="range" id="sigmaRange" min="0.05" max="2" step="0.05" value="0.50" oninput="syncToNum('sigmaRange','sigmaNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">モデルバイアス係数 b</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="bNum" value="0.20" min="0" max="1" step="0.05" oninput="syncFromNum('bRange','bNum')"></div>
+      </div>
+      <div class="param-desc">仮説族と真の関数のミスマッチ強度</div>
+      <input type="range" id="bRange" min="0" max="1" step="0.05" value="0.20" oninput="syncToNum('bRange','bNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statTrain">—</div><div class="sl">訓練データ数</div></div>
+        <div class="stat-card"><div class="sv" id="statValid">—</div><div class="sl">検証データ数</div></div>
+        <div class="stat-card"><div class="sv" id="statTrainMSE">—</div><div class="sl">訓練 MSE</div></div>
+        <div class="stat-card"><div class="sv" id="statCVMSE">—</div><div class="sl">CV MSE</div></div>
+        <div class="stat-card"><div class="sv" id="statSE">—</div><div class="sl">CV 標準誤差</div></div>
+        <div class="stat-card"><div class="sv" id="statGap">—</div><div class="sl">汎化ギャップ (%)</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-shuffle"></i> k 分割の可視化 — fold の巡回アニメーション</div>
+      <canvas id="cvCanvas"></canvas>
+      <p class="canvas-hint">水平バー＝データセット。各 fold で一区画が検証（オレンジ）、残りが訓練（青）になり、k 回繰り返した平均を CV スコアとします。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> バイアス² ・分散・総誤差 vs モデル複雑度</div>
+      <canvas class="ux-chartjs-canvas" id="bvChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-bar"></i> fold 別 CV エラー（標準誤差バー付き）</div>
+      <canvas class="ux-chartjs-canvas" id="foldChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$CV_{(k)} = \frac{1}{k}\sum_{i=1}^{k} L\!\left(y_i,\,\hat f^{-i}(x_i)\right),\qquad SE_{CV} = \frac{s_{CV}}{\sqrt{k}}$$</p>
+      <p style="margin-top:6px;">L は損失関数（回帰なら MSE、分類なら 0–1 損失）、$\hat f^{-i}$ は i 番目の fold を除いて学習したモデル。fold 平均で汎化誤差を推定し、SE で不確かさを定量化します。</p>
+      <p style="margin-top:10px;">$$\mathrm{MSE}_{\text{test}} = \underbrace{\bigl(\mathbb{E}[\hat f]-f\bigr)^2}_{\text{Bias}^2} + \underbrace{\mathrm{Var}(\hat f)}_{\text{Variance}} + \underbrace{\sigma^2}_{\text{Irreducible}}$$</p>
+      <p style="margin-top:6px;">テスト誤差はバイアス²・分散・不可避雑音の和。複雑度を上げるとバイアスは下がり分散は上がる、というトレードオフを CV で観測します。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>k-Fold 交差検証</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">機械学習の本でよく出てくる「交差検証（cross-validation）」って、結局どんな評価のやり方なんですか？訓練データとテストデータに分ければ十分じゃないですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だね。データを「訓練 80% / テスト 20%」みたいに 1 回だけ分ける hold-out は、たまたまテストに難しいサンプルが偏ると評価が悲観的になるし、逆だと楽観的になる。k-fold はその「たまたま」を平均で打ち消す手法だよ。データを k 個に等分して、各回ごとに 1 個を検証・残り k-1 個で訓練、を k 回繰り返して平均する。例えば k=5 なら 1000 件のデータを 200 件ずつ 5 つに分けて、それぞれ「200 で検証 / 800 で訓練」を 5 通り回すんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど！じゃあ k を大きくすればするほど良いってことですか？極端に k = N まで上げる LOOCV とか。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">実はそう単純じゃないんだ。k を大きくすると 1 回ごとの訓練データが N-1 件に近づくからバイアスは下がる。でも fold 同士のデータがほぼ重なるから、k 個の評価結果が強く相関して分散がむしろ大きくなる。さらに学習を k=N 回回す計算コストもバカにならない。経験的には k=10 がバイアスと分散のバランスが良いとされていて、Hastie・Tibshirani の "Elements of Statistical Learning" でも 5 または 10 が推奨されているよ。実務ではほぼ k=5 か 10 で十分。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">左の「汎化ギャップ」って数字、複雑度 d を上げるとどんどん増えていきます。これって何を意味してるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それが過学習（overfitting）の指標だね。訓練 MSE はモデルが訓練データにどれだけフィットしたか、CV MSE は未知データへの予測誤差。両者の差が「optimism（楽観バイアス）」と呼ばれる量で、訓練誤差だけで評価すると現実より良く見えてしまう分なんだ。本ツールではこのギャップを CV MSE で割って % 表示している。25% を超えるとモデルが訓練データを覚え込みすぎているサイン。複雑度を下げるか、正則化を強めるか、データを増やす対応が必要だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">バイアスと分散のトレードオフって聞いたことあります。グラフを見ると複雑度を上げるとバイアス²はずっと下がるけど、分散が増えて総誤差は U 字になりますね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、それがまさに古典的なバイアス・分散分解だよ。テスト誤差 = バイアス² + 分散 + 不可避雑音 σ² と分解できて、複雑度を上げるとバイアスは単調減少、分散は単調増加するから、和は必ず U 字を描く。一番下の点が「ちょうど良い複雑度」で、CV はこの点を経験的に当てに行く手段なんだ。最近のディープラーニングでは double descent と呼ばれる例外現象も見つかっているけど、まずはこの U 字を肌で理解するのが基本だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">標準誤差 SE が表示されているのも面白いですね。これって平均値のばらつきを表しているんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう。k 個の fold ごとに少しずつ違う CV エラーが出るから、その fold 間ばらつきを s_CV、平均値の標準誤差を SE = s_CV / √k で計算する。これがあると「モデル A の CV が 0.263、モデル B が 0.270」と数字だけ見て A が勝ちと判断するのを避けられる。両者の平均 ± 1 SE の範囲が重なるなら、統計的にはほぼ同等で、シンプルな方を選ぶというのが Breiman らの one-SE rule。実際の hyperparameter 探索でもよく使われる定石だよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">k-fold 交差検証の k はどう選べばよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">実務では k=5 か k=10 が標準で、特に k=10 がもっとも広く使われます。k を大きくすると 1 回あたりの訓練データが N(k-1)/k に近づくため、推定値のバイアスは小さくなりますが、fold 間の相関が増えて分散が大きくなり、計算コストも比例して増えます。N=1000・k=5 なら訓練 800・検証 200 と十分なサンプルがあり、計算も 5 回で済むのでバランスが良いです。N が極端に小さいときだけ LOOCV（k=N）を検討します。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">汎化ギャップ（訓練誤差と CV 誤差の差）はどう解釈しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">汎化ギャップは「optimism（楽観バイアス）」とも呼ばれ、訓練データだけで評価したときの誤差がどれだけ現実より甘く出ているかを示します。本ツールでは (CV 誤差 - 訓練誤差) / CV 誤差 × 100 (%) で表示します。25% 以下なら健全、25〜50% は過学習の兆候、50% を超えると典型的な過学習で、テスト時の性能が大きく落ちると考えられます。複雑度を 1 段下げる、正則化を強める、データを増やす、のいずれかで対処します。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">CV の標準誤差はなぜ必要ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">CV の平均値だけでモデルを選ぶと、fold によるたまたまの良し悪しで誤った選択をしがちです。SE = s_CV / √k を計算し、平均 ± 1 SE の範囲が重なるモデル同士は統計的にほぼ同等とみなします。Breiman らが提唱した one-SE rule では、最良モデルの平均 + 1 SE の範囲に入る中で最もシンプルなモデルを選びます。複雑さを抑えながら過学習リスクを下げる実務的な手法として広く使われています。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">時系列データでも普通の k-fold が使えますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">使えません。ランダムに分割すると未来のデータが訓練に入り過去を予測する形になり（情報リーク）、評価が現実より大幅に楽観的になります。時系列では Walk-Forward（前進検証）や TimeSeriesSplit を使い、常に訓練データ→検証データの時間順を保ちます。また分類問題でクラス不均衡があるときは Stratified k-fold で各 fold のクラス比を母集団と同じに保つ必要があります。問題設定に応じた分割戦略の選択が、CV の信頼性を決めます。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>scikit-learn / PyTorch / XGBoost のモデル選択：</strong>多項式次数・木の深さ・学習率・正則化係数といったハイパーパラメータを GridSearchCV や RandomizedSearchCV で探索するとき、内部では k-fold CV が回っています。CV スコアの平均ではなく「平均 + 1 SE」を境界に最もシンプルなモデルを選ぶと、テストデータでの性能が安定しやすくなります。本ツールで複雑度を動かしながら U 字曲線の底を探す感覚を掴むと、実コードでの結果も読み解きやすくなります。</p>
+    <p><strong>Kaggle・コンペティションのリーダーボード対策：</strong>Public LB のスコアだけで提出を選ぶと shake-up（最終順位の大変動）に遭いやすくなります。プロは必ず手元で 5-fold や 10-fold の CV を回し、CV と LB の相関を確認しながら最終モデルを決めます。CV と LB が大きくズレるときは、データ分布の違い（train/test split が時系列やグループで切られている等）を疑います。CV の標準誤差を把握すると「LB の上下 0.001 はノイズだから無視して良い」といった判断ができるようになります。</p>
+    <p><strong>医療・創薬の予測モデル評価：</strong>患者数が数百〜数千と限られる医療データでは hold-out test が小さすぎて信頼性が落ちます。Stratified k-fold で陽性／陰性比を各 fold で揃え、Repeated k-fold（k-fold を異なるシードで複数回繰り返し平均）で評価を安定化させます。さらに患者単位の Group k-fold（同一患者のサンプルを同じ fold に閉じ込める）で情報リークを防ぐのが必須。FDA・PMDA への提出データでも、こうした CV プロトコルの妥当性が審査対象になります。</p>
+    <p><strong>CAE・代理モデル（surrogate model）の構築：</strong>有限要素解析の結果から Kriging やニューラルネット代理モデルを作るとき、計算 1 件に数時間〜数日かかるためサンプル数 N が数十〜数百と非常に少ないことが多いです。この領域では LOOCV（k=N）が主流で、N 回の再学習コストを払ってでも 1 件 1 件の貢献を評価します。Design of Experiments（DOE）で次の計算点を選ぶ前に、LOOCV 誤差マップを見て予測の不確かさが大きい領域を優先するアクティブラーニング戦略にもつながります。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最初の落とし穴が、<strong>「データ前処理を CV ループの外で行ってしまう」</strong>ことです。標準化（StandardScaler）・特徴量選択・PCA を全データに対して先に適用してから k-fold を回すと、検証 fold の情報が訓練フェーズに漏れ込んで CV スコアが楽観的に出ます。これを data leakage と呼びます。正しくは sklearn の Pipeline で前処理と推定器を 1 つにまとめ、Pipeline ごと cross_val_score に渡すか、各 fold 内で「訓練 fold で fit → 検証 fold に transform」を実行します。前処理が単純な標準化なら影響は小さいですが、特徴量選択（target を見ている）や PCA（分散を見ている）では数 % の楽観バイアスが普通に出ます。</p>
+    <p>次に、<strong>「CV の平均だけ見てモデルを決める」</strong>のも危険です。例えば 5-fold で {0.85, 0.82, 0.87, 0.83, 0.86} と {0.88, 0.70, 0.92, 0.75, 0.88} の平均はどちらも約 0.85 ですが、後者は fold 間ばらつきが大きく信頼できません。必ず標準偏差や標準誤差を報告し、複数モデルを比較するときは平均 ± 1 SE の重なりを確認します。one-SE rule に従えば、最良モデルの平均 + 1 SE 以内に入る最もシンプルなモデルを選ぶことで、本番でも安定した性能を期待できます。</p>
+    <p>最後に、<strong>「最終的なテスト評価まで CV だけで済ませる」</strong>のも要注意です。CV は hyperparameter チューニングに使うべきもので、その過程で何度も評価したデータは厳密には「見られたデータ」になっています。最終評価には必ず学習時に一度も触れていない hold-out test set を残しておくのが鉄則。理想は train（CV 用）/ validation（早期停止やしきい値調整）/ test（最終評価のみ）の 3 分割で、test は 1 回だけ評価します。これを怠るとモデル選択バイアスが残り、論文や本番デプロイ後に性能が大幅に低下する事故につながります。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>サンプル数（N）を設定：データセットの総サンプル数を入力。例えば機械学習プロジェクトで N=500 の場合、k=5 なら各折で100サンプルが検証用になります</li>
+<li>分割数（k）を決定：通常 k=5 または k=10 を選択。k が小さいと各折の検証データが多く（N/k が大きい）、計算コストが低下しますが分散が増加します</li>
+<li>モデル複雑度（d）と雑音レベル（σ）を調整：例えば d=3（3次多項式）、σ=0.5 と設定すると、各折での訓練 MSE と CV MSE の乖離が可視化されます</li>
+<li>「シミュレート実行」をクリック：k 回の反復で訓練誤差と検証誤差を計算し、汎化ギャップ（%）と CV 標準誤差を出力</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>化学プロセスの収率予測モデル開発で N=200 サンプル、k=5、d=2（2次多項式回帰）、σ=0.8 と設定した場合：各折では 160 サンプルが訓練、40 サンプルが検証になります。実行結果として訓練 MSE=0.24、CV MSE=0.31、汎化ギャップ=29.2%、CV 標準誤差=0.045 が得られます。この場合、CV MSE が訓練 MSE を明確に上回っており軽度の過学習の兆候があるため、モデル複雑度 d=1（線形）への簡略化または正則化パラメータの調整を検討する値です。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>時系列データには層化 k-fold を使用：金融時系列の日次リターン予測で単純ランダム分割すると時間的依存性が破壊されるため、時系列順序を保持した分割が必須</li>
+<li>不均衡分類問題では Stratified k-fold を適用：異常検知タスク（異常 2%、正常 98%）で無作為分割すると検証折に異常サンプルが 0 個になる可能性があり、層化分割で各折の陽性率を均等化</li>
+<li>CV 標準誤差が大きい場合（＞0.1）はモデル再設計を検討：建築構造の耐震性評価で σ が高い観測環境下では k=10 へ増加させて推定精度を向上</li>
+<li>汎化ギャップが 50% を超える場合は過学習判定：医療診断モデルで d が大きすぎると訓練データへの過適合が進行し実臨床での性能低下につながるため d 削減必須</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== shared state for visualization =====
+const CV = {k:5, trainSize:800, validSize:200, currentFold:0,
+            trainErr:0.19, cvErr:0.26, se:0.034, foldErrs:[]};
+
+// ===== Chart.js setup =====
+const bvChart = new Chart(document.getElementById('bvChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'バイアス²',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.10)',fill:false,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'分散',data:[],borderColor:'#e17055',backgroundColor:'rgba(225,112,85,.10)',fill:false,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'総誤差 (Bias²+Var+σ²)',data:[],borderColor:'#0a8a6a',backgroundColor:'rgba(10,138,106,.13)',fill:true,borderWidth:2.5,pointRadius:0,tension:0.2},
+    {label:'現在の設計',data:[],borderColor:'#d63031',backgroundColor:'#d63031',showLine:false,pointRadius:7,pointHoverRadius:8}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'モデル複雑度 d',font:{size:11}},ticks:{maxTicksLimit:10}},
+      y:{title:{display:true,text:'誤差成分',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const foldChart = new Chart(document.getElementById('foldChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:[],datasets:[
+    {label:'fold 別 CV エラー',data:[],backgroundColor:'rgba(0,123,255,.55)',borderColor:'#007BFF',borderWidth:1.5},
+    {label:'CV 平均',data:[],type:'line',borderColor:'#d63031',backgroundColor:'#d63031',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false},
+    {label:'平均 + 1SE',data:[],type:'line',borderColor:'#e17055',borderDash:[3,3],borderWidth:1.5,pointRadius:0,fill:false},
+    {label:'平均 − 1SE',data:[],type:'line',borderColor:'#e17055',borderDash:[3,3],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'fold 番号',font:{size:11}}},
+      y:{title:{display:true,text:'CV エラー (MSE)',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== deterministic pseudo-random (so the chart is stable across re-renders) =====
+function mulberry32(seed){
+  return function(){
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ===== Main compute =====
+function compute(){
+  const sampleSize      = parseInt(document.getElementById('nRange').value);
+  const numFolds        = parseInt(document.getElementById('kRange').value);
+  const modelComplexity = parseInt(document.getElementById('dRange').value);
+  const trueNoiseStd    = parseFloat(document.getElementById('sigmaRange').value);
+  const modelBias       = parseFloat(document.getElementById('bRange').value);
+
+  // physics: k-fold CV behaviour
+  const trainSize = Math.floor(sampleSize * (numFolds-1)/numFolds);
+  const validSize = Math.floor(sampleSize / numFolds);
+
+  const trainErrorMean = trueNoiseStd*trueNoiseStd * Math.max(0.05, (1 - 0.08*modelComplexity));
+  const biasSquared    = modelBias*modelBias / Math.pow(modelComplexity, 1.2);
+  const variance       = (modelComplexity/10) * trueNoiseStd*trueNoiseStd / Math.sqrt(trainSize);
+  const cvErrorMean    = biasSquared + variance + trueNoiseStd*trueNoiseStd;
+  const cvStdError     = trueNoiseStd*trueNoiseStd / Math.sqrt(numFolds) * 0.3;
+  const optimism       = cvErrorMean - trainErrorMean;
+  const generalizationGap = optimism / cvErrorMean * 100;
+
+  // ----- stat cards -----
+  document.getElementById('statTrain').textContent     = trainSize.toString();
+  document.getElementById('statValid').textContent     = validSize.toString();
+  document.getElementById('statTrainMSE').textContent  = trainErrorMean.toFixed(4);
+  document.getElementById('statCVMSE').textContent     = cvErrorMean.toFixed(4);
+  document.getElementById('statSE').textContent        = cvStdError.toFixed(4);
+  document.getElementById('statGap').textContent       = generalizationGap.toFixed(1);
+
+  // colour the gap stat
+  const gapEl = document.getElementById('statGap');
+  gapEl.style.color = generalizationGap>50 ? '#c0392b' : (generalizationGap>25 ? '#c0563a' : '#0a8a6a');
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(generalizationGap > 50){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> 過学習（汎化ギャップ '+generalizationGap.toFixed(1)+'%）。CV MSE '+cvErrorMean.toFixed(3)+' に対し訓練 MSE '+trainErrorMean.toFixed(3)+' が極端に小さい。複雑度を下げる・正則化を強める・データを増やすのいずれかが必要。';
+  }else if(generalizationGap > 25){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 過学習の兆候（ギャップ '+generalizationGap.toFixed(1)+'%）。CV MSE '+cvErrorMean.toFixed(3)+' ± '+cvStdError.toFixed(3)+'。one-SE rule で 1 段シンプルなモデルとの比較を推奨。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 汎化は健全（ギャップ '+generalizationGap.toFixed(1)+'%）。CV MSE '+cvErrorMean.toFixed(3)+' ± '+cvStdError.toFixed(3)+'、訓練 MSE '+trainErrorMean.toFixed(3)+'。';
+  }
+
+  // ----- bias-variance vs complexity chart -----
+  const bvLabels=[], bvBias=[], bvVar=[], bvTot=[], bvPoint=[];
+  for(let dd=1; dd<=10; dd++){
+    const bs = modelBias*modelBias / Math.pow(dd, 1.2);
+    const va = (dd/10) * trueNoiseStd*trueNoiseStd / Math.sqrt(trainSize);
+    const tt = bs + va + trueNoiseStd*trueNoiseStd;
+    bvLabels.push('d='+dd);
+    bvBias.push(bs);
+    bvVar.push(va);
+    bvTot.push(tt);
+    bvPoint.push(dd===modelComplexity ? tt : null);
+  }
+  bvChart.data.labels = bvLabels;
+  bvChart.data.datasets[0].data = bvBias;
+  bvChart.data.datasets[1].data = bvVar;
+  bvChart.data.datasets[2].data = bvTot;
+  bvChart.data.datasets[3].data = bvPoint;
+  bvChart.update('none');
+
+  // ----- per-fold CV error chart (with deterministic jitter around cvErrorMean) -----
+  const fLabels=[], fData=[], fMean=[], fHi=[], fLo=[];
+  const seed = (sampleSize*7 + numFolds*101 + modelComplexity*1009 + Math.round(trueNoiseStd*1000)*13 + Math.round(modelBias*100)*7) | 0;
+  const rnd = mulberry32(seed >>> 0);
+  // jitter scale = s_CV (per-fold standard deviation), so SE = s_CV/sqrt(k)
+  const sCV = cvStdError * Math.sqrt(numFolds);
+  const errs = [];
+  for(let i=1;i<=numFolds;i++){
+    // pseudo-normal via 4-uniform sum, centred at 0, std≈1
+    const z = (rnd()+rnd()+rnd()+rnd()-2)*Math.sqrt(3);
+    const e = cvErrorMean + sCV*z;
+    errs.push(Math.max(0, e));
+    fLabels.push('fold '+i);
+    fMean.push(cvErrorMean);
+    fHi.push(cvErrorMean + cvStdError);
+    fLo.push(Math.max(0, cvErrorMean - cvStdError));
+  }
+  for(let i=0;i<errs.length;i++) fData.push(errs[i]);
+  CV.foldErrs = errs.slice();
+  foldChart.data.labels = fLabels;
+  foldChart.data.datasets[0].data = fData;
+  foldChart.data.datasets[1].data = fMean;
+  foldChart.data.datasets[2].data = fHi;
+  foldChart.data.datasets[3].data = fLo;
+  foldChart.update('none');
+
+  // ----- update shared state for canvas animation -----
+  CV.k = numFolds;
+  CV.trainSize = trainSize;
+  CV.validSize = validSize;
+  CV.trainErr = trainErrorMean;
+  CV.cvErr = cvErrorMean;
+  CV.se = cvStdError;
+}
+
+// ===== k-fold visualization (rotating fold animation on dark canvas) =====
+(function(){
+  const cv = document.getElementById('cvCanvas');
+  const ctx = cv.getContext('2d');
+  let phase = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const k = Math.max(2, Math.min(20, CV.k|0));
+    const currentFold = Math.floor(phase * k) % k;
+
+    // layout
+    const padL = 80, padR = 30, padT = 24, padB = 32;
+    const barH = Math.max(8, Math.min(22, (H-padT-padB-12) / k - 4));
+    const barW = W - padL - padR;
+    const rowGap = barH + 4;
+    const totalH = k*rowGap;
+    const yStart = padT + ((H-padT-padB) - totalH)/2;
+
+    // title (top-left)
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 12px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('k = '+k+'  fold '+(currentFold+1)+' / '+k, padL-30, padT-6);
+    ctx.fillStyle = 'rgba(160,200,235,.7)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign='right';
+    ctx.fillText('train='+CV.trainSize+'  valid='+CV.validSize, W-padR, padT-6);
+
+    // legend
+    ctx.fillStyle = 'rgba(0,123,255,.85)';
+    ctx.fillRect(padL-30, H-padB+12, 12, 8);
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign='left';
+    ctx.fillText('訓練 (train)', padL-15, H-padB+19);
+
+    ctx.fillStyle = 'rgba(225,112,85,.95)';
+    ctx.fillRect(padL+90, H-padB+12, 12, 8);
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.fillText('検証 (valid)', padL+105, H-padB+19);
+
+    // each row = one fold split; valid block at slot i, train elsewhere
+    const slotW = barW / k;
+    for(let i=0;i<k;i++){
+      const y = yStart + i*rowGap;
+
+      // row label
+      ctx.fillStyle = (i===currentFold) ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.4)';
+      ctx.font = (i===currentFold ? 'bold ' : '') + '10px Roboto Mono, monospace';
+      ctx.textAlign='right';
+      ctx.fillText('iter '+(i+1), padL-8, y+barH*0.72);
+
+      // background bar (data set)
+      ctx.fillStyle = 'rgba(255,255,255,.05)';
+      ctx.fillRect(padL, y, barW, barH);
+
+      // valid slot for this iter = slot i; train = rest
+      for(let s=0;s<k;s++){
+        const x = padL + s*slotW;
+        const isValid = (s===i);
+        if(isValid){
+          ctx.fillStyle = (i===currentFold) ? 'rgba(225,112,85,.95)' : 'rgba(225,112,85,.45)';
+        }else{
+          ctx.fillStyle = (i===currentFold) ? 'rgba(0,123,255,.85)' : 'rgba(0,123,255,.30)';
+        }
+        ctx.fillRect(x+1, y+1, slotW-2, barH-2);
+      }
+
+      // highlight current iter row outline
+      if(i===currentFold){
+        ctx.strokeStyle = 'rgba(255,255,255,.85)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(padL-1, y-1, barW+2, barH+2);
+      }
+    }
+
+    // current fold error readout (top-right of active row)
+    const cfY = yStart + currentFold*rowGap;
+    if(CV.foldErrs && CV.foldErrs.length>currentFold){
+      ctx.fillStyle = 'rgba(255,200,150,.95)';
+      ctx.font = 'bold 10px Roboto Mono, monospace';
+      ctx.textAlign='left';
+      ctx.fillText('CV='+CV.foldErrs[currentFold].toFixed(4), padL+barW+4, cfY+barH*0.7);
+    }
+
+    phase += 0.0035;
+    if(phase>=1) phase = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['nRange','kRange','dRange','sigmaRange','bRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

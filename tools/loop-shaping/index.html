@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ループシェイピング設計シミュレーター — ボード線図と余裕計算 | NovaSolver</title>
+<meta name="description" content="ループシェイピング設計シミュレーターでPI補償のBode線図をリアルタイム描画。ゲイン交差周波数・位相余裕・安定余裕を調整し古典制御設計を学習。">
+<meta property="og:title" content="ループシェイピング設計シミュレーター — Bode 線図で安定余裕を計算 | NovaSolver">
+<meta property="og:description" content="ループシェイピング設計シミュレーターでPI補償のBode線図をリアルタイム描画。ゲイン交差周波数・位相余裕・安定余裕を調整し古典制御設計を学習。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://novasolver.jp/tools/loop-shaping.html">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Loop shaping simulator (Bode plot, PI compensation)">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://novasolver.jp/tools/loop-shaping.html">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/loop-shaping.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/loop-shaping.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/loop-shaping.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/loop-shaping.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "ループシェイピング設計シミュレーター",
+      "description": "プロセス G_p と PI 補償 C から開ループ L=C·G_p の Bode 線図を生成し、ゲイン交差周波数・位相余裕・ゲイン余裕・帯域幅をリアルタイムに計算する制御工学教育用シミュレーター。",
+      "url": "https://novasolver.jp/tools/loop-shaping.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Control Engineering Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["PI 補償と 2 次プロセスの開ループボード線図","ゲイン交差周波数 ω_c の二分探索","位相余裕 PM・ゲイン余裕 GM の計算","近似帯域幅 ω_BW ≈ 1.5 ω_c の表示"],
+      "keywords": "ループシェイピング,ボード線図,PI 補償,位相余裕,ゲイン余裕,帯域幅,周波数応答,古典制御",
+      "datePublished": "2026-05-16",
+      "dateModified": "2026-05-16",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "ループシェイピング設計とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "ループシェイピングは、開ループ伝達関数 L(s) = C(s)·G_p(s) のボード線図を「望ましい形」に整える古典制御の設計手法です。低周波で大きなゲイン（追従性・定常偏差ゼロ）、ゲイン交差周波数 ω_c 付近で位相余裕 40〜60°（安定性）、高周波で十分な減衰（雑音抑制・モデル誤差耐性）の 3 つを同時に満たすように補償器 C(s) を選びます。位相余裕・ゲイン余裕という安定余裕の概念とともに、古典制御の中心的な設計言語です。"}
+        },
+        {
+          "@type": "Question",
+          "name": "位相余裕 PM とゲイン余裕 GM はどう使い分けますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "位相余裕 PM はゲインが 0 dB を切る周波数で「あとどれだけ位相が遅れても発振しないか」、ゲイン余裕 GM は位相が −180° を切る周波数で「あとどれだけゲインを上げても発振しないか」を表します。一般に PM 40〜60°、GM 6〜12 dB が経験的な目安です。PM が小さいとステップ応答が振動的になり、GM が小さいとモデルゲイン誤差に弱くなります。両方を併せて見ることが重要です。"}
+        },
+        {
+          "@type": "Question",
+          "name": "H∞ 設計やナイキスト線図とどう違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "ナイキスト線図は L(jω) を複素平面にプロットして −1 点まわりの一周回数で安定性を判定する方法で、PM・GM はそこから自然に導かれます。H∞ 設計は感度関数 S と相補感度 T のノルム ‖[W_S S; W_T T]‖∞ を最小化する現代制御の枠組みで、重み関数で周波数特性を指定する点ではループシェイピングの一般化と見ることもできます。古典のループシェイピングは直感的で実機調整向き、H∞ は MIMO・モデル不確かさを含む厳密な設計向きです。"}
+        },
+        {
+          "@type": "Question",
+          "name": "感度関数 S と相補感度関数 T は何を意味しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "S = 1/(1+L) は外乱入力から出力までの感度で、低周波で小さくすると外乱抑制・定常偏差低減が得られます。T = L/(1+L) は目標値から出力までの相補感度で、高周波で小さくすると測定雑音やモデル誤差に強くなります。S + T = 1 という制約があり、低周波で T≈1、高周波で S≈1 とせざるを得ません。ω_c 付近をどう遷移させるかがループシェイピングの腕の見せどころです。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "ループシェイピング設計シミュレーター", "item": "https://novasolver.jp/tools/loop-shaping.html"}
+      ]
+    }
+  ]
+}</script>
+<link rel="stylesheet" href="/tools/tools-common.css">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet">
+<script src="/tools/tools-common.js"></script>
+<style>
+:root{
+  --navy:#001F3F; --accent:#007BFF; --accent2:#00B4D8;
+  --bg:#F8F9FA; --card:#ffffff; --text:#1a1a2e;
+  --muted:#6c757d; --border:#dee2e6;
+}
+body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+#bodeCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+.canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.warn-msg{ color:#ff8c42; font-weight:600; font-size:0.78rem; margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">ループシェイピング設計シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/loop-shaping.html" class="active">JA</a>
+      <a href="/en/tools/loop-shaping.html">EN</a>
+      <a href="/zh/tools/loop-shaping.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-wave-square"></i> 制御工学シミュレーター</div>
+    <h1>ループシェイピング設計シミュレーター — Bode 線図と安定余裕</h1>
+    <p class="hero-sub">プロセス G_p と PI 補償 C の開ループ周波数応答 L=C·G_p をリアルタイム描画。ゲイン交差周波数・位相余裕・ゲイン余裕・帯域幅を変化させて、古典制御の設計感覚を体得できます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">プロセスゲイン K_p</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slKpVal" value="1.0" min="0.1" max="10" step="0.1" oninput="syncFromNum('slKp','slKpVal')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slKp" min="0.1" max="10" step="0.1" value="1.0" oninput="syncToNum('slKp','slKpVal');updateSlider(this,'slKpVal',1,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">第 1 時定数 T_1</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slT1Val" value="1.0" min="0.1" max="10" step="0.1" oninput="syncFromNum('slT1','slT1Val')"><span class="num-unit">s</span></div>
+      </div>
+      <input type="range" id="slT1" min="0.1" max="10" step="0.1" value="1.0" oninput="syncToNum('slT1','slT1Val');updateSlider(this,'slT1Val',1,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">PI 比例ゲイン K_c</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slKcVal" value="5.00" min="0.01" max="100" step="0.01" oninput="syncFromNum('slKc','slKcVal')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slKc" min="0.01" max="100" step="0.01" value="5.00" oninput="syncToNum('slKc','slKcVal');updateSlider(this,'slKcVal',2,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">PI 積分時定数 T_i</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slTiVal" value="2.0" min="0.1" max="100" step="0.1" oninput="syncFromNum('slTi','slTiVal')"><span class="num-unit">s</span></div>
+      </div>
+      <input type="range" id="slTi" min="0.1" max="100" step="0.1" value="2.0" oninput="syncToNum('slTi','slTiVal');updateSlider(this,'slTiVal',1,'');compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="btn-group">
+      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">第 2 時定数 T_2 = 0.5 s 固定。周波数範囲 ω ∈ [0.01, 100] rad/s 対数。</p>
+  </div>
+
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statOmegaC">—</div><div class="sl">ゲイン交差 ω_c</div></div>
+        <div class="stat-card"><div class="sv" id="statPM">—</div><div class="sl">位相余裕 PM</div></div>
+        <div class="stat-card"><div class="sv" id="statGM">—</div><div class="sl">ゲイン余裕 GM</div></div>
+        <div class="stat-card"><div class="sv" id="statBW">—</div><div class="sl">帯域幅 ω_BW</div></div>
+      </div>
+      <p id="warnMsg" class="warn-msg" style="display:none"></p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 開ループ Bode 線図 L(j<span style="text-transform:none">ω</span>)</div>
+      <canvas id="bodeCanvas"></canvas>
+      <p class="canvas-hint">上＝ゲイン |L| (dB)、下＝位相 ∠L (°)、横軸＝ω (rad/s) 対数／黄縦線＝ω_c、赤縦線＝ω_180</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <div class="theory-box">
+        <p>プロセス $G_p(s) = K_p/((T_1 s+1)(T_2 s+1))$ に PI 補償 $C(s) = K_c(1+1/(T_i s))$ を直列接続した開ループ伝達関数：</p>
+        $$L(s) = C(s)\,G_p(s) = K_c\!\left(1+\frac{1}{T_i s}\right)\!\frac{K_p}{(T_1 s+1)(T_2 s+1)}$$
+        <p style="margin-top:6px;">ゲイン交差周波数 ω_c は $|L(j\omega_c)|=1$ を満たし、位相余裕 PM は：</p>
+        $$\mathrm{PM} = \angle L(j\omega_c) + 180^\circ$$
+        <p style="margin-top:6px;">位相が −180° を切る周波数 ω_180 におけるゲイン余裕：</p>
+        $$\mathrm{GM} = -20\log_{10}|L(j\omega_{180})|\ [\mathrm{dB}]$$
+        <p style="margin-top:8px;">既定値 (K_p=1, T_1=1, T_2=0.5, K_c=5, T_i=2) では PM・GM が共に正の安定設計となります。帯域幅は経験式で ω_BW ≈ 1.5 ω_c と見積もります。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== Loop Shaping (Bode plot + stability margins) ==========
+var bodeCanvas = document.getElementById('bodeCanvas');
+var bodeCtx = bodeCanvas.getContext('2d');
+
+var T2_FIXED = 0.5;
+var W_MIN = 0.01, W_MAX = 100;
+
+function getParams() {
+  var Kp = parseFloat(document.getElementById('slKp').value);
+  var T1 = parseFloat(document.getElementById('slT1').value);
+  var Kc = parseFloat(document.getElementById('slKc').value);
+  var Ti = parseFloat(document.getElementById('slTi').value);
+  return { Kp: Kp, T1: T1, T2: T2_FIXED, Kc: Kc, Ti: Ti };
+}
+
+// Complex helpers
+function cMul(a, b) { return { re: a.re*b.re - a.im*b.im, im: a.re*b.im + a.im*b.re }; }
+function cDiv(a, b) {
+  var d = b.re*b.re + b.im*b.im;
+  return { re: (a.re*b.re + a.im*b.im)/d, im: (a.im*b.re - a.re*b.im)/d };
+}
+function cAbs(a) { return Math.sqrt(a.re*a.re + a.im*a.im); }
+function cArg(a) { return Math.atan2(a.im, a.re); }
+
+// L(jw) = Kc * (1 + 1/(j Ti w)) * Kp / ((1 + j T1 w)(1 + j T2 w))
+function L(p, w) {
+  // PI part: Kc * (1 + 1/(j Ti w)) = Kc - j*Kc/(Ti w)
+  var pi = { re: p.Kc, im: -p.Kc / (p.Ti * w) };
+  // process denominator: (1 + j T1 w)(1 + j T2 w)
+  var d1 = { re: 1, im: p.T1 * w };
+  var d2 = { re: 1, im: p.T2 * w };
+  var den = cMul(d1, d2);
+  var num = { re: p.Kp, im: 0 };
+  var gp = cDiv(num, den);
+  return cMul(pi, gp);
+}
+
+function magDb(p, w) { return 20 * Math.log10(cAbs(L(p, w))); }
+// unwrapped phase in degrees (since PI adds ~ -90 at low w and each pole adds another -90)
+function phaseDeg(p, w) {
+  // phase of PI = atan2(-Kc/(Ti w), Kc) -> -90..0 from low to high w
+  var phPI = Math.atan2(-p.Kc / (p.Ti * w), p.Kc) * 180 / Math.PI;
+  var phP1 = -Math.atan(p.T1 * w) * 180 / Math.PI;
+  var phP2 = -Math.atan(p.T2 * w) * 180 / Math.PI;
+  return phPI + phP1 + phP2;
+}
+
+// bisection to find w where magDb = 0
+function findOmegaC(p) {
+  // Search across log range; find sign change of magDb
+  var N = 600;
+  var prev = null, prevW = W_MIN;
+  for (var i = 0; i <= N; i++) {
+    var w = W_MIN * Math.pow(W_MAX / W_MIN, i / N);
+    var v = magDb(p, w);
+    if (prev !== null && ((prev > 0 && v <= 0) || (prev < 0 && v >= 0))) {
+      // bisect between prevW and w
+      var lo = prevW, hi = w;
+      for (var k = 0; k < 60; k++) {
+        var mid = Math.sqrt(lo * hi); // log midpoint
+        var vm = magDb(p, mid);
+        if ((prev > 0 && vm > 0) || (prev < 0 && vm < 0)) lo = mid; else hi = mid;
+        if (Math.abs(vm) < 1e-6) return mid;
+      }
+      return Math.sqrt(lo * hi);
+    }
+    prev = v; prevW = w;
+  }
+  return NaN;
+}
+
+// find w180 where phase = -180 (search from high w because phase decreases)
+function findOmega180(p) {
+  var N = 600;
+  var prev = null, prevW = W_MIN;
+  for (var i = 0; i <= N; i++) {
+    var w = W_MIN * Math.pow(W_MAX / W_MIN, i / N);
+    var v = phaseDeg(p, w);
+    if (prev !== null && prev > -180 && v <= -180) {
+      var lo = prevW, hi = w;
+      for (var k = 0; k < 60; k++) {
+        var mid = Math.sqrt(lo * hi);
+        var vm = phaseDeg(p, mid);
+        if (vm > -180) lo = mid; else hi = mid;
+        if (Math.abs(vm + 180) < 1e-6) return mid;
+      }
+      return Math.sqrt(lo * hi);
+    }
+    prev = v; prevW = w;
+  }
+  return NaN;
+}
+
+function __novaCanvasCssW(canvas){
+  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
+}
+function __novaCanvasCssH(canvas){
+  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
+}
+
+function resizeCanvas() {
+  var cv = bodeCanvas;
+  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
+  var __novaW = w;
+  var __novaH = Math.round(w * 0.62);
+  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.style.width = __novaW + 'px';
+  cv.style.height = __novaH + 'px';
+  cv.width = Math.round(__novaW * __novaDpr);
+  cv.height = Math.round(__novaH * __novaDpr);
+  cv.dataset.cssW = String(__novaW);
+  cv.dataset.cssH = String(__novaH);
+  var __novaCtx = cv.getContext && cv.getContext('2d');
+  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+}
+
+function drawBode(p, oc, o180) {
+  var ctx = bodeCtx, W = __novaCanvasCssW(bodeCanvas), H = __novaCanvasCssH(bodeCanvas);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+  var mx = 56, my = 22;
+  var midGap = 28;
+  var x0 = mx, x1 = W - 14;
+  var gw = x1 - x0;
+  var totalH = H - 2 * my - midGap;
+  var gMagH = Math.round(totalH * 0.55);
+  var gPhH = totalH - gMagH;
+  var yMag0 = my, yMag1 = yMag0 + gMagH;
+  var yPh0 = yMag1 + midGap, yPh1 = yPh0 + gPhH;
+
+  // sample
+  var N = 360;
+  var ws = [], mags = [], phs = [];
+  var magMin = Infinity, magMax = -Infinity;
+  for (var i = 0; i <= N; i++) {
+    var w = W_MIN * Math.pow(W_MAX / W_MIN, i / N);
+    ws.push(w);
+    var m = magDb(p, w);
+    var ph = phaseDeg(p, w);
+    mags.push(m); phs.push(ph);
+    if (m < magMin) magMin = m;
+    if (m > magMax) magMax = m;
+  }
+  // axis ranges
+  var magLo = Math.floor(Math.min(magMin, -40) / 20) * 20;
+  var magHi = Math.ceil(Math.max(magMax, 40) / 20) * 20;
+  if (magHi - magLo < 80) magHi = magLo + 80;
+  var phLo = -270, phHi = 0;
+
+  function px(w) { return x0 + (Math.log10(w) - Math.log10(W_MIN)) / (Math.log10(W_MAX) - Math.log10(W_MIN)) * gw; }
+  function pyMag(m) { return yMag0 + (1 - (m - magLo) / (magHi - magLo)) * gMagH; }
+  function pyPh(ph) { return yPh0 + (1 - (ph - phLo) / (phHi - phLo)) * gPhH; }
+
+  // grid lines
+  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
+  ctx.lineWidth = 1;
+  // vertical decade lines
+  for (var d = -2; d <= 2; d++) {
+    var wg = Math.pow(10, d);
+    var xg = px(wg);
+    ctx.beginPath(); ctx.moveTo(xg, yMag0); ctx.lineTo(xg, yMag1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(xg, yPh0); ctx.lineTo(xg, yPh1); ctx.stroke();
+    ctx.fillStyle = 'rgba(143,184,224,0.7)';
+    ctx.font = '10px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('10^' + d, xg, yPh1 + 12);
+  }
+  // horizontal grid magnitude
+  for (var mb = magLo; mb <= magHi; mb += 20) {
+    var yg = pyMag(mb);
+    ctx.beginPath(); ctx.moveTo(x0, yg); ctx.lineTo(x1, yg); ctx.stroke();
+    ctx.fillStyle = 'rgba(143,184,224,0.7)';
+    ctx.textAlign = 'right';
+    ctx.fillText(mb + '', x0 - 4, yg + 3);
+  }
+  // horizontal grid phase
+  for (var pp = phLo; pp <= phHi; pp += 45) {
+    var yg2 = pyPh(pp);
+    ctx.beginPath(); ctx.moveTo(x0, yg2); ctx.lineTo(x1, yg2); ctx.stroke();
+    ctx.fillStyle = 'rgba(143,184,224,0.7)';
+    ctx.textAlign = 'right';
+    ctx.fillText(pp + '', x0 - 4, yg2 + 3);
+  }
+
+  // 0 dB line (emphasized)
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([4, 3]);
+  var y0db = pyMag(0);
+  ctx.beginPath(); ctx.moveTo(x0, y0db); ctx.lineTo(x1, y0db); ctx.stroke();
+  // -180 deg line
+  var ym180 = pyPh(-180);
+  ctx.beginPath(); ctx.moveTo(x0, ym180); ctx.lineTo(x1, ym180); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // axes
+  ctx.strokeStyle = 'rgba(143,184,224,0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x0, yMag0); ctx.lineTo(x0, yMag1); ctx.lineTo(x1, yMag1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0, yPh0); ctx.lineTo(x0, yPh1); ctx.lineTo(x1, yPh1); ctx.stroke();
+
+  // magnitude curve (blue)
+  ctx.strokeStyle = '#00B4D8';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  for (var i = 0; i < ws.length; i++) {
+    var xs = px(ws[i]);
+    var ys = pyMag(mags[i]);
+    if (i === 0) ctx.moveTo(xs, ys); else ctx.lineTo(xs, ys);
+  }
+  ctx.stroke();
+  // phase curve (green)
+  ctx.strokeStyle = '#3ddc97';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  for (var i = 0; i < ws.length; i++) {
+    var xs2 = px(ws[i]);
+    var ys2 = pyPh(phs[i]);
+    if (i === 0) ctx.moveTo(xs2, ys2); else ctx.lineTo(xs2, ys2);
+  }
+  ctx.stroke();
+
+  // ω_c vertical (yellow) on both panels
+  if (isFinite(oc)) {
+    var xc = px(oc);
+    ctx.strokeStyle = 'rgba(255,209,102,0.9)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(xc, yMag0); ctx.lineTo(xc, yPh1); ctx.stroke();
+    // PM marker at the phase plot at omega_c
+    var phc = phaseDeg(p, oc);
+    var ypc = pyPh(phc);
+    ctx.fillStyle = '#FFD166';
+    ctx.beginPath(); ctx.arc(xc, ypc, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('ω_c=' + oc.toFixed(2), xc + 5, yMag0 + 12);
+    var pm = phc + 180;
+    ctx.fillStyle = '#FFD166';
+    ctx.fillText('PM=' + pm.toFixed(1) + '°', xc + 5, ypc - 6);
+  }
+  // ω_180 vertical (red) on both panels
+  if (isFinite(o180)) {
+    var x180 = px(o180);
+    ctx.strokeStyle = 'rgba(231,76,60,0.85)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(x180, yMag0); ctx.lineTo(x180, yPh1); ctx.stroke();
+    var m180 = magDb(p, o180);
+    var ymv = pyMag(m180);
+    ctx.fillStyle = '#e74c3c';
+    ctx.beginPath(); ctx.arc(x180, ymv, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('ω_180=' + o180.toFixed(2), x180 - 5, yMag0 + 12);
+    var gmDb = -m180;
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillText('GM=' + gmDb.toFixed(1) + 'dB', x180 - 5, ymv + 14);
+  }
+
+  // legend labels
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('|L| (dB)', x0 + 4, yMag0 + 12);
+  ctx.fillText('∠L (°)', x0 + 4, yPh0 + 12);
+}
+
+function compute() {
+  var p = getParams();
+  if (!isFinite(p.Kp) || !isFinite(p.T1) || !isFinite(p.Kc) || !isFinite(p.Ti)) return;
+  var oc = findOmegaC(p);
+  var o180 = findOmega180(p);
+  var warnEl = document.getElementById('warnMsg');
+  warnEl.style.display = 'none';
+
+  if (isFinite(oc)) {
+    document.getElementById('statOmegaC').textContent = oc.toFixed(2) + ' rad/s';
+    var pm = phaseDeg(p, oc) + 180;
+    document.getElementById('statPM').textContent = pm.toFixed(1) + ' °';
+    document.getElementById('statBW').textContent = (oc * 1.5).toFixed(2) + ' rad/s';
+  } else {
+    document.getElementById('statOmegaC').textContent = 'no crossover';
+    document.getElementById('statPM').textContent = '—';
+    document.getElementById('statBW').textContent = '—';
+    warnEl.textContent = '注意: ゲイン交差周波数 ω_c が範囲内に存在しません（|L| が 0 dB を切らない）。K_c または K_p を調整してください。';
+    warnEl.style.display = 'block';
+  }
+  if (isFinite(o180)) {
+    var gmDb = -magDb(p, o180);
+    document.getElementById('statGM').textContent = gmDb.toFixed(1) + ' dB';
+  } else {
+    document.getElementById('statGM').textContent = '∞';
+  }
+  drawBode(p, oc, o180);
+}
+
+function resetParams() {
+  var defs = { slKp: 1.0, slT1: 1.0, slKc: 5.00, slTi: 2.0 };
+  Object.keys(defs).forEach(function (id) { document.getElementById(id).value = defs[id]; });
+  updateSlider(document.getElementById('slKp'), 'slKpVal', 1, '');
+  updateSlider(document.getElementById('slT1'), 'slT1Val', 1, '');
+  updateSlider(document.getElementById('slKc'), 'slKcVal', 2, '');
+  updateSlider(document.getElementById('slTi'), 'slTiVal', 1, '');
+  compute();
+}
+
+window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+
+resizeCanvas();
+compute();
+</script>
+
+<section class="explanation">
+  <h2>ループシェイピング設計シミュレーターとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">制御の授業で「ループシェイピング」って言葉が出てきたんですけど、何を「整える」んですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと、開ループ伝達関数 $L(s) = C(s)\,G_p(s)$ のボード線図（ゲインと位相のカーブ）を、望ましい形に「整形」する設計手法だ。低周波ではゲインを高くして追従性を上げ、ゲイン交差周波数 ω_c のあたりで位相余裕を 40〜60° 確保し、高周波では十分減衰させて雑音を抑える。この上の Bode 線図を見ると、青いゲイン線が 0 dB を切るところが ω_c、そのとき緑の位相線がどれだけ −180° から離れているかが位相余裕 PM だ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">PI 比例ゲイン K_c を上げると ω_c が右に動くんですね。じゃあ高速応答にしたければ K_c を上げればいいですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">気持ちは正しいけど、限界がある。K_c を上げると ω_c が高周波側に動き、応答は速くなる。でも実機では位相が周波数とともに遅れていくから、ω_c が高くなりすぎると位相余裕 PM が小さくなり、最終的には負になって発振する。シミュレーターで K_c を 20、30、50 と上げてみて——PM のカードがどんどん減って、いずれ「no crossover」やマイナスの値になるはずだ。経験的には PM 40〜60°、GM 6〜12 dB を目安にする。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">積分時定数 T_i は何のためにありますか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">PI 制御の積分項は低周波ゲインを無限大に持ち上げて、定常偏差をゼロにするためのものだ。T_i を小さくすると積分作用が強くなって低周波ゲインがさらに上がる代わりに、ω_c 付近で位相が遅れる方向に効くから PM が削られる。シミュレーターで T_i を 2 から 0.5 へ下げてみると、低周波の |L| はぐっと上がるけど位相も低周波で −90° に強く張り付く。実務では「プロセス時定数 T_1 と同じくらい」が無難な出発点だ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">プロセスの T_1 が大きいと応答が遅いんですよね？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう。T_1 が大きいと低周波からゲインが落ち始め、結果として閉ループの帯域幅 ω_BW が狭まる。シミュレーターで T_1 を 1 から 5 に上げてみると、ω_c が下がって応答が遅くなるのが分かる。古典制御では帯域幅 ω_BW を ω_c の 1.3〜1.7 倍くらいと見積もる近似がよく使われる——ここでは 1.5 倍で表示している。本格設計には閉ループの周波数応答も別途見る必要があるけど、Bode 線図 1 枚で「速さ・安定性・誤差」の三立てを論じられるのがループシェイピングの強みだよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">既定値ではなぜ K_c=5, T_i=2 で安定なのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">プロセス時定数 T_1=1 s, T_2=0.5 s の 2 次系では、ω_c が概ね 2〜4 rad/s 程度になる K_c が PM 40〜60° の安定領域に入ります。T_i=2 s は T_1 と同じスケールに合わせており、低周波での積分作用と ω_c 付近での位相遅れ増加のバランスが取れた値です。スライダーで K_c や T_i を変えると、PM・GM カードがどう動くか直感的に確認できます。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">「no crossover」と表示されるのはどんなときですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">|L(jω)| が表示範囲 [0.01, 100] rad/s 内で 0 dB を切らない場合、ゲイン交差周波数 ω_c が存在しないと判定し警告を出します。典型的には K_c や K_p が極端に大きく低周波ゲインが下がりきらない場合、または逆に K_c が極端に小さくゲインが終始 0 dB 未満の場合に起こります。ゲインを物理的に妥当な範囲（PI ゲイン 0.1〜30 程度）に戻してください。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">ゲイン余裕 GM が ∞ になることはありますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">あります。本ツールの開ループは PI（−90°）＋2 次プロセス（合計 −180°）で、最大位相遅れがちょうど −180° に漸近しますが、有限の ω では −180° に達しません。したがって ω_180 が範囲内に存在せず、GM は理論上無限大となり「∞」と表示します。実機では計測遅延や高周波極があり実際の GM は有限です。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">この設計を H∞ 制御や感度関数設計とどう繋げられますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">ループシェイピングは感度関数 S=1/(1+L) と相補感度 T=L/(1+L) を間接的に整形しています。低周波 |L|≫1 では S≈1/|L|（外乱抑制）、高周波 |L|≪1 では T≈|L|（雑音抑制）が成り立ちます。H∞ 設計では重み関数 W_S(s), W_T(s) を指定して ‖[W_S S; W_T T]‖∞ を直接最小化します。本ツールで掴んだ「望ましい L の形」が、H∞ における重み W_S, W_T の良い初期推測になります。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>プロセス制御の PID 設計：</strong>化学プラントの温度制御・流量制御・液面制御では、プロセス同定で得た FOPDT（一次遅れ＋むだ時間）モデルに PI/PID を適用します。Ziegler-Nichols などの整定法を出発点に、現場ではボード線図で位相余裕・ゲイン余裕を確認しながら微調整するのが定番です。本ツールの開ループ可視化は、この「整定→確認→微調整」サイクルの直感を養うのに最適です。</p>
+    <p><strong>サーボ系・モータ制御：</strong>サーボモータの速度制御・位置制御では、機械系の共振や慣性比により位相余裕が削られがちです。電流ループ→速度ループ→位置ループのカスケード設計でも、各ループに対してループシェイピングの考え方が使われ、内側ほど ω_c を高く（典型的に 1 桁差）配置して安定なカスケード階層を構成します。</p>
+    <p><strong>電源回路・スイッチング電源：</strong>DC-DC コンバータの電圧制御ループでは、補償器（タイプ II/III）で出力 LC フィルタの 2 重極を補償し、十分な位相余裕を確保します。本ツールと同様にボード線図で ω_c と PM を見ながら設計するのが標準的で、教科書（Erickson "Fundamentals of Power Electronics" 等）でも中心的なテーマです。</p>
+    <p><strong>ロボット・自動車の運動制御：</strong>マニピュレータの関節制御、車両のステア・ブレーキ制御、ドローンの姿勢制御など、運動制御系の多くは内側にループシェイピングで設計した PI/PID を持ちます。モデル予測制御 (MPC) や強化学習が外側を担っても、内側の安定性確保には依然として古典のループシェイピングが頼られます。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最も多い誤解は、<strong>「ゲイン K_c を上げれば必ず応答が速くなる」と考える</strong>ことです。確かに ω_c は K_c に概ね比例して上がりますが、ω_c が高周波側に進むほどプロセスの位相遅れが累積し、ある点を超えると PM が急減します。さらに上げると PM が負になり閉ループが不安定化します。本ツールで K_c を 5→10→30→100 と段階的に上げてみてください。PM カードが 60°→30°→10°→「負」と崩れていくのが確認できます。「速さ」と「安定性」はトレードオフで、PM 40〜60° という経験則がその折衷点です。</p>
+    <p>次に多いのが、<strong>「位相余裕さえ取れていれば閉ループは振動しない」と思い込む</strong>ことです。PM はゲイン交差周波数 1 点での余裕しか見ておらず、複数の交差や複雑な共振がある系では、PM が正でもナイキスト線図が −1 点を「危ない通り方」で回ることがあります。実務ではナイキスト線図、感度関数 |S(jω)| のピーク値 M_S（典型的に M_S ≤ 2、すなわち 6 dB 以下）も併せて確認します。本ツールのように極が実軸上にある単純系では PM が良い指標ですが、共振モードを持つ系では注意が必要です。</p>
+    <p>最後に、<strong>「ボード線図で帯域幅 ω_BW ≈ 1.5 ω_c は厳密な公式」だと誤解する</strong>点に注意してください。これは PM 60° 前後の標準的な設計で経験的に成り立つ近似に過ぎず、PM が小さい（共振気味の）設計では ω_BW/ω_c 比が 2 を超えることもあり、PM が大きい過減衰設計では 1 を割ることもあります。本ツールではあくまで目安として 1.5 倍を表示しています。厳密な閉ループ帯域が必要なときは、閉ループ伝達関数 T(jω) = L(jω)/(1+L(jω)) の振幅が −3 dB になる周波数を別途求める必要があります。</p>
+  </div>
+</section>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="loop-shaping.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/bode-plot.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-area"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ボード線図・周波数応答 シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">NovaSolverの無料オンラインシミュレーターで、伝達関数のボード線図と周波数応答を簡単解析。1次遅れや2次系など様々な系に対応し、ゲイン余裕・位相余裕を自動計算して安定性を即座...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/servo-mechanism.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-gears"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">サーボ機構計算機</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">サーボ機構計算機で、制御システムの設計を効率化。帯域幅や位相余裕、ゲイン余裕、整定時間、定常偏差の計算からPIDパラメータ調整まで、リアルタイムでシミュレーション。ボード線図の概算描...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/nyquist-criterion.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-area"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ナイキスト線図・安定余裕 シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ナイキスト線図と安定余裕をリアルタイムにシミュレーションできる無料オンラインツールです。開ループ伝達関数のゲイン余裕・位相余裕を自動計算し、安定性を視覚的に確認できます。ボード線図と...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/band-pass-filter.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-bolt"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">バンドパスフィルタ シミュレーター — 直列 RLC の共振と Q-factor</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">直列 RLC バンドパスフィルタの周波数特性をリアルタイム可視化。共振周波数 f_0、Q-factor、帯域幅 BW、観測周波数でのゲインと位相を瞬時に算出し、ボード線図と回路波形で...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/control-bode.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-sliders-h"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ボード線図シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">NovaSolverのボード線図シミュレーターは、伝達関数の周波数応答をリアルタイムで描画する制御工学学習ツールです。1次遅れ・2次系・PID制御に対応し、ゲイン余裕や位相余裕、帯域...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/control-step.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-sliders-h"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">制御系ステップ応答・伝達関数シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">2次遅れ系の固有角周波数ωnと減衰比ζをスライダーで調整してステップ応答をリアルタイム可視化。過減衰・臨界減衰・不足減衰を同時比較し、s平面の極を表示。立上り時間・オーバーシュート・...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>プラント伝達関数のゲイン Kp と時定数 T1 をスライダーで設定します。例：Kp=2.5、T1=0.8秒のRC回路モデルを想定してください</li>
+<li>PI補償器のゲイン Kc と積分時間 Ti を調整し、Bode線図上の開ループ周波数応答をリアルタイムで確認します</li>
+<li>ゲイン交差周波数 ω_c、位相余裕 PM、ゲイン余裕 GM が表示されます。PM≥45°、GM≥3dB を目安に補償器を最適化してください</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>プラント G(s)=2.5/(1+0.8s)、PI補償器 C(s)=3.2(1+1/(0.5s)) の場合を考えます。開ループ伝達関数 L(s)=C(s)G(s) の Bode線図から、ゲイン交差周波数は ω_c=1.8rad/s、位相余裕は PM=52°、ゲイン余裕は GM=8.5dB となります。このとき帯域幅 ω_BW≈2.3rad/s で、応答時間は約 t_s=2.2秒（5%整定時間）となり、実装可能な設計値です</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>位相遅れが大きい場合（PM＜30°）は Ti を増やして積分補償を強化しますが、PM≥50° を超えると過補償になり振動が増加します</li>
+<li>センサノイズ環境では積分ゲイン Kc を抑え、高周波 100Hz 以上の位相遅れ要素（センサフィルタ）を加えて安定余裕を再確認してください</li>
+<li>モータ駆動やPLC実装では離散化ピッチ 10ms 以下を確保し、サンプリング周波数がゲイン交差周波数の 10 倍以上になるよう設定します</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script src="/tools/tool-ux-template.js?v20260517r4" defer></script>
+</body>
+</html>

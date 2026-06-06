@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>状態空間 可観測性シミュレーター — 可観測行列・ランク判定 | NovaSolver</title>
+<meta name="description" content="状態空間の可観測性をシミュレーション判定するツール。線形システムの可観測行列ランク・行列式をリアルタイム計算し、状態推定設計の検証・最適化に活用。可観測性判定、状態フィードバック設計に必須。">
+<link rel="canonical" href="https://novasolver.jp/tools/observability-check.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/observability-check.html">
+<meta property="og:title" content="状態空間 可観測性シミュレーター — 可観測行列・ランク判定 | NovaSolver Project">
+<meta property="og:description" content="状態空間の可観測性をシミュレーション判定するツール。線形システムの可観測行列ランク・行列式をリアルタイム計算し、状態推定設計の検証・最適化に活用。可観測性判定、状態フィードバック設計に必須。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="State-space observability simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/observability-check.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/observability-check.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/observability-check.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/observability-check.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#obsCanvas{display:block;width:100%;height:260px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "状態空間 可観測性シミュレーター",
+      "description": "2次の線形時不変系 ẋ=Ax+Bu, y=Cx の可観測性を判定する無料シミュレーター。可観測行列 O=[C;CA] の行列式とランクを計算し、測定出力から内部状態を再構成できるかをリアルタイムで可視化します。",
+      "url": "https://novasolver.jp/tools/observability-check.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Control Engineering Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["可観測行列 O=[C;CA] の行列式とランクの計算","可観測／不可観測の自動判定","出力行ベクトル C と CA の2D可視化","可観測行列の行ベクトル成分の棒グラフ","det(O) の出力行列 C 依存性のスイープグラフ"],
+      "keywords": "可観測性,可観測行列,状態空間,線形時不変系,カルマン,状態推定,オブザーバ,制御工学",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "可観測性とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "可観測性とは、測定できる出力 y(t) の有限時間の履歴だけから、システムの内部状態 x(t) をすべて一意に再構成できる性質のことです。状態空間モデル ẋ=Ax+Bu, y=Cx に対し、可観測行列 O=[C;CA;…;CAⁿ⁻¹] のランクが状態次数 n に等しいとき、その系は可観測であると言います。可観測でない系には、どんなセンサ配置でも出力に一切影響を与えない「不可観測な状態方向」が存在します。"}
+        },{
+          "@type": "Question",
+          "name": "可観測行列 O=[C;CA] はどう計算しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "2次系では、出力行ベクトル C=[c1,c2] と、それに A を右から掛けた行ベクトル CA を縦に積み重ねて O=[C;CA] という2×2行列を作ります。CA=[c1·a11+c2·a21, c1·a12+c2·a22] です。この O の行列式が det(O)=c1·CA[1]−c2·CA[0]。det(O) がゼロでなければランクは2（フルランク）で可観測、ゼロなら2つの行 C と CA が一次従属でランクが落ち、不可観測になります。"}
+        },{
+          "@type": "Question",
+          "name": "可観測性と可制御性はどう違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "可制御性は「入力でどの状態にも到達できるか」、可観測性は「出力からどの状態も読み取れるか」を表す、互いに双対な概念です。可観測行列 O=[C;CA;…] は、双対系（A→Aᵀ, B→Cᵀ）の可制御行列とちょうど一致します。つまり (A,C) の可観測性は (Aᵀ,Cᵀ) の可制御性と等価で、片方の判定法をもう片方に転用できます。"}
+        },{
+          "@type": "Question",
+          "name": "可観測でない（不可観測な）系はどうなりますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "不可観測な系では、状態空間内に出力 y へまったく現れない「不可観測部分空間」が存在します。そこに含まれる状態（例えば内部で発散しているモード）は、出力をいくら測ってもオブザーバやカルマンフィルタで推定できません。実機では、その方向にセンサを追加するか、C を設計し直すか、不可観測なモードが安定（可検出）であることを確認する必要があります。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "状態空間 可観測性シミュレーター", "item": "https://novasolver.jp/tools/observability-check.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">状態空間 可観測性シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/observability-check.html" class="active">JA</a>
+      <a href="/en/tools/observability-check.html">EN</a>
+      <a href="/zh/tools/observability-check.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-eye"></i> 制御工学</div>
+    <h1>状態空間 可観測性シミュレーター</h1>
+    <p class="hero-sub">2次の線形時不変系 ẋ=Ax+Bu, y=Cx について「測定できる出力 y だけから内部状態 x をすべて知れるか」を判定するツールです。システム行列 A とセンサ行ベクトル C を変えると、可観測行列 O=[C;CA] の行列式とランクがリアルタイムで分かり、状態推定が成立する設計を探せます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">システム行列 A</span></div>
+      <div class="param-desc">2次系のダイナミクス A = [[a11,a12],[a21,a22]]</div>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">a11</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="a11Num" value="-1" min="-5" max="5" step="0.1" oninput="syncFromNum('a11Range','a11Num')"></div>
+      </div>
+      <input type="range" id="a11Range" min="-5" max="5" step="0.1" value="-1" oninput="syncToNum('a11Range','a11Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">a12</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="a12Num" value="1" min="-5" max="5" step="0.1" oninput="syncFromNum('a12Range','a12Num')"></div>
+      </div>
+      <input type="range" id="a12Range" min="-5" max="5" step="0.1" value="1" oninput="syncToNum('a12Range','a12Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">a21</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="a21Num" value="0" min="-5" max="5" step="0.1" oninput="syncFromNum('a21Range','a21Num')"></div>
+      </div>
+      <input type="range" id="a21Range" min="-5" max="5" step="0.1" value="0" oninput="syncToNum('a21Range','a21Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">a22</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="a22Num" value="-2" min="-5" max="5" step="0.1" oninput="syncFromNum('a22Range','a22Num')"></div>
+      </div>
+      <input type="range" id="a22Range" min="-5" max="5" step="0.1" value="-2" oninput="syncToNum('a22Range','a22Num');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">出力行ベクトル C</span></div>
+      <div class="param-desc">センサが状態をどう測るか y = C·x = c1·x1 + c2·x2</div>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">c1</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="c1Num" value="1" min="-5" max="5" step="0.1" oninput="syncFromNum('c1Range','c1Num')"></div>
+      </div>
+      <input type="range" id="c1Range" min="-5" max="5" step="0.1" value="1" oninput="syncToNum('c1Range','c1Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">c2</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="c2Num" value="0" min="-5" max="5" step="0.1" oninput="syncFromNum('c2Range','c2Num')"></div>
+      </div>
+      <div class="param-desc">0 にすると状態 x2 を直接は測らない設定</div>
+      <input type="range" id="c2Range" min="-5" max="5" step="0.1" value="0" oninput="syncToNum('c2Range','c2Num');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statDet">—</div><div class="sl">可観測行列の行列式 det</div></div>
+        <div class="stat-card"><div class="sv" id="statRank">—</div><div class="sl">ランク</div></div>
+        <div class="stat-card"><div class="sv" id="statCA1">—</div><div class="sl">CA成分1</div></div>
+        <div class="stat-card"><div class="sv" id="statCA2">—</div><div class="sl">CA成分2</div></div>
+        <div class="stat-card"><div class="sv" id="statObs">—</div><div class="sl">可観測性</div></div>
+        <div class="stat-card"><div class="sv" id="statAbsDet">—</div><div class="sl">|det|</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-vector-square"></i> 可観測行列の行ベクトル — C と CA の張る平面</div>
+      <canvas id="obsCanvas"></canvas>
+      <p class="canvas-hint">原点から伸びる2本の矢印が可観測行列の行 C（青）と CA（橙）。一次独立なら平面全体を張り（緑網掛け＝可観測）、平行になると不可観測方向が赤で示されます。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> det(𝒪) の c2 依存性</div>
+      <canvas class="ux-chartjs-canvas" id="detChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-column"></i> 可観測行列の行ベクトル成分</div>
+      <canvas class="ux-chartjs-canvas" id="rowChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$\mathcal{O}=\begin{bmatrix}C \\ CA\end{bmatrix},\qquad \text{可観測}\iff \operatorname{rank}\mathcal{O}=n$$</p>
+      <p style="margin-top:6px;">可観測行列 𝒪 と可観測性の判定条件。C：出力行ベクトル、A：システム行列、n：状態次数（ここでは n=2）。フルランクなら出力 y から状態 x をすべて再構成できる。</p>
+      <p style="margin-top:10px;">$$CA=\bigl[\,c_1a_{11}+c_2a_{21},\;\; c_1a_{12}+c_2a_{22}\,\bigr]$$</p>
+      <p style="margin-top:6px;">2次系での CA 行ベクトルの成分。出力行 C に A を右から掛けたもので、𝒪 の2行目になる。</p>
+      <p style="margin-top:10px;">$$\det\mathcal{O}=c_1\,CA_2-c_2\,CA_1$$</p>
+      <p style="margin-top:6px;">2×2 可観測行列の行列式。これが 0 でなければランク2でフルランク、可観測。n 次系では 𝒪=[C;CA;CA²;…;CAⁿ⁻¹] と積み上げる。可観測性は可制御性の双対であり、(A,C) の可観測性は (Aᵀ,Cᵀ) の可制御性に等しい。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>可観測性とは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「可観測性」って言葉、制御の授業で出てきたんですけど…正直よく分かりません。何が「観測できる」んですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと「センサで測れる出力 y だけを見て、システムの中身（内部状態 x）が全部分かるか？」という性質だよ。例えばドローンの姿勢制御を考えてみて。本当は角度も角速度も知りたいけど、ジャイロは角速度しか測らないことがある。それでも数式上、出力の履歴から角度まで全部復元できるなら「可観測」。復元できない方向が残るなら「不可観測」なんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど。じゃあ「可観測かどうか」ってどうやって判定するんですか？感覚じゃなくて、ちゃんと計算で出るんですよね？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、可観測行列 𝒪 を作ってランクを見るんだ。出力の行ベクトル C を1行目、それに A を掛けた CA を2行目に積む。2次系なら 𝒪=[C;CA] という2×2行列になる。このランクが状態の次数 n（ここでは2）と同じならフルランクで可観測。左のスライダーで c2 をいじってみて。det(𝒪) が0をまたぐ瞬間にランクが2から1に落ちて、判定が「不可観測」に変わるのが見えるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">右のキャンバスに矢印が2本出てますね。これは C と CA のことですか？平行になると赤くなる…</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">その通り。あの2本は可観測行列の「行ベクトル」を絵にしたものだ。C と CA が違う向きを向いていれば、2本で平面全体を張れる＝独立した情報が2つ取れる＝可観測。でも2本が同じ直線に乗ってしまうと（平行になると）、本質的に1方向の情報しか取れていない。その「見えない方向」が赤で出る。det(𝒪) はちょうど、この2本が作る平行四辺形の符号付き面積なんだよ。面積が0なら潰れている、というわけ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">不可観測になってしまったら、もう手の打ちようがないんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いや、いくつか手はある。一番直接的なのはセンサを足して C を変えること。例えば c2 を 0 から 0.5 にするだけで、x2 の情報が出力に混ざって可観測に戻ることが多い。設計でセンサを増やせないなら、せめて「不可観測なモードが安定しているか（＝可検出か）」を確認する。発散するモードが不可観測だと、オブザーバでもカルマンフィルタでも絶対に推定が破綻するから、これは死活問題なんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">よく「可制御性」とセットで習いますけど、可観測性とはどういう関係なんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">この2つは「双対（そうつい）」と呼ばれる、コインの裏表の関係なんだ。可制御性は「入力でどの状態にも持っていけるか」、可観測性は「出力からどの状態も読めるか」。数式的には、可観測行列 [C;CA;…] は、A を転置した双対系の可制御行列とぴったり一致する。だから片方の判定アルゴリズムをもう片方にそのまま流用できる。オブザーバ設計が状態フィードバック設計の「鏡像」になっているのも、この双対性のおかげなんだよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">可観測性とは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">可観測性とは、測定できる出力 y(t) の有限時間の履歴だけから、システムの内部状態 x(t) をすべて一意に再構成できる性質のことです。状態空間モデル ẋ=Ax+Bu, y=Cx に対し、可観測行列 O=[C;CA;…;CAⁿ⁻¹] のランクが状態次数 n に等しいとき、その系は可観測であると言います。可観測でない系には、どんなセンサ配置でも出力に一切影響を与えない「不可観測な状態方向」が存在します。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">可観測行列 O=[C;CA] はどう計算しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">2次系では、出力行ベクトル C=[c1,c2] と、それに A を右から掛けた行ベクトル CA を縦に積み重ねて O=[C;CA] という2×2行列を作ります。CA=[c1·a11+c2·a21, c1·a12+c2·a22] です。この O の行列式が det(O)=c1·CA[1]−c2·CA[0]。det(O) がゼロでなければランクは2（フルランク）で可観測、ゼロなら2つの行 C と CA が一次従属でランクが落ち、不可観測になります。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">可観測性と可制御性はどう違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">可制御性は「入力でどの状態にも到達できるか」、可観測性は「出力からどの状態も読み取れるか」を表す、互いに双対な概念です。可観測行列 O=[C;CA;…] は、双対系（A→Aᵀ, B→Cᵀ）の可制御行列とちょうど一致します。つまり (A,C) の可観測性は (Aᵀ,Cᵀ) の可制御性と等価で、片方の判定法をもう片方に転用できます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">可観測でない（不可観測な）系はどうなりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">不可観測な系では、状態空間内に出力 y へまったく現れない「不可観測部分空間」が存在します。そこに含まれる状態（例えば内部で発散しているモード）は、出力をいくら測ってもオブザーバやカルマンフィルタで推定できません。実機では、その方向にセンサを追加するか、C を設計し直すか、不可観測なモードが安定（可検出）であることを確認する必要があります。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>オブザーバ（状態推定器）の設計：</strong>モータの回転角はエンコーダで測れても、角速度や負荷トルクは直接測れないことがよくあります。ルーエンベルガ・オブザーバを設計して未測定の状態を推定するには、まず系が可観測であることが大前提です。可観測でなければオブザーバの極をどこにも置けず、推定誤差が収束しません。本ツールのランク判定は、オブザーバを組む前の最初のサニティチェックになります。</p>
+    <p><strong>カルマンフィルタとセンサフュージョン：</strong>自動運転車の自己位置推定や航空機の慣性航法では、複数のノイズの乗ったセンサから状態を推定します。カルマンフィルタが安定して収束するには、系が可観測（少なくとも可検出）であることが必要です。GPSが一時的に途切れる状況などは「一部の状態が一時的に不可観測になる」状況として解析でき、その間にフィルタの推定がどれだけ劣化するかを見積もれます。</p>
+    <p><strong>センサ配置の決定：</strong>大型構造物のモニタリングや化学プラントの温度・濃度推定では、「どこに何個センサを置けば内部状態を全部読めるか」が設計課題になります。候補となる C 行列ごとに可観測行列のランクを計算し、フルランクになる最小限のセンサ構成を選びます。本ツールで c1・c2 を動かすのは、まさにこのセンサ選定のミニチュア版です。</p>
+    <p><strong>モデル低次元化と現代制御の教育：</strong>可観測かつ可制御な部分（最小実現）だけを残してモデルを縮約する際にも可観測性が使われます。また大学の制御工学では、可観測行列・可制御行列・双対性は必修テーマです。手計算で det(𝒪) を求めた後、本ツールで答え合わせをしたり、パラメータを連続的に動かしてランクが落ちる「特異な配置」を体感したりするのに役立ちます。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず多いのが、<strong>「可観測性はシステムの A だけで決まる」という誤解</strong>です。可観測性は A と C の組 (A,C) で決まる性質であり、出力行列 C をどう選ぶか——つまりどの状態をどう測るか——に強く依存します。同じプラント A でも、c2 を 0 にした瞬間に不可観測になることが本ツールで確認できます。逆に「不可観測だから設計が悪い」とも限りません。センサを1個追加して C を変えれば可観測に戻せる場合が多く、可観測性は「プラントの欠陥」ではなく「センサ設計の問題」として捉えるべきです。</p>
+    <p>次に、<strong>「det(𝒪) がゼロに近いだけならほぼ可観測だから問題ない」という油断</strong>。理論上は det(𝒪)≠0 なら可観測ですが、det(𝒪) が極端に小さい系は「ほぼ不可観測」で、実用上は深刻です。可観測グラミアンの最小特異値が小さいと、わずかな測定ノイズが状態推定に巨大な誤差として増幅されます。本ツールは |det| を表示していますが、実機では「可観測か否か」の二択だけでなく、可観測性の“強さ”（条件数や特異値）まで見るのが定石です。</p>
+    <p>最後に、<strong>「可観測でないと制御できない」という思い込み</strong>。可観測性と可制御性は別物です。不可観測な系でも、不可観測なモードがすべて安定（＝可検出）であれば、出力フィードバックで安定化できます。逆に、可制御だが不可観測なモードが発散していると、その状態は推定も観測もできないまま発散します。実務では「可観測」より弱い「可検出（detectability）」、「可制御」より弱い「可安定（stabilizability）」という条件で十分なケースも多く、何が本当に必要かを見極めることが重要です。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>システム行列Aの4要素(a11、a12、a21、a22)をスライダーまたはテキスト入力で設定。各パラメータの範囲指定で感度分析が可能</li>
+<li>出力行列Cは標準形[1 0]を固定。可観測行列O=[C; CA]が自動生成され、行列式と階数をリアルタイム計算</li>
+<li>可観測性判定：2次システムでrank(O)=2かつdet(O)≠0なら完全可観測。状態推定器(オブザーバ)設計が可能と判定</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>DCモーター制御系でA=[[0,1],[-10,−3]]、C=[1,0]を設定。CA=[-10,-3]となり、可観測行列O=[[1,0],[−10,−3]]のdet(O)=−3≠0、rank=2。完全可観測と判定され、ルーエンバーグオブザーバ設計で極配置[-5,-8]を実現可能。一方A=[[0,1],[0,−2]]ではCA=[0,−2]となり、det(O)=0で可観測性失。角速度が測定不可となるため、エンコーダ追加が必須。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>航空機姿勢制御：ジャイロセンサ出力C=[1,0,0]では3軸回転の可観測性確保に注意。慣性センサ不足時はIMU多軸化が必要</li>
+<li>プロセス制御：反応器温度のみ測定(C=[1,0])ではA行列の非対角要素a12>0で熱交換動態が可観測となるか数値検証必須</li>
+<li>数値計算安定性：det(O)が1e-10以下では丸め誤差の影響大。条件数cond(O)確認推奨。アルゴリズム的可観測性判定にはSVD分解採用</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== shared state for the canvas animation =====
+const OS = {C:[1,0], CA:[-1,1], det:1, rank:2, observable:true, pulse:0};
+
+// ===== Chart.js setup =====
+const detChart = new Chart(document.getElementById('detChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'det(𝒪)',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'det = 0',data:[],borderColor:'#6c757d',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false},
+    {label:'現在の c2',data:[],borderColor:'#e17055',backgroundColor:'#e17055',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'出力係数 c2',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'det(𝒪)',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const rowChart = new Chart(document.getElementById('rowChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['C 成分1','C 成分2','CA 成分1','CA 成分2'],datasets:[
+    {label:'行ベクトル成分',data:[0,0,0,0],backgroundColor:['#007BFF','#007BFF','#e17055','#e17055'],borderWidth:0}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{ y:{title:{display:true,text:'成分の値',font:{size:11}}} },
+    plugins:{legend:{display:false}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const a11 = parseFloat(document.getElementById('a11Range').value);
+  const a12 = parseFloat(document.getElementById('a12Range').value);
+  const a21 = parseFloat(document.getElementById('a21Range').value);
+  const a22 = parseFloat(document.getElementById('a22Range').value);
+  const c1  = parseFloat(document.getElementById('c1Range').value);
+  const c2  = parseFloat(document.getElementById('c2Range').value);
+
+  // Observability matrix O = [ C ; C*A ]
+  // C  = [c1, c2]
+  // CA = C * A   (row vector times 2x2 matrix)
+  const CA1 = c1*a11 + c2*a21;
+  const CA2 = c1*a12 + c2*a22;
+
+  // det of the 2x2 matrix [[c1,c2],[CA1,CA2]]
+  const detO = c1*CA2 - c2*CA1;
+
+  // rank determination
+  let rank;
+  if(Math.abs(detO) > 1e-9){
+    rank = 2;
+  }else{
+    const cNonZero  = (Math.abs(c1)  > 1e-9 || Math.abs(c2)  > 1e-9);
+    const caNonZero = (Math.abs(CA1) > 1e-9 || Math.abs(CA2) > 1e-9);
+    rank = (cNonZero || caNonZero) ? 1 : 0;
+  }
+  const observable = (rank === 2);
+
+  // ----- stat cards -----
+  document.getElementById('statDet').textContent    = detO.toFixed(3);
+  document.getElementById('statRank').textContent   = rank;
+  document.getElementById('statCA1').textContent    = CA1.toFixed(3);
+  document.getElementById('statCA2').textContent    = CA2.toFixed(3);
+  document.getElementById('statObs').textContent    = observable ? '可観測' : '不可観測';
+  document.getElementById('statAbsDet').textContent = Math.abs(detO).toFixed(3);
+
+  document.getElementById('statObs').style.color = observable ? '#0a8a6a' : '#c0392b';
+  document.getElementById('statDet').style.color = observable ? '#0a8a6a' : '#c0392b';
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(observable){
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 可観測です（ランク 2 / det(𝒪) = '+detO.toFixed(3)+'）。可観測行列 𝒪=[C;CA] がフルランクなので、測定出力 y の履歴から内部状態 x をすべて一意に再構成できます。オブザーバやカルマンフィルタを設計できます。';
+  }else if(rank === 1){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> 不可観測です（ランク 1 / det(𝒪) = 0）。行 C と CA が一次従属で、出力 y にまったく現れない状態方向が1つ残ります。その方向はセンサからは見えず、推定できません。C を変える（例：c2 を 0 以外に）か、センサを追加してください。';
+  }else{
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> 不可観測です（ランク 0）。出力行ベクトル C が実質ゼロで、システムは出力をまったく生み出しません。どの状態方向も観測できません。';
+  }
+
+  // ----- det(O) vs c2 sweep chart -----
+  const dLabels=[], dData=[], dZero=[], dPoint=[];
+  const c2min=-5, c2max=5, STEP=10/50;
+  for(let cv=c2min; cv<=c2max+1e-6; cv+=STEP){
+    const ca1 = c1*a11 + cv*a21;
+    const ca2 = c1*a12 + cv*a22;
+    const det = c1*ca2 - cv*ca1;
+    dLabels.push(cv.toFixed(1));
+    dData.push(det);
+    dZero.push(0);
+    dPoint.push(null);
+  }
+  let nearest=0, best=1e9;
+  for(let k=0;k<dLabels.length;k++){
+    const dd=Math.abs(parseFloat(dLabels[k])-c2);
+    if(dd<best){best=dd;nearest=k;}
+  }
+  dPoint[nearest] = detO;
+  detChart.data.labels = dLabels;
+  detChart.data.datasets[0].data = dData;
+  detChart.data.datasets[1].data = dZero;
+  detChart.data.datasets[2].data = dPoint;
+  detChart.update('none');
+
+  // ----- row-vector component bar chart -----
+  rowChart.data.datasets[0].data = [c1, c2, CA1, CA2];
+  rowChart.update('none');
+
+  // ----- shared state for the canvas -----
+  OS.C  = [c1, c2];
+  OS.CA = [CA1, CA2];
+  OS.det = detO;
+  OS.rank = rank;
+  OS.observable = observable;
+}
+
+// ===== Observability-matrix row-vector visualization =====
+(function(){
+  const cv = document.getElementById('obsCanvas');
+  const ctx = cv.getContext('2d');
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==260*dpr){
+      cv.width = w*dpr; cv.height = 260*dpr; cv.style.height='260px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function arrow(ox,oy,vx,vy,scale,col,label){
+    const ex = ox + vx*scale, ey = oy - vy*scale;
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ex,ey); ctx.stroke();
+    const ang = Math.atan2(ey-oy, ex-ox);
+    ctx.beginPath();
+    ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-11*Math.cos(ang-0.4), ey-11*Math.sin(ang-0.4));
+    ctx.lineTo(ex-11*Math.cos(ang+0.4), ey-11*Math.sin(ang+0.4));
+    ctx.closePath(); ctx.fill();
+    ctx.font = 'bold 12px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, ex+6, ey-4);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 260;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const cx = W*0.5, cy = H*0.52;
+
+    // ----- auto scale so both vectors fit -----
+    const mag = Math.max(
+      Math.hypot(OS.C[0],OS.C[1]),
+      Math.hypot(OS.CA[0],OS.CA[1]),
+      0.5
+    );
+    const scale = Math.min(W,H)*0.34/mag;
+
+    OS.pulse += 0.05;
+    const pulse = 0.5 + 0.5*Math.sin(OS.pulse);
+
+    // ----- spanned-plane shading (parallelogram of the two rows) -----
+    const cEnd  = {x:cx+OS.C[0]*scale,  y:cy-OS.C[1]*scale};
+    const caEnd = {x:cx+OS.CA[0]*scale, y:cy-OS.CA[1]*scale};
+    if(OS.observable){
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.lineTo(cEnd.x,cEnd.y);
+      ctx.lineTo(cEnd.x+caEnd.x-cx, cEnd.y+caEnd.y-cy);
+      ctx.lineTo(caEnd.x,caEnd.y);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,184,148,'+(0.12+0.06*pulse)+')';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,184,148,.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // ----- grid + axes -----
+    ctx.strokeStyle = 'rgba(255,255,255,.08)';
+    ctx.lineWidth = 1;
+    for(let g=-4;g<=4;g++){
+      const gx = cx+g*scale, gy = cy-g*scale;
+      ctx.beginPath(); ctx.moveTo(gx,20); ctx.lineTo(gx,H-20); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(40,gy); ctx.lineTo(W-40,gy); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(40,cy); ctx.lineTo(W-40,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx,20); ctx.lineTo(cx,H-20); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.4)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('x', W-44, cy-6);
+    ctx.fillText('y', cx-6, 30);
+
+    // ----- unobservable direction (when collinear / rank<2) -----
+    if(!OS.observable){
+      let dx=OS.C[0], dy=OS.C[1];
+      if(Math.hypot(dx,dy)<1e-6){ dx=OS.CA[0]; dy=OS.CA[1]; }
+      const dm = Math.hypot(dx,dy)||1;
+      dx/=dm; dy/=dm;
+      ctx.strokeStyle = 'rgba(214,48,49,'+(0.45+0.4*pulse)+')';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8,5]);
+      ctx.beginPath();
+      ctx.moveTo(cx-dx*scale*4.5, cy+dy*scale*4.5);
+      ctx.lineTo(cx+dx*scale*4.5, cy-dy*scale*4.5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(214,48,49,.9)';
+      ctx.font = 'bold 11px Roboto Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('行 C と CA が平行 — 不可観測方向', cx, H-30);
+    }
+
+    // ----- the two row vectors -----
+    arrow(cx,cy,OS.C[0], OS.C[1], scale,'#3a9bff','C');
+    arrow(cx,cy,OS.CA[0],OS.CA[1],scale,'#e17055','CA');
+
+    // origin dot
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
+
+    // ----- status text (top-left) -----
+    ctx.textAlign = 'left';
+    ctx.fillStyle = OS.observable ? '#00b894' : '#d63031';
+    ctx.font = 'bold 13px Roboto Mono, monospace';
+    ctx.fillText('rank 𝒪 = '+OS.rank+' / 2', 14, 26);
+    ctx.fillStyle = OS.observable ? '#00b894' : '#d63031';
+    ctx.font = '11px Roboto Mono, monospace';
+    ctx.fillText(OS.observable ? '可観測' : '不可観測', 14, 44);
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.fillText('det(𝒪) = '+OS.det.toFixed(3), 14, 60);
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['a11Range','a12Range','a21Range','a22Range','c1Range','c2Range'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

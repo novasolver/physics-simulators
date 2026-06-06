@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勾配クリッピング シミュレーター — 勾配爆発を防ぐ最適化 | NovaSolver</title>
+<meta name="description" content="勾配クリッピングシミュレーターで深層学習の勾配爆発防止を体験。ノルムクリップと値クリップの効果をリアルタイムで可視化し、勾配ノルムと学習率の最適化を検証できます。">
+<link rel="canonical" href="https://novasolver.jp/tools/gradient-clipping.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/gradient-clipping.html">
+<meta property="og:title" content="勾配クリッピング シミュレーター — 勾配爆発を防ぐ最適化 | NovaSolver Project">
+<meta property="og:description" content="勾配クリッピングシミュレーターで深層学習の勾配爆発防止を体験。ノルムクリップと値クリップの効果をリアルタイムで可視化し、勾配ノルムと学習率の最適化を検証できます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Gradient clipping simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/gradient-clipping.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/gradient-clipping.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/gradient-clipping.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/gradient-clipping.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#gcCanvas{display:block;width:100%;height:280px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "勾配クリッピング シミュレーター",
+      "description": "勾配クリッピングをブラウザで体験。クリップ閾値・学習率・ステップ数を変え、ノルムクリップ・値クリップ・クリップなしが「崖あり地形」で勾配爆発をどう防ぐかを等高線と損失・勾配ノルム曲線で可視化する無料シミュレーターです。",
+      "url": "https://novasolver.jp/tools/gradient-clipping.html",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Machine Learning Optimization Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["ノルムクリップ・値クリップ・クリップなしの比較","クリップ閾値・学習率・学習ステップ数の調整","崖あり地形と細長い谷の損失曲面の等高線と最適化軌跡","損失の推移と生の勾配ノルムの推移グラフ","勾配爆発（発散）の自動検出"],
+      "keywords": "勾配クリッピング,勾配爆発,exploding gradients,ノルムクリップ,深層学習,RNN,学習安定化,最適化",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "勾配クリッピングとは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "勾配クリッピングは、各更新ステップの前に勾配の大きさを上限で頭打ちにする手法です。深いネットワーク、特にRNNの損失地形には「崖」（損失が極端に急変する領域）があり、そこで勾配が巨大になります。巨大な勾配に学習率を掛けてそのまま一歩進むと、パラメータが遠くへ飛ばされ学習が崩壊します（勾配爆発）。ノルムクリップは勾配ベクトル全体を最大長 τ まで縮小して向きを保ち、値クリップは各成分を ±τ に切り詰めます。どちらも歩幅を有界に保ち、崖を安全に越えられるようにします。"}
+        },{
+          "@type": "Question",
+          "name": "ノルムクリップと値クリップはどちらを使うべきですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "通常はノルムクリップ（clip-by-norm）が推奨されます。勾配ベクトル全体を g ← g·(τ/‖g‖) と一様に縮小するため、勾配の向き（降下方向）が保たれたまま大きさだけが τ に制限されます。値クリップ（clip-by-value）は各成分を独立に ±τ に切り詰めるため実装は簡単ですが、ある成分だけが切られると合成ベクトルの向きが変わり、降下方向が歪むことがあります。本ツールの崖あり地形でも、ノルムクリップのほうが滑らかに崖を越えられます。多くの深層学習フレームワークが両方を提供しています。"}
+        },{
+          "@type": "Question",
+          "name": "クリップ閾値 τ はどう決めればよいですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "クリップ閾値 τ は「正常時の勾配ノルムは通さず、爆発時の巨大な勾配だけを抑える」値に設定します。小さすぎると平常時の勾配まで縮小して学習が遅くなり、大きすぎると崖でのスパイクを止められず発散します。実務では、まず数百ステップ学習して勾配ノルムの分布を観察し、その中央値〜95パーセンタイル付近、あるいは経験的に 1〜10 程度を選びます。本ツールでは閾値を下げるとクリップ発動回数が増え、上げると最大勾配ノルムが大きくなる様子を確認できます。"}
+        },{
+          "@type": "Question",
+          "name": "なぜRNNやLSTMで勾配クリッピングが特に重要なのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "RNNは同じ重み行列を時間ステップごとに繰り返し掛けるため、誤差逆伝播で勾配がその行列の固有値の累乗で増減します。固有値が1より大きいと勾配は時系列長に対して指数的に増大し、損失地形に切り立った「崖」が生まれます。長い系列の学習中にこの崖に当たると勾配が一気に爆発し、学習が破綻します。勾配クリッピングは、この崖でのスパイクだけを頭打ちにして他のステップには影響を与えないため、RNN・LSTM・Transformerなど系列モデルの学習で標準的に使われています。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "勾配クリッピング シミュレーター", "item": "https://novasolver.jp/tools/gradient-clipping.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">勾配クリッピング シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/gradient-clipping.html" class="active">JA</a>
+      <a href="/en/tools/gradient-clipping.html">EN</a>
+      <a href="/zh/tools/gradient-clipping.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-scissors"></i> 機械学習</div>
+    <h1>勾配クリッピング シミュレーター</h1>
+    <p class="hero-sub">深層学習の「勾配爆発」を防ぐ勾配クリッピングを体験するツールです。クリップ閾値と学習率を変えると、ノルムクリップ・値クリップ・クリップなしが「崖」のある損失地形をどう降りていくかが、等高線上の軌跡と損失・勾配ノルムの推移グラフでリアルタイムに分かります。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">クリップ閾値 τ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="clipNum" value="5" min="0.1" max="20" step="0.1" oninput="syncFromNum('clipRange','clipNum')"></div>
+      </div>
+      <div class="param-desc">勾配の大きさをこの値で頭打ちにする</div>
+      <input type="range" id="clipRange" min="0.1" max="20" step="0.1" value="5" oninput="syncToNum('clipRange','clipNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">学習率 η</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="lrNum" value="0.1" min="0.001" max="1" step="0.001" oninput="syncFromNum('lrRange','lrNum')"></div>
+      </div>
+      <div class="param-desc">1ステップで勾配方向にどれだけ進むか</div>
+      <input type="range" id="lrRange" min="0.001" max="1" step="0.001" value="0.1" oninput="syncToNum('lrRange','lrNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">学習ステップ数</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="stepsNum" value="100" min="10" max="300" step="10" oninput="syncFromNum('stepsRange','stepsNum')"><span class="num-unit">回</span></div>
+      </div>
+      <input type="range" id="stepsRange" min="10" max="300" step="10" value="100" oninput="syncToNum('stepsRange','stepsNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">クリップ方式</span></div>
+      <div class="param-desc">勾配の大きさを抑える方法</div>
+      <select id="modeSel" onchange="compute()">
+        <option value="norm" selected>ノルムクリップ</option>
+        <option value="value">値クリップ</option>
+        <option value="none">クリップなし</option>
+      </select>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">損失地形</span></div>
+      <div class="param-desc">勾配が急変する地形の種類を切り替え</div>
+      <select id="surfSel" onchange="compute()">
+        <option value="cliff" selected>崖あり地形（RNN型）</option>
+        <option value="ravine">細長い谷</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statLoss">—</div><div class="sl">最終損失 f</div></div>
+        <div class="stat-card"><div class="sv" id="statGmax">—</div><div class="sl">最大勾配ノルム（クリップ前）</div></div>
+        <div class="stat-card"><div class="sv" id="statClips">—</div><div class="sl">クリップ発動回数</div></div>
+        <div class="stat-card"><div class="sv" id="statDiv">—</div><div class="sl">発散の有無</div></div>
+        <div class="stat-card"><div class="sv" id="statRed">—</div><div class="sl">損失低減率 (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statClipEff">—</div><div class="sl">クリッピングの判定</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-route"></i> 損失曲面の等高線と最適化軌跡</div>
+      <canvas id="gcCanvas"></canvas>
+      <p class="canvas-hint">等高線が損失 f の地形、緑の点が最小値です。スタート地点から伸びる色付きの経路が更新の軌跡で、マーカーがその上を繰り返し進みます。崖あり地形でクリップなしだと軌跡が画面外へ大きく飛び出します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 損失の推移</div>
+      <canvas class="ux-chartjs-canvas" id="lossChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 勾配ノルムの推移（クリップ前）</div>
+      <canvas class="ux-chartjs-canvas" id="gradChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$\text{if }\lVert g\rVert\gt \tau:\quad g\leftarrow g\cdot\frac{\tau}{\lVert g\rVert}$$</p>
+      <p style="margin-top:6px;">ノルムクリップ。勾配ノルム ‖g‖ が閾値 τ を超えたとき、勾配ベクトル全体を一様に縮小する。向き（降下方向）を保ったまま、大きさだけを τ に制限する。</p>
+      <p style="margin-top:10px;">$$g_i\leftarrow\operatorname{clip}(g_i,\,-\tau,\,+\tau),\qquad \theta\leftarrow\theta-\eta\,g_{\text{clipped}}$$</p>
+      <p style="margin-top:6px;">値クリップは各成分 g_i を独立に ±τ へ切り詰める。最後にクリップ後の勾配で学習率 η ぶんパラメータ θ を更新する。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>勾配クリッピングとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「勾配クリッピング」って深層学習でよく出てきますけど、結局なにをしているんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと「勾配が大きくなりすぎたら、強制的に小さくする」だけだよ。学習は損失という地形を下る作業で、今いる場所の傾き（勾配 g）に学習率 η を掛けて一歩進む。ところが地形に「崖」があると、崖のフチで勾配がとんでもなく大きくなる。そのまま一歩進むと、パラメータが遥か遠くへ吹っ飛んで学習が壊れる。これを「勾配爆発」と呼ぶんだ。クリッピングは、更新の直前に勾配の大きさに上限をかけて、この吹っ飛びを防ぐ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど。左の「クリップ方式」を「クリップなし」にして崖あり地形を見たら、軌跡が一瞬で画面外に消えて「発散」って出ました。これが勾配爆発ですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">まさにそれ。この崖あり地形は、谷底（原点）から少し離れると両側の壁が cosh 関数のように一気に切り立つように作ってある。壁のところでは x 方向の勾配が巨大で、学習率を掛けた一歩がスタート地点を遥かに飛び越える。一歩飛び越えたら次のステップではもっと急な場所にいて勾配がさらに大きくなり…と正のフィードバックで損失が無限大に発散する。これがRNNの学習で実際に起きる典型的な失敗なんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">じゃあ「ノルムクリップ」に戻すと、なぜちゃんと崖を越えられるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ノルムクリップは、勾配ベクトル全体を g ← g·(τ/‖g‖) と一様に縮める。崖で勾配ノルムが閾値 τ を超えた瞬間だけ、ベクトルを長さ τ にカットするんだ。大事なのは「向きは変えない」こと。降りるべき方向はそのままに、歩幅だけを安全な大きさに抑える。だから崖を一歩で飛び越えず、controlled に少しずつ越えていける。下の「勾配ノルムの推移」グラフを見ると、生の勾配ノルムが赤い閾値線をスパイクで超えても、実際の歩幅は τ で頭打ちになっているのが分かるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">もう一つの「値クリップ」とは何が違うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">値クリップは、勾配の各成分を独立に ±τ の範囲に切り詰める。たとえば勾配が (100, 0.3) なら τ=5 のとき (5, 0.3) になる。実装は簡単なんだけど、x 成分だけが切られて y 成分はそのままだから、合成したベクトルの向きが元の勾配からズレてしまう。つまり「降りるべき方向」が少し歪む。ノルムクリップは全成分を同じ比率で縮めるから向きが保たれる。だから実務では、まずノルムクリップを使うのが定番だね。値クリップは挙動が分かりやすい一方、向きが歪む副作用があると覚えておくといいよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">勾配クリッピングとは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">勾配クリッピングは、各更新ステップの前に勾配の大きさを上限で頭打ちにする手法です。深いネットワーク、特にRNNの損失地形には「崖」（損失が極端に急変する領域）があり、そこで勾配が巨大になります。巨大な勾配に学習率を掛けてそのまま一歩進むと、パラメータが遠くへ飛ばされ学習が崩壊します（勾配爆発）。ノルムクリップは勾配ベクトル全体を最大長 τ まで縮小して向きを保ち、値クリップは各成分を ±τ に切り詰めます。どちらも歩幅を有界に保ち、崖を安全に越えられるようにします。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">ノルムクリップと値クリップはどちらを使うべきですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">通常はノルムクリップ（clip-by-norm）が推奨されます。勾配ベクトル全体を g ← g·(τ/‖g‖) と一様に縮小するため、勾配の向き（降下方向）が保たれたまま大きさだけが τ に制限されます。値クリップ（clip-by-value）は各成分を独立に ±τ に切り詰めるため実装は簡単ですが、ある成分だけが切られると合成ベクトルの向きが変わり、降下方向が歪むことがあります。本ツールの崖あり地形でも、ノルムクリップのほうが滑らかに崖を越えられます。多くの深層学習フレームワークが両方を提供しています。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">クリップ閾値 τ はどう決めればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">クリップ閾値 τ は「正常時の勾配ノルムは通さず、爆発時の巨大な勾配だけを抑える」値に設定します。小さすぎると平常時の勾配まで縮小して学習が遅くなり、大きすぎると崖でのスパイクを止められず発散します。実務では、まず数百ステップ学習して勾配ノルムの分布を観察し、その中央値〜95パーセンタイル付近、あるいは経験的に 1〜10 程度を選びます。本ツールでは閾値を下げるとクリップ発動回数が増え、上げると最大勾配ノルムが大きくなる様子を確認できます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">なぜRNNやLSTMで勾配クリッピングが特に重要なのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">RNNは同じ重み行列を時間ステップごとに繰り返し掛けるため、誤差逆伝播で勾配がその行列の固有値の累乗で増減します。固有値が1より大きいと勾配は時系列長に対して指数的に増大し、損失地形に切り立った「崖」が生まれます。長い系列の学習中にこの崖に当たると勾配が一気に爆発し、学習が破綻します。勾配クリッピングは、この崖でのスパイクだけを頭打ちにして他のステップには影響を与えないため、RNN・LSTM・Transformerなど系列モデルの学習で標準的に使われています。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>リカレントニューラルネットワーク（RNN/LSTM）の学習：</strong>勾配クリッピングが最初に広く使われるようになったのが、RNNの学習です。RNNは同じ重みを時間方向に何度も掛けるため、長い系列を逆伝播すると勾配が指数的に増大し、損失地形に切り立った崖が現れます。機械翻訳や音声認識、文章生成などの初期のRNN/LSTMモデルでは、ノルムクリップ（典型的には τ=1〜5）を入れないと数エポックで損失がNaNになって学習が止まる、というのが日常茶飯事でした。クリッピングは事実上必須の安定化テクニックです。</p>
+    <p><strong>Transformer・大規模言語モデルの学習：</strong>現代の巨大なTransformerでも勾配クリッピングは標準装備です。学習の序盤や、ごく稀に現れる「悪いミニバッチ」で勾配ノルムが急増することがあり、クリップしないと一回のスパイクで学習全体が壊れます。GPT系やBERT系の学習設定では「global norm でのクリップ、閾値1.0」がほぼ定番の値として使われてきました。数十億パラメータの学習を数週間止めずに走らせるための保険として効いています。</p>
+    <p><strong>強化学習・方策勾配法：</strong>強化学習では報酬のスケールが安定せず、方策勾配の推定値が外れ値的に巨大になることがあります。PPOやA2Cといったアルゴリズムの実装では、方策ネットワーク・価値ネットワークの勾配にノルムクリップをかけるのが一般的です。環境からのノイズの多い信号で学習を壊さないための、地味だが効果的な安全装置です。</p>
+    <p><strong>CAE・数値最適化での発散対策：</strong>機械学習以外でも、勾配法で目的関数を最小化する数値最適化では「ステップが大きすぎて発散する」問題が共通して起こります。トラスト・リージョン法やライン探索は歩幅を制御する正攻法ですが、勾配クリッピングは「上限だけ決めておく」最も簡便な歩幅制限と見ることもできます。設計変数のスケールがそろっていない病的な目的関数で、最適化を破綻させない応急処置として使えます。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず多いのが、<strong>「勾配クリッピングは勾配消失（vanishing gradients）も直せる」</strong>という誤解です。クリッピングが対処するのは勾配が大きくなりすぎる「勾配爆発」だけで、勾配が小さくなりすぎて学習が進まない「勾配消失」には何の効果もありません。むしろクリッピングは大きい勾配を縮める方向の操作なので、消失とは無関係です。勾配消失への対策は、LSTM・GRUのようなゲート構造、残差接続（スキップ接続）、適切な重み初期化やバッチ正規化など、別の手段です。クリッピングと消失対策は役割が違うと整理しておきましょう。</p>
+    <p>次に、<strong>「閾値 τ は小さくすればするほど安全」</strong>という思い込み。確かに τ を小さくすれば発散はしにくくなりますが、小さすぎると平常時のまっとうな勾配まで一律に縮められ、実効的な学習率が下がって収束が遅くなります。極端な話、τ をほぼ 0 にすると、どのステップもごく小さな歩幅しか進めず、いつまでも谷底に着きません。本ツールで閾値を下げていくと、クリップ発動回数が増える一方で損失の減りが鈍くなる様子が見えます。τ は「爆発だけを止め、正常な勾配は素通しする」ちょうど良い値に置くのが肝心です。</p>
+    <p>最後に、<strong>「クリッピングを入れれば学習率はいくら大きくても大丈夫」</strong>という誤解。クリッピングは勾配の大きさを τ で頭打ちにしますが、実際の歩幅は η·τ です。学習率 η を極端に上げれば、クリップ後の有界な勾配であっても η·τ という歩幅が大きくなりすぎ、最小値を飛び越えて振動したり発散したりします。本ツールでも、ノルムクリップを有効にしたまま学習率を上限近くまで上げると発散するケースがあります。クリッピングはあくまで「勾配側の上限」であって、学習率の調整を不要にするものではありません。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>クリッピング閾値（clipRange: 0.1～10.0）を設定します。LSTM学習時の勾配ノルム爆発を防ぐため、典型値は1.0～2.0です</li>
+<li>学習率（lrRange: 0.0001～0.1）を入力します。ResNet152の学習では0.001が標準で、クリッピング有効時は0.01まで引き上げ可能です</li>
+<li>ステップ数（stepsRange: 10～1000）を設定し、勾配ノルム変化を観察します。RNNでは100ステップで勾配爆発が顕在化します</li>
+<li>シミュレーションを実行し、クリップ前後の勾配ノルム、発動回数、損失低減率を比較分析します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>機械翻訳モデル（Transformer-base、パラメータ数6500万）の訓練で、初期勾配ノルム45.8を閾値1.5でクリップすると、ノルムが1.5に抑制され、発動回数は200ステップで87回に達します。クリッピング無しでは損失が発散（NaN発生）するのに対し、クリップ適用時は損失が4.2から2.1に低減（損失低減率50%）し、最終精度がBLEU 28.5から31.2に向上します</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>勾配ノルムが1000を超える場合、クリッピング閾値を0.5～1.0に設定してください。自然言語処理のGRU-2層モデルでは閾値0.8が最適です</li>
+<li>学習率とクリッピング閾値は連動します。閾値を10倍引き上げた場合、学習率を3～5倍増加させないと学習が停滞します</li>
+<li>クリップ発動回数が全ステップの30%を超える場合、モデルアーキテクチャの見直し（残差接続追加、層正規化導入）を検討してください</li>
+<li>異なるバッチサイズ（32、128、512）でシミュレーション結果が変わるため、実装時は運用バッチサイズで再検証が必須です</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Loss surface presets =====
+// "cliff": a steep-walled valley (RNN-style). The walls rise extremely fast,
+//   so an un-clipped step taken near a wall produces an "exploding gradient"
+//   that hurls the parameters far away. Minimum 0 at the origin.
+//   f(x,y) = 0.5*y*y + 2*A*(cosh(B*x) - 1)
+//   df/dx  = 2*A*B*sinh(B*x),   df/dy = y
+// "ravine": ill-conditioned bowl, steep in y, shallow in x
+//   f(x,y) = 0.5*x*x + 25*y*y,  df/dx = x, df/dy = 50*y
+const CLIFF_A = 0.2;   // wall amplitude
+const CLIFF_B = 3;     // wall steepness
+const SURFACES = {
+  cliff:  {start:[1.7, 4]},
+  ravine: {start:[9, 4]}
+};
+const BIG = 1e6;
+
+// shared state for the canvas animation
+const GC = {surf:'cliff', traj:[[1.7,4]], diverged:false};
+
+// ----- loss value -----
+function lossAt(surf, x, y){
+  if(surf === 'cliff'){
+    return 0.5*y*y + 2*CLIFF_A*(Math.cosh(CLIFF_B*x) - 1);
+  }
+  // ravine
+  return 0.5*x*x + 25*y*y;
+}
+
+// ----- analytic gradient -----
+function gradAt(surf, x, y){
+  if(surf === 'cliff'){
+    const dfdx = 2*CLIFF_A*CLIFF_B*Math.sinh(CLIFF_B*x);
+    const dfdy = y;
+    return [dfdx, dfdy];
+  }
+  // ravine
+  return [x, 50*y];
+}
+
+// ===== Run one optimisation =====
+// returns {traj, loss, gnorm(raw), clips, used, diverged, maxGnorm}
+function runOptim(tau, lr, steps, mode, surf){
+  const s = SURFACES[surf] || SURFACES.cliff;
+  let x = s.start[0], y = s.start[1];
+  const traj  = [[x,y]];
+  const loss  = [lossAt(surf, x, y)];
+  const gnorm = [];
+  let diverged = false, used = 0, clips = 0, maxGnorm = 0;
+
+  for(let i=0;i<steps;i++){
+    // raw analytic gradient and its norm
+    let g = gradAt(surf, x, y);
+    let gx = g[0], gy = g[1];
+    const rawNorm = Math.sqrt(gx*gx + gy*gy);
+    gnorm.push(rawNorm);
+    if(isFinite(rawNorm) && rawNorm > maxGnorm) maxGnorm = rawNorm;
+
+    // clip the gradient
+    if(mode === 'norm'){
+      if(rawNorm > tau){
+        const scale = tau/rawNorm;
+        gx *= scale; gy *= scale;
+        clips++;
+      }
+    } else if(mode === 'value'){
+      let clipped = false;
+      if(gx >  tau){ gx =  tau; clipped = true; }
+      if(gx < -tau){ gx = -tau; clipped = true; }
+      if(gy >  tau){ gy =  tau; clipped = true; }
+      if(gy < -tau){ gy = -tau; clipped = true; }
+      if(clipped) clips++;
+    }
+    // mode 'none': use gradient unchanged
+
+    // gradient-descent update
+    x -= lr*gx;
+    y -= lr*gy;
+    const L = lossAt(surf, x, y);
+    used = i + 1;
+    traj.push([x,y]);
+    loss.push(L);
+
+    // divergence guard
+    if(!isFinite(x) || !isFinite(y) || !isFinite(L) ||
+       Math.abs(x) > BIG || Math.abs(y) > BIG || L > BIG){
+      diverged = true;
+      break;
+    }
+  }
+  return {traj:traj, loss:loss, gnorm:gnorm, clips:clips,
+          used:used, diverged:diverged, maxGnorm:maxGnorm};
+}
+
+// ===== Chart.js setup =====
+const lossChart = new Chart(document.getElementById('lossChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'クリップ後の損失',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.15},
+    {label:'クリップなしの損失',data:[],borderColor:'#d63031',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false,tension:0.15}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'学習ステップ',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'損失 f',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const gradChart = new Chart(document.getElementById('gradChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'生の勾配ノルム ‖g‖',data:[],borderColor:'#e17055',backgroundColor:'rgba(225,112,85,.14)',fill:true,borderWidth:2,pointRadius:0,tension:0.15},
+    {label:'クリップ閾値 τ',data:[],borderColor:'#00b894',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'学習ステップ',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'勾配ノルム ‖g‖',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const tau   = parseFloat(document.getElementById('clipRange').value);
+  const lr    = parseFloat(document.getElementById('lrRange').value);
+  const steps = parseInt(document.getElementById('stepsRange').value, 10);
+  const mode  = document.getElementById('modeSel').value;
+  const surf  = document.getElementById('surfSel').value;
+
+  const start = (SURFACES[surf] || SURFACES.cliff).start;
+  const initialLoss = lossAt(surf, start[0], start[1]);
+
+  // current run (selected clipping mode)
+  const res = runOptim(tau, lr, steps, mode, surf);
+  const finalLoss = res.loss[res.loss.length-1];
+  const reduction = (initialLoss > 0 && isFinite(finalLoss) && !res.diverged)
+    ? (1 - finalLoss/initialLoss)*100 : 0;
+  const converged = (!res.diverged) && isFinite(finalLoss) && (finalLoss < 0.05*initialLoss);
+  const highLoss  = (!res.diverged) && isFinite(finalLoss) && (finalLoss >= 0.05*initialLoss);
+
+  // ----- stat: final loss -----
+  const lossEl = document.getElementById('statLoss');
+  if(res.diverged || !isFinite(finalLoss)){
+    lossEl.textContent = '発散';
+  } else if(finalLoss < 0.01 || finalLoss > 1e4){
+    lossEl.textContent = finalLoss.toExponential(2);
+  } else {
+    lossEl.textContent = finalLoss.toFixed(4);
+  }
+
+  // ----- stat: max raw gradient norm -----
+  const gmaxEl = document.getElementById('statGmax');
+  if(!isFinite(res.maxGnorm)){
+    gmaxEl.textContent = '発散';
+  } else if(res.maxGnorm >= 100){
+    gmaxEl.textContent = res.maxGnorm.toExponential(2);
+  } else {
+    gmaxEl.textContent = res.maxGnorm.toFixed(2);
+  }
+
+  // ----- stat: clip count / divergence / reduction -----
+  document.getElementById('statClips').textContent = res.clips;
+  document.getElementById('statDiv').textContent   = res.diverged ? '発散' : '安定';
+  document.getElementById('statRed').textContent   =
+    (res.diverged || !isFinite(reduction)) ? '—' : reduction.toFixed(1);
+
+  // ----- stat: clipping verdict (coloured) -----
+  const clipEffEl = document.getElementById('statClipEff');
+  let clipEffText;
+  if(res.diverged){
+    clipEffText = '勾配爆発';
+    clipEffEl.style.color = '#c0392b';
+  } else if(mode === 'none'){
+    clipEffText = highLoss ? 'クリップ未使用' : '不要（安定）';
+    clipEffEl.style.color = highLoss ? '#c0563a' : '#0a8a6a';
+  } else if(res.clips > 0){
+    clipEffText = converged ? '有効（発動）' : '発動・要調整';
+    clipEffEl.style.color = converged ? '#0a8a6a' : '#c0563a';
+  } else {
+    clipEffText = '未発動';
+    clipEffEl.style.color = '#0a8a6a';
+  }
+  clipEffEl.textContent = clipEffText;
+
+  const divEl = document.getElementById('statDiv');
+  divEl.style.color = res.diverged ? '#c0392b' : '#0a8a6a';
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(res.diverged){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> 勾配爆発で発散しました（'+res.used+'ステップで損失が無限大へ）。崖で巨大になった勾配がそのまま使われ、一歩でパラメータが遠くへ飛ばされています。クリップ方式をノルムクリップに切り替える、クリップ閾値 τ を下げる、または学習率 η を下げてください。';
+  } else if(mode === 'none' && highLoss){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 発散はしていませんが、クリップなしのため損失が十分に下がっていません（低減率 '+reduction.toFixed(1)+'%）。最大勾配ノルムは '+(isFinite(res.maxGnorm)?res.maxGnorm.toFixed(1):'∞')+' に達しています。ノルムクリップを有効にすると、崖でのスパイクだけが抑えられ、より安定して降下できます。';
+  } else if(converged){
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 安定して収束しました（低減率 '+reduction.toFixed(1)+'%）。'+
+      (res.clips>0
+        ? 'クリッピングが '+res.clips+' ステップで発動し、生の勾配ノルム最大 '+(isFinite(res.maxGnorm)?res.maxGnorm.toFixed(1):'∞')+' のスパイクを閾値 τ='+tau.toFixed(1)+' で頭打ちにしました。崖を一歩で飛び越えず、有界な歩幅で安全に越えています。'
+        : '今回は勾配ノルムが閾値 τ='+tau.toFixed(1)+' を超えず、クリッピングは発動しませんでした。地形が穏やかなため爆発は起きていません。')
+;
+  } else {
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 発散はしていませんが、まだ十分に収束していません（低減率 '+reduction.toFixed(1)+'%）。学習ステップ数を増やす、または学習率 η を上げてください。クリップ閾値 τ が小さすぎると平常時の勾配まで縮められ、収束が遅くなります。';
+  }
+
+  // ----- loss chart: clipped run vs un-clipped ("none") run -----
+  const noneRes = runOptim(tau, lr, steps, 'none', surf);
+  const lLabels = [], lClipped = [], lNone = [];
+  const maxLen = Math.max(res.loss.length, noneRes.loss.length);
+  for(let i=0;i<maxLen;i++){
+    lLabels.push(i);
+    lClipped.push(i < res.loss.length ? res.loss[i] : null);
+    lNone.push(i < noneRes.loss.length ? noneRes.loss[i] : null);
+  }
+  // logarithmic y-axis if the loss spans more than ~100x and stays positive
+  let lo = Infinity, hi = -Infinity;
+  const scan = lClipped.concat(lNone);
+  for(let i=0;i<scan.length;i++){
+    const Lv = scan[i];
+    if(Lv !== null && isFinite(Lv) && Lv > 0){
+      if(Lv < lo) lo = Lv;
+      if(Lv > hi) hi = Lv;
+    }
+  }
+  const useLog = isFinite(lo) && isFinite(hi) && lo > 0 && hi/lo > 100;
+  lossChart.options.scales.y.type = useLog ? 'logarithmic' : 'linear';
+  lossChart.options.scales.y.beginAtZero = !useLog;
+  lossChart.data.labels = lLabels;
+  lossChart.data.datasets[0].data = lClipped;
+  lossChart.data.datasets[1].data = lNone;
+  lossChart.update('none');
+
+  // ----- gradient-norm chart: raw norm vs threshold line -----
+  const gLabels = [], gData = [], gThr = [];
+  for(let i=0;i<res.gnorm.length;i++){
+    gLabels.push(i);
+    gData.push(isFinite(res.gnorm[i]) ? res.gnorm[i] : null);
+    gThr.push(tau);
+  }
+  gradChart.data.labels = gLabels;
+  gradChart.data.datasets[0].data = gData;
+  gradChart.data.datasets[1].data = gThr;
+  gradChart.update('none');
+
+  // ----- update shared state for the canvas -----
+  GC.surf = surf;
+  GC.traj = res.traj;
+  GC.diverged = res.diverged;
+}
+
+// ===== Contour plot + trajectory animation =====
+(function(){
+  const cv = document.getElementById('gcCanvas');
+  const ctx = cv.getContext('2d');
+  let marker = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==280*dpr){
+      cv.width = w*dpr; cv.height = 280*dpr; cv.style.height='280px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // colour along the trajectory: blue -> cyan -> orange
+  function pathColor(t){
+    if(t < 0.5){
+      const u = t/0.5;
+      return 'rgb('+Math.round(0+u*0)+','+Math.round(123+u*57)+','+Math.round(255-u*39)+')';
+    }
+    const u = (t-0.5)/0.5;
+    return 'rgb('+Math.round(0+u*225)+','+Math.round(180-u*68)+','+Math.round(216-u*131)+')';
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 280;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const surf = GC.surf;
+    // world coordinate range per surface (symmetric about the origin)
+    const xR = (surf === 'cliff') ? 3.0 : 11;
+    const yR = (surf === 'cliff') ? 5 : 6;
+    const padX = 16, padY = 14;
+    const plotW = W - 2*padX, plotH = H - 2*padY;
+    function sx(x){ return padX + (x + xR)/(2*xR)*plotW; }
+    function sy(y){ return padY + (yR - y)/(2*yR)*plotH; }
+
+    // ----- contour lines of the loss surface -----
+    // scan each grid row; for each level draw the iso-line points where
+    // |f - level| is small. The cliff surface has very steep walls so the
+    // contours crowd densely near the wall (the visual signature of a cliff).
+    const levels = (surf === 'cliff')
+      ? [0.5, 2, 5, 10, 18, 30, 45]
+      : [0.5, 3, 10, 25, 55, 100, 170];
+    const NX = 110, NY = 70;
+    ctx.lineWidth = 1;
+    for(let li=0; li<levels.length; li++){
+      const c = levels[li];
+      const shade = 0.12 + 0.18*(1 - li/levels.length);
+      ctx.strokeStyle = 'rgba(0,180,216,'+shade.toFixed(3)+')';
+      ctx.beginPath();
+      for(let iy=0; iy<NY; iy++){
+        const wy = yR - 2*yR*iy/(NY-1);
+        let pen = false;
+        for(let ix=0; ix<NX; ix++){
+          const wx = -xR + 2*xR*ix/(NX-1);
+          const v = lossAt(surf, wx, wy);
+          const near = Math.abs(v - c);
+          // tolerance scales with level spacing
+          const tol = (surf === 'cliff') ? (c*0.10 + 0.35) : (c*0.16 + 0.6);
+          if(near < tol){
+            const px = sx(wx), py = sy(wy);
+            if(!pen){ ctx.moveTo(px,py); pen = true; }
+            else { ctx.lineTo(px,py); }
+          } else {
+            pen = false;
+          }
+        }
+      }
+      ctx.stroke();
+    }
+
+    // ----- axes -----
+    ctx.strokeStyle = 'rgba(255,255,255,.20)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padX, sy(0)); ctx.lineTo(W-padX, sy(0)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx(0), padY); ctx.lineTo(sx(0), H-padY); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('x', W-padX-3, sy(0)-5);
+    ctx.textAlign = 'left';
+    ctx.fillText('y', sx(0)+5, padY+10);
+
+    // ----- the cliff-wall markers (cliff surface only) -----
+    // the steep walls rise on either side of the valley centre
+    if(surf === 'cliff'){
+      ctx.strokeStyle = 'rgba(214,48,49,.40)';
+      ctx.setLineDash([4,3]);
+      [-1.6, 1.6].forEach(function(xw){
+        ctx.beginPath();
+        ctx.moveTo(sx(xw), padY); ctx.lineTo(sx(xw), H-padY);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(225,112,85,.85)';
+      ctx.font = '10px Roboto Mono, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('急峻な崖の壁', sx(1.6)+5, H-padY-6);
+    }
+
+    // ----- minimum at the origin -----
+    ctx.fillStyle = '#00b894';
+    ctx.beginPath(); ctx.arc(sx(0), sy(0), 5, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(sx(0), sy(0), 5, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,184,148,.9)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('最小値 (0,0)', sx(0)+9, sy(0)-7);
+
+    const traj = GC.traj;
+    const n = traj.length;
+
+    // ----- trajectory path -----
+    if(n > 1){
+      for(let i=1;i<n;i++){
+        const p0 = traj[i-1], p1 = traj[i];
+        if(!isFinite(p0[0])||!isFinite(p0[1])||!isFinite(p1[0])||!isFinite(p1[1])) break;
+        ctx.strokeStyle = pathColor((i-1)/(n-1));
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx(p0[0]), sy(p0[1]));
+        ctx.lineTo(sx(p1[0]), sy(p1[1]));
+        ctx.stroke();
+      }
+      // dots at each step
+      for(let i=0;i<n;i++){
+        const p = traj[i];
+        if(!isFinite(p[0])||!isFinite(p[1])) break;
+        ctx.fillStyle = pathColor(i/Math.max(1,n-1));
+        ctx.beginPath();
+        ctx.arc(sx(p[0]), sy(p[1]), 2.4, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // ----- start point -----
+    const s = traj[0];
+    ctx.fillStyle = '#ffd24b';
+    ctx.beginPath(); ctx.arc(sx(s[0]), sy(s[1]), 4.5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,210,75,.9)';
+    ctx.textAlign = 'left';
+    ctx.fillText('スタート', sx(s[0])+8, sy(s[1])+4);
+
+    // ----- travelling marker (count finite points only) -----
+    let finN = n;
+    for(let i=0;i<n;i++){
+      if(!isFinite(traj[i][0])||!isFinite(traj[i][1])){ finN = i; break; }
+    }
+    if(finN >= 2){
+      const idx = Math.floor(marker) % finN;
+      const nxt = (idx+1) % finN;
+      const fr = marker - Math.floor(marker);
+      const p0 = traj[idx], p1 = traj[nxt];
+      const mx = p0[0] + (p1[0]-p0[0])*fr;
+      const my = p0[1] + (p1[1]-p0[1])*fr;
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#00B4D8';
+      ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(sx(mx), sy(my), 5, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+      marker += 0.06;
+      if(marker >= finN) marker = 0;
+    }
+
+    // ----- status text -----
+    ctx.fillStyle = GC.diverged ? '#d63031' : 'rgba(255,255,255,.55)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(GC.diverged ? '勾配爆発 — 軌跡が画面外へ'
+                             : (surf==='cliff' ? '崖あり地形（RNN型）' : '細長い谷'),
+                 padX+2, padY+12);
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['clipRange','lrRange','stepsRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

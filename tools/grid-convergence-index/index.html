@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>グリッド収束指数 (GCI) シミュレーター — Roache法・離散化誤差評価 | NovaSolver</title>
+<meta name="description" content="ASME V&V 20 標準の Roache 法によるグリッド収束指数 (GCI) を計算。細・中・粗3メッシュの解から観測収束次数 p、Richardson補外値、細メッシュGCI、漸近収束チェックを評価し、CFD・FEMの離散化誤差を保守的に見積もる無料シミュレーターです。">
+<link rel="canonical" href="https://novasolver.jp/tools/grid-convergence-index.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/grid-convergence-index.html">
+<meta property="og:title" content="グリッド収束指数 (GCI) シミュレーター — Roache法・離散化誤差評価 | NovaSolver Project">
+<meta property="og:description" content="ASME V&V 20 標準の Roache 法による GCI を計算。3メッシュの解から離散化誤差をリアルタイムで定量化し、漸近収束領域も自己診断します。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Grid Convergence Index (GCI) simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/grid-convergence-index.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/grid-convergence-index.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/grid-convergence-index.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/grid-convergence-index.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#gciCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "グリッド収束指数 (GCI) シミュレーター",
+      "description": "ASME V&V 20 標準の Roache 法によるグリッド収束指数 (GCI) を計算。細・中・粗3メッシュの解から観測収束次数 p、Richardson補外値、細メッシュGCI、漸近収束チェックを評価し、CFD・FEMの離散化誤差を保守的に見積もる無料シミュレーターです。",
+      "url": "https://novasolver.jp/tools/grid-convergence-index.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Verification & Validation Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["Roache法によるグリッド収束指数 (GCI) 計算","観測収束次数 p の自動算出","Richardson補外値 f_ext の推定","細メッシュ・粗メッシュ GCI(%) の評価","漸近収束領域の自己診断","ASME V&V 20 標準準拠"],
+      "keywords": "GCI,グリッド収束指数,Roache法,ASME V&V 20,Richardson補外,離散化誤差,CFD検証,メッシュ独立性",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "グリッド収束指数 (GCI) とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "GCI (Grid Convergence Index) は、Roache (1994) が提案した離散化誤差の保守的な指標で、ASME V&V 20-2009 で標準化されています。3つの異なるメッシュ（細・中・粗）で同じ問題を解き、その解の差から「現在の細メッシュ解が真値からどれくらいズレている可能性があるか」をパーセントで表します。たとえば GCI21 = 6.25% なら、細メッシュ解の不確かさが ±6.25% 程度であることを意味します。CFDや有限要素解析の検証 (Verification) で必須のメトリクスです。"}
+        },{
+          "@type": "Question",
+          "name": "安全係数 F_s = 1.25 はどこから来たのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "F_s = 1.25 は Roache (1998) と ASME V&V 20 で推奨されている、3つのメッシュを使う場合の標準値です。Richardson補外による誤差推定は理想的な漸近域では正確ですが、実際の CFD/FEM では完全な漸近域にいるとは限らないため、推定誤差を 1.25 倍に膨らませて保守的に評価します。2メッシュしか使えない場合は F_s = 3.0 が推奨されます。F_s を 1.0 にすると Richardson 誤差そのものになり、保守性が失われます。"}
+        },{
+          "@type": "Question",
+          "name": "漸近収束チェックの値はどう解釈しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "漸近収束チェック GCI32 / (r^p · GCI21) は理論上 1.0 になるべき値です。0.9〜1.1 程度であれば「漸近収束領域内」とみなし、Richardson補外が信頼できると判断します。1.0 から大きく外れる場合、メッシュがまだ十分細かくない、解が単調収束していない（振動収束）、あるいは観測収束次数 p が理論次数と大きく異なる、といった理由が考えられます。この場合はさらにメッシュを細分化するか、ソルバー設定（離散化スキーム・境界条件）を見直す必要があります。"}
+        },{
+          "@type": "Question",
+          "name": "観測収束次数 p が理論値（2次精度など）と一致しないのはなぜですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "観測収束次数 p が理論次数（例えば 2次精度スキームなら p=2）と一致しないのはよくあります。原因は (1) メッシュがまだ漸近域に入っていない、(2) 境界条件や境界層・衝撃波付近で局所的に精度が落ちている、(3) 異方性メッシュやハイブリッドメッシュで実効精度が下がっている、(4) 限定子 (limiter) が働いて1次精度に落ちている、などです。p が 0.5 未満や 5 を超えると Richardson 補外は信頼できないため、メッシュ系列を見直してください。理想的には p = 1.0〜2.5 程度が健全な範囲です。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "グリッド収束指数 (GCI) シミュレーター", "item": "https://novasolver.jp/tools/grid-convergence-index.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">グリッド収束指数 (GCI) シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/grid-convergence-index.html" class="active">JA</a>
+      <a href="/en/tools/grid-convergence-index.html">EN</a>
+      <a href="/zh/tools/grid-convergence-index.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-check-double"></i> 検証・妥当性確認 (V&V)</div>
+    <h1>グリッド収束指数 (GCI) シミュレーター</h1>
+    <p class="hero-sub">CFDや有限要素解析で「メッシュをどこまで細かくすれば信頼できるか」を定量化するツールです。細・中・粗の3メッシュでの解を入力すると、ASME V&V 20 標準の Roache 法で観測収束次数・Richardson補外値・細メッシュGCI・漸近収束チェックがリアルタイムに求まります。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">細メッシュ解 f₁</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="f1Num" value="100" min="0.1" max="10000" step="0.1" oninput="syncFromNum('f1Range','f1Num')"></div>
+      </div>
+      <div class="param-desc">最も細かいメッシュでの解（例：抗力係数・最大応力）</div>
+      <input type="range" id="f1Range" min="0.1" max="10000" step="0.1" value="100" oninput="syncToNum('f1Range','f1Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">中メッシュ解 f₂</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="f2Num" value="105" min="0.1" max="10000" step="0.1" oninput="syncFromNum('f2Range','f2Num')"></div>
+      </div>
+      <div class="param-desc">代表寸法 h₂ = r·h₁ のメッシュでの解</div>
+      <input type="range" id="f2Range" min="0.1" max="10000" step="0.1" value="105" oninput="syncToNum('f2Range','f2Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">粗メッシュ解 f₃</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="f3Num" value="115" min="0.1" max="10000" step="0.1" oninput="syncFromNum('f3Range','f3Num')"></div>
+      </div>
+      <div class="param-desc">代表寸法 h₃ = r²·h₁ のメッシュでの解</div>
+      <input type="range" id="f3Range" min="0.1" max="10000" step="0.1" value="115" oninput="syncToNum('f3Range','f3Num');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">リファインメント比 r</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="rNum" value="2.0" min="1.5" max="4" step="0.1" oninput="syncFromNum('rRange','rNum')"></div>
+      </div>
+      <div class="param-desc">h₂/h₁ = h₃/h₂。1.3 以上が推奨、2.0 が標準</div>
+      <input type="range" id="rRange" min="1.5" max="4" step="0.1" value="2.0" oninput="syncToNum('rRange','rNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">安全係数 F_s</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="fsNum" value="1.25" min="1.0" max="3.0" step="0.05" oninput="syncFromNum('fsRange','fsNum')"></div>
+      </div>
+      <div class="param-desc">3メッシュ系の推奨値 1.25（Roache 1998）</div>
+      <input type="range" id="fsRange" min="1.0" max="3.0" step="0.05" value="1.25" oninput="syncToNum('fsRange','fsNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statP">—</div><div class="sl">観測収束次数 p</div></div>
+        <div class="stat-card"><div class="sv" id="statExt">—</div><div class="sl">Richardson補外値 f_ext</div></div>
+        <div class="stat-card"><div class="sv" id="statGci21">—</div><div class="sl">細メッシュ GCI (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statGci32">—</div><div class="sl">粗メッシュ GCI (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statAsym">—</div><div class="sl">漸近収束チェック GCI32/(r^p·GCI21)</div></div>
+        <div class="stat-card"><div class="sv" id="statJudge">—</div><div class="sl">収束判定</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-project-diagram"></i> メッシュ収束図 — 細さ 1/h に対する解 f</div>
+      <canvas id="gciCanvas"></canvas>
+      <p class="canvas-hint">横軸はメッシュの細かさ 1/h（右へ行くほど細かい）。3つの計算点（f₃, f₂, f₁）と、Richardson補外による h→0 の外挿値 f_ext を表示します。細メッシュ点に GCI 誤差バンドを重ねています。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 解 f vs メッシュ細かさ 1/h（漸近線付き）</div>
+      <canvas class="ux-chartjs-canvas" id="convChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> GCI(%) vs リファインメント比 r</div>
+      <canvas class="ux-chartjs-canvas" id="ratioChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$p=\frac{\ln(|f_3-f_2|/|f_2-f_1|)}{\ln r},\quad \text{GCI}_{21}=\frac{F_s\,|e_{21}|}{r^p-1},\quad f_{ext}=f_1+\frac{f_1-f_2}{r^p-1}$$</p>
+      <p style="margin-top:6px;">観測収束次数 p、細メッシュ GCI、Richardson補外値 f_ext。e₂₁ = |f₁-f₂|/|f₁| は相対誤差、r はリファインメント比、F_s は安全係数。ASME V&V 20 標準。F_s=1.25 が3グリッド系の推奨安全係数。</p>
+      <p style="margin-top:10px;">$$\text{GCI}_{32}=\frac{F_s\,|e_{32}|}{r^p-1},\quad \frac{\text{GCI}_{32}}{r^p\,\text{GCI}_{21}}\approx 1$$</p>
+      <p style="margin-top:6px;">粗メッシュ GCI と漸近収束チェック。比が 0.9〜1.1 なら漸近収束領域内とみなし、Richardson補外が信頼できる。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>グリッド収束指数 (GCI) とは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">CFDの解析結果を見て「メッシュ依存性が…」って先輩がよく言うんですけど、結局メッシュを何分割すれば信頼できるんですか？感覚で決めてるんですかね？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だね。実は感覚で決めるべきじゃなくて、ちゃんと標準化された手法があるんだ。それが「GCI（Grid Convergence Index）」と呼ばれるもので、ASME V&V 20 という国際標準で決まっている。同じ問題を細・中・粗の3つの異なるメッシュで解いて、その差を見れば「今の細メッシュ解が真値からどれくらいズレている可能性があるか」をパーセントで出せるんだ。CFDの論文でも、ジャーナルに投稿するなら GCI の表示はほぼ必須になっているよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど、3メッシュ必要なんですね。でもデフォルト値（f₁=100, f₂=105, f₃=115）でやると、細メッシュ GCI が 6.25% って出てます。これって「真値は100±6.25くらい」って意味ですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、まさにその解釈で合ってる。GCI 6.25% は「細メッシュ解 f₁=100 の不確かさが ±6.25% 程度」という意味で、保守的に「真値は 93.75〜106.25 の間にある可能性が高い」と読む。同時に Richardson 補外値 f_ext=95 も出ているけど、これは「メッシュを無限に細かくしたときの推定値」だ。100 と 95 の差が、まさに離散化誤差そのものだね。GCI はその誤差を 1.25 倍の安全係数で膨らませた、より保守的な上限と思えばいい。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「漸近収束チェック」っていう値も出てますね。これは何を見てるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">これは「Richardson 補外を信用していいか」のセルフチェックなんだ。理論上、漸近収束領域にいれば GCI32/(r^p·GCI21) はちょうど 1 になるべき。デフォルト設定では 0.952 が出ていて、これは「ほぼ1なので漸近域内、信頼できる」という意味。逆にこれが 0.5 や 2.0 みたいに大きく外れていると、「まだメッシュが粗すぎて理論通りに収束していない」というサイン。その場合はもう一段細いメッシュで計算をやり直す必要があるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">観測収束次数 p ってのが 1.000 になってます。これは2次精度スキームを使ったら 2 になるはずですよね？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">鋭い！デフォルトの例だと、解の差が（f₁→f₂で5, f₂→f₃で10）と完全に2倍ずつ変化しているから、p = ln(2)/ln(2) = 1 になる。これは「実効的に1次精度で収束している」ということ。理論的に2次精度スキームを使っていても、観測 p が1になる原因はいくつかあって、(1) 境界層メッシュが粗すぎて1次精度に落ちている、(2) 限定子（limiter）が頻繁に発動している、(3) まだ漸近域に入っていない、などが典型例。実務で2次スキームを使っていて p=1 が観測されたら、まずメッシュをさらに細かくして p が 2 に近づくか確認するのが定石だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">リファインメント比 r って、どれくらいに設定すればいいんですか？2 で固定でもいいんでしょうか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">r = 2 は最も使われる値で、構造格子なら各方向のメッシュを半分にするだけだから実装も楽。ただし ASME V&V 20 では「r ≥ 1.3 が推奨」とあって、必ずしも 2 でなくていい。非構造格子だと体積比で 8 倍（線形寸法で 2 倍）にするのが大変なので、r = 1.5 程度で3メッシュを用意するケースも多い。逆に r を大きくしすぎる（4 以上）と、粗メッシュ解がそもそも実用的な精度に届かず、解の傾向が変わってしまうことがあるので注意。下の「GCI(%) vs r」グラフを動かしてみると、r による GCI の変化が見えるよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">グリッド収束指数 (GCI) とは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">GCI (Grid Convergence Index) は、Roache (1994) が提案した離散化誤差の保守的な指標で、ASME V&V 20-2009 で標準化されています。3つの異なるメッシュ（細・中・粗）で同じ問題を解き、その解の差から「現在の細メッシュ解が真値からどれくらいズレている可能性があるか」をパーセントで表します。たとえば GCI21 = 6.25% なら、細メッシュ解の不確かさが ±6.25% 程度であることを意味します。CFDや有限要素解析の検証 (Verification) で必須のメトリクスです。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">安全係数 F_s = 1.25 はどこから来たのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">F_s = 1.25 は Roache (1998) と ASME V&V 20 で推奨されている、3つのメッシュを使う場合の標準値です。Richardson補外による誤差推定は理想的な漸近域では正確ですが、実際の CFD/FEM では完全な漸近域にいるとは限らないため、推定誤差を 1.25 倍に膨らませて保守的に評価します。2メッシュしか使えない場合は F_s = 3.0 が推奨されます。F_s を 1.0 にすると Richardson 誤差そのものになり、保守性が失われます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">漸近収束チェックの値はどう解釈しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">漸近収束チェック GCI32 / (r^p · GCI21) は理論上 1.0 になるべき値です。0.9〜1.1 程度であれば「漸近収束領域内」とみなし、Richardson補外が信頼できると判断します。1.0 から大きく外れる場合、メッシュがまだ十分細かくない、解が単調収束していない（振動収束）、あるいは観測収束次数 p が理論次数と大きく異なる、といった理由が考えられます。この場合はさらにメッシュを細分化するか、ソルバー設定（離散化スキーム・境界条件）を見直す必要があります。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">観測収束次数 p が理論値（2次精度など）と一致しないのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">観測収束次数 p が理論次数（例えば 2次精度スキームなら p=2）と一致しないのはよくあります。原因は (1) メッシュがまだ漸近域に入っていない、(2) 境界条件や境界層・衝撃波付近で局所的に精度が落ちている、(3) 異方性メッシュやハイブリッドメッシュで実効精度が下がっている、(4) 限定子 (limiter) が働いて1次精度に落ちている、などです。p が 0.5 未満や 5 を超えると Richardson 補外は信頼できないため、メッシュ系列を見直してください。理想的には p = 1.0〜2.5 程度が健全な範囲です。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>航空機・自動車空力 CFD：</strong>翼や車体まわりの抗力係数・揚力係数を求める CFD では、メッシュ依存性を排除した値を提示することが必須です。AIAA Drag Prediction Workshop や自動車メーカーの空力解析仕様書では、GCI 5% 以下を目標値とすることが多く、3〜4 メッシュレベルで計算して GCI を報告することが標準的なフローになっています。</p>
+    <p><strong>ターボ機械・燃焼器の性能予測：</strong>蒸気タービンやガスタービン・ロケットエンジン燃焼器の効率や燃焼温度予測では、剥離点・衝撃波・反応帯の解像度が結果を大きく左右します。GCI を用いれば「効率の見積もり 92.3% に対して不確かさ ±1.5pt」のように、メッシュに由来する不確かさを明示でき、設計判断や認証申請に使えます。</p>
+    <p><strong>原子力安全解析：</strong>NRC（米国原子力規制委員会）や ASME V&V 30 では、安全裕度の証明に GCI 評価を要求します。冷却材喪失事故 (LOCA) 時の最高被覆温度予測などで、解析の不確かさを定量化し、規制値からの余裕（マージン）を明示するために使われます。Richardson 補外で推定した「真値」と、安全係数を加味した GCI 上限値を併記するのが標準です。</p>
+    <p><strong>構造解析（FEM）の応力集中検証：</strong>切欠き・溶接止端・ボルト穴まわりの応力集中点では、メッシュサイズで応力値が大きく変動します。最大ミーゼス応力に対して GCI を評価し、「メッシュ依存性が 3% 以下に収まった上での最大応力 320 MPa」と報告することで、過小評価・過大評価のリスクを抑えられます。特に疲労寿命予測のように応力値の精度がそのまま寿命予測に効く解析では必須の手順です。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の落とし穴が、<strong>「漸近収束領域にいないのに GCI を信用してしまう」</strong>ことです。GCI の理論は Richardson 補外を前提にしており、それが成り立つのは解が漸近的に r^p のオーダーで収束しているとき、つまり「漸近収束領域 (asymptotic range)」に入っている時だけ。漸近収束チェック GCI32/(r^p·GCI21) が 1 から大きく離れていたり、観測収束次数 p が極端な値（0.5 未満や 5 超）になっている場合、メッシュがまだ粗すぎて補外が信頼できません。この状態で「GCI=10%だから問題ない」と判断すると、実際には 30〜50% ズレていることもあり得ます。漸近域に入るまでメッシュを細かくするのが大前提です。</p>
+    <p>次に、<strong>「振動収束を単調収束と混同する」</strong>こと。GCI の式は f₁, f₂, f₃ が同じ方向（単調に増加または減少）で収束していることを暗黙に仮定しています。実際には乱流モデルの不安定性や反復計算の収束不足で、メッシュ細分化に対して解が振動することがあります。例えば f₁=100, f₂=98, f₃=102 のように真値の周りで振動している場合、|f₃-f₂|/|f₂-f₁| が異常な値になり、観測 p も意味を持ちません。プロットして振動の有無を確認し、振動収束の場合は「不確かさ ≥ max(|fi - fj|)」のように別の保守的見積もりに切り替えるべきです。本ツールでも、収束判定が「非漸近域」になる時は要警戒です。</p>
+    <p>最後に、<strong>「グローバル指標と局所指標を混同する」</strong>こと。GCI は基本的に積分量や代表点での値（抗力係数、最大温度など）に対して評価するものです。場の各点 (cell-by-cell) で GCI を出すと、ノイズや局所的な非単調性で異常値が大量に出ます。論文や報告書で GCI を提示する際は、「揚抗比 L/D の GCI が 3%」「最大ミーゼス応力 (point A) の GCI が 5%」のように、明確に評価対象の物理量を限定してください。また、複数の評価量がある場合（揚力・抗力・モーメントなど）、それぞれ独立に GCI を出して、最も保守的な値を採用するのが標準的なやり方です。</p>
+  </div>
+</section>
+
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Shared state for the convergence canvas =====
+const GCI = {f1:100,f2:105,f3:115,r:2.0,p:1,fext:95,gci21:0.0625,gci32:0.119,pulse:0};
+
+// ===== Chart.js setup =====
+const convChart = new Chart(document.getElementById('convChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'計算点 f(1/h)',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:false,borderWidth:2,pointRadius:5,pointBackgroundColor:'#007BFF',tension:0},
+    {label:'Richardson補外 f_ext (h→0)',data:[],borderColor:'#00b894',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false},
+    {label:'漸近フィット f_ext + α·h^p',data:[],borderColor:'#e17055',backgroundColor:'rgba(225,112,85,.10)',fill:false,borderWidth:2,pointRadius:0,tension:0.2}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'メッシュ細かさ 1/h（粗 → 細）',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'解 f',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const ratioChart = new Chart(document.getElementById('ratioChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'細メッシュ GCI21(%)',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'現在の r',data:[],borderColor:'#e17055',backgroundColor:'#e17055',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'リファインメント比 r',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'GCI21 (%)',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Main compute (Roache GCI) =====
+function compute(){
+  const solutionFine   = parseFloat(document.getElementById('f1Range').value);
+  const solutionMed    = parseFloat(document.getElementById('f2Range').value);
+  const solutionCoarse = parseFloat(document.getElementById('f3Range').value);
+  const refinementRatio= parseFloat(document.getElementById('rRange').value);
+  const safetyFactor   = parseFloat(document.getElementById('fsRange').value);
+
+  // Roache GCI core ----------------------------------------------------------
+  const solutionDiff21 = solutionFine - solutionMed;    // signed
+  const solutionDiff32 = solutionMed  - solutionCoarse; // signed
+  const absD21 = Math.abs(solutionDiff21);
+  const absD32 = Math.abs(solutionDiff32);
+
+  // Guarded ratio + observed order of accuracy
+  const ratio = absD21 > 1e-12 ? absD32/absD21 : 1.0;
+  const lnR   = Math.log(refinementRatio);
+  let orderOfAccuracy = (ratio>0 && lnR>1e-12) ? Math.log(ratio)/lnR : 0;
+  if(!isFinite(orderOfAccuracy)) orderOfAccuracy = 0;
+
+  // Richardson extrapolation (safe denominator)
+  const rp     = Math.pow(refinementRatio, orderOfAccuracy);
+  const denom  = rp - 1;
+  const denomSafe = Math.abs(denom) > 1e-6 ? denom : 1e-6 * Math.sign(denom||1);
+
+  const extrapolatedValue = solutionFine + solutionDiff21/denomSafe;
+
+  // Relative errors (fractions) and GCI (fractions)
+  const relativeError21 = Math.abs(solutionFine)>1e-12 ? Math.abs(solutionDiff21/solutionFine) : 0;
+  const relativeError32 = Math.abs(solutionMed )>1e-12 ? Math.abs(solutionDiff32/solutionMed ) : 0;
+  const gci21 = safetyFactor*relativeError21/denomSafe;
+  const gci32 = safetyFactor*relativeError32/denomSafe;
+  const gci21Percent = Math.abs(gci21)*100;
+  const gci32Percent = Math.abs(gci32)*100;
+
+  // Asymptotic range check
+  const denomAsym = rp * Math.abs(gci21);
+  const asymptoticCheck = denomAsym>1e-12 ? Math.abs(gci32)/denomAsym : 0;
+
+  // ----- stat cards -----
+  document.getElementById('statP').textContent    = orderOfAccuracy.toFixed(2);
+  document.getElementById('statExt').textContent  = isFinite(extrapolatedValue)?extrapolatedValue.toFixed(3):'—';
+  document.getElementById('statGci21').textContent= gci21Percent.toFixed(2);
+  document.getElementById('statGci32').textContent= gci32Percent.toFixed(2);
+  document.getElementById('statAsym').textContent = isFinite(asymptoticCheck)?asymptoticCheck.toFixed(3):'—';
+
+  const judgeEl = document.getElementById('statJudge');
+  const inAsym  = asymptoticCheck>0.9 && asymptoticCheck<1.1;
+  judgeEl.textContent = inAsym ? '漸近収束領域内' : '非漸近域';
+  judgeEl.style.color = inAsym ? '#0a8a6a' : '#c0563a';
+  judgeEl.style.fontSize = '0.95rem';
+
+  // ----- verdict (3-state) -----
+  const v = document.getElementById('verdict');
+  let cls='ok';
+  if(orderOfAccuracy<0.5 || orderOfAccuracy>5) cls='ng';
+  else if(asymptoticCheck<0.85 || asymptoticCheck>1.15) cls='warn';
+
+  if(cls==='ng'){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> 観測収束次数 p='+orderOfAccuracy.toFixed(2)+' が異常（0.5 未満または 5 超）。メッシュ系列が漸近域にないか、振動収束の可能性。理論次数に近づくまでメッシュを細分化または見直してください。';
+  }else if(cls==='warn'){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 漸近収束チェック '+asymptoticCheck.toFixed(3)+' が 1.0 から外れています。GCI21='+gci21Percent.toFixed(2)+'% は参考値とし、さらに細いメッシュで再評価を推奨します。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 漸近収束領域内（チェック '+asymptoticCheck.toFixed(3)+'）。観測 p='+orderOfAccuracy.toFixed(2)+'、細メッシュ GCI='+gci21Percent.toFixed(2)+'%、Richardson補外 f_ext='+extrapolatedValue.toFixed(3)+'。';
+  }
+
+  // ----- convergence chart (f vs 1/h) -----
+  // Place h3=4, h2=2, h1=1 (arbitrary), then sweep h fine -> extra fine
+  const h1=1, h2=h1*refinementRatio, h3=h2*refinementRatio;
+  const inv1=1/h1, inv2=1/h2, inv3=1/h3;
+  const xs=[], ysFit=[];
+  // sweep h from h3 down to h1/4
+  const Nfit=40;
+  const hMin=h1/4, hMax=h3;
+  for(let i=0;i<=Nfit;i++){
+    const t=i/Nfit;
+    const h=hMax*Math.pow(hMin/hMax, t); // log sweep
+    const fHat = extrapolatedValue + (solutionFine - extrapolatedValue)*Math.pow(h/h1, orderOfAccuracy);
+    xs.push((1/h).toFixed(3));
+    ysFit.push(fHat);
+  }
+  // 3 measured points overlaid (use sparse arrays aligned to fit grid by inserting null)
+  const meas = new Array(xs.length).fill(null);
+  const ext  = new Array(xs.length).fill(extrapolatedValue);
+  // find nearest indices for inv3, inv2, inv1
+  function nearestIdx(val){
+    let bi=0, bv=1e18;
+    for(let k=0;k<xs.length;k++){
+      const dd=Math.abs(parseFloat(xs[k])-val);
+      if(dd<bv){bv=dd;bi=k;}
+    }
+    return bi;
+  }
+  meas[nearestIdx(inv3)] = solutionCoarse;
+  meas[nearestIdx(inv2)] = solutionMed;
+  meas[nearestIdx(inv1)] = solutionFine;
+  convChart.data.labels = xs;
+  convChart.data.datasets[0].data = meas;
+  convChart.data.datasets[1].data = ext;
+  convChart.data.datasets[2].data = ysFit;
+  convChart.update('none');
+
+  // ----- GCI vs r chart -----
+  const rLabels=[], rGci=[], rPoint=[];
+  const rMin=1.3, rMax=4.0, RSTEP=(rMax-rMin)/30;
+  for(let rv=rMin; rv<=rMax+1e-6; rv+=RSTEP){
+    const denomR = Math.pow(rv, orderOfAccuracy) - 1;
+    const safeR  = Math.abs(denomR)>1e-6 ? denomR : 1e-6;
+    const gciR   = safetyFactor*relativeError21/safeR;
+    rLabels.push(rv.toFixed(2));
+    rGci.push(Math.abs(gciR)*100);
+    rPoint.push(null);
+  }
+  let nearR=0, bestR=1e18;
+  for(let k=0;k<rLabels.length;k++){
+    const dd=Math.abs(parseFloat(rLabels[k])-refinementRatio);
+    if(dd<bestR){bestR=dd;nearR=k;}
+  }
+  rPoint[nearR] = gci21Percent;
+  ratioChart.data.labels = rLabels;
+  ratioChart.data.datasets[0].data = rGci;
+  ratioChart.data.datasets[1].data = rPoint;
+  ratioChart.update('none');
+
+  // ----- shared state for canvas -----
+  GCI.f1=solutionFine; GCI.f2=solutionMed; GCI.f3=solutionCoarse;
+  GCI.r=refinementRatio; GCI.p=orderOfAccuracy; GCI.fext=extrapolatedValue;
+  GCI.gci21=gci21Percent/100; GCI.gci32=gci32Percent/100;
+}
+
+// ===== Grid convergence diagram animation =====
+(function(){
+  const cv = document.getElementById('gciCanvas');
+  const ctx = cv.getContext('2d');
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    GCI.pulse += 0.045;
+    const pulseAlpha = 0.55 + 0.35*Math.sin(GCI.pulse);
+
+    // Data ranges
+    const r = GCI.r>1.05 ? GCI.r : 1.5;
+    const h1=1, h2=h1*r, h3=h2*r;
+    const inv1=1/h1, inv2=1/h2, inv3=1/h3;
+    const xMin = 0;                      // h -> infty
+    const xMax = inv1*1.25;              // a bit beyond the finest measured 1/h
+    const fVals = [GCI.f1, GCI.f2, GCI.f3, GCI.fext];
+    let yMin = Math.min.apply(null, fVals);
+    let yMax = Math.max.apply(null, fVals);
+    const ySpan = Math.max(1e-6, yMax-yMin);
+    yMin -= ySpan*0.18; yMax += ySpan*0.18;
+
+    // Axes layout
+    const padL=60, padR=24, padT=24, padB=44;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+    const X = v => padL + (v-xMin)/(xMax-xMin)*plotW;
+    const Y = v => padT + (yMax-v)/(yMax-yMin)*plotH;
+
+    // axes
+    ctx.strokeStyle = 'rgba(255,255,255,.30)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+
+    // axis labels
+    ctx.fillStyle = 'rgba(255,255,255,.65)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('メッシュ細かさ 1/h →', padL+plotW/2, H-12);
+    ctx.save();
+    ctx.translate(14, padT+plotH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText('解 f', 0, 0);
+    ctx.restore();
+
+    // y-axis ticks
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '9px Roboto Mono, monospace';
+    ctx.textAlign = 'right';
+    for(let k=0;k<=4;k++){
+      const yv = yMin + (yMax-yMin)*k/4;
+      const yp = Y(yv);
+      ctx.strokeStyle = 'rgba(255,255,255,.10)';
+      ctx.beginPath(); ctx.moveTo(padL,yp); ctx.lineTo(padL+plotW,yp); ctx.stroke();
+      ctx.fillText(yv.toFixed(2), padL-6, yp+3);
+    }
+
+    // Asymptotic fit curve
+    ctx.strokeStyle = 'rgba(225,112,85,.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const NN=80;
+    for(let i=0;i<=NN;i++){
+      const t=i/NN;
+      const invH = xMin + (xMax-xMin)*t;
+      const h = invH>1e-6 ? 1/invH : 1e6;
+      const fHat = GCI.fext + (GCI.f1-GCI.fext)*Math.pow(h/h1, GCI.p);
+      const px = padL + (invH-xMin)/(xMax-xMin)*plotW;
+      const py = Y(fHat);
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    // f_ext horizontal dashed line
+    ctx.strokeStyle = 'rgba(0,184,148,.85)';
+    ctx.setLineDash([6,4]); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(padL,Y(GCI.fext)); ctx.lineTo(padL+plotW,Y(GCI.fext)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(0,184,148,.95)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('f_ext = '+GCI.fext.toFixed(2), padL+8, Y(GCI.fext)-6);
+
+    // GCI21 error band around f1 (vertical) at x=inv1
+    const bandHalf = Math.abs(GCI.f1) * GCI.gci21;
+    const x1 = X(inv1);
+    const yTop = Y(GCI.f1 + bandHalf);
+    const yBot = Y(GCI.f1 - bandHalf);
+    ctx.fillStyle = 'rgba(0,123,255,.25)';
+    ctx.fillRect(x1-9, yTop, 18, yBot-yTop);
+    ctx.strokeStyle = 'rgba(0,123,255,.95)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x1-9,yTop); ctx.lineTo(x1+9,yTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1-9,yBot); ctx.lineTo(x1+9,yBot); ctx.stroke();
+
+    // three measured points
+    function pt(invH, fv, label, color){
+      const px = X(invH), py = Y(fv);
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#020d1a';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(px,py,6,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.font = '11px Roboto Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, px, py-12);
+    }
+    pt(inv3, GCI.f3, 'f₃', '#a0aec0');
+    pt(inv2, GCI.f2, 'f₂', '#e1a055');
+    pt(inv1, GCI.f1, 'f₁', '#007BFF');
+
+    // extrapolation point at x=0 (h->inf? actually 1/h=0 means h=infty; reuse to mark axis)
+    // place f_ext marker at x=xMin
+    const pxE = X(xMin), pyE = Y(GCI.fext);
+    ctx.fillStyle = '#00b894';
+    ctx.beginPath(); ctx.arc(pxE,pyE,5,0,Math.PI*2); ctx.fill();
+
+    // Pulsing extrapolation arrow: from (xMin, fext) towards (inv1, f1)
+    ctx.strokeStyle = 'rgba(0,184,148,'+pulseAlpha.toFixed(3)+')';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([4,3]);
+    ctx.beginPath();
+    ctx.moveTo(X(inv1)-12, Y(GCI.f1)+6);
+    ctx.lineTo(pxE+12, pyE+2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // arrow head
+    ctx.fillStyle = 'rgba(0,184,148,'+pulseAlpha.toFixed(3)+')';
+    ctx.beginPath();
+    ctx.moveTo(pxE+12, pyE+2);
+    ctx.lineTo(pxE+22, pyE-3);
+    ctx.lineTo(pxE+22, pyE+7);
+    ctx.closePath();
+    ctx.fill();
+
+    // GCI band label
+    ctx.fillStyle = 'rgba(0,123,255,.95)';
+    ctx.font = 'bold 10px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('GCI±'+(GCI.gci21*100).toFixed(2)+'%', x1+12, Y(GCI.f1)+4);
+
+    // Top header
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Roache GCI（r='+GCI.r.toFixed(2)+', p='+GCI.p.toFixed(2)+'）', padL, 16);
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['f1Range','f2Range','f3Range','rRange','fsRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

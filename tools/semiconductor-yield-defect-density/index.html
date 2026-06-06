@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>半導体歩留 欠陥密度シミュレーター — Murphy/Poisson モデルと EUV | NovaSolver</title>
+<meta name="description" content="半導体ウェーハの歩留 (Yield) を Poisson・Murphy・Seeds (Negative Binomial)・Bose-Einstein の4モデルで計算。ダイサイズ・欠陥密度 D₀・クリティカル層数・設計ルール (CD)・ウェーハ径からダイ数・良品単価を試算できる無料シミュレーター。">
+<link rel="canonical" href="https://novasolver.jp/tools/semiconductor-yield-defect-density.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/semiconductor-yield-defect-density.html">
+<meta property="og:title" content="半導体歩留 欠陥密度シミュレーター — Murphy/Poisson モデルと EUV | NovaSolver Project">
+<meta property="og:description" content="ダイサイズと欠陥密度から半導体ウェーハの歩留・良品ダイ数・良品単価をリアルタイム計算。4種の歩留モデルを比較し EUV ノード設計に役立てます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Semiconductor yield and defect density simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/semiconductor-yield-defect-density.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/semiconductor-yield-defect-density.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/semiconductor-yield-defect-density.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/semiconductor-yield-defect-density.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#syCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "半導体歩留 欠陥密度シミュレーター",
+      "description": "半導体ウェーハの歩留 (Yield) を Poisson・Murphy・Seeds (Negative Binomial)・Bose-Einstein の4モデルで計算。ダイサイズ・欠陥密度 D₀・クリティカル層数・設計ルール (CD)・ウェーハ径からダイ数・良品単価を試算できる無料シミュレーター。",
+      "url": "https://novasolver.jp/tools/semiconductor-yield-defect-density.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Semiconductor Yield Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["Poisson/Murphy/Seeds/Bose-Einstein の4モデルで歩留 Y を比較","ウェーハあたりダイ数・良品ダイ数の自動計算","EUV 5/3nm を含む設計ルール (CD) ごとのコスト試算","ダイサイズ感度カーブと4モデル比較バーグラフ","クラスタリング係数 α による Negative Binomial 補正"],
+      "keywords": "半導体歩留,欠陥密度,Murphy モデル,Poisson モデル,Negative Binomial,EUV,3nm,Wafer Yield,Defect Density,CMOS",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "半導体の歩留 (Yield) はどう計算しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "もっとも基本的なのが Poisson モデル Y = exp(-A·D) です。A はダイ面積 (cm²)、D は欠陥密度 (個/cm²)。ダイが大きくなるほど、または欠陥が多いほど指数関数的に歩留が落ちます。実プロセスでは欠陥が均一に分布せず集団 (cluster) を作るため、Murphy [(1-exp(-AD))/(AD)]² や Seeds (1+AD/α)^(-α) でクラスタリングを補正します。本ツールでは Poisson / Murphy / Seeds / Bose-Einstein の4モデルを切り替え、A·D・歩留 Y・ダイ数・良品単価を比較できます。"}
+        },{
+          "@type": "Question",
+          "name": "EUV 3nm ノードで歩留が伸びにくいのはなぜですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "設計ルール (CD) が小さくなるほど、許容できる欠陥サイズも CD/3 ～ CD 程度まで縮みます。3nm ノードでは 1nm 級の異物・パーティクル・ライン端のラフネス (LER) が致命欠陥として検出され、レジストの光子ショット雑音などストキャスティック欠陥 (Stochastic Defects) が支配的になります。さらにクリティカル層数が 70 層を超えるため、各層 99% でも 0.99^70≒49% まで複合歩留が落ちます。TSMC N3 が量産歩留 80% に到達するまで2年以上を要した理由がここにあります。"}
+        },{
+          "@type": "Question",
+          "name": "Murphy モデルと Negative Binomial (Seeds) はどう使い分けますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Murphy はガンマ分布で欠陥密度のばらつきを仮定したもので、A·D が大きい大型 SoC・GPU・FPGA で Poisson より現実的な値を返します。Negative Binomial (Seeds) は α (クラスタリング係数) を独立にチューニングでき、α が小さいほど欠陥集中度が高くなります。実プロセスでは Inline Inspection (KLA など) の欠陥マップから α をフィッティングし、Murphy より幅広い条件で使えます。本ツールでも α を 0.5～5 で動かして、同じ A·D でも歩留がどう変わるか確認できます。"}
+        },{
+          "@type": "Question",
+          "name": "ウェーハあたりの良品ダイ数・良品単価はどう試算していますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "ウェーハ面積 (π·(D/2)²) にユーティライゼーション 85% を掛けてダイ面積で割り、整数化して「ダイ数」とします。これに歩留 Y を掛けたものが良品ダイ数です。良品単価はウェーハ単価 ÷ 良品ダイ数で、EUV を含む 7nm 以下 (CD<10nm) では $13,000/枚、それ以上のノードでは $8,000/枚を仮定しています。実際の単価は装置償却・マスクコスト・歩留改善曲線で大きく変わるため、相対比較の目安として扱ってください。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "半導体歩留 欠陥密度シミュレーター", "item": "https://novasolver.jp/tools/semiconductor-yield-defect-density.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">半導体歩留 欠陥密度シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/semiconductor-yield-defect-density.html" class="active">JA</a>
+      <a href="/en/tools/semiconductor-yield-defect-density.html">EN</a>
+      <a href="/zh/tools/semiconductor-yield-defect-density.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-microchip"></i> 半導体製造・品質工学</div>
+    <h1>半導体歩留 欠陥密度シミュレーター</h1>
+    <p class="hero-sub">半導体ウェーハの歩留 (Yield) を Poisson・Murphy・Seeds (Negative Binomial)・Bose-Einstein の4モデルで比較計算するツールです。ダイサイズ・欠陥密度 D₀・クリティカル層数・設計ルールを変えると、A·D・歩留・ウェーハあたりダイ数・良品単価がリアルタイムで更新されます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ダイサイズ A</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="dieSizeMm2Num" value="100" min="1" max="1000" step="1" oninput="syncFromNum('dieSizeMm2Range','dieSizeMm2Num')"><span class="num-unit">mm²</span></div>
+      </div>
+      <div class="param-desc">1チップの面積。大きいほど歩留は急落する</div>
+      <input type="range" id="dieSizeMm2Range" min="1" max="1000" step="1" value="100" oninput="syncToNum('dieSizeMm2Range','dieSizeMm2Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">欠陥密度 D₀</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="defectDensityPerCm2Num" value="0.1" min="0.001" max="5" step="0.001" oninput="syncFromNum('defectDensityPerCm2Range','defectDensityPerCm2Num')"><span class="num-unit">/cm²</span></div>
+      </div>
+      <div class="param-desc">単位面積あたりの致命欠陥数。成熟プロセスで 0.05～0.1</div>
+      <input type="range" id="defectDensityPerCm2Range" min="0.001" max="5" step="0.001" value="0.1" oninput="syncToNum('defectDensityPerCm2Range','defectDensityPerCm2Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">クリティカル層数</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="numCriticalLayersNum" value="30" min="5" max="100" step="1" oninput="syncFromNum('numCriticalLayersRange','numCriticalLayersNum')"><span class="num-unit">層</span></div>
+      </div>
+      <div class="param-desc">フォト・エッチ等の重要工程数。EUV 3nm で 70～90 層</div>
+      <input type="range" id="numCriticalLayersRange" min="5" max="100" step="1" value="30" oninput="syncToNum('numCriticalLayersRange','numCriticalLayersNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">歩留モデル</span></div>
+      <div class="param-desc">Poisson は均一分布、他は欠陥クラスタリングを補正</div>
+      <select id="yieldModel" onchange="compute()">
+        <option value="poisson" selected>Poisson</option>
+        <option value="murphy">Murphy (ガンマ分布)</option>
+        <option value="seeds">Seeds (Negative Binomial)</option>
+        <option value="bose">Bose-Einstein</option>
+      </select>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">設計ルール (CD)</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="criticalDimensionNmNum" value="7" min="3" max="180" step="1" oninput="syncFromNum('criticalDimensionNmRange','criticalDimensionNmNum')"><span class="num-unit">nm</span></div>
+      </div>
+      <div class="param-desc">最小線幅。EUV ノードは 3-7nm、DUV は 28-65nm</div>
+      <input type="range" id="criticalDimensionNmRange" min="3" max="180" step="1" value="7" oninput="syncToNum('criticalDimensionNmRange','criticalDimensionNmNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ウェーハ径</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="waferDiameterMmNum" value="300" min="100" max="300" step="50" oninput="syncFromNum('waferDiameterMmRange','waferDiameterMmNum')"><span class="num-unit">mm</span></div>
+      </div>
+      <div class="param-desc">先端プロセスは 300mm 標準。次世代は 450mm 構想</div>
+      <input type="range" id="waferDiameterMmRange" min="100" max="300" step="50" value="300" oninput="syncToNum('waferDiameterMmRange','waferDiameterMmNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">クラスタリング α</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="defectClusterAlphaNum" value="1.5" min="0.5" max="5" step="0.1" oninput="syncFromNum('defectClusterAlphaRange','defectClusterAlphaNum')"></div>
+      </div>
+      <div class="param-desc">Seeds モデル用。小さいほど欠陥が集中</div>
+      <input type="range" id="defectClusterAlphaRange" min="0.5" max="5" step="0.1" value="1.5" oninput="syncToNum('defectClusterAlphaRange','defectClusterAlphaNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statAD">—</div><div class="sl">D₀·A (無次元)</div></div>
+        <div class="stat-card"><div class="sv" id="statY">—</div><div class="sl">歩留 Y (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statDiePerWafer">—</div><div class="sl">ウェーハあたりダイ数</div></div>
+        <div class="stat-card"><div class="sv" id="statGoodDie">—</div><div class="sl">良品ダイ数</div></div>
+        <div class="stat-card"><div class="sv" id="statCost">—</div><div class="sl">良品単価 (USD)</div></div>
+        <div class="stat-card"><div class="sv" id="statCritDefect">—</div><div class="sl">クリティカル欠陥サイズ (nm)</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-microchip"></i> ウェーハマップ — ダイマトリックスと欠陥</div>
+      <canvas id="syCanvas"></canvas>
+      <p class="canvas-hint">300mm ウェーハ上のダイ配列を簡易表示。緑＝良品、赤＝不良ダイ、白点＝検出欠陥。右上のメーターは歩留 Y。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 歩留 Y vs ダイサイズ — 4モデル比較</div>
+      <canvas class="ux-chartjs-canvas" id="yieldSizeChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-column"></i> 現在条件での4モデル予測比較</div>
+      <canvas class="ux-chartjs-canvas" id="modelBarChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$Y_{Poisson} = e^{-AD},\quad Y_{Murphy} = \left(\frac{1-e^{-AD}}{AD}\right)^{2},\quad Y_{Seeds} = \left(1+\frac{AD}{\alpha}\right)^{-\alpha}$$</p>
+      <p style="margin-top:6px;">A：ダイ面積 (cm²)、D：欠陥密度 (/cm²)、α：クラスタリング係数。Bose-Einstein は $Y = 1/(1+AD)$。</p>
+      <p style="margin-top:10px;">$$N_{die} = \left\lfloor\frac{\pi (D_w/2)^2 \cdot u}{A}\right\rfloor,\quad N_{good} = \lfloor N_{die}\cdot Y\rfloor,\quad C_{good} = \frac{C_{wafer}}{N_{good}}$$</p>
+      <p style="margin-top:6px;">ウェーハ径 $D_w$、ユーティライゼーション $u\approx0.85$、ウェーハ単価 $C_{wafer}$ (EUV 7nm 以下で約 $13k、DUV で約 $8k 想定)。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>半導体歩留 — 欠陥密度と Murphy/Poisson モデル</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">半導体ニュースで「3nm の歩留が 80% を超えた」とか聞きますけど、そもそも歩留って何がどう「8割」なんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと、1枚のウェーハから取れたチップのうち、検査をパスして出荷できる「良品」の割合のこと。たとえば 300mm ウェーハに 600 個のダイが取れて、そのうち 480 個が良品なら、歩留 Y = 480/600 = 80% だ。あとはこのウェーハの製造費を良品数で割ったものが「良品単価」になる。だから歩留が 50% か 80% かで、同じチップでもコストが 1.6 倍違ってくるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど…。じゃあその「良品か不良か」を分けてるのは何なんですか？やっぱり配線が切れてたりするんでしょうか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、配線のオープン・ショート、トランジスタの特性ズレ、絶縁不良…どれも原因は「欠陥 (defect)」だ。レジストに紛れたパーティクル、エッチングで残った副生成物、フォトリソの光子ショット雑音まで含めて、致命的な大きさのものが回路を1個でも壊すと、そのダイは不良になる。1cm² あたりに何個の致命欠陥があるかを D₀（欠陥密度）で表す。Poisson の式 Y = exp(-A·D) は「欠陥が均一にランダム分布する」と仮定して、ダイ面積 A が大きいほど指数関数的に歩留が落ちる、と教えてくれる。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">左の「歩留モデル」で Poisson から Murphy や Seeds に切り替えると、同じ条件でも歩留が変わるんですけど、どれが正しいんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いいところに気づいたね。実プロセスの欠陥は均一じゃなくて「ウェーハの端」「特定スキャナのチャック付近」「リソツールの特定ショット」など、集団 (cluster) で出る。だから Poisson は大型ダイで歩留を低く見積りすぎる傾向がある。Murphy はガンマ分布で集中度を補正したもの。Seeds (Negative Binomial) はクラスタリング係数 α で集中度を独立に調整できる。α=1.5～2 が現代プロセスの実測に最も近いと言われてる。Bose-Einstein は最も保守的で、確率論的に「最大限ばらついた」場合の下限値。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「クリティカル層数」もスライダーにありますね。これを 30 から 70 にすると歩留がガクッと落ちる…層が多いほど不利なんですね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう。EUV 3nm は実は 70～90 のクリティカル層を重ねていく。各層の歩留が 99% でも、0.99^70 ≒ 49% まで複合歩留が落ちる。だから単一層の歩留を 99.9% に押し上げる「装置の Cu(クリーンルーム清浄度)」「ペリクル」「インラインメトロロジー」競争が起きている。逆に成熟ノード (28nm など) はクリティカル層が 20 前後なので、欠陥密度がやや高くても 90%+ の歩留が出やすい。これが「成熟ノードのほうがマージンが厚い」と言われる理由だね。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">先端プロセスは大変なんですね…。じゃあ歩留を上げる現実的な手段って何があるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">大きく3つだ。①D を下げる：装置のメンテ・マスクの清浄度・ペリクル更新・スパッタチャンバーのコンディショニング。②A を下げる：チップを分割してチップレットにする (AMD Ryzen や Apple M Ultra)。③クラスタを潰す：KLA や Applied の欠陥マップを AI 解析して「死にスポット」を特定し、装置のメンテ周期を最適化する。Tesla H100 のような巨大 GPU は ①+③ を徹底、Apple や AMD は ② を採用しているわけだ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">半導体の歩留 (Yield) はどう計算しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">もっとも基本的なのが Poisson モデル Y = exp(-A·D) です。A はダイ面積 (cm²)、D は欠陥密度 (個/cm²)。ダイが大きくなるほど、または欠陥が多いほど指数関数的に歩留が落ちます。実プロセスでは欠陥が均一に分布せず集団 (cluster) を作るため、Murphy [(1-exp(-AD))/(AD)]² や Seeds (1+AD/α)^(-α) でクラスタリングを補正します。本ツールでは Poisson / Murphy / Seeds / Bose-Einstein の4モデルを切り替え、A·D・歩留 Y・ダイ数・良品単価を比較できます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">EUV 3nm ノードで歩留が伸びにくいのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">設計ルール (CD) が小さくなるほど、許容できる欠陥サイズも CD/3 ～ CD 程度まで縮みます。3nm ノードでは 1nm 級の異物・パーティクル・ライン端のラフネス (LER) が致命欠陥として検出され、レジストの光子ショット雑音などストキャスティック欠陥 (Stochastic Defects) が支配的になります。さらにクリティカル層数が 70 層を超えるため、各層 99% でも 0.99^70≒49% まで複合歩留が落ちます。TSMC N3 が量産歩留 80% に到達するまで2年以上を要した理由がここにあります。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Murphy モデルと Negative Binomial (Seeds) はどう使い分けますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">Murphy はガンマ分布で欠陥密度のばらつきを仮定したもので、A·D が大きい大型 SoC・GPU・FPGA で Poisson より現実的な値を返します。Negative Binomial (Seeds) は α (クラスタリング係数) を独立にチューニングでき、α が小さいほど欠陥集中度が高くなります。実プロセスでは Inline Inspection (KLA など) の欠陥マップから α をフィッティングし、Murphy より幅広い条件で使えます。本ツールでも α を 0.5～5 で動かして、同じ A·D でも歩留がどう変わるか確認できます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">ウェーハあたりの良品ダイ数・良品単価はどう試算していますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">ウェーハ面積 (π·(D/2)²) にユーティライゼーション 85% を掛けてダイ面積で割り、整数化して「ダイ数」とします。これに歩留 Y を掛けたものが良品ダイ数です。良品単価はウェーハ単価 ÷ 良品ダイ数で、EUV を含む 7nm 以下 (CD<10nm) では $13,000/枚、それ以上のノードでは $8,000/枚を仮定しています。実際の単価は装置償却・マスクコスト・歩留改善曲線で大きく変わるため、相対比較の目安として扱ってください。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>ファウンドリの生産計画：</strong>TSMC・Samsung・Intel Foundry は新ノード立ち上げ時、Murphy/Seeds モデルで歩留改善曲線 (Yield Ramp Curve) を予測し、装置投資・マスクセット枚数・契約価格を決定します。N5→N3 の立ち上げでは、月産 10万枚目標に対して D₀ を半年で 0.5→0.1 /cm² に下げる計画が、装置メーカー (ASML EUV、Lam Etch、KLA Inspection) の発注台数を決めました。</p>
+    <p><strong>チップレット設計の経済性比較：</strong>AMD Ryzen の CCD (Core Complex Die) は約 70mm²、Apple M2 Ultra は 800mm² のモノリシック構造。同じ D=0.1/cm² でも Poisson 歩留はそれぞれ 93% と 45% 程度。本ツールの「歩留 vs ダイサイズ」グラフで、チップレット化による良品単価の劇的な改善を可視化できます。Nvidia H100/B200 が CoWoS 統合に向かう理由もここにあります。</p>
+    <p><strong>欠陥学解析と装置メンテ周期：</strong>KLA や Applied Materials の Wafer Inspection 装置は欠陥マップを取得し、Seeds モデルの α とパーティクルマップから「クリーニング前後でクラスタが消えたか」を判定します。本ツールで α=0.8 (集中) と α=3 (均一) の歩留差を見ると、装置コンディションが歩留にいかに直結するかが分かります。AI による Anomaly Detection 投資が増えている背景です。</p>
+    <p><strong>新材料・新トランジスタの導入判断：</strong>GAA (Gate-All-Around) FET、Backside Power Delivery、High-NA EUV の導入では「初期歩留 30% → 量産歩留 75% まで何ヶ月か」が事業性を決めます。本ツールで CD を 3nm に固定し、D を 0.5 から 0.05 へ徐々に下げると Yield Ramp が体験できます。Intel 18A や Samsung 2GAP がここで競争しています。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の誤解が、<strong>「Poisson モデルだけで歩留を語る」</strong>こと。Poisson は欠陥が完全に均一ランダムに分布する理想を仮定するため、現実の半導体プロセス (ウェーハ端・スキャナ特定ショット・チャック起因) では大型ダイで歩留を低く見積りすぎます。逆に小型ダイでは Poisson と Murphy/Seeds でほぼ差がないため「どのモデルも同じ」と誤認しがちです。ダイサイズが 200mm² を超える GPU・SoC では必ず Murphy か Seeds で再計算し、Poisson との差をマージンとして織り込むのが定石です。</p>
+    <p>次に、<strong>「クリティカル層数を 1 とみなした単層モデルを多層プロセスに適用する」</strong>誤り。本ツールでは簡略化のため Y_die をそのまま使っていますが、現実のロジック量産では各層に独立した D₀ があり、複合歩留は ΠY_layer です。EUV 3nm の 80 層では、各層 99.5% でも 0.995^80 ≒ 67% にしかなりません。先端ノードで「装置1台のメンテをサボると即ライン全体の歩留が崩れる」と言われる根拠です。コスト試算には必ず Critical Layer Count を反映してください。</p>
+    <p>最後に、<strong>「良品単価が低い＝コスト競争力がある」</strong>という単純化。本ツールの良品単価試算はウェーハ単価のみを考慮しますが、実コストにはマスクセット ($30M for 3nm)、設計IP、装置償却 (EUV 1台 $200M)、テスト・パッケージ・歩留改善エンジニアの人件費が乗ります。同じ良品単価 $25 でも、初期歩留 30% のラインと熟成 80% のラインでは事業性 (利益率) が桁違いです。歩留改善曲線・量産期間・需要を合わせて TCO で評価しないと、シリコンウェーハ単価だけで判断するとミスリードになります。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol><li>ダイサイズ (mm²) とウェーハ径から1枚あたりのダイ数を算出。標準300mmウェーハで150mm²ダイなら約600個取得</li><li>欠陥密度 D₀ (defects/cm²)、クリティカル層数、設計ルール (CD) を入力。Murphy モデルではD₀×ダイ面積でα値を計算してPoisson分布に変換</li><li>4つのモデル (Poisson/Murphy/Seeds/Bose-Einstein) の歩留を比較。Seeds (負の二項分布) は欠陥がクラスタ化する場合に歩留を低く評価</li><li>良品ダイ数 = ウェーハあたりダイ数 × 歩留で月産本数を推定。単価 = ウェーハコスト÷良品ダイ数で原価を算定</li></ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>ロジック層 22nm プロセス、ダイサイズ 120mm²、欠陥密度 D₀ = 0.5 defects/cm² (良好なクリーンルーム)、クリティカル層数 8層の場合：D₀×A = 0.5×1.2 = 0.6。Poisson モデルで歩留 Y = exp(-0.6) = 55%。Murphy モデル (層数補正) では Y = 1/(1+0.6×8) ≈ 17.4%。300mm ウェーハで約550ダイ取得時、良品 ≈ 550×55% = 303個 (Poisson) または 96個 (Murphy)。ウェーハコスト 12,000 USD 時、良品単価は Murphy モデルで 125 USD/die に上昇</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol><li>Murphy モデルはメモリデバイス (DRAM/NAND) の複数クリティカル層を考慮するため、ロジックプロセスではPoisson よりも歩留を過度に低く予測する傾向。実績データとの較正が必須</li><li>Bose-Einstein モデルは超高密度 (D₀ > 5/cm²) の欠陥クラスタで適用。通常のファウンドリ (TSMC/Samsung) では D₀ < 1/cm² 管理のため Poisson で十分</li><li>設計ルール (CD) 値は 16nm/14nm/10nm など世代ごとにクリティカルサイズを指定。微細化で同一欠陥サイズでも致命欠陥化する確率が指数増加</li><li>歩留シミュレーションは製造プロセス初期段階の投資判断に活用。量産化 6ヶ月経過後は実測歩留に基づき重回帰モデルで D₀ を逆推算</li></ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== shared state for canvas animation (declared BEFORE IIFE) =====
+const SY = {dieAreaCm2:1.0, ad:0.1, yDie:0.9, diePerWafer:600, goodDie:542, waferDiameterMm:300, yieldModel:'poisson'};
+
+// ===== Chart.js setup =====
+const yieldSizeChart = new Chart(document.getElementById('yieldSizeChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'Poisson',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.1)',fill:false,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'Murphy',data:[],borderColor:'#00b894',backgroundColor:'rgba(0,184,148,.1)',fill:false,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'Seeds (NB)',data:[],borderColor:'#e17055',backgroundColor:'rgba(225,112,85,.1)',fill:false,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'Bose-Einstein',data:[],borderColor:'#6c5ce7',backgroundColor:'rgba(108,92,231,.1)',fill:false,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'現在のA',data:[],borderColor:'#d63031',backgroundColor:'#d63031',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'ダイサイズ A (mm²)',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'歩留 Y',font:{size:11}},beginAtZero:true,max:1.0}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const modelBarChart = new Chart(document.getElementById('modelBarChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['Poisson','Murphy','Seeds (NB)','Bose-Einstein'],datasets:[
+    {label:'歩留 Y (%)',data:[0,0,0,0],backgroundColor:['#007BFF','#00b894','#e17055','#6c5ce7'],borderWidth:0}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{ y:{title:{display:true,text:'歩留 Y (%)',font:{size:11}},beginAtZero:true,max:100} },
+    plugins:{legend:{display:false}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const dieSizeMm2 = parseFloat(document.getElementById('dieSizeMm2Range').value);
+  const defectDensityPerCm2 = parseFloat(document.getElementById('defectDensityPerCm2Range').value);
+  const numCriticalLayers = parseFloat(document.getElementById('numCriticalLayersRange').value);
+  const yieldModel = document.getElementById('yieldModel').value;
+  const criticalDimensionNm = parseFloat(document.getElementById('criticalDimensionNmRange').value);
+  const waferDiameterMm = parseFloat(document.getElementById('waferDiameterMmRange').value);
+  const defectClusterAlpha = parseFloat(document.getElementById('defectClusterAlphaRange').value);
+
+  // Areas
+  const dieAreaCm2 = dieSizeMm2 / 100;          // mm² -> cm²
+  const A_D = defectDensityPerCm2 * dieAreaCm2;
+
+  // ----- yield models -----
+  const Y_poisson = Math.exp(-A_D);
+  const Y_murphy  = A_D > 1e-9 ? Math.pow((1 - Math.exp(-A_D))/A_D, 2) : 1.0;
+  const Y_seeds   = Math.pow(1 + A_D/defectClusterAlpha, -defectClusterAlpha);
+  const Y_bose    = 1 / (1 + A_D);
+
+  let Y_die;
+  if (yieldModel === 'murphy')      Y_die = Y_murphy;
+  else if (yieldModel === 'seeds')  Y_die = Y_seeds;
+  else if (yieldModel === 'bose')   Y_die = Y_bose;
+  else                              Y_die = Y_poisson;
+
+  // Layer compound view (per-layer yield back-out)
+  const yieldPerLayer  = Math.pow(Y_die, 1/numCriticalLayers);
+  const totalLineYield = Math.pow(yieldPerLayer, numCriticalLayers); // == Y_die
+
+  // ----- die per wafer -----
+  const waferAreaCm2 = Math.PI * Math.pow(waferDiameterMm/20, 2);  // (D/2 mm)/10 -> cm
+  const utilization  = 0.85;
+  const diePerWafer  = Math.floor(waferAreaCm2 * utilization / Math.max(dieAreaCm2, 1e-9));
+  const goodDiePerWafer = Math.floor(diePerWafer * Y_die);
+
+  // ----- cost per wafer -----
+  // EUV / sub-10nm wafer is ~$13k, else ~$8k (rough industry estimate)
+  const costPerWafer = (criticalDimensionNm < 10) ? 13000 : 8000;
+  const costPerGoodDie = costPerWafer / Math.max(1, goodDiePerWafer);
+
+  // ----- critical defect size -----
+  const criticalDefectNm = criticalDimensionNm / 3;
+
+  // ----- stat cards -----
+  document.getElementById('statAD').textContent           = A_D.toFixed(3);
+  document.getElementById('statY').textContent            = (Y_die*100).toFixed(1);
+  document.getElementById('statDiePerWafer').textContent  = diePerWafer.toString();
+  document.getElementById('statGoodDie').textContent      = goodDiePerWafer.toString();
+  document.getElementById('statCost').textContent         = costPerGoodDie.toFixed(2);
+  document.getElementById('statCritDefect').textContent   = criticalDefectNm.toFixed(1);
+
+  // colour the yield stat
+  const yEl = document.getElementById('statY');
+  yEl.style.color = Y_die < 0.30 ? '#c0392b' : (Y_die < 0.70 ? '#c0563a' : '#0a8a6a');
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if (Y_die < 0.30){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> 歩留が 30% 未満（'+(Y_die*100).toFixed(1)+'%）— 量産非現実。ダイサイズを下げる／欠陥密度を改善する／チップレット化を検討してください。';
+  } else if (Y_die < 0.70){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 歩留 '+(Y_die*100).toFixed(1)+'% — 立ち上げ初期は許容範囲、量産では 80% 以上を目指してください。良品単価 $'+costPerGoodDie.toFixed(2)+'／良品 '+goodDiePerWafer+' 個。';
+  } else {
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 歩留 '+(Y_die*100).toFixed(1)+'% — 量産水準を満たします。ウェーハあたり '+goodDiePerWafer+' 個の良品、良品単価 $'+costPerGoodDie.toFixed(2)+'。';
+  }
+
+  // ----- yield vs die-size chart -----
+  const sizeLabels=[], pData=[], mData=[], sData=[], bData=[], pointArr=[];
+  const Amin=1, Amax=1000, STEP=(Amax-Amin)/40;
+  for(let Av=Amin; Av<=Amax+1e-6; Av+=STEP){
+    const aCm2 = Av/100;
+    const adv = defectDensityPerCm2 * aCm2;
+    sizeLabels.push(Av.toFixed(0));
+    pData.push(Math.exp(-adv));
+    mData.push(adv > 1e-9 ? Math.pow((1-Math.exp(-adv))/adv, 2) : 1.0);
+    sData.push(Math.pow(1 + adv/defectClusterAlpha, -defectClusterAlpha));
+    bData.push(1/(1+adv));
+    pointArr.push(null);
+  }
+  // place current marker at nearest tick
+  let nearest=0, best=1e9;
+  for(let k=0;k<sizeLabels.length;k++){
+    const dd=Math.abs(parseFloat(sizeLabels[k]) - dieSizeMm2);
+    if(dd<best){best=dd;nearest=k;}
+  }
+  pointArr[nearest] = Y_die;
+  yieldSizeChart.data.labels = sizeLabels;
+  yieldSizeChart.data.datasets[0].data = pData;
+  yieldSizeChart.data.datasets[1].data = mData;
+  yieldSizeChart.data.datasets[2].data = sData;
+  yieldSizeChart.data.datasets[3].data = bData;
+  yieldSizeChart.data.datasets[4].data = pointArr;
+  yieldSizeChart.update('none');
+
+  // ----- model bar chart (current condition) -----
+  modelBarChart.data.datasets[0].data = [Y_poisson*100, Y_murphy*100, Y_seeds*100, Y_bose*100];
+  modelBarChart.update('none');
+
+  // ----- shared state for canvas -----
+  SY.dieAreaCm2 = dieAreaCm2;
+  SY.ad = A_D;
+  SY.yDie = Y_die;
+  SY.diePerWafer = diePerWafer;
+  SY.goodDie = goodDiePerWafer;
+  SY.waferDiameterMm = waferDiameterMm;
+  SY.yieldModel = yieldModel;
+}
+
+// ===== Wafer map canvas =====
+(function(){
+  const cv = document.getElementById('syCanvas');
+  const ctx = cv.getContext('2d');
+  let t = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // deterministic hash so dies do not flicker between frames
+  function hash(i, j, seed){
+    let x = (i*73856093) ^ (j*19349663) ^ (seed*83492791);
+    x = (x ^ (x>>>13))>>>0;
+    x = Math.imul(x, 1274126177)>>>0;
+    return (x>>>0) / 4294967295;
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    // ----- wafer disc on the left -----
+    const cx = H*0.5 + 10;
+    const cy = H*0.5;
+    const R  = H*0.42;
+
+    // wafer outline
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(120,140,165,.18)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(160,185,210,.7)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // notch (300mm wafer has a small flat / notch at the bottom)
+    ctx.beginPath();
+    ctx.moveTo(cx-6, cy+R-2);
+    ctx.lineTo(cx, cy+R-12);
+    ctx.lineTo(cx+6, cy+R-2);
+    ctx.closePath();
+    ctx.fillStyle = '#020d1a';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(160,185,210,.7)';
+    ctx.stroke();
+
+    // ----- die matrix inside the disc -----
+    // choose nDieEdge from dieAreaCm2: square root of die per wafer divided by 4/pi
+    const target = Math.max(4, Math.min(28, Math.round(Math.sqrt(SY.diePerWafer/0.785))));
+    const nx = target, ny = target;
+    const cell = (R*2*0.92) / nx;
+    const ox = cx - (nx*cell)/2;
+    const oy = cy - (ny*cell)/2;
+
+    // base seed depends on yield bucket so that map changes visibly when Y changes
+    const seedBase = Math.floor((1-SY.yDie)*100) + (SY.yieldModel.charCodeAt(0)||0);
+
+    let goodCount = 0, totalCount = 0;
+    for(let j=0;j<ny;j++){
+      for(let i=0;i<nx;i++){
+        const dx = (ox + (i+0.5)*cell) - cx;
+        const dy = (oy + (j+0.5)*cell) - cy;
+        if(dx*dx + dy*dy > (R-cell*0.55)*(R-cell*0.55)) continue;
+        totalCount++;
+        const r = hash(i, j, seedBase);
+        const isGood = r < SY.yDie;
+        if(isGood) goodCount++;
+        ctx.fillStyle = isGood ? 'rgba(0,184,148,.85)' : 'rgba(214,48,49,.85)';
+        ctx.fillRect(ox + i*cell + 0.5, oy + j*cell + 0.5, cell-1.5, cell-1.5);
+        // sprinkle defect dot on failing dies
+        if(!isGood && cell > 6){
+          const rx = ox + i*cell + cell*(0.25 + hash(i+11,j+3,seedBase)*0.5);
+          const ry = oy + j*cell + cell*(0.25 + hash(i+7, j+5,seedBase)*0.5);
+          ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.arc(rx, ry, Math.max(1, cell*0.10), 0, Math.PI*2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // scanning highlight (animated)
+    t += 0.012;
+    const scanY = oy + ((t%1) * ny|0) * cell;
+    ctx.strokeStyle = 'rgba(0,180,216,.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(ox-4, scanY);
+    ctx.lineTo(ox + nx*cell + 4, scanY);
+    ctx.stroke();
+
+    // ----- right side panel: yield meter -----
+    const panelX = H + 30;
+    const panelW = W - panelX - 20;
+    if(panelW > 80){
+      // title
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      ctx.font = 'bold 12px Roboto Mono, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('歩留 Y', panelX, 28);
+
+      // big number
+      const yPct = SY.yDie*100;
+      const yColor = SY.yDie < 0.30 ? '#d63031' : (SY.yDie < 0.70 ? '#e1a055' : '#00b894');
+      ctx.fillStyle = yColor;
+      ctx.font = 'bold 34px Roboto Mono, monospace';
+      ctx.fillText(yPct.toFixed(1)+'%', panelX, 62);
+
+      // gauge bar
+      const gy = 80, gh = 18;
+      ctx.fillStyle = 'rgba(255,255,255,.10)';
+      ctx.fillRect(panelX, gy, panelW, gh);
+      // model-coloured fill
+      const grad = ctx.createLinearGradient(panelX, 0, panelX+panelW, 0);
+      grad.addColorStop(0, '#d63031');
+      grad.addColorStop(0.4, '#e1a055');
+      grad.addColorStop(0.7, '#00b894');
+      grad.addColorStop(1, '#0a8a6a');
+      ctx.fillStyle = grad;
+      ctx.fillRect(panelX, gy, panelW * SY.yDie, gh);
+      ctx.strokeStyle = 'rgba(255,255,255,.35)';
+      ctx.strokeRect(panelX, gy, panelW, gh);
+
+      // legend
+      ctx.font = '11px Roboto Mono, monospace';
+      ctx.fillStyle = 'rgba(0,184,148,.95)';
+      ctx.fillRect(panelX, 116, 12, 12);
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.fillText('良品ダイ ('+SY.goodDie+')', panelX+18, 126);
+
+      ctx.fillStyle = 'rgba(214,48,49,.95)';
+      ctx.fillRect(panelX, 136, 12, 12);
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.fillText('不良ダイ ('+(SY.diePerWafer-SY.goodDie)+')', panelX+18, 146);
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(panelX+6, 162, 2.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.fillText('検出欠陥', panelX+18, 166);
+
+      // A·D readout
+      ctx.fillStyle = 'rgba(255,255,255,.55)';
+      ctx.font = '10px Roboto Mono, monospace';
+      ctx.fillText('A·D = '+SY.ad.toFixed(3)+'  ('+SY.yieldModel+')', panelX, 190);
+      ctx.fillText('ウェーハ径 '+SY.waferDiameterMm.toFixed(0)+' mm', panelX, 206);
+      ctx.fillText('ダイ数 '+SY.diePerWafer+'   (描画 '+totalCount+')', panelX, 222);
+    }
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['dieSizeMm2Range','defectDensityPerCm2Range','numCriticalLayersRange','criticalDimensionNmRange','waferDiameterMmRange','defectClusterAlphaRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

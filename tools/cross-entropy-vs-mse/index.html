@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交差エントロピー vs MSE 損失シミュレーター — 勾配消失の可視化 | NovaSolver</title>
+<meta name="description" content="二値分類の損失関数を比較するシミュレーター。ロジット z と正解ラベル y を変えると、交差エントロピー損失とMSE損失、そして勾配がリアルタイムで分かります。確信を持って間違えたときMSE勾配が消失し、交差エントロピーが分類で標準損失となる理由を直感的に学べる無料ツールです。">
+<link rel="canonical" href="https://novasolver.jp/tools/cross-entropy-vs-mse.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/cross-entropy-vs-mse.html">
+<meta property="og:title" content="交差エントロピー vs MSE 損失シミュレーター — 勾配消失の可視化 | NovaSolver Project">
+<meta property="og:description" content="二値分類でなぜ交差エントロピーがMSEより優れるのか。ロジットを動かして損失と勾配の違い、MSEの勾配消失をリアルタイムで可視化できます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Cross-entropy vs MSE loss simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/cross-entropy-vs-mse.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/cross-entropy-vs-mse.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/cross-entropy-vs-mse.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/cross-entropy-vs-mse.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#celCanvas{display:block;width:100%;height:260px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "交差エントロピー vs MSE 損失シミュレーター",
+      "description": "二値分類の損失関数を比較するシミュレーター。ロジット z と正解ラベル y を変えると、交差エントロピー損失とMSE損失、そして勾配がリアルタイムで分かります。確信を持って間違えたときMSE勾配が消失し、交差エントロピーが分類で標準損失となる理由を直感的に学べる無料ツールです。",
+      "url": "https://novasolver.jp/tools/cross-entropy-vs-mse.html",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Machine Learning Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["シグモイド出力に対する交差エントロピー損失とMSE損失の計算","ロジットに関する両損失の勾配の算出","勾配消失（MSE）の自動判定","予測確率に対する損失曲線の可視化","ロジットに対する勾配の比較グラフ"],
+      "keywords": "交差エントロピー,MSE,損失関数,勾配消失,シグモイド,二値分類,機械学習,深層学習",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "なぜ分類問題ではMSEではなく交差エントロピーを使うのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "ロジット z に関する勾配を見ると理由が分かります。交差エントロピー損失の勾配は dCE/dz = p − y で、誤差そのものに比例します。一方MSE損失の勾配は dMSE/dz = 2(p−y)·p(1−p) で、シグモイドの導関数 p(1−p) が掛かります。モデルが確信を持って間違えると p が0または1に飽和し p(1−p)→0 となるため、MSEの勾配はほぼゼロに消失します。交差エントロピーは誤差が大きいほど強い勾配を保つため、分類では標準の損失関数として使われます。"}
+        },{
+          "@type": "Question",
+          "name": "勾配消失とは何ですか？MSEとどう関係しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "勾配消失とは、損失が大きいのにパラメータ更新の勾配がほぼゼロになり、学習が進まなくなる現象です。シグモイド出力 + MSE損失の組み合わせでは、出力が飽和した領域（p≈0 または p≈1）でシグモイドの微分 p(1−p) が極端に小さくなります。MSEの勾配にはこの p(1−p) が掛かるため、確信を持って間違えた瞬間こそ最も大きく更新したいのに勾配が消えてしまいます。交差エントロピーは勾配に p(1−p) が入らないため、この問題を回避できます。"}
+        },{
+          "@type": "Question",
+          "name": "交差エントロピー損失で log(0) が発生したらどうなりますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "交差エントロピー CE = −[y·ln p + (1−y)·ln(1−p)] では、p がちょうど0または1になると ln が −∞ に発散し、損失が Infinity や NaN になります。実装では予測確率 p を [1e−12, 1−1e−12] のような微小区間でクランプ（クリップ）してから対数を取るのが定石です。本ツールも同じクランプを行っており、ロジット z を ±8 まで振っても損失値が NaN や Infinity になりません。"}
+        },{
+          "@type": "Question",
+          "name": "シグモイド + 交差エントロピーの勾配が p − y になるのはなぜですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "シグモイド p = σ(z) と交差エントロピー CE を合成して連鎖律で微分すると、シグモイドの導関数 p(1−p) と交差エントロピーの p に関する微分がちょうど打ち消し合い、dCE/dz = p − y というシンプルな式になります。これは「予測と正解の差」がそのまま勾配になることを意味し、誤差が大きいほど更新が大きくなる望ましい性質です。この打ち消しが起きるのは、シグモイドと交差エントロピーが情報理論的に対になる組み合わせだからです。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "交差エントロピー vs MSE 損失シミュレーター", "item": "https://novasolver.jp/tools/cross-entropy-vs-mse.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">交差エントロピー vs MSE 損失シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/cross-entropy-vs-mse.html" class="active">JA</a>
+      <a href="/en/tools/cross-entropy-vs-mse.html">EN</a>
+      <a href="/zh/tools/cross-entropy-vs-mse.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-brain"></i> 機械学習</div>
+    <h1>交差エントロピー vs MSE 損失シミュレーター</h1>
+    <p class="hero-sub">二値分類で「なぜ交差エントロピーを使い、平均二乗誤差（MSE）を使わないのか」を体感するツールです。シグモイドへの入力ロジット z と正解ラベル y を変えると、両方の損失と勾配がリアルタイムで分かり、確信を持って間違えたときにMSEの勾配が消える様子を可視化できます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ロジット z（シグモイド入力）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="zNum" value="-1" min="-8" max="8" step="0.1" oninput="syncFromNum('zRange','zNum')"></div>
+      </div>
+      <div class="param-desc">モデルの生出力。p = σ(z) でシグモイドを通り予測確率になる</div>
+      <input type="range" id="zRange" min="-8" max="8" step="0.1" value="-1" oninput="syncToNum('zRange','zNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">正解ラベル y</span></div>
+      <div class="param-desc">この入力が属する真のクラス（0 または 1）</div>
+      <select id="ySel" onchange="compute()">
+        <option value="1" selected>正解ラベル y = 1</option>
+        <option value="0">正解ラベル y = 0</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statP">—</div><div class="sl">予測確率 p</div></div>
+        <div class="stat-card"><div class="sv" id="statCE">—</div><div class="sl">交差エントロピー損失 CE</div></div>
+        <div class="stat-card"><div class="sv" id="statMSE">—</div><div class="sl">MSE損失</div></div>
+        <div class="stat-card"><div class="sv" id="statGCE">—</div><div class="sl">CE勾配 |dCE/dz|</div></div>
+        <div class="stat-card"><div class="sv" id="statGMSE">—</div><div class="sl">MSE勾配 |dMSE/dz|</div></div>
+        <div class="stat-card"><div class="sv" id="statRatio">—</div><div class="sl">勾配比 CE/MSE</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-wave-square"></i> 損失曲線の比較 — 動作点アニメーション</div>
+      <canvas id="celCanvas"></canvas>
+      <p class="canvas-hint">予測確率 p に対する交差エントロピー損失（急峻に立ち上がる曲線）とMSE損失（なだらかな放物線）を、現在の正解ラベル y について重ねて表示します。現在の動作点 p を両曲線上にマークします。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 損失 vs 予測確率 p</div>
+      <canvas class="ux-chartjs-canvas" id="lossChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 勾配 vs ロジット z</div>
+      <canvas class="ux-chartjs-canvas" id="gradChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$\text{CE}=-\big[y\ln p+(1-y)\ln(1-p)\big],\qquad \text{MSE}=(p-y)^2$$</p>
+      <p style="margin-top:6px;">二値分類の損失。p：シグモイド予測確率 p = σ(z) = 1/(1+e^−z)、y：正解ラベル（0 または 1）。</p>
+      <p style="margin-top:10px;">$$\frac{\partial \text{CE}}{\partial z}=p-y,\qquad \frac{\partial \text{MSE}}{\partial z}=2(p-y)\,p(1-p)$$</p>
+      <p style="margin-top:6px;">ロジット z に関する勾配。CEの勾配は誤差 p−y そのもの。MSEの勾配にはシグモイドの導関数 p(1−p) が掛かる。</p>
+      <p style="margin-top:10px;">出力が飽和（p≈0 または p≈1）すると p(1−p)→0 となり、MSEの勾配は消失するが、CEの勾配は ±1 付近を保つ。これが分類で交差エントロピーが標準損失となる理由である。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>交差エントロピーとMSEとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">機械学習の「損失関数」って、予測と正解のズレを測る関数ですよね。回帰でMSE（平均二乗誤差）を使うのは分かるんですけど、分類だとなぜ交差エントロピーなんですか？二乗誤差じゃダメなんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だね。結論から言うと、分類でもMSEは「一応」使えるんだ。予測確率 p と正解 y の差を二乗するだけだから、ちゃんと0以上の値になるし、p=y で最小になる。だから初心者がうっかりMSEを分類に使ってしまうこともある。でも実際に学習させると、交差エントロピーより明らかに遅い。その原因が「勾配」にあるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">勾配ですか。損失そのものじゃなくて、その微分が問題になるんですね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう。学習はパラメータを「勾配の向きに少しずつ動かす」ことで進む。だから本当に効くのは損失の値じゃなくて勾配の大きさなんだ。左でロジット z を −8 に振ってみて。正解が y=1 なのに z が大きく負だと、モデルは「クラス0だ」と確信を持って間違えている状態だ。このとき右の「MSE勾配」を見ると、ほぼ0になっているはずだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">本当だ、MSE勾配が0.000に近いです。一番大きく間違えているのに勾配が消えてる…これは困りますね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">まさにそれが「勾配消失」だ。理由はシグモイドの形にある。MSEの勾配は dMSE/dz = 2(p−y)·p(1−p) で、シグモイドの微分 p(1−p) という項が掛かっている。p が0や1に飽和するとこの p(1−p) がほぼ0になる。つまり確信を持って間違えた瞬間こそ大きく直したいのに、ブレーキがかかってしまうんだ。一方、交差エントロピーの勾配 dCE/dz = p−y にはこの項がない。だから z=−8 でも勾配は ±1 付近を保っている。右の「勾配 vs ロジット」グラフを見ると、両者の差が一目で分かるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">CEの勾配が p−y というシンプルな式になるのはなぜですか？偶然にしてはきれいすぎます。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">偶然じゃないんだ。シグモイドと交差エントロピーを合成して連鎖律で微分すると、交差エントロピー側に出てくる 1/p や 1/(1−p) と、シグモイドの微分 p(1−p) がちょうど打ち消し合う。その結果が p−y。これは設計の妙でね、シグモイドと交差エントロピーは情報理論的に「対になる」組み合わせなんだ。だから実務では迷わずこのペアを使う。回帰ならMSE、二値分類ならシグモイド+交差エントロピー、多クラスならソフトマックス+交差エントロピー、と覚えておけばまず外さないよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">なぜ分類問題ではMSEではなく交差エントロピーを使うのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">ロジット z に関する勾配を見ると理由が分かります。交差エントロピー損失の勾配は dCE/dz = p − y で、誤差そのものに比例します。一方MSE損失の勾配は dMSE/dz = 2(p−y)·p(1−p) で、シグモイドの導関数 p(1−p) が掛かります。モデルが確信を持って間違えると p が0または1に飽和し p(1−p)→0 となるため、MSEの勾配はほぼゼロに消失します。交差エントロピーは誤差が大きいほど強い勾配を保つため、分類では標準の損失関数として使われます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">勾配消失とは何ですか？MSEとどう関係しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">勾配消失とは、損失が大きいのにパラメータ更新の勾配がほぼゼロになり、学習が進まなくなる現象です。シグモイド出力 + MSE損失の組み合わせでは、出力が飽和した領域（p≈0 または p≈1）でシグモイドの微分 p(1−p) が極端に小さくなります。MSEの勾配にはこの p(1−p) が掛かるため、確信を持って間違えた瞬間こそ最も大きく更新したいのに勾配が消えてしまいます。交差エントロピーは勾配に p(1−p) が入らないため、この問題を回避できます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">交差エントロピー損失で log(0) が発生したらどうなりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">交差エントロピー CE = −[y·ln p + (1−y)·ln(1−p)] では、p がちょうど0または1になると ln が −∞ に発散し、損失が Infinity や NaN になります。実装では予測確率 p を [1e−12, 1−1e−12] のような微小区間でクランプ（クリップ）してから対数を取るのが定石です。本ツールも同じクランプを行っており、ロジット z を ±8 まで振っても損失値が NaN や Infinity になりません。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">シグモイド + 交差エントロピーの勾配が p − y になるのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">シグモイド p = σ(z) と交差エントロピー CE を合成して連鎖律で微分すると、シグモイドの導関数 p(1−p) と交差エントロピーの p に関する微分がちょうど打ち消し合い、dCE/dz = p − y というシンプルな式になります。これは「予測と正解の差」がそのまま勾配になることを意味し、誤差が大きいほど更新が大きくなる望ましい性質です。この打ち消しが起きるのは、シグモイドと交差エントロピーが情報理論的に対になる組み合わせだからです。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>ニューラルネットワークの分類タスク：</strong>画像分類、スパムメール判定、医療画像の良性／悪性判定など、出力がクラス確率になるタスクでは交差エントロピーが事実上の標準損失です。二値分類ではシグモイド + 二値交差エントロピー、多クラス分類ではソフトマックス + カテゴリカル交差エントロピーを使います。PyTorch の <code>BCEWithLogitsLoss</code> や TensorFlow の <code>categorical_crossentropy</code> はいずれもこの設計で、ロジットを直接受け取って数値的に安定な形で損失を計算します。</p>
+    <p><strong>ロジスティック回帰：</strong>古典的な統計モデルであるロジスティック回帰も、内部では「シグモイド + 交差エントロピー」をそのまま使っています。交差エントロピー損失の最小化は、ベルヌーイ分布の最尤推定と数学的に等価です。つまり交差エントロピーを使うことは「観測データが最も尤もらしくなるようにパラメータを選ぶ」という統計的に正当な手続きであり、MSEにはこの解釈がありません。</p>
+    <p><strong>勾配ベース最適化の安定化：</strong>深層学習では層を重ねるほど勾配が伝播の途中で小さくなりがちです。出力層でMSEを使うと、そこにさらに勾配消失が加わり学習がほぼ止まります。出力層を交差エントロピーにするだけで、少なくとも出力層からの勾配は誤差に比例した健全な大きさになり、その分だけ学習が安定します。これは ReLU 活性化やバッチ正規化と並ぶ、勾配消失対策の基本中の基本です。</p>
+    <p><strong>機械学習教育・モデルのデバッグ：</strong>「分類モデルの学習が進まない」というトラブルの典型的な原因の一つが、損失関数の取り違えです。本ツールのような可視化で「飽和領域でMSE勾配が消える」ことを一度体感しておくと、学習が止まったときに損失関数・活性化関数の組み合わせを真っ先に疑えるようになります。損失曲線がほぼ平らなまま動かないときは、勾配消失を起こす設計になっていないか確認するのが定石です。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず多い誤解が、<strong>「MSEは分類に使えない」</strong>という言い切りです。正確には「使えるが学習が遅い・不安定になりやすい」が正しい表現です。MSE損失自体は p=y で最小になる正しい形をしており、損失の値だけ見れば分類の指標として破綻していません。問題は損失の値ではなく勾配にあります。確信を持って間違えた領域で勾配が消えるため、最適化が進まないのです。「損失が小さい＝良いモデル」ではなく「勾配が誤差に応じて適切に出る損失を選ぶ」という視点が重要です。</p>
+    <p>次に、<strong>「交差エントロピーはシグモイドなしでも勾配が p−y になる」</strong>という思い込み。dCE/dz = p−y というきれいな式が成り立つのは、シグモイド（または多クラスならソフトマックス）と交差エントロピーを必ずペアで使ったときだけです。例えば出力に ReLU や恒等写像を使って交差エントロピーだけ被せても、この打ち消しは起こりません。さらに、シグモイドを通した確率に対してもう一度シグモイドを掛けるような二重適用や、ロジットと確率を混同した実装はバグの典型です。<code>BCEWithLogitsLoss</code> のように「ロジットを渡す関数」と「確率を渡す関数」を取り違えないよう注意してください。</p>
+    <p>最後に、<strong>「勾配消失はMSEだけの問題」</strong>と考えるのも危険です。勾配消失の根本原因はシグモイド／tanh の飽和であり、損失関数を交差エントロピーにしても、隠れ層に飽和しやすい活性化関数を多段に重ねれば勾配は依然として小さくなります。交差エントロピーが解決するのは「出力層の損失由来の勾配消失」だけです。深いネットワーク全体の勾配消失には、ReLU 系活性化、残差接続（スキップ接続）、適切な重み初期化、バッチ正規化などを組み合わせる必要があります。交差エントロピーは万能薬ではなく、勾配消失対策の一手にすぎない、と理解しておきましょう。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>ロジット z を -5 から +5 の範囲で調整してシミュレーションを開始します</li>
+<li>正解ラベル y を 0（負例）または 1（正例）に設定します</li>
+<li>リアルタイムで予測確率 p = 1/(1+e^-z)、交差エントロピー損失 CE = -[y·log(p) + (1-y)·log(1-p)]、MSE損失 = (p-y)²、各勾配を確認します</li>
+<li>z が正解ラベルと逆方向の極値（例：y=1 で z=-4）にあるとき、MSE勾配が接近 0 になる現象を観察します</li>
+<li>勾配比グラフで交差エントロピーが常に安定した学習信号を送ることを視覚化します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>医療画像診断で悪性腫瘍判定（y=1）の場合、ロジット z=2.0 での結果：予測確率 p≈0.881、交差エントロピー損失≈0.126、MSE損失≈0.014、CE勾配≈0.119、MSE勾配≈0.237。一方 z=-2.0（確信を持った誤り）では p≈0.119、CE損失≈2.126、MSE損失≈0.786 であるのに対し、MSE勾配は僅か≈0.237 に消失し、CE勾配は≈0.881 と高いまま。この勾配差がニューラルネットワークの収束速度を左右します。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>シグモイド関数の飽和領域（z &lt; -4 または z &gt; +4）でMSE勾配が消失する vanishing gradient 問題により、不均衡データセット（例：陽性率2%）の学習が著しく遅延します</li>
+<li>交差エントロピーは分類精度が低い初期学習段階でも高勾配を維持するため、ビッグデータCNN（ResNet、VGGなど）や言語モデル（BERT、GPT）の標準損失として採用されています</li>
+<li>回帰問題（連続値予測：在来線到着時間±5分誤差範囲）ではMSEが適切ですが、分類境界学習では交差エントロピーを優先してください</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Numerical helpers =====
+const EPS = 1e-12;
+function sigmoid(z){ return 1/(1+Math.exp(-z)); }
+function clampP(p){ return Math.min(1-EPS, Math.max(EPS, p)); }
+
+// shared state for the canvas animation
+const CL = {p:0.26894, y:1, ce:0, mse:0, gCE:0, gMSE:0};
+
+// ===== Chart.js setup =====
+// loss vs predicted probability p
+const lossChart = new Chart(document.getElementById('lossChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'交差エントロピー損失 CE',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.12)',fill:true,borderWidth:2,pointRadius:0,tension:0.15},
+    {label:'MSE損失',data:[],borderColor:'#e17055',backgroundColor:'rgba(225,112,85,.12)',fill:true,borderWidth:2,pointRadius:0,tension:0.15},
+    {label:'現在の動作点',data:[],borderColor:'#00b894',backgroundColor:'#00b894',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'予測確率 p',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'損失',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// gradient magnitude vs logit z
+const gradChart = new Chart(document.getElementById('gradChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'|dCE/dz|',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.12)',fill:true,borderWidth:2,pointRadius:0,tension:0.15},
+    {label:'|dMSE/dz|',data:[],borderColor:'#e17055',backgroundColor:'rgba(225,112,85,.12)',fill:true,borderWidth:2,pointRadius:0,tension:0.15},
+    {label:'現在の z',data:[],borderColor:'#00b894',backgroundColor:'#00b894',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'ロジット z',font:{size:11}},ticks:{maxTicksLimit:9}},
+      y:{title:{display:true,text:'勾配の大きさ',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const z = parseFloat(document.getElementById('zRange').value);
+  const y = parseInt(document.getElementById('ySel').value, 10);
+
+  // sigmoid prediction
+  const p  = sigmoid(z);
+  const pc = clampP(p);
+
+  // losses
+  const ce  = -(y*Math.log(pc) + (1-y)*Math.log(1-pc));
+  const mse = (p-y)*(p-y);
+
+  // gradients w.r.t. the logit z
+  const gCE  = p - y;                  // dCE/dz
+  const gMSE = 2*(p-y)*p*(1-p);        // dMSE/dz
+  const aGCE  = Math.abs(gCE);
+  const aGMSE = Math.abs(gMSE);
+  const ratio = aGMSE > 1e-12 ? aGCE/aGMSE : Infinity;
+
+  // ----- stat cards -----
+  document.getElementById('statP').textContent     = p.toFixed(4);
+  document.getElementById('statCE').textContent    = ce.toFixed(4);
+  document.getElementById('statMSE').textContent   = mse.toFixed(4);
+  document.getElementById('statGCE').textContent   = aGCE.toFixed(4);
+  document.getElementById('statGMSE').textContent  = aGMSE.toFixed(4);
+  document.getElementById('statRatio').textContent = isFinite(ratio) ? ratio.toFixed(2) : '∞';
+
+  // colour the MSE-gradient stat when it vanishes
+  document.getElementById('statGMSE').style.color = aGMSE < 0.05 ? '#c0392b' : '#0a8a6a';
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  const ratioTxt = isFinite(ratio) ? ratio.toFixed(1)+'倍' : '事実上∞倍';
+  if(aGMSE < 0.05){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> この z では交差エントロピーの勾配がMSEの約'+ratioTxt+'です。予測が飽和して確信を持って間違えているため、MSE勾配が消失し学習が停滞します（勾配消失）。交差エントロピーは強い勾配を保つため分類で好まれます。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> この z では交差エントロピーの勾配がMSEの約'+ratioTxt+'です。予測が飽和すると（確信を持って誤分類すると）MSE勾配は消失して学習が止まりますが、交差エントロピーは強い勾配を保ちます。ゆえに分類では交差エントロピーが選ばれます。';
+  }
+
+  // ----- loss vs p chart -----
+  const lLabels=[], lCE=[], lMSE=[], lPoint=[];
+  const PN=60;
+  for(let i=0;i<=PN;i++){
+    const pv = 0.01 + (0.99-0.01)*i/PN;
+    const pvc = clampP(pv);
+    lLabels.push(pv.toFixed(2));
+    lCE.push(-(y*Math.log(pvc) + (1-y)*Math.log(1-pvc)));
+    lMSE.push((pv-y)*(pv-y));
+    lPoint.push(null);
+  }
+  // mark the current operating point on the CE curve
+  let nearest=0, best=1e9;
+  for(let k=0;k<lLabels.length;k++){
+    const d=Math.abs(parseFloat(lLabels[k])-p);
+    if(d<best){best=d;nearest=k;}
+  }
+  lPoint[nearest] = lCE[nearest];
+  lossChart.data.labels = lLabels;
+  lossChart.data.datasets[0].data = lCE;
+  lossChart.data.datasets[1].data = lMSE;
+  lossChart.data.datasets[2].data = lPoint;
+  lossChart.update('none');
+
+  // ----- gradient vs z chart -----
+  const gLabels=[], gAceData=[], gAmseData=[], gPoint=[];
+  const ZN=64;
+  for(let i=0;i<=ZN;i++){
+    const zv = -8 + 16*i/ZN;
+    const pv = sigmoid(zv);
+    gLabels.push(zv.toFixed(1));
+    gAceData.push(Math.abs(pv - y));
+    gAmseData.push(Math.abs(2*(pv-y)*pv*(1-pv)));
+    gPoint.push(null);
+  }
+  let zNear=0, zBest=1e9;
+  for(let k=0;k<gLabels.length;k++){
+    const d=Math.abs(parseFloat(gLabels[k])-z);
+    if(d<zBest){zBest=d;zNear=k;}
+  }
+  gPoint[zNear] = gAceData[zNear];
+  gradChart.data.labels = gLabels;
+  gradChart.data.datasets[0].data = gAceData;
+  gradChart.data.datasets[1].data = gAmseData;
+  gradChart.data.datasets[2].data = gPoint;
+  gradChart.update('none');
+
+  // ----- shared state for the canvas -----
+  CL.p=p; CL.y=y; CL.ce=ce; CL.mse=mse; CL.gCE=aGCE; CL.gMSE=aGMSE;
+}
+
+// ===== Loss-curve canvas animation =====
+(function(){
+  const cv = document.getElementById('celCanvas');
+  const ctx = cv.getContext('2d');
+  let pulse = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==260*dpr){
+      cv.width = w*dpr; cv.height = 260*dpr; cv.style.height='260px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 260;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    // plot area
+    const padL = 52, padR = 24, padT = 24, padB = 40;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+
+    // y axis range: cap the cross-entropy curve so MSE stays visible
+    const lossMax = 4.6;   // ln(0.01) ~ 4.6
+    const y = CL.y;
+
+    function px(p){ return padL + plotW*p; }
+    function py(L){ return padT + plotH*(1 - Math.min(L,lossMax)/lossMax); }
+
+    // ----- grid + axes -----
+    ctx.strokeStyle = 'rgba(255,255,255,.10)';
+    ctx.lineWidth = 1;
+    for(let i=0;i<=4;i++){
+      const gy = padT + plotH*i/4;
+      ctx.beginPath(); ctx.moveTo(padL,gy); ctx.lineTo(padL+plotW,gy); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.beginPath();
+    ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH);
+    ctx.stroke();
+
+    // axis labels
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('予測確率 p', padL+plotW/2, H-12);
+    ctx.fillText('0', padL, H-24);
+    ctx.fillText('1', padL+plotW, H-24);
+    ctx.save();
+    ctx.translate(14, padT+plotH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText('損失', 0, 0);
+    ctx.restore();
+
+    // ----- MSE curve (gentle parabola) -----
+    ctx.strokeStyle = '#e17055';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    for(let i=0;i<=120;i++){
+      const p = i/120;
+      const L = (p-y)*(p-y);
+      const X = px(p), Y = py(L);
+      i===0?ctx.moveTo(X,Y):ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+
+    // ----- cross-entropy curve (rises steeply) -----
+    ctx.strokeStyle = '#3a9bff';
+    ctx.lineWidth = 2.4;
+    ctx.shadowColor = '#3a9bff'; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    for(let i=0;i<=160;i++){
+      const p = 0.002 + 0.996*i/160;
+      const pc = Math.min(1-EPS, Math.max(EPS, p));
+      const L = -(y*Math.log(pc) + (1-y)*Math.log(1-pc));
+      const X = px(p), Y = py(L);
+      i===0?ctx.moveTo(X,Y):ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // ----- curve labels -----
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#3a9bff';
+    ctx.fillText('交差エントロピー', padL+8, padT+16);
+    ctx.fillStyle = '#e17055';
+    ctx.fillText('MSE', padL+8, padT+32);
+
+    // ----- correct-answer marker (loss minimum at p = y) -----
+    ctx.strokeStyle = 'rgba(0,184,148,.5)';
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.moveTo(px(y), padT); ctx.lineTo(px(y), padT+plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(0,184,148,.85)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = y>0.5 ? 'right' : 'left';
+    ctx.fillText('正解 y='+y, y>0.5 ? px(y)-6 : px(y)+6, padT+plotH-8);
+
+    // ----- operating point on both curves (pulsing) -----
+    pulse += 0.07;
+    const r = 5 + 2.2*Math.abs(Math.sin(pulse));
+    const cePc = Math.min(1-EPS, Math.max(EPS, CL.p));
+    const ceL  = -(y*Math.log(cePc) + (1-y)*Math.log(1-cePc));
+    const mseL = (CL.p-y)*(CL.p-y);
+
+    // vertical guide at current p
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    ctx.moveTo(px(CL.p), padT); ctx.lineTo(px(CL.p), padT+plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // marker on the MSE curve
+    ctx.fillStyle = '#e17055';
+    ctx.beginPath(); ctx.arc(px(CL.p), py(mseL), r, 0, Math.PI*2); ctx.fill();
+    // marker on the CE curve
+    ctx.fillStyle = '#3a9bff';
+    ctx.shadowColor = '#3a9bff'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(px(CL.p), py(ceL), r, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // current readout
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('p='+CL.p.toFixed(3), px(CL.p), padT-8);
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['zRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

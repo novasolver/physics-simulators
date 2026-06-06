@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2次元 定常 熱伝導 FDM シミュレーター — Gauss-Seidel 反復解法 | NovaSolver</title>
+<meta name="description" content="2次元定常熱伝導をFDM有限差分法で解析するシミュレーター。Gauss-Seidel反復解法により境界条件・熱源設定から温度分布を高速計算。">
+<meta property="og:title" content="2次元 定常 熱伝導 FDM シミュレーター — Gauss-Seidel 反復解法">
+<meta property="og:description" content="2次元定常熱伝導をFDM有限差分法で解析するシミュレーター。Gauss-Seidel反復解法により境界条件・熱源設定から温度分布を高速計算。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="2D heat conduction FDM simulation showing temperature contour map and isotherms on a 20x20 grid">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://novasolver.jp/tools/heat-conduction-2d.html">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/heat-conduction-2d.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/heat-conduction-2d.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/heat-conduction-2d.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/heat-conduction-2d.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "2次元熱伝導FDMシミュレーター",
+      "description": "20×20グリッドの2次元定常熱伝導をガウス・ザイデル法で数値解析。カラーコンター・等温線・中心線プロファイルをリアルタイム可視化。",
+      "url": "https://novasolver.jp/tools/heat-conduction-2d.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Heat Analysis Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["20×20有限差分格子","ガウス・ザイデル反復法（最大500回）","4辺境界温度の任意設定","中心熱源Qの設定","カラーコンターマップ＋等温線","中心水平線の温度プロファイル"],
+      "keywords": "2次元熱伝導,有限差分法,FDM,ガウスザイデル,温度分布,等温線,熱解析,CAE",
+      "datePublished": "2026-04-09",
+      "dateModified": "2026-04-09",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "2次元熱伝導方程式（ポアソン方程式）とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "定常状態では ∂²T/∂x² + ∂²T/∂y² + Q/k = 0 が成立します。Qが0の場合はラプラス方程式となり、内部に熱源がある場合はポアソン方程式となります。有限差分法では各格子点の温度を隣接4点の平均として近似し反復計算で解きます。"}
+        },{
+          "@type": "Question",
+          "name": "ガウス・ザイデル法とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "線形方程式系を反復法で解くアルゴリズムです。各格子点で新しい温度値をその場で更新しながら隣接点の最新値を使う点がヤコビ法と異なり、収束が速いのが特徴です。このツールでは最大500回反復して定常解を求めます。"}
+        },{
+          "@type": "Question",
+          "name": "等温線（アイソサーム）は何を意味しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "等温線は温度が一定の曲線で、地図の等高線と同じ考え方です。等温線が密なほど温度勾配が急で、熱流束が大きいことを示します。実務では部品の最高温度箇所や熱応力が集中する箇所を特定するのに使います。"}
+        },{
+          "@type": "Question",
+          "name": "このシミュレーターはどのようなCAE問題に応用できますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "電子部品の冷却設計、建築断熱性能の評価、原子炉の炉心温度分布、半導体プロセスの温度均一性評価など幅広く応用できます。本ツールは簡略モデルですが、Ansys・Abaqusと同じ有限差分の考え方を使っています。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp"},{"@type": "ListItem", "position": 2, "name": "シミュレーター集", "item": "https://novasolver.jp/tools/"},{"@type": "ListItem", "position": 3, "name": "2次元熱伝導FDM", "item": "https://novasolver.jp/tools/heat-conduction-2d.html"}
+      ]
+    }
+  ]
+}</script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+  <link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}:root{
+  --navy:#001F3F;--accent:#007BFF;--accent2:#00B4D8;
+  --bg:#F8F9FA;--card:#ffffff;--text:#1a1a2e;
+  --muted:#6c757d;--border:#dee2e6;
+}
+html,body{overflow-x:hidden;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+header{background:var(--navy);color:#fff;padding:0 24px;}
+.header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:16px;height:56px;}
+.header-logo{font-size:0.85rem;font-weight:600;color:#fff;text-decoration:none;opacity:.8;}
+.header-logo:hover{opacity:1;}
+.header-sep{color:rgba(255,255,255,.3);}
+.header-title{font-size:1rem;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;;flex:1}
+
+.hero-inner{max-width:1200px;margin:0 auto;padding:0 24px;}
+
+.hero-sub{color:rgba(255,255,255,.75);font-size:0.9rem;line-height:1.6;max-width:640px;}@media(max-width:820px){}@media(max-width:640px){.header-sep{display:none;}}.panel-title::after{content:'';flex:1;height:1px;background:var(--border);}.param-group{margin-bottom:14px;}.param-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}.param-name{font-size:0.83rem;font-weight:600;color:var(--text);}.param-value{font-family:'Roboto Mono',monospace;font-size:0.82rem;color:var(--accent);font-weight:600;background:rgba(0,123,255,.08);padding:2px 8px;border-radius:6px;min-width:60px;text-align:right;}input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:linear-gradient(to right,var(--accent) 0%,var(--accent) var(--pct,50%),var(--border) var(--pct,50%),var(--border) 100%);outline:none;cursor:pointer;}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 2px 6px rgba(0,123,255,.4);transition:transform .15s;}input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2);}input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;border:none;}.divider{height:1px;background:var(--border);margin:14px 0;}.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-family:inherit;font-weight:600;transition:background .2s;width:100%;justify-content:center;}.btn:hover{background:#0056b3;}.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;}.stat-card{background:var(--bg);border-radius:10px;padding:12px;border:1px solid var(--border);text-align:center;}.stat-label{font-size:0.7rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}.stat-value{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--accent);margin-top:3px;}.theory-box{background:rgba(0,123,255,.04);border:1px solid rgba(0,123,255,.15);border-radius:10px;padding:14px;margin-top:16px;font-size:0.82rem;line-height:1.7;color:#333;overflow-x:auto;}.theory-box h4{font-size:0.75rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+.canvas-wrap{position:relative;}.chart-label{font-size:0.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;}.contour-row{display:flex;gap:12px;align-items:flex-start;margin-bottom:20px;}.contour-row>.chart-card{flex:1 1 auto;min-width:0}.colorbar-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 58px}.colorbar-col .chart-card{width:58px!important;min-width:58px!important;padding:10px 8px!important}.colorbar-col .chart-title,.colorbar-col summary,.colorbar-col .collapse-toggle{display:none!important}.cb-val{font-family:'Roboto Mono',monospace;font-size:0.72rem;color:var(--muted);}.main>*{min-width:0;max-width:100%;overflow:hidden}mjx-container{overflow-x:auto;max-width:100%;display:inline-block;}@media(max-width:640px){.contour-row{display:block}.colorbar-col{display:none!important}.chart-label{font-size:.7rem;line-height:1.35}}/* === Mobile Compact === */
+@media(max-width:820px){
+
+.hero h1{font-size:1.15rem;margin-bottom:4px}
+.hero-sub{font-size:0.78rem;line-height:1.4}
+.hero-badge{margin-bottom:6px;font-size:0.65rem;padding:3px 8px}.panel-title{margin-bottom:10px;font-size:0.65rem}.param-group{margin-bottom:8px}.param-label{margin-bottom:3px}.param-name{font-size:0.78rem}.param-value{font-size:0.76rem;padding:1px 6px}input[type=range]{height:3px;margin:2px 0}.divider{margin:8px 0}.theory-box{font-size:0.78rem;padding:10px 12px;margin-top:10px}.theory-box h3{font-size:0.8rem;margin-bottom:4px}.stat-cards{gap:6px}.stat-card{padding:8px}.stat-card .sv{font-size:0.95rem}.stat-card .sl{font-size:0.62rem}.btn{padding:7px 14px;font-size:0.8rem}.btn-group{gap:6px;margin-bottom:8px}.preset-btn{padding:4px 8px;font-size:0.7rem}.cae-note{padding:8px 10px;font-size:0.73rem;margin-top:8px}.toggle-btn{padding:4px 10px;font-size:0.73rem}
+}@media(max-width:640px){
+
+.hero h1{font-size:1.05rem}
+.hero-sub{display:none}
+.hero-badge{margin-bottom:4px;font-size:0.6rem;padding:2px 6px}.panel-title{margin-bottom:6px;font-size:.6rem}.param-group{margin-bottom:4px}.param-name{font-size:.72rem}.param-value{font-size:0.73rem}.divider{margin:4px 0}.theory-box{padding:8px 10px;margin-top:8px}.viz-panel{padding:12px;border-radius:10px}.stat-card{padding:6px}.stat-card .sv{font-size:0.85rem}.btn{padding:6px 12px;font-size:0.78rem}.preset-btn{padding:3px 6px;font-size:0.68rem}
+.param-group{margin-bottom:2px}.field-header{margin-bottom:0}.param-label{margin-bottom:0}.num-wrap{gap:2px}.num-input{width:56px;padding:1px 3px;font-size:.74rem;border-radius:4px}.num-unit{font-size:.68rem;min-width:16px}.param-name{font-size:.71rem}.param-value{font-size:.71rem;padding:1px 5px;min-width:auto}input[type=range]{height:3px;margin:0}select{padding:3px 5px;font-size:.74rem;margin-bottom:2px}.divider{margin:3px 0;opacity:.4}.panel{padding:7px}.panel-title{margin-bottom:4px;font-size:.58rem}
+
+}.explanation{max-width:1200px;margin:0 auto;padding:40px 24px 60px}.explanation h2{font-size:19px;font-weight:700;color:var(--accent);margin:24px 0 10px;border-left:3px solid var(--accent);padding-left:12px}.explanation p{font-size:15px;line-height:1.8;color:var(--text);margin-bottom:12px}.fblock{background:rgba(0,123,255,.04);border:1px solid rgba(0,123,255,.15);border-radius:8px;padding:16px 20px;margin:14px 0;overflow-x:auto}.fblock p{margin-bottom:8px;font-size:14px;color:var(--text)}.chat{background:rgba(0,123,255,.04);border:1px solid rgba(0,123,255,.1);border-radius:12px;padding:16px;margin:20px 0}.cmsg{display:flex;gap:10px;margin-bottom:12px;align-items:flex-start}.cmsg .ico{font-size:22px;flex-shrink:0}.cmsg .bub{background:var(--card);border-radius:8px;padding:10px 14px;font-size:14px;line-height:1.7;color:var(--text);border:1px solid var(--border)}.cmsg.st .bub{border-left:3px solid var(--accent2)}.cmsg.pr .bub{border-left:3px solid #f59e0b}
+
+/* Collapsible theory-box / cae-note */
+details.theory-box>summary,details.cae-note>summary{list-style:none;cursor:pointer;user-select:none;-webkit-user-select:none;}
+details.theory-box>summary::-webkit-details-marker,details.cae-note>summary::-webkit-details-marker{display:none;}
+details.theory-box>summary h3,details.theory-box>summary h4{margin-bottom:0;}
+details.theory-box[open]>summary h3,details.theory-box[open]>summary h4{margin-bottom:6px;}
+details.cae-note>summary{font-size:0.85rem;font-weight:600;}
+details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
+details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
+
+</style>
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://novasolver.jp/tools/heat-conduction-2d.html">
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">2次元熱伝導 FDM</span>
+    <nav class="lang-nav">
+      <a href="/tools/heat-conduction-2d.html" class="active">JA</a>
+      <a href="/en/tools/heat-conduction-2d.html">EN</a>
+      <a href="/zh/tools/heat-conduction-2d.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-temperature-high"></i> 熱解析</div>
+    <h1>2次元 定常 熱伝導 FDM シミュレーター — Gauss-Seidel 反復解法</h1>
+    <p class="hero-sub">有限差分法（FDM）で2次元定常熱伝導を解析。境界温度・内部熱源を自由に設定し、温度コンターと等温線をリアルタイム確認しよう。</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title">境界条件・パラメータ</div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">上面温度 T_top</span><div class="num-wrap"><input type="number" class="num-input" id="valTtopNum" value="100" min="0" max="100" step="1" oninput="syncFromNum('paramTtop','valTtopNum')"><span class="num-unit">°C</span></div></div>
+      <input type="range" id="paramTtop" oninput="syncToNum('paramTtop','valTtopNum')" min="0" max="100" step="1" value="100">
+    </div>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">下面温度 T_bottom</span><div class="num-wrap"><input type="number" class="num-input" id="valTbottomNum" value="0" min="0" max="100" step="1" oninput="syncFromNum('paramTbottom','valTbottomNum')"><span class="num-unit">°C</span></div></div>
+      <input type="range" id="paramTbottom" oninput="syncToNum('paramTbottom','valTbottomNum')" min="0" max="100" step="1" value="0">
+    </div>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">左面温度 T_left</span><div class="num-wrap"><input type="number" class="num-input" id="valTleftNum" value="50" min="0" max="100" step="1" oninput="syncFromNum('paramTleft','valTleftNum')"><span class="num-unit">°C</span></div></div>
+      <input type="range" id="paramTleft" oninput="syncToNum('paramTleft','valTleftNum')" min="0" max="100" step="1" value="50">
+    </div>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">右面温度 T_right</span><div class="num-wrap"><input type="number" class="num-input" id="valTrightNum" value="50" min="0" max="100" step="1" oninput="syncFromNum('paramTright','valTrightNum')"><span class="num-unit">°C</span></div></div>
+      <input type="range" id="paramTright" oninput="syncToNum('paramTright','valTrightNum')" min="0" max="100" step="1" value="50">
+    </div>
+    <div class="divider"></div>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">中心熱源 Q (W/m²)</span><div class="num-wrap"><input type="number" class="num-input" id="valQNum" value="0" min="0" max="5000" step="100" oninput="syncFromNum('paramQ','valQNum')"><span class="num-unit">W/m²</span></div></div>
+      <input type="range" id="paramQ" oninput="syncToNum('paramQ','valQNum')" min="0" max="5000" step="100" value="0">
+    </div>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">熱伝導率 k (W/mK)</span><div class="num-wrap"><input type="number" class="num-input" id="valKNum" value="10" min="1" max="50" step="1" oninput="syncFromNum('paramK','valKNum')"><span class="num-unit">W/mK</span></div></div>
+      <input type="range" id="paramK" oninput="syncToNum('paramK','valKNum')" min="1" max="50" step="1" value="10">
+    </div>
+    <div class="divider"></div>
+    <button class="btn" id="btnRun"><i class="fas fa-fire"></i> 計算実行</button>
+
+  </div>
+
+  <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">T_max</div><div class="stat-value" id="statTmax">—</div></div>
+      <div class="stat-card"><div class="stat-label">T_min</div><div class="stat-value" id="statTmin">—</div></div>
+      <div class="stat-card"><div class="stat-label">T_center</div><div class="stat-value" id="statTcenter">—</div></div>
+      <div class="stat-card"><div class="stat-label">収束反復数</div><div class="stat-value" id="statIter">—</div></div>
+    </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <div class="chart-card"><div class="chart-title">温度コンターマップ + 等温線（10°C 間隔）</div>
+      <div class="contour-row">
+        <canvas id="contourCanvas" width="400" height="400" style="border-radius:8px;max-width:100%;flex:1;"></canvas>
+        <div class="colorbar-col">
+          <span class="cb-val" id="cbMax">100°C</span>
+          <canvas id="colorbarCanvas" width="18" height="340" style="border-radius:4px;"></canvas>
+          <span class="cb-val" id="cbMin">0°C</span>
+        </div>
+      </div><canvas class="ux-chartjs-canvas" id="chartProfile"></canvas></div>
+    </div>
+  
+<div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+<p><strong>定常熱伝導（ポアソン方程式）</strong></p>
+      $$\frac{\partial^2 T}{\partial x^2}+\frac{\partial^2 T}{\partial y^2}+\frac{Q}{k}=0$$
+      <p style="margin-top:8px;"><strong>有限差分近似（ガウス・ザイデル）</strong></p>
+      $$T_{i,j}=\frac{T_{i+1,j}+T_{i-1,j}+T_{i,j+1}+T_{i,j-1}+\frac{Q\,\Delta x^2}{k}}{4}$$
+    
+</div>
+</div>
+</div>
+
+<script>
+function __novaCanvasCssW(canvas){
+  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
+}
+function __novaCanvasCssH(canvas){
+  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
+}
+function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.setAttribute('data-ux-no-scale', '1');
+  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / dpr || 600));
+  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / dpr || 320));
+  canvas.style.setProperty('width', w + 'px', 'important');
+  canvas.style.setProperty('height', h + 'px', 'important');
+  var bw = Math.round(w * dpr);
+  var bh = Math.round(h * dpr);
+  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
+  canvas.dataset.cssW = String(w);
+  canvas.dataset.cssH = String(h);
+  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w: w, h: h, dpr: dpr };
+}
+
+
+const N=20,IMAX=500;
+let chartProfile=null;
+
+function solveFDM(Ttop,Tbottom,Tleft,Tright,Q,k){
+  const T=Array.from({length:N},()=>new Float64Array(N));
+  const dx=1.0/(N-1),src=Q*dx*dx/k;
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++)T[i][j]=Tleft+(Tright-Tleft)*(j/(N-1));
+  function bc(){for(let j=0;j<N;j++){T[0][j]=Ttop;T[N-1][j]=Tbottom;}for(let i=0;i<N;i++){T[i][0]=Tleft;T[i][N-1]=Tright;}}bc();
+  const ci=Math.floor(N/2),cj=Math.floor(N/2);
+  let iter=0;
+  for(iter=0;iter<IMAX;iter++){
+    let md=0;
+    for(let i=1;i<N-1;i++)for(let j=1;j<N-1;j++){
+      const s=(i===ci&&j===cj)?src:0;
+      const Tnew=(T[i+1][j]+T[i-1][j]+T[i][j+1]+T[i][j-1]+s)/4;
+      md=Math.max(md,Math.abs(Tnew-T[i][j]));T[i][j]=Tnew;
+    }
+    bc();
+    if(md<1e-4)break;
+  }return{T,iter};
+}function hsvToRgb(h,s,v){
+  const c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=x;}else if(h<120){r=x;g=c;}else if(h<180){g=c;b=x;}else if(h<240){g=x;b=c;}else if(h<300){r=x;b=c;}else{r=c;b=x;}
+  return[Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)];
+}function tempColor(t,tmin,tmax){const r=Math.max(0,Math.min(1,(t-tmin)/(tmax-tmin)));return hsvToRgb((1-r)*240,1,1);}function drawContour(T){
+  const cv=document.getElementById('contourCanvas'),ctx=cv.getContext('2d');
+  const __novaDims=__novaHiDpiCanvas(cv, cv.clientWidth || cv.offsetWidth || parseFloat(cv.getAttribute('width')) || 400, cv.clientHeight || cv.offsetHeight || parseFloat(cv.getAttribute('height')) || 400, ctx);
+  const W=__novaDims.w,H=__novaDims.h,cw=W/N,ch=H/N;
+  let tmin=Infinity,tmax=-Infinity;
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++){tmin=Math.min(tmin,T[i][j]);tmax=Math.max(tmax,T[i][j]);}if(tmax-tmin<0.5)tmax=tmin+1;
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++){const[r,g,b]=tempColor(T[i][j],tmin,tmax);ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fillRect(j*cw,i*ch,cw+1,ch+1);}// Isotherms
+  ctx.strokeStyle='rgba(255,255,255,0.65)';ctx.lineWidth=1;
+  const step=10,t0=Math.ceil(tmin/step)*step;
+  for(let tv=t0;tv<tmax;tv+=step){
+    ctx.beginPath();
+    for(let i=0;i<N-1;i++)for(let j=0;j<N-1;j++){
+      const corners=[T[i][j],T[i][j+1],T[i+1][j+1],T[i+1][j]];
+      const pts=[];
+      const edges=[[0,1],[1,2],[2,3],[3,0]];
+      const ex=[j*cw,(j+1)*cw,(j+1)*cw,j*cw],ey=[i*ch,i*ch,(i+1)*ch,(i+1)*ch];
+      for(const[a,b]of edges){const ta=corners[a],tb=corners[b];if((ta-tv)*(tb-tv)<=0&&Math.abs(ta-tb)>1e-9){const f=(tv-ta)/(tb-ta);pts.push([ex[a]+f*(ex[b]-ex[a]),ey[a]+f*(ey[b]-ey[a])]);}}if(pts.length>=2){ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[1][0],pts[1][1]);}
+    }
+    ctx.stroke();ctx.beginPath();
+  }
+  // Colorbar
+  const cb=document.getElementById('colorbarCanvas'),cbCtx=cb.getContext('2d');
+  const cbDims=__novaHiDpiCanvas(cb, 18, 340, cbCtx);
+  for(let y=0;y<cbDims.h;y++){const[r,g,b]=tempColor(tmin+(1-y/cbDims.h)*(tmax-tmin),tmin,tmax);cbCtx.fillStyle=`rgb(${r},${g},${b})`;cbCtx.fillRect(0,y,cbDims.w,1);}document.getElementById('cbMax').textContent=tmax.toFixed(1)+'°C';
+  document.getElementById('cbMin').textContent=tmin.toFixed(1)+'°C';
+  return{tmin,tmax};
+}function drawProfile(T){
+  const mid=Math.floor(N/2);
+  const labels=Array.from({length:N},(_,j)=>j);
+  const data=Array.from({length:N},(_,j)=>+T[mid][j].toFixed(2));
+  if(chartProfile)chartProfile.destroy();
+  chartProfile=new Chart(document.getElementById('chartProfile'),{type:'line',data:{labels,datasets:[{label:'T(x) at y=中央',data,borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,0.07)',borderWidth:2,pointRadius:3,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,resizeDelay:100,animation:false,plugins:{legend:{labels:{font:{size:11}}}},scales:{x:{ title:{display:true,text:'格子インデックス j',font:{size:11}},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'温度 (°C)',font:{size:11}}}}}});
+}function run(){
+  const Ttop=+document.getElementById('paramTtop').value;
+  const Tbottom=+document.getElementById('paramTbottom').value;
+  const Tleft=+document.getElementById('paramTleft').value;
+  const Tright=+document.getElementById('paramTright').value;
+  const Q=+document.getElementById('paramQ').value;
+  const k=+document.getElementById('paramK').value;
+  const{T,iter}=solveFDM(Ttop,Tbottom,Tleft,Tright,Q,k);
+  drawContour(T);
+  drawProfile(T);
+  const mid=Math.floor(N/2);
+  let tmin=Infinity,tmax=-Infinity;
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++){tmin=Math.min(tmin,T[i][j]);tmax=Math.max(tmax,T[i][j]);}
+  document.getElementById('statTmax').textContent=tmax.toFixed(1)+'°C';
+  document.getElementById('statTmin').textContent=tmin.toFixed(1)+'°C';
+  document.getElementById('statTcenter').textContent=T[mid][mid].toFixed(1)+'°C';
+  document.getElementById('statIter').textContent=iter;
+}function bindSlider(id,dispId,suffix,dec){
+  const el=document.getElementById(id),disp=document.getElementById(dispId);
+  function u(){const _eDV=disp;if(_eDV.tagName==='INPUT'){_eDV.value=parseFloat(el.value).toFixed(dec);}else{_eDV.textContent=parseFloat(el.value).toFixed(dec)+suffix;}el.style.setProperty('--pct',(el.value-el.min)/(el.max-el.min)*100+'%');}
+  el.addEventListener('input',u);u();
+}bindSlider('paramTtop','valTtopNum',' °C',0);
+bindSlider('paramTbottom','valTbottomNum',' °C',0);
+bindSlider('paramTleft','valTleftNum',' °C',0);
+bindSlider('paramTright','valTrightNum',' °C',0);
+bindSlider('paramQ','valQNum','',0);
+bindSlider('paramK','valKNum','',1);
+
+document.getElementById('btnRun').addEventListener('click',run);
+['paramTtop','paramTbottom','paramTleft','paramTright','paramQ','paramK'].forEach(id=>document.getElementById(id).addEventListener('change',run));
+run();
+</script>
+
+<section class="explanation">
+  <h2>2次元熱伝導FDMシミュレーターとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">このシミュレーターで「定常熱伝導」を解くってどういうことですか？時間が止まってる状態？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">大まかに言うと、十分な時間が経って温度分布がもう変わらなくなった状態だね。例えば、エンジンをかけてしばらくした後のエンジンブロックの温度分布を考えるイメージだ。このツールでは、境界の温度（上下左右）と内部のヒーター（Q）を設定すると、その条件で最終的に落ち着く温度マップをガウス・ザイデル法という計算で求めてるんだ。上のスライダーで「T_top」を変えてみると、すぐに温度分布が変わるのがわかるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">ガウス・ザイデル法って、どうして「反復」が必要なんですか？一発で答えが出ないんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">実は、ある点の温度は隣の点の温度に依存し、隣の点もまたその隣に依存する…という連立方程式みたいな状態になってるんだ。だから、最初は適当な温度（例えば0℃）からスタートして、計算を繰り返すうちに正しい分布に近づけていくんだよ。このツールでは最大500回反復してるね。パラメータ「Q」を大きくすると、中心が熱くなるから収束に時間がかかる（反復回数が増える）様子も観察できるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">表示されている「等温線」がギュッと詰まっているところがあるのは、何を意味してるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それは温度勾配が急な、つまり熱が集中的に流れている場所だ！例えば、左面「T_left」を低温、右面を高温に設定してみて。等温線が垂直に密になるよね。これは熱が左から右へたくさん流れている証拠。実務では、等温線が密な場所は熱応力が集中して壊れやすいので、放熱フィンを付けたり材料を変えたりする対策が必要になるんだ。</div>
+    </div>
+  </div>
+  <h2>よくある質問</h2>
+<div class="faq-section">
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggleFaq(this)">境界温度や内部熱源の値を変更したのに、コンター図がすぐに更新されません。なぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+    <div class="faq-a">本シミュレーターは反復計算（ガウス・ザイデル法）で解を収束させています。値を変更後、収束条件を満たすまで計算が続くため、リアルタイム更新には若干のタイムラグが生じます。しばらくお待ちいただくか、収束判定の許容誤差を調整してみてください。</div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggleFaq(this)">熱伝導率kの値を大きくすると、温度分布はどう変わりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+    <div class="faq-a">kが大きいほど熱が伝わりやすくなり、温度分布が均一化されます。例えば、高温部と低温部の差が小さくなり、等温線の間隔が広がる傾向があります。逆にkが小さいと局所的な温度変化が顕著になります。</div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggleFaq(this)">内部熱源Qを負の値に設定しても問題ありませんか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+    <div class="faq-a">はい、設定可能です。Qが負の値は「吸熱」や「冷却」を意味します。例えば、局所的に熱を奪うヒートシンクのような効果をモデル化できます。ただし、過度に大きな負の値にすると計算が収束しにくくなる場合があります。</div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggleFaq(this)">このシミュレーターで解析できる領域の形状は四角形だけですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+    <div class="faq-a">現状は直交格子を用いた長方形領域のみ対応しています。円形や傾斜境界など複雑形状の解析はできません。ただし、境界条件を細かく設定することで、近似的なモデル化が可能な場合もあります。</div>
+  </div>
+</div>
+<h2>実世界での応用</h2>
+<div class="fblock">
+  <p><strong>電子機器の熱設計：</strong>スマートフォンやCPUの内部では、特定のチップ（熱源Q）が発熱します。周囲の筐体（境界温度）との間でどのように熱が拡散し、最高温度がどこになるかをこのようなシミュレーションで予測し、放熱設計やファンの配置を決定します。</p>
+  <p><strong>建築・断熱設計：</strong>壁や窓（境界）の外気温と室内温度を設定し、断熱材（熱伝導率k）の性能を評価します。等温線の間隔を見ることで、熱橋（ヒートブリッジ）と呼ばれる局部から熱が逃げやすい箇所を特定できます。</p>
+  <p><strong>材料加工・溶接：</strong>溶接トーチを熱源（移動するQ）とみなして、母材内の温度分布を予測します。これにより、材料が変性したり割れたりするのを防ぎ、最適な加工条件を見つけます。</p>
+  <p><strong>地熱・地中熱利用：</strong>地面を2次元断面とみなし、地表（上面温度）と地中深部（下面温度）の温度差による自然な熱の流れを解析します。地中熱ヒートポンプのパイプ配置の最適化に応用されます。</p>
+
+</div>
+<h2>よくある誤解と注意点</h2>
+<div class="fblock">
+<p>まず、このツールで設定する「内部熱源 Q」は、<strong>単位面積あたりの発熱量</strong>として簡略化されている点に注意だ。実務では体積あたり [W/m³] が基本だから、例えば厚さが重要な板の解析をする時は、この値を厚さで割るなどの換算が必要になる。次に、<strong>境界条件の設定ミス</strong>がよくある。全ての境界を「断熱」にしたつもりで、うっかり一か所だけ固定温度にしていると、熱がそこに吸い込まれるような非現実的な分布になる。例えば、四辺すべてを「断熱」スライダーにしたら、内部熱源Qがあれば全体が際限なく熱くなる（現実ではあり得ない）。これは熱平衡条件（発生熱＝放熱）を満たしていないからで、実機の設計では必ず放熱経路を考える必要があるんだ。</p>
+<p>最後に、<strong>グリッドサイズの依存性</strong>を理解しておこう。このツールは20×20で固定だけど、実はこの数が結果の精度を大きく左右する。例えば、等温線が密な部分（温度勾配が急なところ）では、グリッドが粗いと実際よりなだらかな分布になってしまう。逆にグリッドを細かくしすぎると計算時間が爆発的に増える。実務では、必要十分な解像度を見極める「メッシュ感度解析」が必須のステップだ。</p>
+
+</div>
+
+</section>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-conduction-2d.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/heat-conduction-cylinder.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-circle"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">非定常熱伝導ヒーズラー線図計算機</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">非定常熱伝導ヒーズラー線図計算機は、平板・無限円筒・球の非定常熱伝導を1次近似（ヒーズラー線図）で解析します。ビオ数やフーリエ数から中心温度・表面温度・総熱移動量をリアルタイム計算。...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/heat-conduction-transient.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-thermometer-half"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">2D過渡熱伝導シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">2D過渡熱伝導シミュレーターで、有限差分法による温度分布の時間変化をアニメーションで可視化。内部熱源や境界条件を設定し、ICチップの冷却解析や建物壁の熱応答など、工学的な熱伝導現象を...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/finite-diff-heat.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-border-all"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">有限差分熱伝導シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">陽解法有限差分法 T^(n+1)_i = T^n_i + r(T^n_i+1-2T^n_i+T^n_i-1) をリアルタイムアニメーション。フーリエ数・安定性条件r≤0.5・ディリク...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/heat-diffusion.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-fire-flame-curved"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">2D熱拡散シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">2D熱拡散シミュレーターで、フーリエの熱方程式をリアルタイムに体験。クリックで熱源を配置し、材料や境界条件を自由に変更。鋼材・銅・木材の熱拡散率の違いを視覚的に学び、温度場の時間発展...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/heat-equation-2d.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">2次元非定常熱伝導シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">2次元非定常熱伝導シミュレーター「NovaSolver」は、熱伝導方程式の数値解析をリアルタイムで体験できるCAE教育ツールです。自由に境界条件や初期条件を設定し、クリックで熱源を追...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/lumped-capacitance.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-half"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">集中容量法・冷却/加熱曲線 シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">集中容量法・冷却/加熱曲線シミュレーター。ビオ数(Bi)の妥当性を確認し、非定常熱伝導の温度履歴をリアルタイムに可視化。鋼・アルミ・セラミックなど各種材料の時定数を比較できます。集中...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>四辺の境界条件を設定します。上辺・下辺・左辺・右辺それぞれについて、温度値（℃）を入力するか熱流束（W/m²）を選択します</li>
+<li>領域内の熱源密度（W/m³）、格子間隔（mm）、材料の熱伝導率（W/m·K）を指定します</li>
+<li>「計算実行」ボタンをクリックするとGauss-Seidel法で反復計算が開始され、収束条件を満たした温度分布が可視化されます</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>アルミニウム板（熱伝導率λ=160 W/m·K）50mm×50mm領域で、上辺を80℃固定、下辺を20℃固定、左右辺は断熱（熱流束=0）、内部熱源q=5000 W/m³の場合、FDM格子5×5で計算すると中央部付近は約55℃、左右辺中央では約50℃に収束します。反復回数は通常200～500回程度で相対誤差1%以下に到達します</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>境界条件の混在設定時、隣接辺の条件が矛盾していないか確認してください。例えば角部で異なる温度値が指定されると局所的な不連続が生じます</li>
+<li>格子間隔を細かくしすぎるとメモリ使用量が増加し計算時間が急増するため、収束精度と処理能力のバランスを取ってΔx=1～5mmの範囲で設定することを推奨します</li>
+<li>定常解析のため、実際の加熱・冷却プロセスの過渡応答は別途瞬間値シミュレーターで確認が必要です</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a></div><div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem"><a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+  <script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

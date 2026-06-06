@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音圧レベルと距離減衰シミュレーター — 逆二乗則・dB計算 | NovaSolver</title>
+<meta name="description" content="音圧レベルと距離減衰シミュレーター：点音源からの逆二乗則による音の減衰をリアルタイム計算。音響パワーレベル、距離、指向性係数から音圧レベルと信号対雑音比を算出できる設計ツール。">
+<link rel="canonical" href="https://novasolver.jp/tools/sound-pressure-distance.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/sound-pressure-distance.html">
+<meta property="og:title" content="音圧レベルと距離減衰シミュレーター — 逆二乗則・dB計算 | NovaSolver Project">
+<meta property="og:description" content="音圧レベルと距離減衰シミュレーター：点音源からの逆二乗則による音の減衰をリアルタイム計算。音響パワーレベル、距離、指向性係数から音圧レベルと信号対雑音比を算出できる設計ツール。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Sound pressure level vs distance simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/sound-pressure-distance.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/sound-pressure-distance.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/sound-pressure-distance.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/sound-pressure-distance.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#spdCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "音圧レベルと距離減衰シミュレーター",
+      "description": "点音源の音圧レベルが距離とともにどう減衰するかを計算。音響パワーレベル・距離・指向性係数・暗騒音を変えて、逆二乗則による距離減衰（距離2倍で約6dB低下）と暗騒音との合成レベル・S/Nを求められる無料シミュレーターです。",
+      "url": "https://novasolver.jp/tools/sound-pressure-distance.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Acoustics Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["点音源の音圧レベルと距離減衰の計算","逆二乗則（距離2倍で約6dB低下）の可視化","指向性係数 Q による反射面効果の反映","暗騒音との合成レベルとS/Nマージンの算出","音圧レベル vs 距離・音圧レベル vs 指向性のグラフ"],
+      "keywords": "音圧レベル,音響パワーレベル,逆二乗則,距離減衰,指向性係数,暗騒音,デシベル,音響工学",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "音響パワーレベルと音圧レベルは何が違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "音響パワーレベル L_W は音源そのものが1秒間に放射する音響エネルギーの総量を表す量で、電球のワット数のように音源固有の値です。距離で変わりません。一方、音圧レベル L_p はある地点で聞き手やマイクが実際に受け取る量で、距離によって大きく変わります。この2つの橋渡しが逆二乗則で、点音源では L_p = L_W + 10log10(Q/(4πr²)) で計算します。両者を混同するのが音響工学で最も多い間違いの一つです。"}
+        },{
+          "@type": "Question",
+          "name": "なぜ距離が2倍になると音圧レベルは約6dB下がるのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "点音源は一定の音響パワーを球面状に広がる波面へ放射します。球の表面積は距離の2乗に比例して増えるため、1平方メートルを通過するエネルギー（音の強さ）は距離の2乗に反比例して減ります。これがデシベル（対数）スケールでは 10·log10(1/4) ≈ −6.0dB という単純な形になり、距離が2倍になるたびに音圧レベルが約6dB低下します。これが逆二乗則による距離減衰です。"}
+        },{
+          "@type": "Question",
+          "name": "指向性係数 Q とは何で、どう値を選びますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "指向性係数 Q は音源が周囲の反射面によって音をどれだけ狭い空間へ集中して放射するかを表す係数です。何もない自由空間（全方向）では Q=1、硬い床の上にある半空間では Q=2（自由空間より約3dB大きい）、壁と床の隅では Q=4（約6dB大きい）、3面が交わる隅では Q=8（約9dB大きい）です。同じ音源でも置き場所で受音点のレベルが変わるため、設置条件に合わせて Q を選びます。"}
+        },{
+          "@type": "Question",
+          "name": "暗騒音との合成レベルやS/Nはなぜ重要ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "どんなに静かな音源も、その場所の暗騒音（背景騒音）より小さければ聞き取れません。2つの音を足すときはエネルギーを対数加算するため、同じ大きさの2音を合わせても3dBしか大きくなりません。S/N（音源と暗騒音の差）が10dB以上あれば音源が支配的、0dB付近では暗騒音にほぼ埋もれます。騒音測定や警報音の設計では、合成レベルとS/Nの両方を確認することが欠かせません。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "音圧レベルと距離減衰シミュレーター", "item": "https://novasolver.jp/tools/sound-pressure-distance.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">音圧レベルと距離減衰シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/sound-pressure-distance.html" class="active">JA</a>
+      <a href="/en/tools/sound-pressure-distance.html">EN</a>
+      <a href="/zh/tools/sound-pressure-distance.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-volume-high"></i> 音響工学</div>
+    <h1>音圧レベルと距離減衰シミュレーター</h1>
+    <p class="hero-sub">点音源から離れるにつれて音がどれだけ小さくなるかを計算するツールです。音響パワーレベル・距離・指向性係数・暗騒音を変えると、逆二乗則による距離減衰（距離2倍で約6dB低下）と、暗騒音との合成レベル・S/Nがリアルタイムで分かります。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">音響パワーレベル L_W</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="lwNum" value="100" min="60" max="150" step="1" oninput="syncFromNum('lwRange','lwNum')"><span class="num-unit">dB</span></div>
+      </div>
+      <div class="param-desc">音源そのものが放射する音響エネルギーの総量</div>
+      <input type="range" id="lwRange" min="60" max="150" step="1" value="100" oninput="syncToNum('lwRange','lwNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">距離 r</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="rNum" value="10" min="0.5" max="500" step="0.5" oninput="syncFromNum('rRange','rNum')"><span class="num-unit">m</span></div>
+      </div>
+      <div class="param-desc">音源から受音点（聞き手）までの距離</div>
+      <input type="range" id="rRange" min="0.5" max="500" step="0.5" value="10" oninput="syncToNum('rRange','rNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">暗騒音レベル</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="bgNum" value="45" min="20" max="80" step="1" oninput="syncFromNum('bgRange','bgNum')"><span class="num-unit">dB</span></div>
+      </div>
+      <div class="param-desc">音源がない状態での周囲の背景騒音</div>
+      <input type="range" id="bgRange" min="20" max="80" step="1" value="45" oninput="syncToNum('bgRange','bgNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">指向性係数 Q</span></div>
+      <div class="param-desc">反射面の影響。狭い空間へ放射するほど大きい</div>
+      <select id="dirSel" onchange="compute()">
+        <option value="1">自由空間（全方向, Q=1）</option>
+        <option value="2" selected>硬い床の上（半空間, Q=2）</option>
+        <option value="4">壁と床の隅（Q=4）</option>
+        <option value="8">3面の隅（Q=8）</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statSpl">—</div><div class="sl">この距離の音圧レベル (dB)</div></div>
+        <div class="stat-card"><div class="sv" id="statSpl2">—</div><div class="sl">距離2倍での音圧レベル (dB)</div></div>
+        <div class="stat-card"><div class="sv" id="statSpl1">—</div><div class="sl">1 m 基準での音圧レベル (dB)</div></div>
+        <div class="stat-card"><div class="sv" id="statComb">—</div><div class="sl">暗騒音との合成レベル (dB)</div></div>
+        <div class="stat-card"><div class="sv" id="statSnr">—</div><div class="sl">暗騒音との差 S/N (dB)</div></div>
+        <div class="stat-card"><div class="sv" id="statClass">—</div><div class="sl">騒音レベルの判定</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-broadcast-tower"></i> 点音源・球面波・受音点 — 距離減衰アニメーション</div>
+      <canvas id="spdCanvas"></canvas>
+      <p class="canvas-hint">点音源から広がる球面波（波面）は距離とともに薄れます。聞き手の位置に置いた騒音計が音圧レベルを読み取り、暗騒音の床も表示します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 音圧レベル vs 距離（対数距離軸）</div>
+      <canvas class="ux-chartjs-canvas" id="distChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-column"></i> 音圧レベル vs 指向性係数 Q</div>
+      <canvas class="ux-chartjs-canvas" id="dirChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$L_p=L_W+10\log_{10}\!\frac{Q}{4\pi r^{2}}$$</p>
+      <p style="margin-top:6px;">点音源の音圧レベル L_p。L_W：音響パワーレベル、Q：指向性係数、r：距離。距離が2倍になるたびにレベルは約6dB低下し、指向性係数 Q は床や壁などの反射面の効果を表す。</p>
+      <p style="margin-top:10px;">$$L_{p,\text{2r}}=L_p-20\log_{10}2\approx L_p-6.0\ \text{dB}$$</p>
+      <p style="margin-top:6px;">距離2倍での音圧レベル。逆二乗則をデシベルで表すと、距離2倍ごとに −6dB の一定の傾きになる。</p>
+      <p style="margin-top:10px;">$$L_\text{sum}=10\log_{10}\!\big(10^{L_p/10}+10^{L_\text{bg}/10}\big)$$</p>
+      <p style="margin-top:6px;">音源と暗騒音の合成レベル L_sum。音はエネルギーを対数加算するため、同じ大きさの2音を足しても +3dB にしかならない。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>音圧レベルと距離減衰とは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">音の大きさって「○○dB」で表しますよね。でもこのツール、「音響パワーレベル」と「音圧レベル」って2つ出てきます。同じdBなのに、何が違うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だね。ここを混同するのが音響でいちばん多い間違いなんだ。ざっくり言うと、音響パワーレベル L_W は「音源そのものの強さ」。電球で言えばワット数で、その音源が1秒間にどれだけ音のエネルギーを出すか、という固有の値だ。距離を変えても変わらない。一方の音圧レベル L_p は「ある場所で実際に耳やマイクが感じる大きさ」。これは距離でどんどん変わる。だから「○○dBの機械」と言われても、それがパワーなのか、何メートル地点の音圧なのかで全然意味が違うんだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど…。じゃあ、音源は同じなのに距離で音圧が下がるのはどういう仕組みなんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それが「逆二乗則」だ。点音源は一定のエネルギーを、風船みたいに広がっていく球面の波に乗せて放射する。距離が2倍になると、その球の表面積は2の2乗で4倍になる。同じエネルギーが4倍の面積に薄く広がるから、1平方メートルあたりのエネルギー＝音の強さは4分の1になる。これをデシベルにすると 10·log10(1/4) ≈ −6dB。つまり距離が2倍になるたびに音圧レベルが約6dBずつ下がっていく。左の「距離」スライダーを動かすと、下のグラフでこの一定の傾きが見えるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">距離2倍で6dBって、すごくきれいな法則ですね。でも「指向性係数 Q」を変えると、同じ距離でもレベルが変わります。これは何ですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">Q は「音源が周りの反射面で、どれだけ音を狭い方向に集中させているか」だ。何もない空中なら音は全方向（球面）に広がるから Q=1。でも硬い床の上に置くと、本来下に行くはずの音も上向きに反射されて、同じパワーが半分の空間（半球）に集まる。だからレベルは約3dB上がって Q=2。壁ぎわの隅なら4分の1空間で Q=4、約6dBアップ。3面が交わる部屋の隅なら8分の1で Q=8、約9dBアップだ。同じスピーカーでも、机の上か部屋の隅かで聞こえ方が変わるのは、まさにこの効果だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「暗騒音との合成レベル」と「S/N」も気になります。音と音を足すのって、ただの足し算じゃないんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それがデシベルの落とし穴でね。dBは対数だから、60dB＋60dBは120dBじゃない。エネルギーで足してから対数に戻すから、同じ大きさの2音を足しても +3dB、つまり63dBにしかならないんだ。だから音源の音圧と暗騒音を足した「合成レベル」も、片方が10dB以上大きければほぼ大きい方の値に等しくなる。逆に音源が暗騒音より小さいと、その音は背景に埋もれて聞こえない。この差が S/N（信号対雑音比）で、警報音の設計や騒音測定では「S/Nが十分あるか」を必ず確認するんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">逆二乗則って、どこでも成り立つんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そこは要注意だ。逆二乗則がきれいに成り立つのは「点音源」を「屋外の自由音場」で見たときの話。大きな音源のすぐ近くや、反射が積み重なって残響音場ができる室内、それから幹線道路のような線音源では、距離による減衰はもっと緩やかになる。例えば直線状の道路騒音は距離2倍で約3dBしか下がらない。このツールは点音源モデルだから、その前提を頭に置いて使ってね。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">音響パワーレベルと音圧レベルは何が違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">音響パワーレベル L_W は音源そのものが1秒間に放射する音響エネルギーの総量を表す量で、電球のワット数のように音源固有の値です。距離で変わりません。一方、音圧レベル L_p はある地点で聞き手やマイクが実際に受け取る量で、距離によって大きく変わります。この2つの橋渡しが逆二乗則で、点音源では L_p = L_W + 10log10(Q/(4πr²)) で計算します。両者を混同するのが音響工学で最も多い間違いの一つです。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">なぜ距離が2倍になると音圧レベルは約6dB下がるのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">点音源は一定の音響パワーを球面状に広がる波面へ放射します。球の表面積は距離の2乗に比例して増えるため、1平方メートルを通過するエネルギー（音の強さ）は距離の2乗に反比例して減ります。これがデシベル（対数）スケールでは 10·log10(1/4) ≈ −6.0dB という単純な形になり、距離が2倍になるたびに音圧レベルが約6dB低下します。これが逆二乗則による距離減衰です。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">指向性係数 Q とは何で、どう値を選びますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">指向性係数 Q は音源が周囲の反射面によって音をどれだけ狭い空間へ集中して放射するかを表す係数です。何もない自由空間（全方向）では Q=1、硬い床の上にある半空間では Q=2（自由空間より約3dB大きい）、壁と床の隅では Q=4（約6dB大きい）、3面が交わる隅では Q=8（約9dB大きい）です。同じ音源でも置き場所で受音点のレベルが変わるため、設置条件に合わせて Q を選びます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">暗騒音との合成レベルやS/Nはなぜ重要ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">どんなに静かな音源も、その場所の暗騒音（背景騒音）より小さければ聞き取れません。2つの音を足すときはエネルギーを対数加算するため、同じ大きさの2音を合わせても3dBしか大きくなりません。S/N（音源と暗騒音の差）が10dB以上あれば音源が支配的、0dB付近では暗騒音にほぼ埋もれます。騒音測定や警報音の設計では、合成レベルとS/Nの両方を確認することが欠かせません。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>工場・プラントの騒音対策：</strong>機械の音響パワーレベルはメーカーのカタログや ISO 3744 などの試験で測られます。設計者はそのパワーレベルから、敷地境界や作業者の位置での音圧レベルを逆二乗則で予測します。境界の規制値（例えば昼間55dB）を超えそうなら、音源を遠ざける、遮音壁を立てる、低騒音機種に替える、といった対策を距離減衰量で定量的に検討できます。</p>
+    <p><strong>環境騒音アセスメント：</strong>道路・鉄道・風力発電所・屋外イベントの騒音影響評価では、音源から住宅までの距離減衰を予測することが計画の中心になります。点音源（変電所のトランスなど）は距離2倍で6dB、線音源（道路）は約3dBと減衰の仕方が異なるため、音源モデルの選択が結果を大きく左右します。</p>
+    <p><strong>警報音・サイン音の設計：</strong>火災報知器や駅構内放送、車両のバックアラームなどは、最も遠い受音点でも暗騒音に対して十分なS/N（一般に15dB以上）を確保する必要があります。本ツールのように音源パワー・距離・暗騒音から合成レベルとS/Nを計算すれば、必要な音源出力やスピーカー配置を見積もれます。</p>
+    <p><strong>オーディオ・拡声システムの設計：</strong>ホールや屋外会場のスピーカー設計では、最前列と最後列の音圧レベル差（カバレッジ）を逆二乗則で見積もります。1台のスピーカーでは遠近差が大きくなりすぎるため、複数台を分散配置し、各受音点での合成レベルを均一化します。指向性係数の考え方は壁ぎわ設置やコーナー設置の補正にも使われます。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の誤解が、<strong>「逆二乗則はどんな音にもそのまま使える」</strong>というものです。距離2倍で6dB低下が成り立つのは、あくまで点音源を屋外の自由音場で見たときの理想形です。室内では壁・天井・床からの反射音が積み重なって残響音場をつくり、ある距離（残響半径）より遠ざかってもレベルがほとんど下がらなくなります。また道路や鉄道のような線音源は距離2倍で約3dB、面音源ではさらに緩やか、と減衰則そのものが変わります。音源の種類と音場（自由音場か残響音場か）を最初に見極めることが、予測精度の前提です。</p>
+    <p>次に、<strong>「音響パワーレベルと音圧レベルを同じものとして扱う」</strong>こと。カタログに「85dB」とだけ書かれていても、それが音響パワーレベルなのか、1m地点の音圧レベルなのか、機械の表面での値なのかで、別の地点に換算したときの結果は10dB以上ずれます。パワーレベル L_W は音源固有で距離に依存しませんが、音圧レベル L_p は必ず「どこで測ったか」がセットの量です。数値だけでなく、その量の定義と測定条件を必ず確認してください。</p>
+    <p>最後に、<strong>「デシベルは普通の数のように足し引きできる」</strong>という思い込み。デシベルは対数量なので、60dB＋60dBは120dBではなく約63dBです。逆に2つの音源のレベル差が10dB以上あれば、合成レベルは大きい方とほぼ同じになり、小さい方は無視できます。暗騒音より音源が小さいときは、その音は背景に埋もれてそもそも聞こえません。レベルを足し引きするときは、必ずいったんエネルギー（10^(L/10)）に戻してから計算するのが鉄則です。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>音響パワーレベル(Lw)を入力します。例えば工場の旋盤は95dB、空調室外機は85dBが目安です</li>
+<li>測定距離(r)をメートル単位で設定します。1m、5m、10mなど現場の条件に合わせます</li>
+<li>暗騒音レベル(背景騒音)を入力します。事務所40dB、車通りの多い道路70dB、屋外工事現場80dBなどが参考値です</li>
+<li>シミュレーションを実行すると、その距離での音圧レベル、距離2倍での減衰値、S/N比が自動計算されます</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>音響パワーレベルLw=90dBの産業用ポンプから距離r=2mで測定する場合：逆二乗則により音圧レベルLp=90-20log₁₀(2)-11=73.98dBとなります。距離を4mに倍にするとLp=68.0dBに減衰します。背景騒音が55dBの工場環境では、合成レベルは73.6dB、S/N比は18.6dBで機械音が明確に識別できます</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>コンプレッサーやファンなど指向性を持つ音源では、計算値より実測値が異なる場合があります。指向性係数を調整してください</li>
+<li>屋内環境では反響の影響で逆二乗則より減衰が小さくなり、実測音圧レベルが2～3dB高くなることがあります</li>
+<li>S/N比が3dB未満の場合、暗騒音マスキング効果により機械音の知覚が困難になるため、測定位置の変更が必要です</li>
+<li>騒音規制値との比較時は、時間重み付けA特性での評価値との一致を確認してください</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// shared state for the canvas animation
+const SP = {r:10, spl:0, bg:45, lw:100, dir:2};
+
+// ===== Chart.js setup =====
+const distChart = new Chart(document.getElementById('distChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'音圧レベル L_p',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.15},
+    {label:'暗騒音レベル',data:[],borderColor:'#d63031',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false},
+    {label:'現在の距離',data:[],borderColor:'#e17055',backgroundColor:'#e17055',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{type:'logarithmic',title:{display:true,text:'距離 r (m, 対数軸)',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'音圧レベル (dB)',font:{size:11}},beginAtZero:false}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const dirChart = new Chart(document.getElementById('dirChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['Q=1 自由空間','Q=2 半空間','Q=4 壁と床の隅','Q=8 3面の隅'],datasets:[
+    {label:'音圧レベル (dB)',data:[0,0,0,0],backgroundColor:['#6c757d','#6c757d','#6c757d','#6c757d'],borderWidth:0}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{ y:{title:{display:true,text:'音圧レベル (dB)',font:{size:11}},beginAtZero:false} },
+    plugins:{legend:{display:false}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const soundPowerLevel = parseFloat(document.getElementById('lwRange').value);   // dB
+  const distance        = parseFloat(document.getElementById('rRange').value);    // m
+  const backgroundNoise = parseFloat(document.getElementById('bgRange').value);   // dB
+  const directivity     = parseFloat(document.getElementById('dirSel').value);    // Q
+
+  // Sound pressure level at the distance (inverse-square law)
+  const soundPressureLevel = soundPowerLevel + 10*Math.log10(directivity/(4*Math.PI*distance*distance));
+  // Sound pressure level at twice the distance (~ -6 dB per doubling)
+  const levelAtDoubleDistance = soundPowerLevel + 10*Math.log10(directivity/(4*Math.PI*4*distance*distance));
+  // Sound pressure level at a 1 m reference distance
+  const levelAtOneMeter = soundPowerLevel + 10*Math.log10(directivity/(4*Math.PI));
+  // Combined level of the source and the background noise (decibel addition)
+  const combinedLevel = 10*Math.log10(Math.pow(10, soundPressureLevel/10) + Math.pow(10, backgroundNoise/10));
+  // Signal-to-noise margin
+  const signalToNoise = soundPressureLevel - backgroundNoise;
+
+  // noise-level classification by sound pressure level
+  let classText, classColor;
+  if(soundPressureLevel < 50){ classText='静か'; classColor='#0a8a6a'; }
+  else if(soundPressureLevel <= 70){ classText='中程度'; classColor='#0a8a6a'; }
+  else if(soundPressureLevel <= 85){ classText='やや大きい'; classColor='#c0563a'; }
+  else { classText='大きい（聴覚保護を検討）'; classColor='#c0392b'; }
+
+  // ----- stat cards -----
+  document.getElementById('statSpl').textContent   = soundPressureLevel.toFixed(1);
+  document.getElementById('statSpl2').textContent  = levelAtDoubleDistance.toFixed(1);
+  document.getElementById('statSpl1').textContent  = levelAtOneMeter.toFixed(1);
+  document.getElementById('statComb').textContent  = combinedLevel.toFixed(1);
+  document.getElementById('statSnr').textContent   = signalToNoise.toFixed(1);
+  document.getElementById('statClass').textContent = classText;
+  document.getElementById('statClass').style.color = classColor;
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(soundPressureLevel > 85){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> この距離の音圧レベルは '+soundPressureLevel.toFixed(1)+' dB で大きめです。長時間の暴露では聴覚保護具の着用や、音源からの距離確保・遮音対策を検討してください。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> この距離の音圧レベルは '+soundPressureLevel.toFixed(1)+' dB（'+classText+'）。距離2倍では約 '+levelAtDoubleDistance.toFixed(1)+' dB、暗騒音との差 S/N は '+signalToNoise.toFixed(1)+' dB です。';
+  }
+
+  // ----- sound pressure level vs distance chart (log distance axis) -----
+  const dLabels=[], dData=[], dBg=[], dPoint=[];
+  for(let i=0;i<=48;i++){
+    // logarithmic sweep 0.5 m .. 500 m
+    const rv = 0.5*Math.pow(1000, i/48);
+    const lp = soundPowerLevel + 10*Math.log10(directivity/(4*Math.PI*rv*rv));
+    dLabels.push(rv);
+    dData.push(lp);
+    dBg.push(backgroundNoise);
+    dPoint.push(null);
+  }
+  // mark the current distance on the curve
+  let nearest=0, best=1e9;
+  for(let k=0;k<dLabels.length;k++){
+    const dd=Math.abs(dLabels[k]-distance);
+    if(dd<best){best=dd;nearest=k;}
+  }
+  dPoint[nearest] = soundPowerLevel + 10*Math.log10(directivity/(4*Math.PI*distance*distance));
+  distChart.data.labels = dLabels;
+  distChart.data.datasets[0].data = dData;
+  distChart.data.datasets[1].data = dBg;
+  distChart.data.datasets[2].data = dPoint;
+  distChart.update('none');
+
+  // ----- sound pressure level vs directivity chart -----
+  const qValues=[1,2,4,8], qData=[], qColors=[];
+  for(let k=0;k<qValues.length;k++){
+    qData.push(soundPowerLevel + 10*Math.log10(qValues[k]/(4*Math.PI*distance*distance)));
+    qColors.push(qValues[k]===directivity ? '#007BFF' : '#6c757d');
+  }
+  dirChart.data.datasets[0].data = qData;
+  dirChart.data.datasets[0].backgroundColor = qColors;
+  dirChart.update('none');
+
+  // ----- update shared state for animation -----
+  SP.r=distance; SP.spl=soundPressureLevel; SP.bg=backgroundNoise;
+  SP.lw=soundPowerLevel; SP.dir=directivity;
+}
+
+// ===== Point-source / spherical-wave animation =====
+(function(){
+  const cv = document.getElementById('spdCanvas');
+  const ctx = cv.getContext('2d');
+  let t = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // colour by sound pressure level
+  function splColor(lp){
+    if(lp<50) return '#00b894';
+    if(lp<=70) return '#3aa6d8';
+    if(lp<=85) return '#e1a055';
+    return '#d63031';
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    // geometry
+    const srcX = 70, srcY = H*0.5;
+    const padR = 130;
+    const listX = W - padR;
+    const maxR  = listX - srcX;          // px distance source -> listener
+
+    // ----- expanding spherical wavefronts (dim with distance) -----
+    const RINGS = 5;
+    for(let i=0;i<RINGS;i++){
+      const ph = ((t/120) + i/RINGS) % 1;
+      const rad = ph*maxR*1.15;
+      if(rad<4) continue;
+      const fade = (1-ph)*0.55;
+      ctx.beginPath();
+      ctx.arc(srcX, srcY, rad, -Math.PI*0.62, Math.PI*0.62);
+      ctx.strokeStyle = 'rgba(0,180,216,'+fade.toFixed(3)+')';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // ----- point sound source -----
+    const pulse = 4 + 2*Math.sin(t/9);
+    ctx.beginPath();
+    ctx.arc(srcX, srcY, 9+pulse, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,180,216,.18)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(srcX, srcY, 9, 0, Math.PI*2);
+    ctx.fillStyle = '#00B4D8';
+    ctx.shadowColor = '#00B4D8'; ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(200,235,250,.9)';
+    ctx.font = '11px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('点音源', srcX, srcY-26);
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText('L_W='+SP.lw.toFixed(0)+' dB', srcX, srcY+30);
+
+    // ----- distance dimension line -----
+    ctx.strokeStyle = 'rgba(255,255,255,.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(srcX, srcY+46); ctx.lineTo(listX, srcY+46); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.font = '11px Roboto Mono, monospace';
+    ctx.fillText('r = '+SP.r.toFixed(1)+' m', (srcX+listX)/2, srcY+60);
+
+    // ----- listener -----
+    ctx.fillStyle = 'rgba(180,200,225,.92)';
+    ctx.beginPath();
+    ctx.arc(listX, srcY-6, 7, 0, Math.PI*2);   // head
+    ctx.fill();
+    ctx.fillRect(listX-7, srcY+2, 14, 16);     // body
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.textAlign = 'center';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText('聞き手', listX, srcY-22);
+
+    // ----- decibel meter at the listener -----
+    const col = splColor(SP.spl);
+    const mx = listX+18, my = srcY-44, mw = 96, mh = 56;
+    ctx.fillStyle = 'rgba(255,255,255,.06)';
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(mx, my, mw, mh);
+    ctx.strokeRect(mx, my, mw, mh);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.font = '9px Roboto Mono, monospace';
+    ctx.fillText('騒音計 L_p', mx+8, my+14);
+    ctx.fillStyle = col;
+    ctx.font = 'bold 20px Roboto Mono, monospace';
+    ctx.fillText(SP.spl.toFixed(1), mx+8, my+38);
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText('dB', mx+70, my+38);
+    // small bar gauge
+    const frac = Math.max(0, Math.min(1, (SP.spl-20)/80));
+    ctx.fillStyle = 'rgba(255,255,255,.12)';
+    ctx.fillRect(mx+8, my+44, mw-16, 6);
+    ctx.fillStyle = col;
+    ctx.fillRect(mx+8, my+44, (mw-16)*frac, 6);
+
+    // ----- background-noise floor -----
+    const bgY = H-24;
+    ctx.strokeStyle = 'rgba(214,48,49,.65)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([7,5]);
+    ctx.beginPath(); ctx.moveTo(20, bgY); ctx.lineTo(W-20, bgY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(225,112,85,.9)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('暗騒音レベル '+SP.bg.toFixed(0)+' dB', 24, bgY-6);
+
+    // ----- title / status (top-left) -----
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText('逆二乗則：距離2倍ごとに約 −6 dB', 20, 20);
+
+    t += 1;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['lwRange','rRange','bgRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

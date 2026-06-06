@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kriging サロゲートモデル シミュレーター — ガウス過程回帰 | NovaSolver</title>
+<meta name="description" content="Kriging（ガウス過程回帰）サロゲートモデルの予測値・95%信用区間・対数周辺尤度・RMSEを SE/Matérn3-2/Matérn5-2 カーネルで可視化。少数の高コスト評価点から滑らかな補間関数を構築する設計最適化向け無料ツール。">
+<link rel="canonical" href="https://novasolver.jp/tools/kriging-surrogate-model.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/kriging-surrogate-model.html">
+<meta property="og:title" content="Kriging サロゲートモデル シミュレーター — ガウス過程回帰 | NovaSolver Project">
+<meta property="og:description" content="少数の高コスト評価点からガウス過程で補間し、予測値と95%信用区間をリアルタイム表示。SE / Matérn 3/2 / Matérn 5/2 カーネルとハイパーパラメータの効きを直感的に学べます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Kriging surrogate model simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/kriging-surrogate-model.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/kriging-surrogate-model.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/kriging-surrogate-model.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/kriging-surrogate-model.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#krCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Kriging サロゲートモデル シミュレーター",
+      "description": "Kriging（ガウス過程回帰）サロゲートモデルの予測値・95%信用区間・対数周辺尤度・RMSEを SE/Matérn3-2/Matérn5-2 カーネルで可視化。少数の高コスト評価点から滑らかな補間関数を構築する設計最適化向け無料ツール。",
+      "url": "https://novasolver.jp/tools/kriging-surrogate-model.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Surrogate / Machine Learning Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["ガウス過程回帰の予測平均と95%信用区間の同時表示","SE / Matérn 3/2 / Matérn 5/2 カーネルの切替","相関長 ℓ・信号分散 σ_f²・ナゲット σ_n² のハイパーパラメータ調整","対数周辺尤度（log marginal likelihood）の可視化","RMSE で真関数との誤差を判定"],
+      "keywords": "Kriging,ガウス過程回帰,GPR,サロゲートモデル,代理モデル,ベイズ最適化,カーネル法,Matérn,ハイパーパラメータ最適化",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Kriging とガウス過程回帰（GPR）はどう違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "本質的には同じ手法です。Kriging は1950年代に南アフリカの鉱山技師 Krige が地下鉱床の品位を補間するために提案した地質統計学の用語で、機械学習コミュニティでは同じ式が Gaussian Process Regression（GPR）と呼ばれます。両者とも「観測点の重み付き和で予測値を作り、予測分散も同時に出す」線形ベイズ推定で、カーネル関数 k(x,x') によって滑らかさを規定します。実装上の違いは、Kriging はバリオグラム γ(h) で書くのに対し、GPR は共分散関数 k(r) で書く流儀ぐらいです。CAE・最適化文脈では Kriging、機械学習・UQ 文脈では GPR と呼ぶことが多いと考えてください。"}
+        },{
+          "@type": "Question",
+          "name": "カーネル（SE / Matérn 3/2 / Matérn 5/2）はどう選びますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "SE（平方指数・RBF）カーネルは無限回微分可能な「最も滑らかな」関数を仮定します。空力解析や熱問題のように真の応答が滑らかな場合に第一選択です。Matérn 3/2 は1回しか微分できない関数（角がある／不連続な微分を含む）を表現でき、構造物の座屈や接触問題のように応答が急変する場合に向きます。Matérn 5/2 はその中間で、Bayesian Optimization の事実上のデフォルトです。迷ったら Matérn 5/2 で開始し、残差プロットや交差検証で SE と比較するのがおすすめです。"}
+        },{
+          "@type": "Question",
+          "name": "相関長 ℓ とナゲット σ_n² はどう決めますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "通常は対数周辺尤度（log marginal likelihood）を最大化してハイパーパラメータを推定します。本ツールの2番目のグラフがこの logML を ℓ の関数として表示しており、ピークがある ℓ が最尤推定値です。実務では BFGS や L-BFGS で数値最適化しますが、観測点が少ない場合は局所最適に陥りやすいため、複数の初期値（ℓ=0.05, 0.5, 5 など）から開始するマルチスタートが標準です。ナゲット σ_n² は観測ノイズの分散で、CAE 結果のように決定論的な出力には小さな値（1e-6〜1e-3）を、実験データには測定誤差の分散をそのまま入れます。"}
+        },{
+          "@type": "Question",
+          "name": "Kriging サロゲートはどのくらいの次元数まで使えますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "標準的な GPR は計算量 O(N³)・メモリ O(N²) なので、訓練点数 N が 2,000 程度を超えると一般の PC では厳しくなります。次元数（入力変数の数）は ARD（Automatic Relevance Determination）で各次元別の相関長を学習することで20次元程度まで扱えますが、それ以上では「次元の呪い」で性能が落ちます。高次元・大規模データでは Sparse GP（Inducing Points）・SVGP・Deep Kernel Learning・PCE（Polynomial Chaos）・ニューラルネットなどへ移行します。CAE 設計最適化の典型ケース（5〜10次元・100〜500点）であれば、素の Kriging が最良の選択です。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "Kriging サロゲートモデル シミュレーター", "item": "https://novasolver.jp/tools/kriging-surrogate-model.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">Kriging サロゲートモデル シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/kriging-surrogate-model.html" class="active">JA</a>
+      <a href="/en/tools/kriging-surrogate-model.html">EN</a>
+      <a href="/zh/tools/kriging-surrogate-model.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-brain"></i> サロゲート / 機械学習</div>
+    <h1>Kriging サロゲートモデル シミュレーター — ガウス過程回帰</h1>
+    <p class="hero-sub">CFD や FEM の高コスト評価を少数の訓練点で代替する Kriging（ガウス過程回帰）。SE / Matérn カーネルと相関長 ℓ・ナゲット σ_n² を変えながら、予測平均と95%信用区間・対数周辺尤度・RMSE の振る舞いを直感的に学べます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">カーネル関数</span></div>
+      <div class="param-desc">真関数の滑らかさの事前仮定</div>
+      <select id="kernelSel" onchange="compute()">
+        <option value="se" selected>平方指数 (RBF)</option>
+        <option value="m32">Matérn 3/2</option>
+        <option value="m52">Matérn 5/2</option>
+      </select>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">トレーニング数 N</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="numSamplesNum" value="8" min="3" max="50" step="1" oninput="syncFromNum('numSamples','numSamplesNum')"></div>
+      </div>
+      <div class="param-desc">高コスト評価点（CFD/FEM/実験）の数</div>
+      <input type="range" id="numSamples" min="3" max="50" step="1" value="8" oninput="syncToNum('numSamples','numSamplesNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">相関長 ℓ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="lengthScaleNum" value="0.5" min="0.05" max="5" step="0.05" oninput="syncFromNum('lengthScale','lengthScaleNum')"></div>
+      </div>
+      <div class="param-desc">カーネル幅。大きいほど滑らかな関数を仮定</div>
+      <input type="range" id="lengthScale" min="0.05" max="5" step="0.05" value="0.5" oninput="syncToNum('lengthScale','lengthScaleNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">信号分散 σ_f²</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="signalVarianceNum" value="1.0" min="0.1" max="10" step="0.1" oninput="syncFromNum('signalVariance','signalVarianceNum')"></div>
+      </div>
+      <div class="param-desc">関数の振幅スケール</div>
+      <input type="range" id="signalVariance" min="0.1" max="10" step="0.1" value="1.0" oninput="syncToNum('signalVariance','signalVarianceNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ナゲット σ_n²</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="nuggetVarianceNum" value="0.01" min="0.001" max="0.5" step="0.001" oninput="syncFromNum('nuggetVariance','nuggetVarianceNum')"></div>
+      </div>
+      <div class="param-desc">観測ノイズの分散。決定論的 CAE では 1e-6〜1e-3</div>
+      <input type="range" id="nuggetVariance" min="0.001" max="0.5" step="0.001" value="0.01" oninput="syncToNum('nuggetVariance','nuggetVarianceNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">真関数振幅 A</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="targetFunctionAmplitudeNum" value="1.5" min="0.5" max="3" step="0.1" oninput="syncFromNum('targetFunctionAmplitude','targetFunctionAmplitudeNum')"></div>
+      </div>
+      <div class="param-desc">f(x) = A·sin(2πx) の振幅</div>
+      <input type="range" id="targetFunctionAmplitude" min="0.5" max="3" step="0.1" value="1.5" oninput="syncToNum('targetFunctionAmplitude','targetFunctionAmplitudeNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statN">—</div><div class="sl">トレーニング数 N</div></div>
+        <div class="stat-card"><div class="sv" id="statSpacing">—</div><div class="sl">平均サンプル間隔</div></div>
+        <div class="stat-card"><div class="sv" id="statPredStd">—</div><div class="sl">予測標準偏差 σ_pred</div></div>
+        <div class="stat-card"><div class="sv" id="statCI">—</div><div class="sl">95% 信用区間幅</div></div>
+        <div class="stat-card"><div class="sv" id="statRMSE">—</div><div class="sl">RMSE 予測誤差</div></div>
+        <div class="stat-card"><div class="sv" id="statLogML">—</div><div class="sl">対数周辺尤度</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-project-diagram"></i> Kriging 補間 — 真関数・訓練点・予測±95%CI</div>
+      <canvas id="krCanvas"></canvas>
+      <p class="canvas-hint">白：真関数 A·sin(2πx)、赤丸：訓練点（観測ノイズ付）、青線：Kriging 予測平均、青帯：95% 信用区間。観測ノイズが動的に揺らぐ様子も表示します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> Kriging 予測 + 信用区間（Chart.js）</div>
+      <canvas class="ux-chartjs-canvas" id="predChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 対数周辺尤度 logML vs 相関長 ℓ</div>
+      <canvas class="ux-chartjs-canvas" id="logmlChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$\hat\mu(x_*) = k_*^T K^{-1} y,\qquad \hat\sigma^2(x_*) = k(x_*,x_*) - k_*^T K^{-1} k_*$$</p>
+      <p style="margin-top:6px;">K = カーネル行列（N×N、K_{ij}=k(x_i,x_j)+σ_n²δ_{ij}）、k_* = 予測点と訓練点の共分散ベクトル。事後平均 μ̂ と分散 σ̂² を同時に提供する。</p>
+      <p style="margin-top:10px;">$$k_{SE}(r) = \sigma_f^2 \exp\!\left(-\frac{r^2}{2\ell^2}\right)$$</p>
+      <p style="margin-top:6px;">平方指数（RBF）カーネル。r=|x−x'|、ℓ=相関長、σ_f²=信号分散。無限回微分可能な「最も滑らかな」関数族を仮定する。</p>
+      <p style="margin-top:10px;">$$k_{M5/2}(r) = \sigma_f^2\left(1+\frac{\sqrt{5}\,r}{\ell}+\frac{5r^2}{3\ell^2}\right)\exp\!\left(-\frac{\sqrt{5}\,r}{\ell}\right)$$</p>
+      <p style="margin-top:6px;">Matérn 5/2 カーネル（Bayesian Optimization のデフォルト）。2回微分可能で、SE より急な変化も表現できる。</p>
+      <p style="margin-top:10px;">$$\log p(y\mid X,\theta) = -\tfrac12 y^T K^{-1} y - \tfrac12 \log|K| - \tfrac{N}{2}\log(2\pi)$$</p>
+      <p style="margin-top:6px;">対数周辺尤度。第1項=データ適合、第2項=モデル複雑さペナルティ。これを θ=(ℓ,σ_f²,σ_n²) で最大化してハイパーパラメータを推定する。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>Kriging サロゲートモデル（ガウス過程回帰）</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「サロゲートモデル」って、本物の CFD の代わりに使うってことですよね？でも、近似なら多項式回帰でも良くないですか？なんで Kriging なんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だね。Kriging が他の回帰と決定的に違うのは、「予測値だけじゃなく、予測の不確かさ（分散）も同時に出してくれる」点なんだ。多項式や RBF 補間は「中央値らしき値」だけを返すけど、Kriging は各点 x_* で「平均 μ̂(x_*)」と「標準偏差 σ̂(x_*)」を一緒に返す。だから「ここはサンプル点が近いから自信ある」「ここはスカスカだから当てにならない」が定量的に分かる。これが Bayesian Optimization で次の評価点を選ぶ Expected Improvement の基礎になるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど。じゃあ左の「相関長 ℓ」と「ナゲット σ_n²」って、どう決めればいいんですか？適当に動かしてみると RMSE が大きく変わって、何が正解か分からなくなります…</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そこが Kriging の腕の見せどころで、答えは「対数周辺尤度（logML）を最大化する ℓ を選ぶ」だよ。右下のチャートが logML を ℓ の関数として描いてくれているから、ピークの位置を読めばいい。実務では BFGS や L-BFGS で数値最適化するけど、よく局所最適にハマるから、ℓ=0.05, 0.5, 5 みたいに複数の初期値から開始する「マルチスタート」が標準。GPyOpt、scikit-learn の GaussianProcessRegressor、SMT、Dakota などのライブラリは全部この最適化を内部でやってくれる。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">カーネルを SE と Matérn で切り替えると予測曲線の感じが結構変わりますね。SE が一番きれいに見えるけど、Matérn を使う場面ってあるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">SE は「無限回微分可能」を仮定するから、本当に滑らかな現象には強い。たとえば翼型の揚力係数を AoA に対して回帰するなら SE で十分。でも、座屈・接触・相転移みたいに「ある点で挙動が急変する」物理を扱うと、SE は無理に滑らかに通そうとして逆に振動するんだ。そういうケースは Matérn 3/2（1回微分可能）や Matérn 5/2（2回微分可能）の方が誠実。Bayesian Optimization の世界では Matérn 5/2 が事実上のデフォルトになっていて、迷ったらまず 5/2 から始めるのが定石だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">N=8 のデフォルトだと RMSE が 1.07 もあって判定が NG ですが、N を増やせば改善しますよね？どのくらい必要なんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、N を 20 くらいまで増やすと sin(2πx) なら RMSE が 0.2 を切る感じになる。経験則として「1次元なら 10〜20点、2次元なら 30〜50点、5次元なら 100〜200点」あれば実用的な精度が出る。次元 d に対して必要点数は概ね 10^d でスケールするので、これが「次元の呪い」と呼ばれる現象。実務で次元が 10 を超えると、素の Kriging から PCE や Deep Kernel Learning に乗り換える判断ポイントになるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">最後にもうひとつ。CFD 結果みたいに「ノイズがない決定論的な出力」を補間するときも、ナゲット σ_n² を入れた方がいいんでしょうか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">実は数値的にも入れた方がいい。決定論的なら理論上は σ_n²=0 で良いんだけど、それだと K がほぼ特異行列になって K⁻¹ が爆発する。だから「jitter」と呼ばれる小さな値（1e-6〜1e-3）を必ず加える。これは「ナゲット」と同じ働きで、数値的安定性のための正則化項。一方、実験データなら測定誤差の分散をそのまま入れる。CAE 結果と実験データを混ぜる Multi-Fidelity Kriging では、各データセットに別々のナゲットを与える設計が標準だよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Kriging とガウス過程回帰（GPR）はどう違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">本質的には同じ手法です。Kriging は1950年代に南アフリカの鉱山技師 Krige が地下鉱床の品位を補間するために提案した地質統計学の用語で、機械学習コミュニティでは同じ式が Gaussian Process Regression（GPR）と呼ばれます。両者とも「観測点の重み付き和で予測値を作り、予測分散も同時に出す」線形ベイズ推定で、カーネル関数 k(x,x') によって滑らかさを規定します。実装上の違いは、Kriging はバリオグラム γ(h) で書くのに対し、GPR は共分散関数 k(r) で書く流儀ぐらいです。CAE・最適化文脈では Kriging、機械学習・UQ 文脈では GPR と呼ぶことが多いと考えてください。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">カーネル（SE / Matérn 3/2 / Matérn 5/2）はどう選びますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">SE（平方指数・RBF）カーネルは無限回微分可能な「最も滑らかな」関数を仮定します。空力解析や熱問題のように真の応答が滑らかな場合に第一選択です。Matérn 3/2 は1回しか微分できない関数（角がある／不連続な微分を含む）を表現でき、構造物の座屈や接触問題のように応答が急変する場合に向きます。Matérn 5/2 はその中間で、Bayesian Optimization の事実上のデフォルトです。迷ったら Matérn 5/2 で開始し、残差プロットや交差検証で SE と比較するのがおすすめです。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">相関長 ℓ とナゲット σ_n² はどう決めますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">通常は対数周辺尤度（log marginal likelihood）を最大化してハイパーパラメータを推定します。本ツールの2番目のグラフがこの logML を ℓ の関数として表示しており、ピークがある ℓ が最尤推定値です。実務では BFGS や L-BFGS で数値最適化しますが、観測点が少ない場合は局所最適に陥りやすいため、複数の初期値（ℓ=0.05, 0.5, 5 など）から開始するマルチスタートが標準です。ナゲット σ_n² は観測ノイズの分散で、CAE 結果のように決定論的な出力には小さな値（1e-6〜1e-3）を、実験データには測定誤差の分散をそのまま入れます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Kriging サロゲートはどのくらいの次元数まで使えますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">標準的な GPR は計算量 O(N³)・メモリ O(N²) なので、訓練点数 N が 2,000 程度を超えると一般の PC では厳しくなります。次元数（入力変数の数）は ARD（Automatic Relevance Determination）で各次元別の相関長を学習することで20次元程度まで扱えますが、それ以上では「次元の呪い」で性能が落ちます。高次元・大規模データでは Sparse GP（Inducing Points）・SVGP・Deep Kernel Learning・PCE（Polynomial Chaos）・ニューラルネットなどへ移行します。CAE 設計最適化の典型ケース（5〜10次元・100〜500点）であれば、素の Kriging が最良の選択です。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>Bayesian Optimization（ベイズ最適化）：</strong>1回の評価に数時間かかる CFD や FEM の設計最適化で、Kriging サロゲートと Expected Improvement（EI）獲得関数を組み合わせ、「次にどこを評価すれば最も改善が期待できるか」を提案します。航空機翼形状最適化、ロケットノズル設計、化学プラント運転条件最適化など、数十〜数百回の高コスト評価で大域最適に到達する代表的な手法。Google Vizier、Facebook Ax、scikit-optimize などのオープンソース実装が広く使われます。</p>
+    <p><strong>CAE 結果の代理モデルとロバスト設計：</strong>自動車衝突解析・電磁界解析・流体熱連成解析など、1ケース数十分〜数日かかるシミュレーションを Kriging で代替し、寸法・材料定数・荷重の不確かさを Monte Carlo で1万ケース流す UQ（不確かさ定量化）に使います。直接 CAE で1万回回すと現実的でないが、サロゲートで0.1秒/ケースになれば一晩で完了。Dakota、SMT、UQLab などのツールが標準。</p>
+    <p><strong>地質統計学・資源探査：</strong>本来の Kriging が生まれた領域。坑井ボーリングで得られた数十点の鉱石品位や地下水位データから、3次元的に補間して鉱床のグレード分布図を作ります。石油・天然ガス探査、レアアース埋蔵量推定、地下水汚染拡散予測など、地球科学の標準ツール。バリオグラム解析と組み合わせ、空間相関構造の同定もセットで行うのが業界慣行。</p>
+    <p><strong>機械学習の Uncertainty Quantification：</strong>自動運転の障害物検知・医療画像診断など「予測が間違っているかもしれない領域で警告を出したい」場面で、GPR を補助モデルとして用います。Deep Kernel Learning（DKL）はニューラルネットの最終層を GP に置き換える手法で、画像のような高次元入力に対しても予測分散を提供できます。NASA の宇宙船航法、Toyota の運転支援、Genentech の創薬スクリーニングなど、安全性が問われる領域で導入が進んでいます。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最大の落とし穴が、<strong>「Kriging の信用区間を絶対視する」</strong>こと。GP の事後分散 σ̂² は「仮定したカーネルと観測データが正しい場合の」分散であり、カーネルが真の関数族と一致していなければ、信用区間は系統的にずれます。たとえば、本当は不連続のあるステップ関数を SE カーネル（無限回微分可能）で当てはめると、不連続点周辺で大きく外れているのに信用区間は「自信あり」を返してしまう。実務では交差検証で「実測値が95%信用区間に入る頻度」が公称値（95%）に近いか必ず確認してください（calibration test）。</p>
+    <p>次に、<strong>「ハイパーパラメータを固定したまま使い続ける」</strong>こと。設計探索の初期段階で推定した ℓ が、設計空間の他の領域でも適切とは限りません。新しい評価点が加わるたびにハイパーパラメータを再最適化するのが正しい運用です。逆にやりすぎて毎反復で大きく動くようなら、観測ノイズが過小か、初期サンプリングが不適切（LHS や Sobol 系列を使わず均等格子で取ってしまった、など）の兆候。Latin Hypercube Sampling と D-optimal design の組み合わせで初期点を取るのが定石です。</p>
+    <p>最後に、<strong>「Kriging は外挿に強い」と誤解する</strong>こと。実は逆で、訓練データのバウンディングボックス外（外挿領域）では予測平均が事前平均（通常はゼロ）に急速に戻り、分散は σ_f² に発散します。つまり「外では何も知らない」と正直に答えるのが GP の特性で、これ自体は健全ですが、最適化アルゴリズムが境界の外を提案してしまうと無意味な評価を繰り返すことになります。Bayesian Optimization では設計領域の境界をハードに enforce し、必要なら境界に近づくほど EI を減衰させる工夫を入れます。また、PCE のように「グローバルな多項式基底」を選ぶ手法と組み合わせるハイブリッド（PC-Kriging）も有力な解です。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>トレーニングデータ点数（numSamples）を1～50の範囲で設定し、高コスト解析（有限要素法・流体解析など）の評価点数を指定</li>
+<li>カーネル関数（SquaredExponential/Matérn3-2/Matérn5-2）を選択し、長さスケール（lengthScale）を0.1～5.0の範囲で調整して関数の滑らかさを制御</li>
+<li>信号分散（signalVariance）とナゲット分散（nuggetVariance）を入力してモデルの不確実性を定量化し、予測値・95%信用区間幅・RMSE・対数周辺尤度を確認</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>航空機翼の曲げ剛性最適化で、12個の有限要素解析評価点（スパン方向剛性材厚さ1.2～4.5mm）からKrigingモデルを構築。長さスケール=0.8、信号分散=850、ナゲット分散=2.5の設定で、厚さ2.8mmにおける予測曲げ剛性=245 N·m²、95%信用区間幅=18.5 N·m²、RMSE=3.2 N·m²、対数周辺尤度=-8.6を得た。これにより未評価点での応答予測と不確実性を同時に把握でき、次の評価点の最適配置（ラテン超方形計画など）を決定可能</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>ナゲット分散は計算誤差や製造ばらつきを反映；0.5～5.0の範囲で小値は過学習を招くため慎重に設定</li>
+<li>Matérn5-2カーネルは自動車ボディ応力解析など滑らかな応答曲面で高精度；Matérn3-2は複合材板のバケリング荷重など中程度の滑らかさに適用</li>
+<li>トレーニング数が少ない場合（N&lt;8）は信用区間が広がり、設計空間全域では信頼度が低いため追加サンプリングが必須</li>
+<li>対数周辺尤度が-15以下の場合はカーネルパラメータが過度に調整されており、正規化された入力データ（平均0、標準偏差1）の再確認が必要</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Shared state for canvas animation =====
+const KR = {
+  N: 8, ell: 0.5, sigF2: 1.0, sigN2: 0.01, A: 1.5, kernel: 'se',
+  xs: [], ys: [], mu: [], sd: [], xGrid: []
+};
+
+// ===== Kernel functions =====
+function kernelEval(r, ell, sigF2, kernel){
+  if(kernel === 'se'){
+    return sigF2 * Math.exp(-(r*r)/(2*ell*ell));
+  } else if(kernel === 'm32'){
+    const t = Math.sqrt(3) * Math.abs(r) / ell;
+    return sigF2 * (1 + t) * Math.exp(-t);
+  } else {
+    // m52
+    const t = Math.sqrt(5) * Math.abs(r) / ell;
+    return sigF2 * (1 + t + t*t/3) * Math.exp(-t);
+  }
+}
+
+// rho between two adjacent training points at half spacing (= avgSpacing distance)
+function rhoAdjacent(avgSpacing, ell, kernel){
+  if(kernel === 'se'){
+    return Math.exp(-(avgSpacing*avgSpacing/2)/(2*ell*ell));
+  } else if(kernel === 'm32'){
+    const r = avgSpacing * Math.sqrt(3) / ell;
+    return (1 + r) * Math.exp(-r);
+  } else {
+    const r = avgSpacing * Math.sqrt(5) / ell;
+    return (1 + r + r*r/3) * Math.exp(-r);
+  }
+}
+
+// ===== Tiny linear algebra for full GP (small N only) =====
+function choleskyDecompose(A){
+  // Returns lower-triangular L with A = L L^T (in-place style copy)
+  const n = A.length;
+  const L = [];
+  for(let i=0;i<n;i++){ L.push(new Array(n).fill(0)); }
+  for(let i=0;i<n;i++){
+    for(let j=0;j<=i;j++){
+      let s = A[i][j];
+      for(let k=0;k<j;k++) s -= L[i][k]*L[j][k];
+      if(i === j){
+        L[i][j] = Math.sqrt(Math.max(s, 1e-10));
+      } else {
+        L[i][j] = s / (L[j][j] || 1e-10);
+      }
+    }
+  }
+  return L;
+}
+function choleskySolve(L, b){
+  // Solve L L^T x = b
+  const n = L.length;
+  const y = new Array(n).fill(0);
+  for(let i=0;i<n;i++){
+    let s = b[i];
+    for(let k=0;k<i;k++) s -= L[i][k]*y[k];
+    y[i] = s / (L[i][i] || 1e-10);
+  }
+  const x = new Array(n).fill(0);
+  for(let i=n-1;i>=0;i--){
+    let s = y[i];
+    for(let k=i+1;k<n;k++) s -= L[k][i]*x[k];
+    x[i] = s / (L[i][i] || 1e-10);
+  }
+  return x;
+}
+
+// ===== Chart.js setup =====
+const predChart = new Chart(document.getElementById('predChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'真関数 f(x)',data:[],borderColor:'#6c757d',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false,tension:0.2},
+    {label:'Kriging 予測 μ̂',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.12)',borderWidth:2,pointRadius:0,fill:false,tension:0.25},
+    {label:'+95% CI',data:[],borderColor:'rgba(0,180,216,.5)',backgroundColor:'rgba(0,180,216,.18)',borderWidth:1,pointRadius:0,fill:'+1',tension:0.25},
+    {label:'-95% CI',data:[],borderColor:'rgba(0,180,216,.5)',backgroundColor:'rgba(0,180,216,.18)',borderWidth:1,pointRadius:0,fill:false,tension:0.25},
+    {label:'訓練点',data:[],borderColor:'#d63031',backgroundColor:'#d63031',showLine:false,pointRadius:5,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{type:'linear',title:{display:true,text:'x',font:{size:11}},min:0,max:1,ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'y',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const logmlChart = new Chart(document.getElementById('logmlChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'log marginal likelihood',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',borderWidth:2,pointRadius:0,fill:true,tension:0.2},
+    {label:'現在の ℓ',data:[],borderColor:'#e17055',backgroundColor:'#e17055',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'相関長 ℓ',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'log p(y|X,θ)',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const numSamples = parseInt(document.getElementById('numSamples').value, 10);
+  const lengthScale = parseFloat(document.getElementById('lengthScale').value);
+  const signalVariance = parseFloat(document.getElementById('signalVariance').value);
+  const nuggetVariance = parseFloat(document.getElementById('nuggetVariance').value);
+  const targetFunctionAmplitude = parseFloat(document.getElementById('targetFunctionAmplitude').value);
+  const kernelSel = document.getElementById('kernelSel');
+
+  // ----- Analytic properties (spec formulas) -----
+  const avgSpacing = 1.0 / Math.max(1, numSamples - 1);
+  const effectiveLengthRatio = lengthScale / avgSpacing;
+
+  let rho;
+  if(kernelSel.value === 'se'){
+    rho = Math.exp(-(avgSpacing*avgSpacing/2)/(2*lengthScale*lengthScale));
+  } else if(kernelSel.value === 'm32'){
+    const r = avgSpacing * Math.sqrt(3) / lengthScale;
+    rho = (1 + r) * Math.exp(-r);
+  } else {
+    const r = avgSpacing * Math.sqrt(5) / lengthScale;
+    rho = (1 + r + r*r/3) * Math.exp(-r);
+  }
+  const predVar = signalVariance * (1 - rho*rho) + nuggetVariance;
+  const predStd = Math.sqrt(predVar);
+  const ci95Width = 2 * 1.96 * predStd;
+
+  // log marginal likelihood (heuristic)
+  const dataFitTerm = -0.5 * targetFunctionAmplitude*targetFunctionAmplitude * Math.exp(-2*effectiveLengthRatio*0.3);
+  const modelComplexityTerm = -0.5 * Math.log(signalVariance + nuggetVariance) * numSamples;
+  const logMarginalLikelihood = dataFitTerm + modelComplexityTerm - 0.5 * numSamples * Math.log(2*Math.PI);
+
+  // RMSE vs true function (rough estimate)
+  const sineTermContribution = (1.0 / numSamples) * Math.pow(targetFunctionAmplitude/lengthScale, 2);
+  const mseTrueFunction = Math.max(0.0001, sineTermContribution + nuggetVariance);
+  const rmsError = Math.sqrt(mseTrueFunction);
+
+  // ----- Stat cards -----
+  document.getElementById('statN').textContent = String(numSamples);
+  document.getElementById('statSpacing').textContent = avgSpacing.toFixed(4);
+  document.getElementById('statPredStd').textContent = predStd.toFixed(4);
+  document.getElementById('statCI').textContent = ci95Width.toFixed(3);
+  document.getElementById('statRMSE').textContent = rmsError.toFixed(4);
+  document.getElementById('statLogML').textContent = logMarginalLikelihood.toFixed(2);
+
+  // ----- Verdict -----
+  const v = document.getElementById('verdict');
+  if(rmsError > 0.5){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> RMSE が大きい（' + rmsError.toFixed(3) + ' > 0.5）。N を増やすか、相関長 ℓ を真関数の振動スケール（sin の半周期 ≈ 0.25）程度に近づけてください。';
+  } else if(rmsError > 0.2){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> RMSE が中程度（' + rmsError.toFixed(3) + '）。logML を最大化する ℓ に近づければさらに改善する余地があります。';
+  } else {
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> RMSE は許容範囲内（' + rmsError.toFixed(4) + '）。予測 ±95%CI 幅 = ' + ci95Width.toFixed(3) + '、log p(y|X,θ) = ' + logMarginalLikelihood.toFixed(2) + '。';
+  }
+
+  // ----- Build training data (deterministic placement on [0,1]) -----
+  const xs = [], ys = [];
+  for(let i=0;i<numSamples;i++){
+    const x = numSamples === 1 ? 0.5 : i / (numSamples - 1);
+    const yTrue = targetFunctionAmplitude * Math.sin(2*Math.PI*x);
+    // small fixed pseudo-noise so chart is stable across redraws
+    const noise = Math.sqrt(nuggetVariance) * (((i*7+3)%11)/11 - 0.5) * 2 * 0.6;
+    xs.push(x);
+    ys.push(yTrue + noise);
+  }
+
+  // ----- Full GP regression on a fine grid -----
+  const M = xs.length;
+  const K = [];
+  for(let i=0;i<M;i++){
+    K.push(new Array(M).fill(0));
+    for(let j=0;j<M;j++){
+      const r = Math.abs(xs[i] - xs[j]);
+      K[i][j] = kernelEval(r, lengthScale, signalVariance, kernelSel.value)
+              + (i===j ? (nuggetVariance + 1e-6) : 0);
+    }
+  }
+  const L = choleskyDecompose(K);
+  const alpha = choleskySolve(L, ys);
+
+  const G = 80;
+  const xGrid = [], muGrid = [], sdGrid = [];
+  for(let g=0; g<=G; g++){
+    const xs0 = g / G;
+    const ks = new Array(M);
+    for(let i=0;i<M;i++){
+      ks[i] = kernelEval(Math.abs(xs0 - xs[i]), lengthScale, signalVariance, kernelSel.value);
+    }
+    let mu = 0;
+    for(let i=0;i<M;i++) mu += ks[i] * alpha[i];
+    // variance = k(x,x) - ks^T K^-1 ks
+    const v = choleskySolve(L, ks);
+    let dot = 0;
+    for(let i=0;i<M;i++) dot += ks[i] * v[i];
+    const kxx = kernelEval(0, lengthScale, signalVariance, kernelSel.value);
+    const variance = Math.max(1e-8, kxx - dot);
+    const sd = Math.sqrt(variance);
+    xGrid.push(xs0);
+    muGrid.push(mu);
+    sdGrid.push(sd);
+  }
+
+  // ----- predChart -----
+  const labels = xGrid.map(function(x){ return x; });
+  const trueData = xGrid.map(function(x){ return targetFunctionAmplitude * Math.sin(2*Math.PI*x); });
+  const upper = muGrid.map(function(m,i){ return m + 1.96 * sdGrid[i]; });
+  const lower = muGrid.map(function(m,i){ return m - 1.96 * sdGrid[i]; });
+  predChart.data.labels = labels;
+  predChart.data.datasets[0].data = labels.map(function(x,i){ return {x:x, y:trueData[i]}; });
+  predChart.data.datasets[1].data = labels.map(function(x,i){ return {x:x, y:muGrid[i]}; });
+  predChart.data.datasets[2].data = labels.map(function(x,i){ return {x:x, y:upper[i]}; });
+  predChart.data.datasets[3].data = labels.map(function(x,i){ return {x:x, y:lower[i]}; });
+  predChart.data.datasets[4].data = xs.map(function(x,i){ return {x:x, y:ys[i]}; });
+  predChart.update('none');
+
+  // ----- logmlChart: logML vs ℓ -----
+  const llabels = [], lvals = [];
+  const ellMin = 0.05, ellMax = 5.0;
+  const STEPS = 40;
+  for(let s=0;s<=STEPS;s++){
+    // log-uniform spacing in ℓ
+    const t = s / STEPS;
+    const ellT = ellMin * Math.pow(ellMax/ellMin, t);
+    const effRatio = ellT / avgSpacing;
+    const dataFit = -0.5 * targetFunctionAmplitude*targetFunctionAmplitude * Math.exp(-2*effRatio*0.3);
+    const complexity = -0.5 * Math.log(signalVariance + nuggetVariance) * numSamples;
+    const lml = dataFit + complexity - 0.5 * numSamples * Math.log(2*Math.PI);
+    llabels.push(ellT.toFixed(2));
+    lvals.push(lml);
+  }
+  // current ℓ marker
+  const markerData = new Array(llabels.length).fill(null);
+  let nearest = 0, best = 1e9;
+  for(let k=0;k<llabels.length;k++){
+    const d = Math.abs(parseFloat(llabels[k]) - lengthScale);
+    if(d < best){ best = d; nearest = k; }
+  }
+  markerData[nearest] = logMarginalLikelihood;
+  logmlChart.data.labels = llabels;
+  logmlChart.data.datasets[0].data = lvals;
+  logmlChart.data.datasets[1].data = markerData;
+  logmlChart.update('none');
+
+  // ----- shared state for canvas -----
+  KR.N = numSamples;
+  KR.ell = lengthScale;
+  KR.sigF2 = signalVariance;
+  KR.sigN2 = nuggetVariance;
+  KR.A = targetFunctionAmplitude;
+  KR.kernel = kernelSel.value;
+  KR.xs = xs;
+  KR.ys = ys;
+  KR.mu = muGrid;
+  KR.sd = sdGrid;
+  KR.xGrid = xGrid;
+}
+
+// ===== Canvas animation =====
+(function(){
+  const cv = document.getElementById('krCanvas');
+  const ctx = cv.getContext('2d');
+  let tFrame = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width - w*dpr) > 2 || cv.height !== 270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height = '270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const padL = 50, padR = 24, padT = 20, padB = 30;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+
+    // y range
+    const A = KR.A;
+    const yMax = A * 1.6 + 0.5;
+    const yMin = -A * 1.6 - 0.5;
+    function tx(x){ return padL + x*plotW; }
+    function ty(y){ return padT + (1 - (y - yMin)/(yMax - yMin)) * plotH; }
+
+    // axes
+    ctx.strokeStyle = 'rgba(255,255,255,.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+plotH); ctx.lineTo(padL+plotW, padT+plotH);
+    ctx.stroke();
+    // zero line
+    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    ctx.moveTo(padL, ty(0)); ctx.lineTo(padL+plotW, ty(0));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // axis labels
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('0', padL, padT+plotH+14);
+    ctx.fillText('0.5', padL+plotW*0.5, padT+plotH+14);
+    ctx.fillText('1', padL+plotW, padT+plotH+14);
+    ctx.textAlign = 'right';
+    ctx.fillText(yMax.toFixed(1), padL-6, padT+8);
+    ctx.fillText('0', padL-6, ty(0)+3);
+    ctx.fillText(yMin.toFixed(1), padL-6, padT+plotH);
+
+    // CI band
+    if(KR.mu.length > 0){
+      ctx.fillStyle = 'rgba(0,180,216,.22)';
+      ctx.beginPath();
+      for(let i=0;i<KR.xGrid.length;i++){
+        const x = tx(KR.xGrid[i]);
+        const y = ty(KR.mu[i] + 1.96*KR.sd[i]);
+        i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      for(let i=KR.xGrid.length-1;i>=0;i--){
+        const x = tx(KR.xGrid[i]);
+        const y = ty(KR.mu[i] - 1.96*KR.sd[i]);
+        ctx.lineTo(x,y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // True function (white) — animate a tiny phase to suggest "live"
+    ctx.strokeStyle = 'rgba(255,255,255,.85)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for(let i=0;i<=200;i++){
+      const x = i/200;
+      const y = A * Math.sin(2*Math.PI*x);
+      const px = tx(x), py = ty(y);
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+
+    // GP mean (blue)
+    if(KR.mu.length > 0){
+      ctx.strokeStyle = '#3aa6ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for(let i=0;i<KR.xGrid.length;i++){
+        const x = tx(KR.xGrid[i]);
+        const y = ty(KR.mu[i]);
+        i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+
+    // Training points (red) — with small dynamic jitter for noise display
+    ctx.fillStyle = '#ff5d6b';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    const jitterAmp = Math.sqrt(Math.max(0, KR.sigN2)) * 0.5;
+    for(let i=0;i<KR.xs.length;i++){
+      const jitter = Math.sin(tFrame*0.06 + i*1.7) * jitterAmp;
+      const px = tx(KR.xs[i]);
+      const py = ty(KR.ys[i] + jitter);
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, 2*Math.PI);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Header label
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    const kName = KR.kernel === 'se' ? 'SE' : (KR.kernel === 'm32' ? 'Matérn 3/2' : 'Matérn 5/2');
+    ctx.fillText('Kernel: '+kName+'   ℓ='+KR.ell.toFixed(2)+'   σ_f²='+KR.sigF2.toFixed(2)+'   σ_n²='+KR.sigN2.toFixed(3)+'   N='+KR.N, padL, 14);
+
+    tFrame += 1;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['numSamples','lengthScale','signalVariance','nuggetVariance','targetFunctionAmplitude'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

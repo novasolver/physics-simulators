@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>糖尿病インスリンポンプ ベーサル・ボーラスシミュレーター — TDD・ICR・ISF | NovaSolver</title>
+<meta name="description" content="1型・2型・LADA 糖尿病のインスリンポンプ（CSII）ベーサル率・ボーラス投与量を計算する無料シミュレーター。TDD（Total Daily Dose）・ICR（500 Rule）・ISF（1800 Rule）・補正ボーラス・活性インスリンから 4 時間後血糖と低血糖リスクをリアルタイム可視化。">
+<link rel="canonical" href="https://novasolver.jp/tools/diabetic-insulin-pump-basal-bolus.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/diabetic-insulin-pump-basal-bolus.html">
+<meta property="og:title" content="糖尿病インスリンポンプ ベーサル・ボーラスシミュレーター | NovaSolver Project">
+<meta property="og:description" content="CSII（持続皮下インスリン注入）のベーサル・カーボボーラス・補正ボーラスを TDD/ICR/ISF から自動計算。1型糖尿病の血糖管理を学べる無料の教育用ツール。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Diabetic insulin pump basal-bolus simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/diabetic-insulin-pump-basal-bolus.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/diabetic-insulin-pump-basal-bolus.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/diabetic-insulin-pump-basal-bolus.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/diabetic-insulin-pump-basal-bolus.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#insulinCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "糖尿病インスリンポンプ ベーサル・ボーラスシミュレーター",
+      "description": "1型・2型・LADA 糖尿病のインスリンポンプ（CSII）ベーサル率・ボーラス投与量を TDD/ICR/ISF から自動計算する無料シミュレーター。活性インスリンと補正ボーラスから 4 時間後血糖と低血糖リスクを可視化。",
+      "url": "https://novasolver.jp/tools/diabetic-insulin-pump-basal-bolus.html",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Medical Physiology Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["TDD（Total Daily Dose）の体重ベース算出","500 Rule による Insulin-to-Carb Ratio（ICR）計算","1800/1500 Rule による Insulin Sensitivity Factor（ISF）計算","カーボボーラスと補正ボーラスの合算とアクティブインスリン控除","4 時間後血糖の予測と低血糖リスク判定"],
+      "keywords": "インスリンポンプ,CSII,ベーサル,ボーラス,TDD,ICR,ISF,500 Rule,1800 Rule,糖尿病,血糖管理",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "TDD（Total Daily Dose）はどう推定しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "本シミュレーターは Holman らの体重ベース経験式を採用し、TDD = 体重 × 1日あたり U/kg で算出します。係数は 1 型 0.7、2 型インスリン依存 0.4、LADA 0.6 を初期値としています。実臨床では年齢・運動量・インスリン抵抗性により 0.3〜1.0 U/kg の幅で個別化され、CGM の TIR と HbA1c を見ながら 2 週間ごとに微調整します。新規導入時は低めから始め、ベーサルを 50% 程度に設定して空腹時血糖が平坦になるかを確認してください。"}
+        },{
+          "@type": "Question",
+          "name": "500 Rule と 1800 Rule は何のための計算式ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "500 Rule は ICR（Insulin-to-Carbohydrate Ratio）= 500 / TDD で、1 単位のインスリンが代謝できる炭水化物のグラム数を求める式です。1800 Rule は ISF（Insulin Sensitivity Factor）= 1800 / TDD で、1 単位のインスリンが下げる血糖値（mg/dL）を表します。レギュラーインスリン（速効ではない）の場合は 1500 Rule を使うのが標準です。これらは速効型アナログを前提とした近似値で、運動・ストレス・月経周期によって ±20% 変動します。"}
+        },{
+          "@type": "Question",
+          "name": "アクティブインスリン（IOB）はなぜ差し引くのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "速効型インスリンの作用は約 4〜5 時間続き、注射後 1〜2 時間後に効果が最大になります。前回ボーラスがまだ作用中に追加で打つと、ピークが重なって重症低血糖を起こす可能性があります。これを防ぐためポンプは IOB（Insulin on Board）を計算し、補正ボーラスの量から残存量を自動的に減算します。本シミュレーターでも「活性インスリン U」を入力し、合算ボーラスから引いて最終投与量を出しています。Smart Pump のボーラスウィザードと同じロジックです。"}
+        },{
+          "@type": "Question",
+          "name": "ハイブリッドクローズドループ（人工膵臓）と何が違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Medtronic 780G、Tandem t:slim X2 Control-IQ、Insulet Omnipod 5、Beta Bionics iLet などのハイブリッドクローズドループは、CGM（Dexcom G7、Libre 3 等）からの 5 分ごとの血糖値を読み取り、PID 制御や MPC（モデル予測制御）でベーサル率を自動調整します。食事ボーラスは依然ユーザーが申告しますが、就寝中の低血糖回避や食後の補正は自動です。TIR（Time-in-Range 70〜180 mg/dL）が 75〜85% に達することが多く、本シミュレーターのような手動計算より優れた血糖変動の平坦化を実現します。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "糖尿病インスリンポンプ ベーサル・ボーラスシミュレーター", "item": "https://novasolver.jp/tools/diabetic-insulin-pump-basal-bolus.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">糖尿病インスリンポンプ ベーサル・ボーラスシミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/diabetic-insulin-pump-basal-bolus.html" class="active">JA</a>
+      <a href="/en/tools/diabetic-insulin-pump-basal-bolus.html">EN</a>
+      <a href="/zh/tools/diabetic-insulin-pump-basal-bolus.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-prescription-bottle"></i> 糖尿病・CSII</div>
+    <h1>糖尿病インスリンポンプ ベーサル・ボーラスシミュレーター</h1>
+    <p class="hero-sub">1 型・2 型・LADA 糖尿病のインスリンポンプ（CSII）治療を学ぶための教育用シミュレーターです。体重とインスリン製剤から TDD・ICR・ISF を自動算出し、食事 carb・食前血糖・活性インスリンを入力すると、ベーサル率・カーボボーラス・補正ボーラスと 4 時間後の予測血糖がリアルタイムで分かります。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">糖尿病型</span></div>
+      <div class="param-desc">基礎の必要 U/kg を切り替え（1型 0.7／2型 0.4／LADA 0.6）</div>
+      <select id="diabetesType" onchange="compute()">
+        <option value="t1" selected>1 型</option>
+        <option value="t2-insulin">2 型 インスリン依存</option>
+        <option value="lada">LADA</option>
+      </select>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">体重</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="bodyWeightKgInsNum" value="65" min="30" max="150" step="1" oninput="syncFromNum('bodyWeightKgIns','bodyWeightKgInsNum')"><span class="num-unit">kg</span></div>
+      </div>
+      <input type="range" id="bodyWeightKgIns" min="30" max="150" step="1" value="65" oninput="syncToNum('bodyWeightKgIns','bodyWeightKgInsNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">インスリン製剤</span></div>
+      <div class="param-desc">速効型は 1800 Rule、レギュラーは 1500 Rule</div>
+      <select id="insulinType" onchange="compute()">
+        <option value="lispro" selected>Lispro 速効型（Humalog）</option>
+        <option value="aspart">Aspart（NovoRapid／Fiasp）</option>
+        <option value="glulisine">Glulisine（Apidra）</option>
+        <option value="regular">Regular 速攻型ヒト</option>
+      </select>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">食事 carb</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="bolusTotalCarbGNum" value="60" min="0" max="150" step="5" oninput="syncFromNum('bolusTotalCarbG','bolusTotalCarbGNum')"><span class="num-unit">g</span></div>
+      </div>
+      <input type="range" id="bolusTotalCarbG" min="0" max="150" step="5" value="60" oninput="syncToNum('bolusTotalCarbG','bolusTotalCarbGNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">食前血糖</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="preprandialBGNum" value="130" min="70" max="300" step="5" oninput="syncFromNum('preprandialBG','preprandialBGNum')"><span class="num-unit">mg/dL</span></div>
+      </div>
+      <input type="range" id="preprandialBG" min="70" max="300" step="5" value="130" oninput="syncToNum('preprandialBG','preprandialBGNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">目標血糖</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="targetBGNum" value="110" min="80" max="150" step="5" oninput="syncFromNum('targetBG','targetBGNum')"><span class="num-unit">mg/dL</span></div>
+      </div>
+      <input type="range" id="targetBG" min="80" max="150" step="5" value="110" oninput="syncToNum('targetBG','targetBGNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">活性インスリン（IOB）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="activeInsulinUnitsNum" value="0" min="0" max="10" step="0.1" oninput="syncFromNum('activeInsulinUnits','activeInsulinUnitsNum')"><span class="num-unit">U</span></div>
+      </div>
+      <div class="param-desc">前回ボーラスから残っているインスリン量。スタック防止のため合算ボーラスから減算</div>
+      <input type="range" id="activeInsulinUnits" min="0" max="10" step="0.1" value="0" oninput="syncToNum('activeInsulinUnits','activeInsulinUnitsNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ベーサル率（% of TDD）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="basalRatePctOfTDDNum" value="50" min="30" max="60" step="5" oninput="syncFromNum('basalRatePctOfTDD','basalRatePctOfTDDNum')"><span class="num-unit">%</span></div>
+      </div>
+      <div class="param-desc">1 日のベーサルが TDD に占める割合。成人は 40〜50% が標準</div>
+      <input type="range" id="basalRatePctOfTDD" min="30" max="60" step="5" value="50" oninput="syncToNum('basalRatePctOfTDD','basalRatePctOfTDDNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statTDD">—</div><div class="sl">TDD（U/日）</div></div>
+        <div class="stat-card"><div class="sv" id="statBasalHr">—</div><div class="sl">時間基礎レート（U/hr）</div></div>
+        <div class="stat-card"><div class="sv" id="statICR">—</div><div class="sl">ICR（g/U）</div></div>
+        <div class="stat-card"><div class="sv" id="statISF">—</div><div class="sl">ISF（mg/dL/U）</div></div>
+        <div class="stat-card"><div class="sv" id="statBolus">—</div><div class="sl">食事ボーラス（U）</div></div>
+        <div class="stat-card"><div class="sv" id="statBG4">—</div><div class="sl">予測 4 時間後 BG（mg/dL）</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-syringe"></i> インスリンポンプ模式図 — ベーサル＋ボーラス注入</div>
+      <canvas id="insulinCanvas"></canvas>
+      <p class="canvas-hint">ポンプから皮下のカニューレへ、定常のベーサルと食事ごとの大きなボーラスが注入されます。血糖（黄色）は食後に上昇しインスリンで下降します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 血糖プロファイル（食前〜4 時間）</div>
+      <canvas class="ux-chartjs-canvas" id="bgChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-bar"></i> TDD 配分比較（ベーサル／カーボ／補正）</div>
+      <canvas class="ux-chartjs-canvas" id="ddChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$TDD = w \cdot 0.7,\quad ICR = \frac{500}{TDD},\quad ISF = \frac{1800}{TDD},\quad Bolus = \frac{Carb}{ICR} + \frac{BG-T}{ISF}$$</p>
+      <p style="margin-top:6px;">TDD：総日投与量（U/日、体重 w に比例）、ICR：1 U あたり代謝できる炭水化物量（g/U）、ISF：1 U あたり下げる血糖（mg/dL/U）、Bolus：食事＋補正の合算ボーラス。活性インスリン（IOB）を差し引いて最終投与量を決定します。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>糖尿病 インスリンポンプ ベーサル・ボーラス — TDD・ICR・ISF</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">インスリンポンプって、注射と何が違うんですか？ボタンを押すと自動で打ってくれるイメージなんですけど、なんで「ベーサル」と「ボーラス」って分けるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いいところを突いてるね。ポンプは正式には CSII（Continuous Subcutaneous Insulin Infusion）といって、お腹に刺したカニューレからチビチビとインスリンを流し続けてるんだ。健康な人の膵臓は「常にちょっとずつ出す（基礎分泌）」＋「食事のたびに大量に出す（追加分泌）」の二段構えで血糖を保ってる。これを真似るために、ポンプも 1 日 24 時間ずっと流す「ベーサル」と、食事や血糖補正のときだけドンと打つ「ボーラス」を分けてるんだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど！じゃあ TDD っていうのは 1 日に使うインスリンの合計ですよね。これってどうやって決まるんですか？体重で決まるって書いてあるけど、ホントにそれだけで？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと「体重 × 0.5〜0.7 U/kg」が出発点。例えば 65kg の 1 型なら 65×0.7 ≒ 46 U/日 から始める。これを Holman の経験式って呼ぶ。ただし、運動量が多い人や体脂肪率が低い人は 0.3 U/kg で済むこともあるし、思春期や妊娠中は 1.2 U/kg まで必要になることもある。最終的には CGM の TIR（Time in Range）と HbA1c を見て 2 週間ごとに ±10〜20% で微調整するんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">それで TDD が決まると、左パネルで自動的に ICR と ISF が出てきますよね。500 Rule とか 1800 Rule って、なんでそんなキリのいい数字なんですか？魔法の定数？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">魔法じゃなくて、何千人もの 1 型患者を観察した結果から逆算された経験定数だよ。500 Rule（ICR = 500 / TDD）は「1 U のインスリンが代謝できる炭水化物 g 数」。例えば TDD=45 なら 500/45 ≒ 11 g/U、つまり 11 g の糖質に 1 単位打つ。1800 Rule（ISF = 1800 / TDD）は「1 U で下がる血糖値 mg/dL」。レギュラーインスリン（古いタイプ）だけは 1500 Rule を使う。これらは速効型アナログ（Lispro、Aspart）を前提にしていて、運動・体温・ストレスで ±20% は普通にズレるから、CGM で実測して個別チューニングする必要があるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">右側に「活性インスリン IOB」っていうスライダーがあって、これを増やすと最終ボーラスが減るんですけど、これは何ですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それが重要！Insulin on Board、つまり「まだ体内で効いている前回ボーラスの残り」のこと。速効型でも作用は 4〜5 時間続いて、注入後 90 分でピークになる。例えば 2 時間前に 5 U 打って、まだ 3 U くらい残ってる状態で「血糖高いから」と追加で 4 U 打つと、ピークが重なって 30 分後に重症低血糖になるんだ。これを「インスリンスタッキング」と呼んで、ポンプ初心者の事故原因 No.1。だから Smart Pump のボーラスウィザードは IOB を自動計算して、補正ボーラスから自動で引いてくれる。本ツールでも同じロジックを使ってる。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">最近「人工膵臓」って言葉を聞くんですけど、それも同じポンプですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ほぼ同じハードに「自動制御アルゴリズム」を載せたもので、ハイブリッドクローズドループ（HCL）と呼ばれる。Medtronic 780G、Tandem t:slim X2 Control-IQ、Insulet Omnipod 5、Beta Bionics iLet が代表例。CGM（Dexcom G7、Libre 3）が 5 分ごとに皮下グルコースを測って、PID 制御や MPC（モデル予測制御）でベーサル率を勝手に上下させる。食事ボーラスだけはユーザーが申告するけど、就寝中の低血糖回避は完全自動。TIR が 80% を超えることが多くて、HbA1c も 6.5% 台が狙える。ただし日本ではまだ Medtronic 770G/780G とテルモ Medisafe Insulink が中心で、Omnipod 5 や iLet は未承認だよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">TDD（Total Daily Dose）はどう推定しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">本シミュレーターは Holman らの体重ベース経験式を採用し、TDD = 体重 × 1日あたり U/kg で算出します。係数は 1 型 0.7、2 型インスリン依存 0.4、LADA 0.6 を初期値としています。実臨床では年齢・運動量・インスリン抵抗性により 0.3〜1.0 U/kg の幅で個別化され、CGM の TIR と HbA1c を見ながら 2 週間ごとに微調整します。新規導入時は低めから始め、ベーサルを 50% 程度に設定して空腹時血糖が平坦になるかを確認してください。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">500 Rule と 1800 Rule は何のための計算式ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">500 Rule は ICR（Insulin-to-Carbohydrate Ratio）= 500 / TDD で、1 単位のインスリンが代謝できる炭水化物のグラム数を求める式です。1800 Rule は ISF（Insulin Sensitivity Factor）= 1800 / TDD で、1 単位のインスリンが下げる血糖値（mg/dL）を表します。レギュラーインスリン（速効ではない）の場合は 1500 Rule を使うのが標準です。これらは速効型アナログを前提とした近似値で、運動・ストレス・月経周期によって ±20% 変動します。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">アクティブインスリン（IOB）はなぜ差し引くのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">速効型インスリンの作用は約 4〜5 時間続き、注射後 1〜2 時間後に効果が最大になります。前回ボーラスがまだ作用中に追加で打つと、ピークが重なって重症低血糖を起こす可能性があります。これを防ぐためポンプは IOB（Insulin on Board）を計算し、補正ボーラスの量から残存量を自動的に減算します。本シミュレーターでも「活性インスリン U」を入力し、合算ボーラスから引いて最終投与量を出しています。Smart Pump のボーラスウィザードと同じロジックです。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">ハイブリッドクローズドループ（人工膵臓）と何が違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">Medtronic 780G、Tandem t:slim X2 Control-IQ、Insulet Omnipod 5、Beta Bionics iLet などのハイブリッドクローズドループは、CGM（Dexcom G7、Libre 3 等）からの 5 分ごとの血糖値を読み取り、PID 制御や MPC（モデル予測制御）でベーサル率を自動調整します。食事ボーラスは依然ユーザーが申告しますが、就寝中の低血糖回避や食後の補正は自動です。TIR（Time-in-Range 70〜180 mg/dL）が 75〜85% に達することが多く、本シミュレーターのような手動計算より優れた血糖変動の平坦化を実現します。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>1 型糖尿病の標準治療：</strong>日本国内だけでもインスリンポンプ装着者は 1 万 5 千人を超え、世界では 100 万人以上が CSII を使用しています。とくに小児・若年成人の 1 型では、ペン注射の MDI（Multiple Daily Injection）よりも HbA1c が 0.3〜0.5% 低下し、重症低血糖が 30〜70% 減ることが大規模 RCT（DCCT、STAR-3）で示されています。本ツールの ICR/ISF 自動算出は、外来でカーボカウントを学ぶ最初のステップとして利用できます。</p>
+    <p><strong>カーボカウント教育：</strong>米飯 150g（茶碗 1 杯）≒ 55g carb、食パン 6 枚切 1 枚 ≒ 26g carb、バナナ 1 本 ≒ 23g carb といった食品ごとの糖質量を覚え、ICR で割って必要ボーラスを暗算するのが日常運用です。本シミュレーターは carb 入力スライダーで「60g 食べたら何 U 必要か」を即座に可視化するため、栄養指導の場面で教材として活用できます。</p>
+    <p><strong>ハイブリッドクローズドループの理解：</strong>Medtronic 780G の SmartGuard、Tandem Control-IQ、Omnipod 5 SmartAdjust などの自動補正アルゴリズムは、内部で本ツールと同じ TDD/ICR/ISF を使っています。違いは「CGM の血糖トレンドを読んでベーサル率を 5 分ごとに自動調整」する点だけ。HCL を理解する前提として、手動の TDD/ICR/ISF 計算を体験することが重要です。</p>
+    <p><strong>2 型糖尿病・LADA の強化療法：</strong>経口薬・GLP-1 で目標 HbA1c に到達できない 2 型糖尿病や、緩徐進行型自己免疫性糖尿病（LADA）でも、内因性インスリン分泌が低下した時点で CSII の適応となります。2 型では TDD が体重あたり 0.4〜0.6 U/kg と低めで、インスリン抵抗性が高いため ICR は数値以上に厳しめに設定する必要があります。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の落とし穴は <strong>「教科書値の TDD/ICR/ISF をそのまま使う」</strong> こと。500 Rule・1800 Rule は数千人の平均値から導出された近似式で、個人差は ±50% に及びます。同じ体重・同じ年齢でも、運動量が多い人は ICR が 20 g/U、座位中心の人は 8 g/U ということが普通にあります。本シミュレーターの数値はあくまで「初期推定値」であり、CGM で 2 週間トラックしながら 10〜15% 刻みで実測ベースで調整する必要があります。担当医・糖尿病療養指導士の指示なしに教科書値だけで運用するのは厳禁です。</p>
+    <p>次に、<strong>「ベーサル率を一定にしておけば良い」</strong> という誤解。健康な人の基礎インスリン分泌は早朝（dawn phenomenon）に増加し、深夜に低下します。1 型患者でも午前 4〜8 時はベーサル必要量が 30〜50% 高くなることが多く、Smart Pump では時間帯別ベーサル率（24 個のセグメント）を設定できます。本ツールは平均ベーサルだけを表示しますが、実際の運用ではベーサルテスト（食事抜きで 6 時間の血糖変化を見る）で時間帯ごとにチューニングします。さらに運動時は 50〜80% に一時減量、シックデイ（発熱）は 150% に増量、と動的調整が必要です。</p>
+    <p>最後に、<strong>「ボーラス予測式 = 食後血糖が確実にこの値になる」</strong> という思い込み。本ツールの 4 時間後血糖予測は、カーボ吸収速度を平均 4 mg/dL/g、インスリン作用を線形と仮定した粗いモデルです。実際は GI 値（白米とおにぎりで吸収速度が 2 倍違う）、脂質・タンパク質（晩発性血糖上昇）、注入部位の吸収率（腹部 vs 大腿でピーク時刻が 30 分ズレる）、運動の有無で大きく変動します。本ツールは「設計の感度」を学ぶ教育用ツールであり、臨床判断に直接使うものではないことを強調しておきます。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>体重を入力します。1型糖尿病の場合は体重1kg当たり0.5U/日、2型やLADAの場合は0.3～0.4U/日を目安にTDD（1日総インスリン必要量）を算出します</li>
+<li>食事の炭水化物量（g）と食前血糖値（mg/dL）を入力し、ICR（Insulin-to-Carb Ratio、500ルール）とISF（Insulin Sensitivity Factor、1800ルール）から食事ボーラスと補正ボーラスを自動計算します</li>
+<li>シミュレーターが現在の活性インスリン量から4時間後の予測血糖値と低血糖リスク（活性インスリン≧2Uかつ予測BG≦100mg/dLの場合は警告）をリアルタイム表示します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>体重70kg、1型糖尿病患者の例：TDD=35U/日（0.5U/kg×70kg）、ベーサル率=1.46U/時間。朝食で炭水化物60g、食前血糖値140mg/dL、目標血糖値120mg/dLを入力した場合、ICR=14g/U（500÷35）、ISF=51mg/dL/U（1800÷35）から、食事ボーラス4.3U＋補正ボーラス0.4U＝合計4.7U投与。30分後に活性インスリン4.2Uが存在し、4時間後の予測血糖値が85mg/dLの場合、低血糖リスク警告が表示されます</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>Tandem t:slim X2やMedtronic 780G等のポンプ機種により、インスリン吸収モデル（ラピッド=3時間、ウルトララピッド=2時間）が異なるため、4時間後の活性インスリン残存量を正確に反映させてください</li>
+<li>夜間ベーサル率は昼間の20～40%低下させるのが一般的ですが、暁現象がある患者は早朝3～6時のベーサル率を1.5～2倍に設定する必要があります</li>
+<li>ICRとISFは月1回以上の血糖自己測定記録を基に微調整します。特に同じ時間帯で連続3日以上の食後高血糖が見られた場合はICRを0.5g/U単位で減量してください</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Constants =====
+const dailyTDD_U_per_kg = { t1: 0.7, "t2-insulin": 0.4, lada: 0.6 };
+const isfRule = { lispro: 1800, aspart: 1800, glulisine: 1800, regular: 1500 };
+
+// shared state for the animation
+const IN = {TDD:45.5, basalHr:0.95, ICR:11, ISF:40, bolus:5.97, BG0:130, BG4:134, carb:60, type:'t1'};
+
+// ===== Chart.js setup =====
+const bgChart = new Chart(document.getElementById('bgChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'血糖（mg/dL）',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.25},
+    {label:'目標域 70–180',data:[],borderColor:'#00b894',borderDash:[6,4],borderWidth:1,pointRadius:0,fill:false},
+    {label:'低血糖閾値 70',data:[],borderColor:'#d63031',borderDash:[4,3],borderWidth:1,pointRadius:0,fill:false}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'時間（時間）',font:{size:11}},ticks:{maxTicksLimit:9}},
+      y:{title:{display:true,text:'血糖（mg/dL）',font:{size:11}},beginAtZero:false,min:40,max:300}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const ddChart = new Chart(document.getElementById('ddChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['ベーサル','カーボボーラス','補正ボーラス'],datasets:[{
+    label:'インスリン（U）',data:[0,0,0],
+    backgroundColor:['#00b894','#007BFF','#e17055'],
+    borderColor:['#00b894','#007BFF','#e17055'],borderWidth:1
+  }]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{ticks:{font:{size:11}}},
+      y:{title:{display:true,text:'インスリン（U）',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:false}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const dt   = document.getElementById('diabetesType').value || 't1';
+  const it   = document.getElementById('insulinType').value || 'lispro';
+  const w    = parseFloat(document.getElementById('bodyWeightKgIns').value);
+  const carb = parseFloat(document.getElementById('bolusTotalCarbG').value);
+  const bg0  = parseFloat(document.getElementById('preprandialBG').value);
+  const tgt  = parseFloat(document.getElementById('targetBG').value);
+  const iob  = parseFloat(document.getElementById('activeInsulinUnits').value);
+  const bpct = parseFloat(document.getElementById('basalRatePctOfTDD').value);
+
+  // TDD via Holman empirical
+  const tdd_per_kg = dailyTDD_U_per_kg[dt] || 0.7;
+  const TDD = w * tdd_per_kg;
+  const basalDaily_U = TDD * bpct/100;
+  const basalHourly_U = basalDaily_U / 24;
+  const ICR_g_per_U = 500 / TDD;
+  const ISF_mg_dL_per_U = (isfRule[it] || 1800) / TDD;
+  const carbBolus_U = carb / ICR_g_per_U;
+  const correctionBolus_U = (bg0 - tgt) / ISF_mg_dL_per_U;
+  const totalBolus_U = Math.max(0, carbBolus_U + correctionBolus_U - iob);
+  const carb_to_BG = 4;
+  const expected_BG_4hr = bg0 + carb * carb_to_BG - totalBolus_U * ISF_mg_dL_per_U;
+  const hypoRisk = expected_BG_4hr < 70 ? '高（要対策）' : expected_BG_4hr < 90 ? '中' : '低';
+  const avgGlucose = (bg0 + expected_BG_4hr)/2;
+  const TIR_estimate = 70 + Math.max(0, 30 - Math.abs(avgGlucose - 130)/3);
+
+  // ----- stat cards -----
+  document.getElementById('statTDD').textContent     = TDD.toFixed(1);
+  document.getElementById('statBasalHr').textContent = basalHourly_U.toFixed(2);
+  document.getElementById('statICR').textContent     = ICR_g_per_U.toFixed(0);
+  document.getElementById('statISF').textContent     = ISF_mg_dL_per_U.toFixed(0);
+  document.getElementById('statBolus').textContent   = totalBolus_U.toFixed(2);
+  document.getElementById('statBG4').textContent     = expected_BG_4hr.toFixed(0);
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(expected_BG_4hr < 70){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> 予測 4 時間後血糖 '+expected_BG_4hr.toFixed(0)+' mg/dL — 低血糖リスク '+hypoRisk+'。ボーラスを 1〜2 U 減らすかブドウ糖補食を準備してください。';
+  }else if(expected_BG_4hr > 180 || hypoRisk === '中'){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 予測 4 時間後血糖 '+expected_BG_4hr.toFixed(0)+' mg/dL — 目標域外。低血糖リスク '+hypoRisk+'。TIR 推定 '+TIR_estimate.toFixed(0)+'%。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 予測 4 時間後血糖 '+expected_BG_4hr.toFixed(0)+' mg/dL（目標域内）。低血糖リスク '+hypoRisk+'、TIR 推定 '+TIR_estimate.toFixed(0)+'%。';
+  }
+
+  // ----- BG profile chart (0 to 4 hours, 24 points) -----
+  const labels=[], bgData=[], targetUpper=[], hypoLine=[];
+  const N=24;
+  for(let i=0;i<=N;i++){
+    const t = 4*i/N;                         // hours
+    labels.push(t.toFixed(1));
+    // Bilinear-ish model: carb peaks at 1.5h, insulin peaks at 1.5h, both decay by 4h
+    const carbEffect = carb * carb_to_BG * Math.min(1, t/4);
+    const insulinEffect = totalBolus_U * ISF_mg_dL_per_U * Math.min(1, t/4);
+    // smooth gaussian rise/fall around 1.5h, settle to (bg0 + carbEffect - insulinEffect)
+    const transient = 30 * Math.exp(-Math.pow((t-1.5)/0.9,2)) * (carb>20 ? 1 : 0);
+    bgData.push(bg0 + carbEffect - insulinEffect + transient);
+    targetUpper.push(180);
+    hypoLine.push(70);
+  }
+  bgChart.data.labels = labels;
+  bgChart.data.datasets[0].data = bgData;
+  bgChart.data.datasets[1].data = targetUpper;
+  bgChart.data.datasets[2].data = hypoLine;
+  bgChart.update('none');
+
+  // ----- TDD allocation chart -----
+  ddChart.data.datasets[0].data = [basalDaily_U, carbBolus_U, Math.max(0, correctionBolus_U)];
+  ddChart.update('none');
+
+  // ----- update shared state for animation -----
+  IN.TDD = TDD;
+  IN.basalHr = basalHourly_U;
+  IN.ICR = ICR_g_per_U;
+  IN.ISF = ISF_mg_dL_per_U;
+  IN.bolus = totalBolus_U;
+  IN.BG0 = bg0;
+  IN.BG4 = expected_BG_4hr;
+  IN.carb = carb;
+  IN.type = dt;
+}
+
+// ===== Pump + glucose animation =====
+let _insulinPhase = 0;
+(function(){
+  const cv = document.getElementById('insulinCanvas');
+  const ctx = cv.getContext('2d');
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    // ----- left: insulin pump body -----
+    const pumpX = 40, pumpY = 80, pumpW = 80, pumpH = 110;
+    ctx.fillStyle = 'rgba(80,130,180,.45)';
+    ctx.strokeStyle = 'rgba(150,200,235,.85)';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(pumpX, pumpY, pumpW, pumpH);
+    ctx.strokeRect(pumpX, pumpY, pumpW, pumpH);
+    // screen
+    ctx.fillStyle = 'rgba(40,200,140,.85)';
+    ctx.fillRect(pumpX+10, pumpY+10, pumpW-20, 30);
+    ctx.fillStyle = '#020d1a';
+    ctx.font = 'bold 10px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('CSII PUMP', pumpX+pumpW/2, pumpY+24);
+    ctx.fillText(IN.basalHr.toFixed(2)+' U/h', pumpX+pumpW/2, pumpY+36);
+    // buttons
+    ctx.fillStyle = 'rgba(200,225,245,.6)';
+    for(let i=0;i<3;i++){
+      ctx.beginPath();
+      ctx.arc(pumpX+18+i*22, pumpY+pumpH-22, 7, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // ----- tubing from pump to abdomen -----
+    const tubeStartX = pumpX+pumpW;
+    const tubeStartY = pumpY+pumpH/2;
+    const cannulaX = W-80, cannulaY = 160;
+    ctx.strokeStyle = 'rgba(180,200,220,.7)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(tubeStartX, tubeStartY);
+    ctx.bezierCurveTo(tubeStartX+60, tubeStartY-30, cannulaX-60, cannulaY-50, cannulaX, cannulaY);
+    ctx.stroke();
+
+    // moving insulin droplets along tube
+    const nDrop = 5;
+    for(let i=0;i<nDrop;i++){
+      const t = ((_insulinPhase + i/nDrop) % 1);
+      const x1=tubeStartX, x2=cannulaX;
+      const y1=tubeStartY, y2=cannulaY;
+      const cx1=tubeStartX+60, cy1=tubeStartY-30, cx2=cannulaX-60, cy2=cannulaY-50;
+      const u=t;
+      const bx = Math.pow(1-u,3)*x1 + 3*Math.pow(1-u,2)*u*cx1 + 3*(1-u)*u*u*cx2 + Math.pow(u,3)*x2;
+      const by = Math.pow(1-u,3)*y1 + 3*Math.pow(1-u,2)*u*cy1 + 3*(1-u)*u*u*cy2 + Math.pow(u,3)*y2;
+      // bolus burst phase
+      const isBolus = (_insulinPhase % 1) < 0.15;
+      ctx.fillStyle = isBolus ? '#e17055' : 'rgba(0,180,216,.95)';
+      ctx.beginPath();
+      ctx.arc(bx, by, isBolus ? 5 : 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // ----- abdomen / cannula site -----
+    ctx.fillStyle = 'rgba(255,210,180,.18)';
+    ctx.beginPath();
+    ctx.arc(cannulaX, cannulaY, 36, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,210,180,.55)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // cannula
+    ctx.fillStyle = 'rgba(220,230,240,.9)';
+    ctx.fillRect(cannulaX-3, cannulaY-2, 6, 14);
+    ctx.fillStyle = 'rgba(200,225,245,.85)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('カニューレ', cannulaX, cannulaY+30);
+    ctx.fillText('（皮下）', cannulaX, cannulaY+42);
+
+    // ----- bottom: blood glucose curve -----
+    const gx0 = 40, gy0 = H-40, gw = W-80, gh = 50;
+    // axis
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(gx0, gy0); ctx.lineTo(gx0+gw, gy0);
+    ctx.moveTo(gx0, gy0-gh); ctx.lineTo(gx0, gy0);
+    ctx.stroke();
+    // target band 70-180 mapped within gh
+    const bgMin=40, bgMax=300;
+    function py(bg){ return gy0 - gh * (bg-bgMin)/(bgMax-bgMin); }
+    ctx.fillStyle = 'rgba(0,184,148,.18)';
+    ctx.fillRect(gx0, py(180), gw, py(70)-py(180));
+    // glucose curve
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    const N=40;
+    for(let i=0;i<=N;i++){
+      const u = i/N;
+      const t = 4*u;
+      const carbEffect = IN.carb * 4 * Math.min(1, t/4);
+      const insulinEffect = IN.bolus * IN.ISF * Math.min(1, t/4);
+      const transient = 30 * Math.exp(-Math.pow((t-1.5)/0.9,2)) * (IN.carb>20 ? 1 : 0);
+      const bg = IN.BG0 + carbEffect - insulinEffect + transient;
+      const x = gx0 + gw*u;
+      const y = py(Math.max(bgMin, Math.min(bgMax,bg)));
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    // labels
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.font = '9px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('BG '+IN.BG0.toFixed(0), gx0+3, gy0-gh+2);
+    ctx.textAlign = 'right';
+    ctx.fillText('4h: '+IN.BG4.toFixed(0)+' mg/dL', gx0+gw-3, gy0-gh+2);
+    ctx.textAlign='center';
+    ctx.fillText('血糖プロファイル（0〜4 時間）', gx0+gw/2, gy0+14);
+
+    // ----- title -----
+    ctx.fillStyle = '#00b894';
+    ctx.font = 'bold 12px Roboto Mono, monospace';
+    ctx.textAlign='left';
+    ctx.fillText('TDD='+IN.TDD.toFixed(1)+' U/d   ICR='+IN.ICR.toFixed(0)+' g/U   ISF='+IN.ISF.toFixed(0)+' mg/dL/U', 40, 24);
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText('Bolus = '+IN.bolus.toFixed(2)+' U', 40, 40);
+
+    _insulinPhase += 0.005;
+    if(_insulinPhase>=1) _insulinPhase = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['bodyWeightKgIns','bolusTotalCarbG','preprandialBG','targetBG','activeInsulinUnits','basalRatePctOfTDD'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

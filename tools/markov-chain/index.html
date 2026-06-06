@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マルコフ連鎖 シミュレーター — 2 状態の定常分布と混合時間 | NovaSolver</title>
+<meta name="description" content="2状態マルコフ連鎖の定常分布と混合時間をリアルタイム計算。遷移確率から固有値・収束速度を可視化。エンジニア向け確率シミュレーター。">
+<meta property="og:title" content="マルコフ連鎖 シミュレーター — 2 状態の定常分布と混合時間 | NovaSolver">
+<meta property="og:description" content="2状態マルコフ連鎖の定常分布と混合時間をリアルタイム計算。遷移確率から固有値・収束速度を可視化。エンジニア向け確率シミュレーター。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://novasolver.jp/tools/markov-chain.html">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Two-state Markov chain stationary distribution and mixing time simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://novasolver.jp/tools/markov-chain.html">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/markov-chain.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/markov-chain.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/markov-chain.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/markov-chain.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "マルコフ連鎖 シミュレーター",
+      "description": "2 状態マルコフ連鎖の遷移確率 p, q から定常分布 π、t ステップ後の状態確率 P_1(t)、99% 混合時間 t_mix をリアルタイムに計算・可視化する教育用シミュレーター。",
+      "url": "https://novasolver.jp/tools/markov-chain.html",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Stochastic Process Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["遷移確率 p, q と初期分布をスライダーで操作","定常分布 π_1, π_2 と P_1(t) を即時計算","状態図と確率の指数収束曲線を描画","99% 混合時間 t_mix を解析的に算出"],
+      "keywords": "マルコフ連鎖,定常分布,混合時間,遷移確率,確率過程,固有値,Perron-Frobenius",
+      "datePublished": "2026-05-16",
+      "dateModified": "2026-05-16",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "定常分布 π はどう計算しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "2 状態マルコフ連鎖の遷移行列 P = [[1-p, p], [q, 1-q]] に対して、定常分布 π = (π_1, π_2) は π P = π かつ π_1 + π_2 = 1 を満たします。これを解くと π_1 = q/(p+q)、π_2 = p/(p+q) という閉形式が得られます。直感的には、状態 1 から状態 2 への流出（p·π_1）と、状態 2 から状態 1 への流入（q·π_2）が釣り合う点が定常分布です。"}
+        },
+        {
+          "@type": "Question",
+          "name": "混合時間 t_mix とはどういう意味ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "混合時間は、初期分布の影響がほぼ消えて定常分布に収束するまでに必要なステップ数です。本ツールでは、初期確率 P_1(0) と π_1 の差が 1% にまで縮まるステップ数を t_mix として表示します。式は t_mix ≈ ln(0.01)/ln|1−p−q| で、|1−p−q| が固有値 λ の絶対値に対応します。p+q が 1 に近いと λ→0 となり混合は速く、p+q が 0 や 2 に近いと λ→1 となり混合は極端に遅くなります。"}
+        },
+        {
+          "@type": "Question",
+          "name": "P_1(t) の指数収束はどう導出されますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "遷移行列 P の固有値は λ_1 = 1（定常分布に対応）と λ_2 = 1 − p − q の 2 つです。任意の初期分布は固有ベクトルの線形結合に分解でき、t ステップ後の確率は P_1(t) = π_1 + (P_1(0) − π_1)·(1−p−q)^t と書けます。第 2 項が λ_2^t で減衰し、t→∞ で π_1 に指数収束します。これは線形ダイナミクスの典型例で、Perron-Frobenius の定理が裏側で働いています。"}
+        },
+        {
+          "@type": "Question",
+          "name": "実応用にはどんな例がありますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "信頼性工学では機械の「稼働⇄故障」状態の遷移、待ち行列理論では「空き⇄混雑」、IT 監視では「正常⇄異常」、自然言語処理では品詞遷移、強化学習では Markov 決定過程の基礎モデルとして使われます。Google PageRank も巨大なマルコフ連鎖の定常分布で、本ツールはその最小サイズ版に相当します。CAE 関連では、状態ベース信頼性解析 (Markov reliability) や離散事象シミュレーションの理論基盤として現れます。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "マルコフ連鎖 シミュレーター", "item": "https://novasolver.jp/tools/markov-chain.html"}
+      ]
+    }
+  ]
+}</script>
+<link rel="stylesheet" href="/tools/tools-common.css">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet">
+<script src="/tools/tools-common.js"></script>
+<style>
+:root{
+  --navy:#001F3F; --accent:#007BFF; --accent2:#00B4D8;
+  --bg:#F8F9FA; --card:#ffffff; --text:#1a1a2e;
+  --muted:#6c757d; --border:#dee2e6;
+}
+body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+#stateCanvas,#chartCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+.canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">マルコフ連鎖 シミュレーター — 2 状態の定常分布と混合時間</span>
+    <nav class="lang-nav">
+      <a href="/tools/markov-chain.html" class="active">JA</a>
+      <a href="/en/tools/markov-chain.html">EN</a>
+      <a href="/zh/tools/markov-chain.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-circle-nodes"></i> 確率過程シミュレーター</div>
+    <h1>マルコフ連鎖 シミュレーター — 2 状態の定常分布と混合時間</h1>
+    <p class="hero-sub">遷移確率 p, q を持つ 2 状態マルコフ連鎖の定常分布 π、t ステップ後の状態確率 P_1(t)、99% 混合時間 t_mix をリアルタイムに計算します。Perron-Frobenius の定理と固有値による指数収束を直感的に理解できます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">P 1 to 2</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slPVal" value="0.30" min="0.01" max="0.99" step="0.01" oninput="syncFromNum('slP','slPVal')"><span class="num-unit"></span></div>
+      </div>
+      <input type="range" id="slP" min="0.01" max="0.99" step="0.01" value="0.30" oninput="syncToNum('slP','slPVal');updateSlider(this,'slPVal',2,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">P 2 to 1</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slQVal" value="0.40" min="0.01" max="0.99" step="0.01" oninput="syncFromNum('slQ','slQVal')"><span class="num-unit"></span></div>
+      </div>
+      <input type="range" id="slQ" min="0.01" max="0.99" step="0.01" value="0.40" oninput="syncToNum('slQ','slQVal');updateSlider(this,'slQVal',2,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">初期 P state 1</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slP1_initVal" value="1.00" min="0.00" max="1.00" step="0.01" oninput="syncFromNum('slP1_init','slP1_initVal')"><span class="num-unit"></span></div>
+      </div>
+      <input type="range" id="slP1_init" min="0.00" max="1.00" step="0.01" value="1.00" oninput="syncToNum('slP1_init','slP1_initVal');updateSlider(this,'slP1_initVal',2,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">観測ステップ t</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slT_stepsVal" value="10" min="0" max="50" step="1" oninput="syncFromNum('slT_steps','slT_stepsVal')"><span class="num-unit"></span></div>
+      </div>
+      <input type="range" id="slT_steps" min="0" max="50" step="1" value="10" oninput="syncToNum('slT_steps','slT_stepsVal');updateSlider(this,'slT_stepsVal',0,'');compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="btn-group">
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> ステップをスイープ</button>
+      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">p = P(1→2)、q = P(2→1)。再生で t を 0→50 までスイープし、初期分布から定常 π への指数収束を観察できます。</p>
+  </div>
+
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statPi1">—</div><div class="sl">定常 π_1</div></div>
+        <div class="stat-card"><div class="sv" id="statPi2">—</div><div class="sl">定常 π_2</div></div>
+        <div class="stat-card"><div class="sv" id="statP1_t">—</div><div class="sl">P_1(t)</div></div>
+        <div class="stat-card"><div class="sv" id="statP1_0">—</div><div class="sl">P_1(0)</div></div>
+        <div class="stat-card"><div class="sv" id="statMixing">—</div><div class="sl">t_mix (99%)</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-circle-nodes"></i> 状態遷移図</div>
+      <canvas id="stateCanvas"></canvas>
+      <p class="canvas-hint">2 つの円が状態 1, 2。円の大きさが現在ステップ t での確率に比例します。矢印は遷移確率 p (1→2) と q (2→1)、自己ループは滞在確率 (1−p), (1−q)。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> P_1(t) の指数収束</div>
+      <canvas id="chartCanvas"></canvas>
+      <p class="canvas-hint">横軸はステップ t (0〜50)、縦軸は状態 1 にいる確率 P_1(t)。水平破線は定常値 π_1、黄色マーカーは現在の t です。|1−p−q| が固有値 λ_2 で、収束速度を決めます。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>2 状態マルコフ連鎖の遷移行列を $P = \begin{pmatrix} 1-p & p \\ q & 1-q \end{pmatrix}$ とおく。固有値は $\lambda_1 = 1$ と $\lambda_2 = 1-p-q$ で、定常分布は</p>
+      $$\pi_1 = \frac{q}{p+q}, \qquad \pi_2 = \frac{p}{p+q}$$
+      <p style="margin-top:6px;">$t$ ステップ後の状態 1 の確率は固有値分解から</p>
+      $$P_1(t) = \pi_1 + (P_1(0) - \pi_1)\,(1-p-q)^t$$
+      <p style="margin-top:6px;">99% 混合時間は $|P_1(t)-\pi_1| / |P_1(0)-\pi_1| = 0.01$ から $t_{\text{mix}} = \ln(0.01) / \ln|1-p-q|$ となります。$p+q \to 0$ または $\to 2$ で $\lambda_2 \to \pm 1$ となり、混合時間は発散します。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== Markov Chain (2-state) Simulator ==========
+var stateCanvas = document.getElementById('stateCanvas');
+var stateCtx = stateCanvas.getContext('2d');
+var chartCanvas = document.getElementById('chartCanvas');
+var chartCtx = chartCanvas.getContext('2d');
+var playing = false;
+var animId = null;
+
+function getParams() {
+  var p = parseFloat(document.getElementById('slP').value);
+  var q = parseFloat(document.getElementById('slQ').value);
+  var p1_init = parseFloat(document.getElementById('slP1_init').value);
+  var t = parseInt(document.getElementById('slT_steps').value, 10);
+  return { p: p, q: q, p1_init: p1_init, t: t };
+}
+
+function pi1Of(p, q) { return q / (p + q); }
+function pi2Of(p, q) { return p / (p + q); }
+
+function p1AtT(p, q, p1_init, t) {
+  var pi1 = pi1Of(p, q);
+  var lam = 1 - p - q;
+  return pi1 + (p1_init - pi1) * Math.pow(lam, t);
+}
+
+function mixingTime(p, q) {
+  var lam = Math.abs(1 - p - q);
+  if (lam < 1e-12) return 0; // immediate mixing
+  if (lam >= 1 - 1e-12) return Infinity;
+  return Math.log(0.01) / Math.log(lam);
+}
+
+function fmt4(x) {
+  return x.toFixed(4);
+}
+function fmt2(x) {
+  if (!isFinite(x)) return '∞';
+  // Ceil to two decimals: mixing time is the smallest step count above threshold.
+  return (Math.ceil(x * 100) / 100).toFixed(2);
+}
+
+function __novaCanvasCssW(canvas){
+  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
+}
+function __novaCanvasCssH(canvas){
+  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
+}
+
+function resizeCanvases() {
+  [stateCanvas, chartCanvas].forEach(function (cv) {
+    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 720));
+    var __novaW = w;
+    var __novaH = Math.round(w * 0.6);
+    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = __novaW + 'px';
+    cv.style.height = __novaH + 'px';
+    cv.width = Math.round(__novaW * __novaDpr);
+    cv.height = Math.round(__novaH * __novaDpr);
+    cv.dataset.cssW = String(__novaW);
+    cv.dataset.cssH = String(__novaH);
+    var __novaCtx = cv.getContext && cv.getContext('2d');
+    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+  });
+}
+
+function drawState(p) {
+  var ctx = stateCtx, W = __novaCanvasCssW(stateCanvas), H = __novaCanvasCssH(stateCanvas);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+
+  var pi1 = pi1Of(p.p, p.q);
+  var P1t = p1AtT(p.p, p.q, p.p1_init, p.t);
+  var P2t = 1 - P1t;
+
+  // Two state circles
+  var cy = H / 2;
+  var cx1 = W * 0.28, cx2 = W * 0.72;
+  var rMax = Math.min(W * 0.16, H * 0.28);
+  var rMin = Math.max(rMax * 0.30, 18);
+  var r1 = rMin + (rMax - rMin) * P1t;
+  var r2 = rMin + (rMax - rMin) * P2t;
+
+  // Self-loop arc above each circle
+  function selfLoop(cx, cy, r, label) {
+    ctx.strokeStyle = 'rgba(143,184,224,0.7)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(cx, cy - r - 14, 14, 0.2 * Math.PI, 0.8 * Math.PI, false);
+    ctx.stroke();
+    // arrow head at end
+    var ax = cx + 14 * Math.cos(0.8 * Math.PI);
+    var ay = cy - r - 14 + 14 * Math.sin(0.8 * Math.PI);
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax + 5, ay + 2);
+    ctx.lineTo(ax + 1, ay + 7);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(143,184,224,0.9)';
+    ctx.fill();
+    ctx.fillStyle = 'rgba(207,227,247,0.9)';
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, cx, cy - r - 32);
+  }
+
+  // Arrow from 1 -> 2 (above)
+  function arrow12() {
+    var y = cy - 24;
+    ctx.strokeStyle = 'rgba(0,180,216,0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx1 + r1 * 0.85, y);
+    var c1x = (cx1 + cx2) / 2; var c1y = y - 30;
+    ctx.quadraticCurveTo(c1x, c1y, cx2 - r2 * 0.85, y);
+    ctx.stroke();
+    // arrow head
+    ctx.fillStyle = 'rgba(0,180,216,1)';
+    ctx.beginPath();
+    ctx.moveTo(cx2 - r2 * 0.85, y);
+    ctx.lineTo(cx2 - r2 * 0.85 - 8, y - 5);
+    ctx.lineTo(cx2 - r2 * 0.85 - 8, y + 5);
+    ctx.closePath();
+    ctx.fill();
+    // label
+    ctx.fillStyle = 'rgba(255,209,102,0.95)';
+    ctx.font = '12px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('p = ' + p.p.toFixed(2), (cx1 + cx2) / 2, y - 36);
+  }
+
+  // Arrow from 2 -> 1 (below)
+  function arrow21() {
+    var y = cy + 24;
+    ctx.strokeStyle = 'rgba(231,111,81,0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx2 - r2 * 0.85, y);
+    var c1x = (cx1 + cx2) / 2; var c1y = y + 30;
+    ctx.quadraticCurveTo(c1x, c1y, cx1 + r1 * 0.85, y);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(231,111,81,1)';
+    ctx.beginPath();
+    ctx.moveTo(cx1 + r1 * 0.85, y);
+    ctx.lineTo(cx1 + r1 * 0.85 + 8, y - 5);
+    ctx.lineTo(cx1 + r1 * 0.85 + 8, y + 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,209,102,0.95)';
+    ctx.font = '12px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('q = ' + p.q.toFixed(2), (cx1 + cx2) / 2, y + 48);
+  }
+
+  arrow12();
+  arrow21();
+  selfLoop(cx1, cy, r1, '1−p = ' + (1 - p.p).toFixed(2));
+  selfLoop(cx2, cy, r2, '1−q = ' + (1 - p.q).toFixed(2));
+
+  // Circles
+  function circ(cx, cy, r, color, label, prob) {
+    var grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, 'rgba(10,25,41,0.95)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, cx, cy - 6);
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.fillText('P=' + prob.toFixed(3), cx, cy + 12);
+    ctx.textBaseline = 'alphabetic';
+  }
+  circ(cx1, cy, r1, 'rgba(0,123,255,0.95)', '1', P1t);
+  circ(cx2, cy, r2, 'rgba(231,111,81,0.95)', '2', P2t);
+
+  // Title text
+  ctx.fillStyle = 'rgba(255,209,102,0.9)';
+  ctx.font = 'bold 13px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('t = ' + p.t + '   π_1 = ' + pi1.toFixed(4), 12, 20);
+}
+
+function drawChart(p) {
+  var ctx = chartCtx, W = __novaCanvasCssW(chartCanvas), H = __novaCanvasCssH(chartCanvas);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+
+  var pad = { l: 56, r: 18, t: 22, b: 38 };
+  var plotW = W - pad.l - pad.r;
+  var plotH = H - pad.t - pad.b;
+
+  // Axes
+  ctx.strokeStyle = 'rgba(143,184,224,0.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, pad.t + plotH);
+  ctx.lineTo(pad.l + plotW, pad.t + plotH);
+  ctx.stroke();
+
+  function tx(t) { return pad.l + (t / 50) * plotW; }
+  function ty(y) { return pad.t + (1 - y) * plotH; }
+
+  // Y grid (0, 0.25, 0.5, 0.75, 1)
+  ctx.fillStyle = 'rgba(207,227,247,0.7)';
+  ctx.font = '10px "Roboto Mono",monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (var iy = 0; iy <= 4; iy++) {
+    var yv = iy / 4;
+    var y = ty(yv);
+    ctx.strokeStyle = 'rgba(143,184,224,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(pad.l + plotW, y);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(207,227,247,0.7)';
+    ctx.fillText(yv.toFixed(2), pad.l - 6, y);
+  }
+  // X grid
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for (var ix = 0; ix <= 5; ix++) {
+    var xv = ix * 10;
+    var x = tx(xv);
+    ctx.strokeStyle = 'rgba(143,184,224,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(x, pad.t);
+    ctx.lineTo(x, pad.t + plotH);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(207,227,247,0.7)';
+    ctx.fillText(xv.toString(), x, pad.t + plotH + 6);
+  }
+  // Axis labels
+  ctx.fillStyle = 'rgba(207,227,247,0.85)';
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('step t', pad.l + plotW / 2, pad.t + plotH + 24);
+  ctx.save();
+  ctx.translate(14, pad.t + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('P_1(t)', 0, 0);
+  ctx.restore();
+
+  // Stationary line π_1
+  var pi1 = pi1Of(p.p, p.q);
+  ctx.strokeStyle = 'rgba(255,209,102,0.85)';
+  ctx.setLineDash([6, 4]);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, ty(pi1));
+  ctx.lineTo(pad.l + plotW, ty(pi1));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // label
+  ctx.fillStyle = 'rgba(255,209,102,0.95)';
+  ctx.textAlign = 'right';
+  ctx.fillText('π_1 = ' + pi1.toFixed(4), pad.l + plotW - 6, ty(pi1) - 4);
+
+  // Curve P_1(t)
+  ctx.strokeStyle = '#00B4D8';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (var step = 0; step <= 50; step++) {
+    var v = p1AtT(p.p, p.q, p.p1_init, step);
+    if (v < 0) v = 0; if (v > 1) v = 1;
+    var x2 = tx(step);
+    var y2 = ty(v);
+    if (step === 0) ctx.moveTo(x2, y2);
+    else ctx.lineTo(x2, y2);
+  }
+  ctx.stroke();
+
+  // Discrete points
+  ctx.fillStyle = '#00B4D8';
+  for (var step2 = 0; step2 <= 50; step2 += 1) {
+    var v2 = p1AtT(p.p, p.q, p.p1_init, step2);
+    if (v2 < 0) v2 = 0; if (v2 > 1) v2 = 1;
+    ctx.beginPath();
+    ctx.arc(tx(step2), ty(v2), 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Current t marker (yellow)
+  var curV = p1AtT(p.p, p.q, p.p1_init, p.t);
+  if (curV < 0) curV = 0; if (curV > 1) curV = 1;
+  ctx.strokeStyle = '#FFD166';
+  ctx.fillStyle = '#FFD166';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(tx(p.t), pad.t);
+  ctx.lineTo(tx(p.t), pad.t + plotH);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(tx(p.t), ty(curV), 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,209,102,0.95)';
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('t=' + p.t + ', P_1=' + curV.toFixed(4), tx(p.t) + 8, ty(curV) - 6);
+
+  // Frame
+  ctx.strokeStyle = 'rgba(143,184,224,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(pad.l, pad.t, plotW, plotH);
+}
+
+function compute() {
+  var p = getParams();
+  if (!isFinite(p.p) || !isFinite(p.q)) return;
+  if (p.p + p.q < 1e-9) return;
+  var pi1 = pi1Of(p.p, p.q);
+  var pi2 = pi2Of(p.p, p.q);
+  var P1t = p1AtT(p.p, p.q, p.p1_init, p.t);
+  var tmix = mixingTime(p.p, p.q);
+
+  document.getElementById('statPi1').textContent = fmt4(pi1);
+  document.getElementById('statPi2').textContent = fmt4(pi2);
+  document.getElementById('statP1_t').textContent = fmt4(P1t);
+  document.getElementById('statP1_0').textContent = fmt4(p.p1_init);
+  document.getElementById('statMixing').textContent = fmt2(tmix);
+
+  drawState(p);
+  drawChart(p);
+}
+
+function animationStep() {
+  if (!playing) return;
+  var sl = document.getElementById('slT_steps');
+  var v = parseInt(sl.value, 10) + 1;
+  if (v > 50) v = 0;
+  sl.value = v;
+  updateSlider(sl, 'slT_stepsVal', 0, '');
+  compute();
+  setTimeout(function () {
+    if (playing) animId = requestAnimationFrame(animationStep);
+  }, 250);
+}
+
+function togglePlay() {
+  playing = !playing;
+  var btn = document.getElementById('playBtn');
+  if (playing) {
+    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    animId = requestAnimationFrame(animationStep);
+  } else {
+    btn.innerHTML = '<i class="fas fa-play"></i> ステップをスイープ';
+    if (animId) cancelAnimationFrame(animId);
+  }
+}
+
+function resetParams() {
+  playing = false;
+  if (animId) cancelAnimationFrame(animId);
+  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> ステップをスイープ';
+  var defs = { slP: 0.30, slQ: 0.40, slP1_init: 1.00, slT_steps: 10 };
+  Object.keys(defs).forEach(function (id) {
+    document.getElementById(id).value = defs[id];
+  });
+  updateSlider(document.getElementById('slP'), 'slPVal', 2, '');
+  updateSlider(document.getElementById('slQ'), 'slQVal', 2, '');
+  updateSlider(document.getElementById('slP1_init'), 'slP1_initVal', 2, '');
+  updateSlider(document.getElementById('slT_steps'), 'slT_stepsVal', 0, '');
+  compute();
+}
+
+window.addEventListener('resize', function () { resizeCanvases(); compute(); });
+
+resizeCanvases();
+compute();
+</script>
+
+<section class="explanation">
+  <h2>マルコフ連鎖シミュレーターとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">マルコフ連鎖って「未来は現在だけで決まる」やつですよね。それを 2 状態でやって何が面白いんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いいところに気づいた。2 状態は最小サイズだけど、定常分布・固有値・混合時間というマルコフ連鎖の主要な概念がすべて閉形式で書ける唯一のサイズなんだ。例えば $\pi_1 = q/(p+q)$ という式は、p=0.30, q=0.40 を入れれば手計算で 0.5714 が出る。これを数値だけじゃなく状態図と収束カーブで「動く絵」として理解するのが本ツールの目的だ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">スライダーで p+q を 1 に近づけると、収束カーブがすぐ平らになりますね。なんでですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">$\lambda_2 = 1-p-q$ が固有値で、これが 0 に近いと $\lambda_2^t$ が 1 ステップでほぼ消える。逆に p=q=0.01 みたいに 0 に近いと $\lambda_2 \approx 0.98$ になって $0.98^{10}=0.82$、$0.98^{50}=0.36$、ほとんど初期分布のままだ。$t_{\text{mix}}$ の式 $\ln(0.01)/\ln|\lambda_2|$ で見ると、$|\lambda_2|$ が 1 に近いほど分母が 0 に近づき発散する、というのが直感的に分かる。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">p+q を 2 に近づける（両方 0.99）と $\lambda_2 \approx -0.98$ で負になりますよね。何が起きるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">鋭い質問だ。負の固有値は「振動収束」を生む。$P_1(t)$ が $\pi_1$ の周りで 1 ステップごとに上下に振動しながら徐々に減衰する。再生ボタンでスイープすると、収束カーブがギザギザに振動するのが見える。これは周期 2 のマルコフ連鎖（バイパータイト）に近い状態で、純粋に周期的だと定常分布に収束しない。実用上は遅延再起や信号の交互変化を扱う場面で出てくる。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">PageRank もマルコフ連鎖って聞きました。これと何が違うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">本質は同じだ。PageRank は数十億ノードの巨大マルコフ連鎖で、各 Web ページが状態、リンクが遷移確率に対応する。求めるのは定常分布 $\pi$ で、それがページの「重要度」になる。本ツールの 2×2 行列を 10^9 × 10^9 にスケールアップしたものと思えばいい。実装はべき乗法（power iteration）で $\pi^{(t+1)} = \pi^{(t)} P$ を反復するだけで、本ツールの $P_1(t) = \pi_1 + (P_1(0)-\pi_1)\lambda^t$ を巨大次元でやっているだけだ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">なぜ定常分布が一意に存在するのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">2 状態マルコフ連鎖が「既約 (irreducible)」であるためには p>0 かつ q>0 が必要で、本ツールではスライダー範囲 0.01〜0.99 でこれを保証しています。さらに「非周期的 (aperiodic)」であれば（自己ループ 1−p>0 または 1−q>0 があれば自動的に成立）、Perron-Frobenius の定理から固有値 1 が単純で、対応する固有ベクトル（左固有ベクトル）が一意の定常分布 π となります。p+q=2 の極限では周期 2 になり収束しません（本ツールでは p+q≤1.98 の範囲）。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">混合時間と緩和時間 (relaxation time) の違いは？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">緩和時間は $\tau_{\text{rel}} = 1/(1-|\lambda_2|)$ で定義され、確率の差が $1/e \approx 0.368$ に減衰する特性時間です。混合時間 $t_{\text{mix}}$ は具体的なしきい値（本ツールでは 1%）に減衰するステップ数で、両者は $t_{\text{mix}} \approx \tau_{\text{rel}} \ln(1/\epsilon)$ の関係があります。本ツールの $t_{\text{mix}} = \ln(0.01)/\ln|\lambda_2|$ は ε=0.01 の場合の正確な離散ステップ数で、log-base による微小な丸め誤差で異なる文献の値と差が出ることがあります。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">CAE/信頼性工学とどう関係しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">マルコフ信頼性解析 (Markov reliability analysis) は冗長系の故障率と修理率から「稼働⇄故障」の遷移確率を作り、可用性 (availability) を定常分布 π_稼働 = μ/(λ+μ) として求めます。これは本ツールの π_1 = q/(p+q) と同じ式で、p ↔ 故障率 λ、q ↔ 修理率 μ に対応します。FMEA や FTA がツリー構造で組み合わせ確率を計算するのに対し、マルコフモデルは時間発展（過渡状態から定常状態への収束）を扱える点で補完的です。離散事象シミュレーション (DES) や信頼性ブロック図のバックエンドにも現れます。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">3 状態以上に拡張するとどうなりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">N 状態に拡張すると遷移行列は N×N になり、固有値は N 個（うち 1 つは必ず λ_1=1）出てきます。定常分布は左固有ベクトル $\pi P = \pi$ を解いて求めますが、3 状態以上では一般に閉形式が出ません。実装はべき乗法（$\pi^{(t+1)} = \pi^{(t)} P$ を反復）が標準で、PageRank も同じ手法です。混合時間は 2 番目に大きい固有値 $|\lambda_2|$（スペクトラルギャップ）で決まり、$t_{\text{mix}} \approx \ln(1/\epsilon)/(1-|\lambda_2|)$ となります。本ツールの 2×2 はその最小サイズで、すべての概念が手計算で確認できる利点があります。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>信頼性工学・保全計画：</strong>製造ラインの設備が「稼働 (Up)」と「故障 (Down)」を行き来する単純モデルでは、平均故障時間 MTTF = 1/p、平均修理時間 MTTR = 1/q から定常稼働率 (Availability) が A = q/(p+q) で計算できます。本ツールで p=0.05, q=0.50 にすると A=0.909 つまり 90.9% の稼働率が得られ、これは工場保全部門が KPI として日常的に使う数字です。3 状態以上（稼働・劣化・故障）に拡張すれば予防保全の最適化にも使えます。</p>
+    <p><strong>Web 検索・PageRank：</strong>Google PageRank は数百億 Web ページを状態とする超大規模マルコフ連鎖の定常分布を、ダンピング係数 0.85 のべき乗法で計算します。リンク構造が遷移行列、定常確率がページの重要度ランクとなり、本ツールの $\pi P = \pi$ を 10^11 次元で解いている形になります。レコメンドシステム（YouTube/Amazon の関連動画・商品）も同じ枠組みで、ランダムウォークによる定常分布として実装される例が多くあります。</p>
+    <p><strong>強化学習・MDP：</strong>マルコフ決定過程 (Markov Decision Process) は、エージェントの行動 a を加えた拡張で、Bellman 方程式 V(s) = max_a [r(s,a) + γ Σ P(s'|s,a) V(s')] により最適政策を求めます。Q-learning や SARSA、Deep Q-Network (DQN) はすべてマルコフ性を仮定しており、AlphaGo・自動運転・ChatGPT の RLHF も背景にあるのは MDP です。本ツールは「行動なし・報酬なし」の基本マルコフ連鎖で、その下準備として固有値解析を直感的に理解できます。</p>
+    <p><strong>自然言語処理・隠れマルコフモデル (HMM)：</strong>音声認識・品詞タグ付け・遺伝子配列解析で使われる HMM は、観測できない隠れ状態のマルコフ連鎖と、各状態からの観測確率を組み合わせたモデルです。Viterbi アルゴリズム（最尤状態列）と Baum-Welch (EM) で学習しますが、ベースとなる遷移行列の固有値解析は本ツールと同じ枠組みです。Cell phones の T9 入力予測や DNA メチル化解析もこの応用です。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最も多い誤解は、<strong>「定常分布に収束したら、そのあと状態は変動しない」</strong>と思うことです。実際には個々の遷移は確率的に起き続けており、長時間平均で状態 1 にいる時間の割合が π_1 に収束する、というのが正しい解釈です。例えば π_1=0.5714 は「100 ステップのうち約 57 ステップは状態 1」を意味し、毎ステップでは 1↔2 の遷移が確率 p, q で起き続けます。本ツールの確率カーブ P_1(t) は「無限個のサンプルパスをアンサンブル平均した期待値」であり、単一のサンプルパス（実現値）ではありません。</p>
+    <p>次に、<strong>「マルコフ性は過去をすべて忘れること」を「全履歴の情報がない」と誤解する</strong>ことです。マルコフ性 P(X_{t+1}|X_t, X_{t-1}, ...) = P(X_{t+1}|X_t) は「現在の状態 X_t に必要な情報がすべて凝縮されている」と解釈すべきで、過去の履歴は X_t に「埋め込まれて」います。例えば株価の単純なランダムウォークはマルコフですが、株価+前日変化率 (X_t, ΔX_t) を状態にすれば「前日変化率付きマルコフ」になり、より高次の情報を保持できます。状態空間設計が応用上の鍵です。</p>
+    <p>最後に、<strong>「混合時間の計算で得られた値を絶対視しない」</strong>こと。本ツールの $t_{\text{mix}} = \ln(0.01)/\ln|\lambda_2|$ は ε=0.01（1% しきい値）の選択に依存します。ε=0.05 にすれば値は約 65% に縮み、ε=0.001 にすれば 1.5 倍に伸びます。実用上は「99% 収束する目安」として使い、厳密な収束保証が必要な場合は全変動距離 (total variation) や χ² 距離で別途評価します。MCMC（マルコフ連鎖モンテカルロ）の事前バーンイン期間を決めるときも同様の注意が必要です。</p>
+  </div>
+</section>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="markov-chain.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/pca-2d.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">主成分分析（PCA）シミュレーター — 2D データの固有値分解</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">主成分分析（PCA）シミュレーターは、2次元相関データに対して共分散行列の固有値・固有ベクトルから主成分軸と寄与率をリアルタイム計算します。相関係数と標準偏差を変えて、データの主要な...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/linear-algebra-vis.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-vector-square"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">線形代数・行列変換ビジュアライザー</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">2×2行列の各成分をスライダーで操作し、2次元グリッドの回転・拡大・せん断をリアルタイムアニメーションで可視化。固有ベクトルが向きを変えない理由や、行列式（面積倍率）、固有値の意味が...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/matrix-operations.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-calculator"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">行列演算・固有値 計算機</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">行列演算・固有値計算機なら、行列の加算・減算・乗算から行列式・逆行列・転置、固有値・固有ベクトルの計算まで、ブラウザ上で即時処理。2×2から4×4の行列に対応し、構造解析における剛性...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/matrix-transform.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-border-all"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">行列変換ビジュアライザー</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">行列変換ビジュアライザー「NovaSolver」は、2×2行列による線形変換を幾何学的にリアルタイム可視化。回転やスケーリング、せん断、固有ベクトルを直感的なアニメーションで理解でき...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/principal-stress-3d.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-wave-square"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">3D 主応力 シミュレーター — 応力テンソルの固有値</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">3 次元応力テンソル (σx, σy, σz, τxy) から 3 つの主応力 σ1≥σ2≥σ3 と最大せん断応力 τ_max を固有値解析でリアルタイム計算し、3 つのモール円と主...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/eigenvalue-vibration.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-wave-square"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">固有値・振動解析インタラクティブシミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">NovaSolverの固有値・振動解析シミュレーターは、バネ質量系の固有振動数とモード形状をリアルタイムで計算し、アニメーション表示する無料オンライン計算機です。2〜5自由度の振動解...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>遷移確率P(1→1)をslPで設定します。例：機械の故障率が0.92の場合、故障状態から正常状態への復帰確率は0.08になります。</li>
+<li>遷移確率Q(2→2)をslQで設定します。通信システムではビット誤り率0.95が継続する確率に対応します。</li>
+<li>初期状態P₁(0)をslP1_initで指定し、シミュレーション時間ステップ数をslT_stepsで入力して実行します。定常分布π₁、π₂と混合時間t_mix(99%)がリアルタイム計算されます。</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>製造ラインの品質管理を想定します。P=0.88（良好状態継続確率）、Q=0.75（不良状態継続確率）、初期状態P₁(0)=1.0、計算ステップ数50の場合：定常分布はπ₁=0.60、π₂=0.40となり、混合時間は約15ステップで99%収束します。固有値λ₂=0.63から減衰速度exp(-0.46t)で評価でき、エンジニアは平衡到達時間を予測できます。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>通信ネットワーク設計では混合時間が短いほど（t_mix &lt;10ステップ）システムが安定です。P+Q&gt;1.5なら固有値が小さくなり、状態遷移が速く収束します。</li>
+<li>在庫管理システムでP、Qが0.5未満の場合、定常分布に到達しにくく、初期状態の影響が長く残ります。必ずt_mixで検証してください。</li>
+<li>機械保全では遷移行列の対称性を確認します。P=Q=0.9なら完全対称で、定常分布はπ₁=π₂=0.5になり、信頼性評価が単純化されます。</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script src="/tools/tool-ux-template.js?v20260517r4" defer></script>
+</body>
+</html>

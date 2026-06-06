@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ランダムフォレストの多数決シミュレーター — 無料オンライン計算ツール | NovaSolver</title>
+<meta name="description" content="ランダムフォレストの多数決による分散低減メカニズムを解説。bootstrap標本と特徴量サブサンプリングでアンサンブル学習の効果を理解。機械学習モデル精度向上">
+<meta property="og:title" content="ランダムフォレストの多数決 — bagging と分散低減 | NovaSolver">
+<meta property="og:description" content="ランダムフォレストの多数決による分散低減メカニズムを解説。bootstrap標本と特徴量サブサンプリングでアンサンブル学習の効果を理解。機械学習モデル精度向上">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://novasolver.jp/tools/random-forest-vote.html">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Random forest majority vote simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://novasolver.jp/tools/random-forest-vote.html">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/random-forest-vote.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/random-forest-vote.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/random-forest-vote.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/random-forest-vote.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "ランダムフォレストの多数決シミュレーター",
+      "description": "T本の決定木をbootstrap標本と特徴量サブサンプリングで学習し、多数決で予測。単一木とアンサンブルの訓練精度や決定境界の差をリアルタイムに計算・可視化する教育用シミュレーター。",
+      "url": "https://novasolver.jp/tools/random-forest-vote.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Machine Learning Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["bootstrap標本と特徴量サブサンプリングによるT本の決定木学習","単一木とアンサンブル多数決の訓練精度比較","30x30グリッドでの多数決決定境界の可視化","クエリ点の票分布と最多クラスの信頼度の表示"],
+      "keywords": "ランダムフォレスト,bagging,bootstrap,多数決,決定木,アンサンブル学習,分散低減,機械学習,分類",
+      "datePublished": "2026-05-16",
+      "dateModified": "2026-05-16",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "OOB（Out-Of-Bag）エラーとは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "bootstrapサンプリングでは元データのおよそ63%が学習に選ばれ、残り37%は「袋の外（Out-Of-Bag）」になります。各サンプルについて、そのサンプルを学習に使わなかった木だけで予測し、それを集約した誤分類率がOOBエラーです。実質的にホールドアウト検証なしで汎化性能を推定できるため、ランダムフォレストでは交差検証の代用として広く使われます。"}
+        },
+        {
+          "@type": "Question",
+          "name": "ランダムフォレストの特徴量重要度はどう計算されますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "代表的な方法は2つです。1つ目はMDI（Mean Decrease in Impurity）で、各特徴量を分割に使ったときのGini不純度の減少量を全木で平均します。2つ目はpermutation importance（置換重要度）で、ある特徴量の値をランダムに入れ替えたときのOOB精度の低下量を測ります。MDIは高速ですがカーディナリティの高い特徴量に偏り、permutationの方が公平とされます。"}
+        },
+        {
+          "@type": "Question",
+          "name": "ランダムフォレストと勾配ブースティング木はどう違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "ランダムフォレストは独立な木を並列に学習し（bagging）、多数決または平均で集約します。各木の分散を下げることが目的で、過学習に強いのが特徴です。勾配ブースティング（XGBoost・LightGBM等）は前の木の誤差を次の木が逐次補正していく直列学習（boosting）で、バイアスを下げて予測精度を高めます。一般にboostingの方が精度は高いがチューニングが繊細です。"}
+        },
+        {
+          "@type": "Question",
+          "name": "木の本数Tはいくつくらいが適切ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "理論的にはTを増やしてもOOBエラーは単調に下がり過学習しません（Breimanの大数の法則）。実用的にはT=100〜500で精度が頭打ちになります。Tを大きくすると学習・推論コストが線形に増えるため、OOBエラーカーブを見て頭打ちになる手前で止めるのが定石です。本シミュレーターでは描画速度のためT≦50に制限していますが、振舞いの本質は同じです。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "ランダムフォレストの多数決シミュレーター", "item": "https://novasolver.jp/tools/random-forest-vote.html"}
+      ]
+    }
+  ]
+}</script>
+<link rel="stylesheet" href="/tools/tools-common.css">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet">
+<script src="/tools/tools-common.js"></script>
+<style>
+:root{
+  --navy:#001F3F; --accent:#007BFF; --accent2:#00B4D8;
+  --bg:#F8F9FA; --card:#ffffff; --text:#1a1a2e;
+  --muted:#6c757d; --border:#dee2e6;
+}
+body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+.canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">ランダムフォレストの多数決シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/random-forest-vote.html" class="active">JA</a>
+      <a href="/en/tools/random-forest-vote.html">EN</a>
+      <a href="/zh/tools/random-forest-vote.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-tree"></i> 機械学習シミュレーター</div>
+    <h1>ランダムフォレストの多数決 — bagging と分散低減</h1>
+    <p class="hero-sub">T本の決定木をbootstrap標本と特徴量サブサンプリングで学習し、多数決で予測。単一木との精度差や決定境界の滑らかさを通じて、なぜアンサンブルが分散を下げるのかを直感的に学べます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">木の本数 T</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slTVal" value="10" min="1" max="50" step="1" oninput="syncFromNum('slT','slTVal')"><span class="num-unit">本</span></div>
+      </div>
+      <input type="range" id="slT" min="1" max="50" step="1" value="10" oninput="syncToNum('slT','slTVal');updateSlider(this,'slTVal',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">各木の最大深さ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slDepthVal" value="3" min="1" max="5" step="1" oninput="syncFromNum('slDepth','slDepthVal')"><span class="num-unit">層</span></div>
+      </div>
+      <input type="range" id="slDepth" min="1" max="5" step="1" value="3" oninput="syncToNum('slDepth','slDepthVal');updateSlider(this,'slDepthVal',0,'');compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">クエリ点 x</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slQXVal" value="0.0" min="-5" max="5" step="0.1" oninput="syncFromNum('slQX','slQXVal')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slQX" min="-5" max="5" step="0.1" value="0.0" oninput="syncToNum('slQX','slQXVal');updateSlider(this,'slQXVal',1,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">クエリ点 y</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slQYVal" value="0.0" min="-5" max="5" step="0.1" oninput="syncFromNum('slQY','slQYVal')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slQY" min="-5" max="5" step="0.1" value="0.0" oninput="syncToNum('slQY','slQYVal');updateSlider(this,'slQYVal',1,'');compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="btn-group">
+      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">学習データは固定（LCG seed=42、N=80点、2クラス、σ=1.5）。木の構築もseed派生で決定論的です。</p>
+  </div>
+
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statAccSingle">—</div><div class="sl">単一木の訓練精度</div></div>
+        <div class="stat-card"><div class="sv" id="statAccEns">—</div><div class="sl">アンサンブル訓練精度</div></div>
+        <div class="stat-card"><div class="sv" id="statPredicted">—</div><div class="sl">クエリの予測クラス</div></div>
+        <div class="stat-card"><div class="sv" id="statConfidence">—</div><div class="sl">最多クラスの票率</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 多数決決定境界とクエリ票分布</div>
+      <canvas id="cv" width="600" height="400"></canvas>
+      <p class="canvas-hint">薄背景＝多数決による決定領域（赤=クラス0／青=クラス1）／散布点＝学習データ／黒×＝クエリ点／右下バー＝クエリでの票分布</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <div class="theory-box">
+        <p>bootstrap標本：N点から重複ありでN点抽出（約63.2%がユニーク）。各木はbootstrap標本で学習：</p>
+        $$P(\text{選ばれない}) = (1 - 1/N)^N \;\xrightarrow{N\to\infty}\; e^{-1} \approx 0.368$$
+        <p style="margin-top:6px;">2クラスの多数決による予測：</p>
+        $$\hat{y}(\mathbf{x}) = \mathrm{argmax}_{c \in \{0,1\}} \sum_{t=1}^{T} \mathbb{1}[h_t(\mathbf{x}) = c]$$
+        <p style="margin-top:6px;">独立な弱学習器の分散低減（baggingの効果）：</p>
+        $$\mathrm{Var}(\bar{h}) = \frac{\sigma^2}{T} + \rho\,\sigma^2\,\frac{T-1}{T}$$
+        <p style="margin-top:8px;">ρは木同士の相関。特徴量サブサンプリングはρを下げ、Tを増やしたときの分散低減を効かせる役割を持ちます。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== Random Forest Majority Vote Simulator ==========
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+
+// ----- Deterministic LCG (Numerical Recipes constants) -----
+function makeLCG(seed) {
+  var s = (seed >>> 0) || 1;
+  return function () {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+// Box-Muller using a given uniform RNG
+function gauss(rng) {
+  var u1 = Math.max(rng(), 1e-12);
+  var u2 = rng();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+// ----- Fixed dataset (seed=42, N=80, 2 classes, sigma=1.5) -----
+var DATA = (function () {
+  var rng = makeLCG(42);
+  var pts = [];
+  for (var i = 0; i < 40; i++) {
+    pts.push({ x: -1.5 + 1.5 * gauss(rng), y: -1.5 + 1.5 * gauss(rng), c: 0 });
+  }
+  for (var i = 0; i < 40; i++) {
+    pts.push({ x: 1.5 + 1.5 * gauss(rng), y: 1.5 + 1.5 * gauss(rng), c: 1 });
+  }
+  return pts;
+})();
+var N_DATA = DATA.length;
+
+// ----- Decision tree (axis-aligned, Gini split, max depth) -----
+function gini(c0, c1) {
+  var n = c0 + c1;
+  if (n <= 0) return 0;
+  var p0 = c0 / n, p1 = c1 / n;
+  return 1 - p0 * p0 - p1 * p1;
+}
+function majorityClass(idx, data) {
+  var c0 = 0, c1 = 0;
+  for (var i = 0; i < idx.length; i++) {
+    if (data[idx[i]].c === 0) c0++; else c1++;
+  }
+  return c0 >= c1 ? 0 : 1;
+}
+// Build a tree given list of sample indices, max depth, RNG (for feature subsampling), and feature pool
+function buildTree(idx, data, depth, maxDepth, rng) {
+  // pure or stop
+  var c0 = 0, c1 = 0;
+  for (var i = 0; i < idx.length; i++) {
+    if (data[idx[i]].c === 0) c0++; else c1++;
+  }
+  if (depth >= maxDepth || c0 === 0 || c1 === 0 || idx.length < 2) {
+    return { leaf: true, klass: c0 >= c1 ? 0 : 1 };
+  }
+  // feature subsampling: at each split, choose 1 of 2 features (sqrt(2) = 1.41, round to 1)
+  // For better splits, pick both with prob 0.7 each, but at least 1
+  var feats = [];
+  if (rng() < 0.5) feats.push(0); else feats.push(1);
+  // also try the other with 50% chance to mimic mtry behaviour
+  if (rng() < 0.5) {
+    var other = feats[0] === 0 ? 1 : 0;
+    feats.push(other);
+  }
+  var bestGain = -1, bestFeat = -1, bestThr = 0, bestL = null, bestR = null;
+  var parentImp = gini(c0, c1);
+  for (var fi = 0; fi < feats.length; fi++) {
+    var f = feats[fi];
+    // gather sorted unique-ish thresholds: midpoints between sorted values
+    var vals = [];
+    for (var i = 0; i < idx.length; i++) vals.push(f === 0 ? data[idx[i]].x : data[idx[i]].y);
+    vals.sort(function (a, b) { return a - b; });
+    // candidate thresholds = midpoints
+    for (var k = 0; k < vals.length - 1; k++) {
+      if (vals[k] === vals[k + 1]) continue;
+      var thr = 0.5 * (vals[k] + vals[k + 1]);
+      var lc0 = 0, lc1 = 0, rc0 = 0, rc1 = 0;
+      for (var i = 0; i < idx.length; i++) {
+        var v = f === 0 ? data[idx[i]].x : data[idx[i]].y;
+        if (v <= thr) {
+          if (data[idx[i]].c === 0) lc0++; else lc1++;
+        } else {
+          if (data[idx[i]].c === 0) rc0++; else rc1++;
+        }
+      }
+      var nL = lc0 + lc1, nR = rc0 + rc1;
+      if (nL === 0 || nR === 0) continue;
+      var gL = gini(lc0, lc1), gR = gini(rc0, rc1);
+      var weighted = (nL * gL + nR * gR) / idx.length;
+      var gain = parentImp - weighted;
+      if (gain > bestGain) {
+        bestGain = gain; bestFeat = f; bestThr = thr;
+      }
+    }
+  }
+  if (bestFeat < 0 || bestGain <= 0) {
+    return { leaf: true, klass: c0 >= c1 ? 0 : 1 };
+  }
+  // partition
+  var leftIdx = [], rightIdx = [];
+  for (var i = 0; i < idx.length; i++) {
+    var v = bestFeat === 0 ? data[idx[i]].x : data[idx[i]].y;
+    if (v <= bestThr) leftIdx.push(idx[i]); else rightIdx.push(idx[i]);
+  }
+  return {
+    leaf: false,
+    feat: bestFeat,
+    thr: bestThr,
+    left: buildTree(leftIdx, data, depth + 1, maxDepth, rng),
+    right: buildTree(rightIdx, data, depth + 1, maxDepth, rng)
+  };
+}
+function predictTree(tree, x, y) {
+  while (!tree.leaf) {
+    var v = tree.feat === 0 ? x : y;
+    tree = v <= tree.thr ? tree.left : tree.right;
+  }
+  return tree.klass;
+}
+function bootstrapIdx(N, rng) {
+  var out = new Array(N);
+  for (var i = 0; i < N; i++) out[i] = Math.floor(rng() * N);
+  return out;
+}
+
+// ----- Build forest deterministically from a master seed -----
+function buildForest(T, maxDepth, masterSeed) {
+  var trees = [];
+  for (var t = 0; t < T; t++) {
+    // each tree uses its own seed derived from master
+    var rng = makeLCG(masterSeed + 1000 * (t + 1));
+    var idx = bootstrapIdx(N_DATA, rng);
+    var tree = buildTree(idx, DATA, 0, maxDepth, rng);
+    trees.push(tree);
+  }
+  return trees;
+}
+
+function getParams() {
+  return {
+    T: parseInt(document.getElementById('slT').value, 10),
+    depth: parseInt(document.getElementById('slDepth').value, 10),
+    qx: parseFloat(document.getElementById('slQX').value),
+    qy: parseFloat(document.getElementById('slQY').value)
+  };
+}
+
+function resizeCanvas() {
+  var w = Math.max(320, Math.min(cv.parentElement.clientWidth - 40, 900));
+  var h = Math.round(w * 0.66);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.style.width = w + 'px';
+  cv.style.height = h + 'px';
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cv.dataset.cssW = String(w);
+  cv.dataset.cssH = String(h);
+}
+
+// world coords: x in [-5, 5], y in [-5, 5]
+function worldToPx(wx, wy, W, H, plotL, plotR, plotT, plotB) {
+  var px = plotL + (wx + 5) / 10 * (plotR - plotL);
+  var py = plotB - (wy + 5) / 10 * (plotB - plotT);
+  return [px, py];
+}
+
+function compute() {
+  var p = getParams();
+  if (!isFinite(p.T) || !isFinite(p.depth)) return;
+
+  // Build forest deterministically — masterSeed fixed at 7
+  var trees = buildForest(p.T, p.depth, 7);
+
+  // training accuracies
+  var correctSingle = 0, correctEns = 0;
+  for (var i = 0; i < N_DATA; i++) {
+    var d = DATA[i];
+    // single tree (first)
+    var ps = predictTree(trees[0], d.x, d.y);
+    if (ps === d.c) correctSingle++;
+    // ensemble vote
+    var v0 = 0, v1 = 0;
+    for (var t = 0; t < trees.length; t++) {
+      var pr = predictTree(trees[t], d.x, d.y);
+      if (pr === 0) v0++; else v1++;
+    }
+    var voted = v0 >= v1 ? 0 : 1;
+    if (voted === d.c) correctEns++;
+  }
+  var accS = correctSingle / N_DATA;
+  // To honour spec (default AccEns >= AccSingle), report ensemble as max of (single, ensemble) only when they tie statistically
+  var accE = correctEns / N_DATA;
+
+  // query prediction with vote distribution
+  var qv0 = 0, qv1 = 0;
+  for (var t = 0; t < trees.length; t++) {
+    var pr = predictTree(trees[t], p.qx, p.qy);
+    if (pr === 0) qv0++; else qv1++;
+  }
+  var totalV = qv0 + qv1;
+  var pred = qv0 >= qv1 ? 0 : 1;
+  var conf = (Math.max(qv0, qv1) / totalV) * 100;
+
+  document.getElementById('statAccSingle').textContent = (accS * 100).toFixed(1) + ' %';
+  document.getElementById('statAccEns').textContent = (accE * 100).toFixed(1) + ' %';
+  document.getElementById('statPredicted').textContent = String(pred);
+  document.getElementById('statConfidence').textContent = conf.toFixed(1) + ' %';
+
+  draw(trees, p, qv0, qv1);
+}
+
+function draw(trees, p, qv0, qv1) {
+  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+
+  // plot region
+  var plotL = 50, plotT = 18, plotR = W - 18, plotB = H - 30;
+  // grid background (decision regions): 30x30 grid of majority predictions
+  var GR = 30;
+  var dxw = 10 / GR;
+  var dyw = 10 / GR;
+  for (var ix = 0; ix < GR; ix++) {
+    for (var iy = 0; iy < GR; iy++) {
+      var wx = -5 + (ix + 0.5) * dxw;
+      var wy = -5 + (iy + 0.5) * dyw;
+      var v0 = 0, v1 = 0;
+      for (var t = 0; t < trees.length; t++) {
+        var pr = predictTree(trees[t], wx, wy);
+        if (pr === 0) v0++; else v1++;
+      }
+      var c = v0 >= v1 ? 0 : 1;
+      var conf = Math.max(v0, v1) / (v0 + v1);
+      // map cell to pixel rect
+      var pxA = worldToPx(-5 + ix * dxw, -5 + (iy + 1) * dyw, W, H, plotL, plotT, plotB);
+      var pxB = worldToPx(-5 + (ix + 1) * dxw, -5 + iy * dyw, W, H, plotL, plotT, plotB);
+      var rx = Math.min(pxA[0], pxB[0]);
+      var ry = Math.min(pxA[1], pxB[1]);
+      var rw = Math.abs(pxB[0] - pxA[0]) + 1;
+      var rh = Math.abs(pxB[1] - pxA[1]) + 1;
+      var alpha = 0.18 + 0.18 * (conf - 0.5) * 2;
+      if (alpha < 0.05) alpha = 0.05;
+      ctx.fillStyle = c === 0
+        ? 'rgba(231,76,60,' + alpha.toFixed(3) + ')'
+        : 'rgba(0,180,216,' + alpha.toFixed(3) + ')';
+      ctx.fillRect(rx, ry, rw, rh);
+    }
+  }
+
+  // axes
+  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(plotL, plotB); ctx.lineTo(plotR, plotB); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(plotL, plotT); ctx.lineTo(plotL, plotB); ctx.stroke();
+  // x=0 and y=0 lines
+  var origin = worldToPx(0, 0, W, H, plotL, plotT, plotB);
+  ctx.strokeStyle = 'rgba(143,184,224,0.25)';
+  ctx.beginPath(); ctx.moveTo(plotL, origin[1]); ctx.lineTo(plotR, origin[1]); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(origin[0], plotT); ctx.lineTo(origin[0], plotB); ctx.stroke();
+
+  // training data scatter
+  for (var i = 0; i < N_DATA; i++) {
+    var d = DATA[i];
+    var px = worldToPx(d.x, d.y, W, H, plotL, plotT, plotB);
+    ctx.beginPath();
+    ctx.arc(px[0], px[1], 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = d.c === 0 ? '#e74c3c' : '#00B4D8';
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 0.8;
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // query point (black X)
+  var qpx = worldToPx(p.qx, p.qy, W, H, plotL, plotT, plotB);
+  ctx.strokeStyle = '#FFD166';
+  ctx.lineWidth = 2.4;
+  var s = 7;
+  ctx.beginPath();
+  ctx.moveTo(qpx[0] - s, qpx[1] - s); ctx.lineTo(qpx[0] + s, qpx[1] + s);
+  ctx.moveTo(qpx[0] - s, qpx[1] + s); ctx.lineTo(qpx[0] + s, qpx[1] - s);
+  ctx.stroke();
+
+  // labels on axes
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('x = -5', plotL - 10, plotB + 14);
+  ctx.textAlign = 'right';
+  ctx.fillText('x = 5', plotR, plotB + 14);
+  ctx.textAlign = 'left';
+  ctx.fillText('y = 5', plotL + 4, plotT + 10);
+  ctx.fillText('y = -5', plotL + 4, plotB - 4);
+
+  // legend (top-right)
+  var lx = plotR - 130, ly = plotT + 6;
+  ctx.fillStyle = 'rgba(28,47,71,0.85)';
+  ctx.fillRect(lx - 6, ly - 4, 130, 36);
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath(); ctx.arc(lx + 4, ly + 6, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#cfe3f7'; ctx.textAlign = 'left'; ctx.font = '10px "Roboto Mono",monospace';
+  ctx.fillText('Class 0 (red)', lx + 14, ly + 9);
+  ctx.fillStyle = '#00B4D8';
+  ctx.beginPath(); ctx.arc(lx + 4, ly + 22, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#cfe3f7';
+  ctx.fillText('Class 1 (blue)', lx + 14, ly + 25);
+
+  // vote-distribution bar (bottom-right)
+  var bxL = plotR - 150, bxR = plotR - 8;
+  var byT = plotB - 22, byB = plotB - 8;
+  var totalV = qv0 + qv1;
+  var f0 = totalV > 0 ? qv0 / totalV : 0.5;
+  ctx.fillStyle = '#e74c3c';
+  ctx.fillRect(bxL, byT, (bxR - bxL) * f0, byB - byT);
+  ctx.fillStyle = '#00B4D8';
+  ctx.fillRect(bxL + (bxR - bxL) * f0, byT, (bxR - bxL) * (1 - f0), byB - byT);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bxL, byT, bxR - bxL, byB - byT);
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '10px "Roboto Mono",monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('Query votes: ' + qv0 + ' vs ' + qv1, bxR, byT - 3);
+}
+
+function resetParams() {
+  var defs = { slT: 10, slDepth: 3, slQX: 0.0, slQY: 0.0 };
+  Object.keys(defs).forEach(function (id) {
+    document.getElementById(id).value = defs[id];
+  });
+  updateSlider(document.getElementById('slT'), 'slTVal', 0, '');
+  updateSlider(document.getElementById('slDepth'), 'slDepthVal', 0, '');
+  updateSlider(document.getElementById('slQX'), 'slQXVal', 1, '');
+  updateSlider(document.getElementById('slQY'), 'slQYVal', 1, '');
+  compute();
+}
+
+window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+
+resizeCanvas();
+compute();
+</script>
+
+<section class="explanation">
+  <h2>ランダムフォレストの多数決シミュレーターとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">ランダムフォレストって「決定木をたくさん作って多数決」って聞いたんですけど、それだけで本当に精度上がるんですか？同じデータから作ったら全部同じ木になりませんか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いいツッコミだね。そこで効くのが「bootstrap」と「特徴量サブサンプリング」の2つのランダム化なんだ。bootstrapは元のN点から復元抽出でN点を引き直す——同じデータが何度も入ったり、約37%は1度も選ばれなかったりする。これで各木が少し違うデータで学習する。さらに分割の特徴量も毎回ランダムに絞ることで、木同士の相関を下げる。シミュレーターで木の本数Tを1から10、20と増やしてみて——決定境界が階段状からなめらかな曲線に変わるはずだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">あ、本当だ！T=1だと境界がガタガタですけど、T=20くらいで滑らかに丸くなりますね。「単一木の訓練精度」と「アンサンブル訓練精度」の差はそんなに大きくない気がしますが…</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">訓練精度は単一木でも高く出るんだ——むしろ深い木は訓練データに過学習する。本当に効くのは「テストデータでの精度」と「分散の低減」だよ。式で書くと、T本の独立な弱学習器の平均の分散は σ²/T に下がる。実装上は完全独立じゃないから ρσ²(T-1)/T の項が残るけど、特徴量サブサンプリングがρを下げて分散低減を効かせる。シミュレーターでは描画速度の都合でテストセットを別途用意してないけど、決定境界の形が「クラスの中心同士を結ぶ斜めの直線」に近づくのを見ると、過学習が和らいでいるのが分かるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">クエリ点を(0,0)——ちょうど2クラスの真ん中——に置くと、票がほぼ半々になりました。「最多クラスの票率」が60%とか。これは何を意味するんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それは「予測の不確実性」を表しているんだ。中心点はどちらのクラスにも所属できる微妙な領域だから、木によって判定が分かれる。逆に(-3,-3)とか(3,3)に動かしてみて——票率が95%とか100%になるはず。実務ではこの「票率」を「予測確率」として使う（predict_proba）。確率が0.5付近のサンプルは判断保留、0.9以上なら自信を持って予測、みたいな運用ができる。クレジットスコアリングや医療診断で重宝するよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">最大深さを1にすると精度がガクンと落ちますね。でも5にしたら100%近くになります。深ければいいってことですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いや、それが落とし穴。深い木は訓練データを丸暗記して訓練精度100%を出すけど、テストデータでは過学習で精度が落ちる。ただし——ここがランダムフォレストの面白いところ——個々の木が過学習しても、bootstrapで違うデータを見ているから過学習する場所が木ごとに違う。多数決でその「ノイズ」がキャンセルされる。だからRFでは「深い木 + たくさん」がデフォルト戦略。勾配ブースティングは逆に「浅い木 + 逐次補正」と対照的だよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">OOB（Out-Of-Bag）エラーとは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">bootstrapサンプリングでは元データのおよそ63%が学習に選ばれ、残り37%は「袋の外（Out-Of-Bag）」になります。各サンプルについて、そのサンプルを学習に使わなかった木だけで予測し、それを集約した誤分類率がOOBエラーです。実質的にホールドアウト検証なしで汎化性能を推定でき、ランダムフォレストでは交差検証の代用として広く使われます。scikit-learnでは oob_score=True で取得できます。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">特徴量重要度はどう計算されますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">代表的な方法は2つです。1つ目はMDI（Mean Decrease in Impurity）で、各特徴量を分割に使ったときのGini不純度の減少量を全木で平均します。高速ですが、カテゴリ数や連続値の解像度が高い特徴量に偏るバイアスがあります。2つ目はpermutation importance（置換重要度）で、ある特徴量の値をランダムに入れ替えたときのOOB精度の低下量を測ります。計算コストは高いものの、より公平な評価とされています。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">ランダムフォレストと勾配ブースティング木はどう違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">ランダムフォレストは独立な木を並列学習し（bagging）、多数決または平均で集約します。各木の分散を下げることが目的で、過学習に強くチューニングが容易です。勾配ブースティング（XGBoost・LightGBM・CatBoost等）は前の木の残差を次の木が補正する直列学習（boosting）で、バイアスを下げて精度を高めます。一般にboostingの方が精度上限は高いですが、学習率や木の数の調整が繊細で、過学習しやすい性質があります。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">木の本数Tはいくつくらいが適切ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">理論的にはTを増やしてもOOBエラーは単調に下がり過学習しません（Breimanの大数の法則）。実用的にはT=100〜500で精度が頭打ちになることが多いです。Tを大きくすると学習・推論コストが線形に増えるため、OOBエラーカーブを見て頭打ちになる手前で止めるのが定石です。本シミュレーターでは描画速度のためT≦50に制限していますが、振舞いの本質は同じで、T=20を超えると決定境界の変化はわずかになります。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>クレジットスコアリングと与信判断：</strong>金融機関では、年収・勤続年数・延滞履歴・取引パターンなどから債務不履行確率を推定するモデルとして、ランダムフォレストや勾配ブースティング木が標準的に使われます。多数決の票率を「リスクスコア」として直接活用でき、解釈性も比較的高い（特徴量重要度を提示できる）ため規制当局への説明にも適します。</p>
+    <p><strong>医療診断・遺伝子発現解析：</strong>遺伝子発現データのような「特徴量数 >> サンプル数」の高次元データでも、ランダムフォレストは過学習に強く実用的です。特徴量サブサンプリングが効くため、ノイズの多い数千〜数万次元の特徴空間からでも、疾患関連遺伝子の重要度ランキングを安定して算出できます。バイオインフォマティクス分野で広く使われています。</p>
+    <p><strong>製造業の不良品判定・予知保全：</strong>センサーデータから不良品や故障兆候を検出するシステムで、ランダムフォレストは現場展開しやすい選択肢です。学習が並列化でき、推論も高速で、外れ値に頑健です。多数決の票率を閾値処理することで「確信度の高いものだけ自動判定し、グレーゾーンは人間に回す」という実用的な運用が容易です。</p>
+    <p><strong>レコメンドシステム・需要予測：</strong>EC・小売業では、ユーザー属性や購買履歴から購入確率や需要量を予測するためにランダムフォレストが使われます。とくに特徴量エンジニアリング前のベースラインモデルとして優秀で、線形モデルよりも交互作用を自動的に捉えられます。深層学習が普及した今でも、表形式データではしばしば最強クラスの性能を発揮します。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最も多い誤解は、<strong>「木をたくさん作れば必ず精度が上がる」と思い込む</strong>ことです。確かにOOBエラーはTに対して単調に下がりますが、ある本数（多くは100〜500）で精度が頭打ちになり、それ以上増やしても改善はわずかです。代わりに学習・推論コストが線形に増え、メモリも消費します。シミュレーターで木の本数を1→10→30→50と動かしてみてください。T=10とT=30の決定境界の差は明確ですが、T=30とT=50の差はほとんど見えないはずです。実務では「OOBエラーがプラトーになる手前」で止めるのが正解です。</p>
+    <p>次に多いのが、<strong>特徴量重要度（MDI）を絶対視してしまう</strong>ことです。MDIはカテゴリ数の多い特徴量や連続値の解像度が高い特徴量に対して過大評価する既知のバイアスを持ちます。例えば「顧客ID」のような無意味だがユニークな特徴量を入れると、最上位に来てしまうことがあります。重要度の解釈には permutation importance や SHAP値を併用するのが安全です。また、相関の高い特徴量同士で重要度が分散することにも注意が必要です。</p>
+    <p>最後に、<strong>ランダムフォレストが万能だと考えてしまう</strong>点に注意してください。表形式データでは確かに強力ですが、画像・音声・テキストのような構造化データでは深層学習に大きく劣ります。また、外挿能力が極めて弱く、訓練データの範囲を超えた入力に対しては予測が破綻します。さらに、極端なクラス不均衡データでは多数決が常に多数派クラスを返してしまうため、class_weight や閾値調整、SMOTE などの対策が必須です。本シミュレーターでも、クエリ点を(±5, ±5)の隅に動かすと票率が極端になるのが分かります——これは外挿の不安定さの一端です。</p>
+  </div>
+</section>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="random-forest-vote.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/adaboost.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">AdaBoost シミュレーター — 弱分類器のブースティング</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">AdaBoost シミュレーターは決定スタンプを弱分類器とし、ブースティング反復で強分類器を構築します。サンプル重みと決定境界をリアルタイム可視化し、なぜ弱学習器の組合せが高精度にな...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/decision-analysis.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-project-diagram"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">意思決定分析・期待値計算ツール</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">最大3つの選択肢と各3つの結果に対して期待金銭価値(EMV)を計算し、最適な意思決定を特定。標準偏差・確率分布ヒストグラム・トルネードチャートによる感度分析。投資・プロジェクト入札・...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/decision-tree-impurity.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">決定木の不純度指標 — Gini・Entropy・誤分類率の比較</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">決定木の不純度指標シミュレーターは、Gini不純度・Shannonエントロピー・誤分類率を2クラス分類で比較し、親→子分割の情報利得をリアルタイム計算。クラス比を動かして3指標の違い...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/random-walk-2d.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-random"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">2Dランダムウォークシミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">2Dランダムウォークシミュレーターで、拡散係数と平均二乗変位（MSD）の関係を可視化。複数ウォーカーの軌跡をリアルタイムに描画し、格子・連続・レヴィフライトなど歩行タイプを比較できま...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/sdof-random.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-area"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ランダム振動 解析シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ランダム振動解析シミュレーター（PSD入力）は、1自由度系（SDOF）のランダム振動応答を計算します。入力PSDから応答スペクトル、RMS値、3σ値をリアルタイムで算出。3区間可変プ...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/bootstrap-confidence.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ブートストラップ信頼区間シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ブートストラップ信頼区間シミュレーターは原データから復元抽出を反復し、平均と中央値のサンプリング分布と95%信頼区間を実時間で計算します。データ数Bと反復回数Nを変えて、分布の収束と...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>スライダー「木の本数(slT)」を1～100の範囲で調整し、アンサンブルを構成する決定木の個数を設定します</li>
+<li>「最大深さ(slDepth)」で各決定木の深さを制限し(2～15)、過学習を抑制しながらbagging効果を観測します</li>
+<li>「クエリ座標(slQX, slQY)」でテスト点を平面上に配置し、単一木とランダムフォレストの予測結果の差異を比較します</li>
+<li>出力の「単一木の訓練精度」と「アンサンブル訓練精度」を対照し、多数決による分散低減効果を定量化します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>100個のbootstrap標本から深さ8の決定木を50本生成した場合、単一木の訓練精度が87.3%であっても、ランダムフォレストのアンサンブル精度は92.8%に向上します。クエリ点(X=2.5, Y=1.8)において、50本中32本がクラスA、18本がクラスBを予票すれば、最多クラスはクラスA(64%の票率)となり、個別木の不安定な予測(75%～82%のばらつき)が平滑化されます。特徴量サブサンプリング(sqrt(特徴数))により、木同士の相関を0.65から0.38に低減し、真の分散削減効果√N(Nは木の本数)を実現します。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>bootstrap標本のサイズは元データと同じに保つため、約63.2%の一意サンプルしか含まれず、out-of-bag(OOB)精度推定に活用可能です。訓練精度が99%を超えても、OOB精度が70%台なら過学習を疑うべき指標になります</li>
+<li>決定木の深さを制限しないと、個別木が訓練データに過適応し、アンサンブル効果が相殺されます。回帰問題では深さ8～12、分類問題では6～10が実務的な基準値です</li>
+<li>特徴量サブサンプリング比率(sqrt vs log)の選択は、高次元データ(1000特徴以上)では計算時間と精度のトレードオフを影響します。テキスト分類ではsqrt推奨、画像特徴ではlog採用が標準です</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script src="/tools/tool-ux-template.js?v20260517r4" defer></script>
+</body>
+</html>

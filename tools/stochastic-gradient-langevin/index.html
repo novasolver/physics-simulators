@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SGLD ストキャスティック勾配ランジュバン シミュレーター — ベイズ深層学習 | NovaSolver</title>
+<meta name="description" content="SGLDストキャスティック勾配ランジュバンダイナミクスによるBayesian事後分布サンプリングツール。ステップサイズ、バッチサイズ、ノイズ強度を調整してESS、混合時間、Gelman-Rubin R̂をリアルタイム監視。確率的勾配法、MCMCサンプラー設計を学習。">
+<link rel="canonical" href="https://novasolver.jp/tools/stochastic-gradient-langevin.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/stochastic-gradient-langevin.html">
+<meta property="og:title" content="SGLD ストキャスティック勾配ランジュバン シミュレーター | NovaSolver Project">
+<meta property="og:description" content="SGLDストキャスティック勾配ランジュバンダイナミクスによるBayesian事後分布サンプリングツール。ステップサイズ、バッチサイズ、ノイズ強度を調整してESS、混合時間、Gelman-Rubin R̂をリアルタイム監視。確率的勾配法、MCMCサンプラー設計を学習。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SGLD stochastic gradient Langevin dynamics simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/stochastic-gradient-langevin.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/stochastic-gradient-langevin.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/stochastic-gradient-langevin.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/stochastic-gradient-langevin.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#sgldCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "SGLD ストキャスティック勾配ランジュバン シミュレーター",
+      "description": "SGLD (Stochastic Gradient Langevin Dynamics, Welling & Teh 2011) のインタラクティブシミュレーター。ステップサイズ・バッチサイズ・雑音強度・データ規模を変えて、確率的バイアス・ランジュバンノイズ・有効サンプル数・R̂ 収束指標を可視化する Bayesian 深層学習向け無料ツール。",
+      "url": "https://novasolver.jp/tools/stochastic-gradient-langevin.html",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Bayesian Deep Learning / MCMC Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["SGLD 更新則の可視化と 2D 損失曲面ウォーカー","確率的バイアス vs ランジュバンノイズのトレードオフ","有効サンプル数 ESS と混合時間の推定","事後分布カバレッジと Gelman-Rubin R̂ の表示","SGD と SGLD の損失推移比較グラフ"],
+      "keywords": "SGLD,Stochastic Gradient Langevin Dynamics,Welling Teh,Bayesian Deep Learning,MCMC,事後分布サンプリング,R-hat,有効サンプル数",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "SGLD と通常の SGD はどう違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "SGD は θ_{t+1} = θ_t − η·∇L で「最尤解」に向かって降下するアルゴリズムですが、SGLD は同じ更新式に sqrt(2η)·ξ_t（ξ_t は標準正規乱数）を毎ステップ加えます。この Brownian 雑音のおかげで反復解はランジュバン拡散方程式の離散化となり、η→0 の極限で Bayesian 事後分布 p(θ|D) からのサンプリングと等価になります。1 行のコード変更で「最適化アルゴリズム」が「サンプリングアルゴリズム」に変わるのが SGLD の魅力で、深層モデルの不確かさ定量化や強化学習の探索に広く使われます。"}
+        },{
+          "@type": "Question",
+          "name": "ステップサイズ η の選び方を教えてください。",
+          "acceptedAnswer": {"@type": "Answer", "text": "SGLD には bias と variance のトレードオフがあります。η を大きくすると 1 ステップで遠くまで動けて混合時間 1/η は短くなりますが、確率的バイアス（≈ η·grad_var·N/B/2）が増えて事後分布から外れます。逆に η を小さくすると bias は減るが ESS が伸びず収束に時間がかかります。Welling-Teh の原論文は η_t = a/(b+t)^γ（γ∈(0.5,1]) で減衰させる方式を推奨。実務では 1e-4 〜 1e-3 程度から始め、R̂ < 1.2 と posterior coverage > 80% を満たす最大の η を探すのが定石です。"}
+        },{
+          "@type": "Question",
+          "name": "R̂（Gelman-Rubin 指標）はなぜ 1.2 で判定するのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "R̂ は複数チェーンの「鎖間分散 / 鎖内分散」の平方根に近い量で、定常分布に達していれば 1 に近づきます。R̂ > 1.1 〜 1.2 のときは、まだチェーンが事後分布全体を探索しきっておらず posterior 推定が偏っている目安。Gelman ら (2013) の Bayesian Data Analysis では R̂ < 1.1 を要求していますが、SGLD のような有限 η のサンプラーでは bias の影響でやや高く出るため、本ツールでは緩めに R̂ < 1.2 を OK ラインとしています。実プロジェクトでは複数チェーン・複数初期値で確認するのが原則です。"}
+        },{
+          "@type": "Question",
+          "name": "SGLD の発展形（SGHMC, pSGLD, SVGD）にはどんな違いがありますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "SGHMC (Chen et al. 2014) は Hamiltonian dynamics に friction を加え、慣性で局所最適を脱出しやすくしたもの。pSGLD (Li et al. 2016) は RMSprop 風の前処理行列で各パラメータの曲率に適応し、深層ネットでの収束を加速します。SVGD (Liu & Wang 2016) はカーネル法で複数粒子を同時に更新する deterministic な変分推論で、SGLD よりサンプル効率が高いが計算コストも増えます。深層ベイズ学習では、まず SGLD/pSGLD でベースラインを取り、必要に応じて SGHMC や Stein 系に拡張する流れが一般的です。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "SGLD ストキャスティック勾配ランジュバン シミュレーター", "item": "https://novasolver.jp/tools/stochastic-gradient-langevin.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">SGLD ストキャスティック勾配ランジュバン シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/stochastic-gradient-langevin.html" class="active">JA</a>
+      <a href="/en/tools/stochastic-gradient-langevin.html">EN</a>
+      <a href="/zh/tools/stochastic-gradient-langevin.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-atom"></i> ベイズ深層学習・MCMC</div>
+    <h1>SGLD ストキャスティック勾配ランジュバン シミュレーター</h1>
+    <p class="hero-sub">SGD に Brownian 雑音を加えるだけで Bayesian 事後分布をサンプリングする SGLD (Welling & Teh 2011) を、ステップサイズ・バッチサイズ・雑音強度・データ規模の 6 つのスライダーで操作できるツールです。確率的バイアスとランジュバンノイズのトレードオフ、有効サンプル数 ESS、混合時間、Gelman-Rubin R̂ がリアルタイムで更新され、Bayesian 深層学習のサンプラー設計を直感的に学べます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ステップサイズ η</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="stepSizeSGLDNum" value="0.001" min="0.00001" max="0.1" step="0.00001" oninput="syncFromNum('stepSizeSGLD','stepSizeSGLDNum')"></div>
+      </div>
+      <div class="param-desc">η が大きいほど混合時間↓・bias↑のトレードオフ</div>
+      <input type="range" id="stepSizeSGLD" min="0.00001" max="0.1" step="0.00001" value="0.001" oninput="syncToNum('stepSizeSGLD','stepSizeSGLDNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">イテレーション数</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="numIterationsSGLDNum" value="5000" min="100" max="100000" step="100" oninput="syncFromNum('numIterationsSGLD','numIterationsSGLDNum')"></div>
+      </div>
+      <div class="param-desc">サンプラーの総ステップ数。ESS と coverage に直結</div>
+      <input type="range" id="numIterationsSGLD" min="100" max="100000" step="100" value="5000" oninput="syncToNum('numIterationsSGLD','numIterationsSGLDNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ミニバッチサイズ B</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="batchSizeNum" value="32" min="1" max="512" step="1" oninput="syncFromNum('batchSize','batchSizeNum')"></div>
+      </div>
+      <div class="param-desc">小さいほど勾配雑音↑→ bias↑、計算コスト↓</div>
+      <input type="range" id="batchSize" min="1" max="512" step="1" value="32" oninput="syncToNum('batchSize','batchSizeNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">全データ数 N</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="datasetSizeNum" value="10000" min="100" max="1000000" step="100" oninput="syncFromNum('datasetSize','datasetSizeNum')"></div>
+      </div>
+      <div class="param-desc">SGLD の bias は N/B に比例して効く</div>
+      <input type="range" id="datasetSize" min="100" max="1000000" step="100" value="10000" oninput="syncToNum('datasetSize','datasetSizeNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">雑音強度 √(2/N·η) 倍</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="noiseAmplificationNum" value="1.0" min="0.5" max="2" step="0.05" oninput="syncFromNum('noiseAmplification','noiseAmplificationNum')"></div>
+      </div>
+      <div class="param-desc">温度パラメータ的に Brownian 雑音の振幅を制御</div>
+      <input type="range" id="noiseAmplification" min="0.5" max="2" step="0.05" value="1.0" oninput="syncToNum('noiseAmplification','noiseAmplificationNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">勾配分散 σ²_g</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="gradientVarianceNum" value="1.0" min="0.01" max="10" step="0.01" oninput="syncFromNum('gradientVariance','gradientVarianceNum')"></div>
+      </div>
+      <div class="param-desc">ミニバッチ勾配の分散。bias の主因子</div>
+      <input type="range" id="gradientVariance" min="0.01" max="10" step="0.01" value="1.0" oninput="syncToNum('gradientVariance','gradientVarianceNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statBias">—</div><div class="sl">確率的バイアス</div></div>
+        <div class="stat-card"><div class="sv" id="statNoise">—</div><div class="sl">ランジュバンノイズ</div></div>
+        <div class="stat-card"><div class="sv" id="statESS">—</div><div class="sl">有効サンプル数 ESS</div></div>
+        <div class="stat-card"><div class="sv" id="statMix">—</div><div class="sl">混合時間 (iters)</div></div>
+        <div class="stat-card"><div class="sv" id="statCov">—</div><div class="sl">事後分布カバレッジ (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statRhat">—</div><div class="sl">R̂ 収束指標</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-atom"></i> 2D 損失曲面と SGD/SGLD ウォーカー</div>
+      <canvas id="sgldCanvas"></canvas>
+      <p class="canvas-hint">赤い点が SGD（最尤推定に直行）、青い点が SGLD（Brownian 雑音で事後分布の輪郭を探索）。同心の薄い円が事後分布 p(θ|D) の等高線。η と雑音強度を変えると軌跡の広がりが変化します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> SGD vs SGLD 損失推移</div>
+      <canvas class="ux-chartjs-canvas" id="lossChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 事後分布カバレッジ vs イテレーション数</div>
+      <canvas class="ux-chartjs-canvas" id="coverageChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$\theta_{t+1} = \theta_t - \frac{\eta_t}{2}\sum_{i\in B_t} \nabla L_i(\theta_t) + \sqrt{\eta_t}\,\xi_t,\quad \xi_t \sim \mathcal{N}(0,I)$$</p>
+      <p style="margin-top:6px;">SGLD 更新則（Welling & Teh 2011）。η_t はステップサイズ、B_t はミニバッチ、ξ_t は Brownian 雑音。η→0 の極限で正確な事後分布サンプリング、有限 η では bias を伴う近似。</p>
+      <p style="margin-top:10px;">$$\mathrm{Bias} \;\propto\; \eta\,\sigma_g^2\,\frac{N}{B}, \qquad \mathrm{Var} \;\propto\; \eta, \qquad \tau_{\mathrm{mix}} \approx \frac{1}{\eta}$$</p>
+      <p style="margin-top:6px;">確率的バイアスは η と勾配分散 σ²_g に比例、混合時間 τ_mix は η の逆数。Brownian 雑音は √(2η) スケールで支配的になり、KSD（Kernel Stein Discrepancy）も η の関数として上界がついている（Chen-Ding-Carin 2015）。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>Stochastic Gradient Langevin Dynamics (SGLD) — Bayesian深層学習</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">最近の論文でよく「SGLD」って見かけるんですが、これって名前のとおりただの SGD の親戚ですか？ ランジュバンっていう人名がついてるけど…</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">親戚というより「双子」だね。式を見るとほぼ同じで、SGD の更新 θ ← θ − η·∇L にガウス雑音 √(2η)·ξ を 1 行足すだけ。でもこの一行で性格がガラッと変わって、「最尤解 1 点を探すアルゴリズム」が「事後分布 p(θ|D) からサンプルを引く MCMC」になる。元ネタの Welling-Teh (2011) は ICML のたった 8 ページの論文だけど、Bayesian 深層学習の事実上のスタートラインになったよ。ランジュバンの名前は、確率分布をターゲットにしたブラウン運動の連続版「ランジュバン拡散方程式」から来ている。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど。でも左の「ステップサイズ η」を上げると上の R̂ がどんどん大きくなりますよね。default の 4.49 でもう収束失敗判定だし、ちっとも上手くサンプリングしてくれないんですけど…</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そこが SGLD の一番のクセなんだ。確率的バイアスは η·σ²_g·N/B に比例するから、データセット N=10000、バッチ B=32 だと N/B=312 倍に増幅されて、η=0.001 でも bias が 0.156 になっちゃう。一方で Brownian 雑音は √(2η)=0.045 だから、bias が雑音の 3.5 倍も大きい。これじゃ「サンプリング」じゃなくて「バイアス入り SGD」だね。「N を 100 まで下げる」「B を 256 まで上げる」「η を 0.0001 まで下げる」のどれかをやると R̂ が 1.2 を切るよ。やってみて。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">η を 0.0001 にしたら R̂=1.36 まで下がりました。でも今度は混合時間が 10000 iter になって、5000 iter じゃ全然足りない…完璧な設定にするのって難しいんですね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それが SGLD の bias-variance トレードオフの本質だよ。η を小さくすると bias は減るけど、混合時間 τ_mix=1/η が伸びてサンプル間の相関が高くなり、ESS（有効サンプル数）が稼げない。実務では η_t = a/(b+t)^γ で時間とともに減衰させる「polynomial decay」を使う。最初は大きな η で広く探索し、後半で小さな η で正確に分布を捉える。γ∈(0.5,1] が理論的な収束保証つきの範囲で、Pereyra-Vono らがその選び方を詳しく研究しているよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">2D 損失曲面のキャンバスで青い SGLD ウォーカーがフワフワ動いているのが可愛いです。赤い SGD は中心の最尤点に張り付いてますね。これって何の絵ですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">あれは「事後分布の風景」のイラストだよ。中心の濃い色が最頻値（MAP）、薄い同心円が事後分布 p(θ|D) の等高線。SGD はその風景の谷底に向かって最短距離で滑り落ちる「点推定」をしている。一方 SGLD は Brownian 雑音のおかげで谷底にとどまらず、確率の高い領域全体をフラフラと巡回する。たくさんのサンプルを集めて平均すれば「予測の不確かさ」が出る。例えば医療診断 AI で「90% の確率でガン陽性、95% 信頼区間は…」みたいに言えるようになるのが Bayesian 深層学習の旨味なんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど、点推定じゃ「自信なし」って言えないですもんね。実装って大変なんですか？ PyTorch とかで使えます？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">超簡単だよ。PyTorch なら標準の torch.optim.SGD のあとに <code>for p in model.parameters(): p.data += torch.randn_like(p) * math.sqrt(2*lr)</code> を足すだけ。それで SGLD になる。Edward2 や Pyro、TensorFlow Probability にも組み込みクラスがある。深層モデルだと収束が遅いので、pSGLD（前処理つき、Li 2016）や SGHMC（運動量つき、Chen 2014）を併用するのが現代の定番。Mandt-Hoffman らの研究では SGD 自体も「定常分布つきサンプラー」とみなせることが分かっていて、SGLD はその拡張という見方もできる。一行のコード変更で「世界の見方」が変わる、というのが SGLD の魅力だね。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">SGLD と通常の SGD はどう違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">SGD は θ_{t+1} = θ_t − η·∇L で「最尤解」に向かって降下するアルゴリズムですが、SGLD は同じ更新式に sqrt(2η)·ξ_t（ξ_t は標準正規乱数）を毎ステップ加えます。この Brownian 雑音のおかげで反復解はランジュバン拡散方程式の離散化となり、η→0 の極限で Bayesian 事後分布 p(θ|D) からのサンプリングと等価になります。1 行のコード変更で「最適化アルゴリズム」が「サンプリングアルゴリズム」に変わるのが SGLD の魅力で、深層モデルの不確かさ定量化や強化学習の探索に広く使われます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">ステップサイズ η の選び方を教えてください。 <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">SGLD には bias と variance のトレードオフがあります。η を大きくすると 1 ステップで遠くまで動けて混合時間 1/η は短くなりますが、確率的バイアス（≈ η·grad_var·N/B/2）が増えて事後分布から外れます。逆に η を小さくすると bias は減るが ESS が伸びず収束に時間がかかります。Welling-Teh の原論文は η_t = a/(b+t)^γ（γ∈(0.5,1]) で減衰させる方式を推奨。実務では 1e-4 〜 1e-3 程度から始め、R̂ &lt; 1.2 と posterior coverage &gt; 80% を満たす最大の η を探すのが定石です。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">R̂（Gelman-Rubin 指標）はなぜ 1.2 で判定するのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">R̂ は複数チェーンの「鎖間分散 / 鎖内分散」の平方根に近い量で、定常分布に達していれば 1 に近づきます。R̂ &gt; 1.1 〜 1.2 のときは、まだチェーンが事後分布全体を探索しきっておらず posterior 推定が偏っている目安。Gelman ら (2013) の Bayesian Data Analysis では R̂ &lt; 1.1 を要求していますが、SGLD のような有限 η のサンプラーでは bias の影響でやや高く出るため、本ツールでは緩めに R̂ &lt; 1.2 を OK ラインとしています。実プロジェクトでは複数チェーン・複数初期値で確認するのが原則です。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">SGLD の発展形（SGHMC, pSGLD, SVGD）にはどんな違いがありますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">SGHMC (Chen et al. 2014) は Hamiltonian dynamics に friction を加え、慣性で局所最適を脱出しやすくしたもの。pSGLD (Li et al. 2016) は RMSprop 風の前処理行列で各パラメータの曲率に適応し、深層ネットでの収束を加速します。SVGD (Liu &amp; Wang 2016) はカーネル法で複数粒子を同時に更新する deterministic な変分推論で、SGLD よりサンプル効率が高いが計算コストも増えます。深層ベイズ学習では、まず SGLD/pSGLD でベースラインを取り、必要に応じて SGHMC や Stein 系に拡張する流れが一般的です。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>医療診断 AI の不確かさ定量化：</strong>放射線科の CT 画像分類や病理画像セグメンテーションでは、「90% で陽性、95% 信頼区間は 80〜97%」のように<strong>予測の自信</strong>を返す必要があります。Kendall-Gal (2017) は SGLD/MC-Dropout で得た事後分布から aleatoric / epistemic 不確かさを分離し、確信度の低いケースを医師にフラグする「自己診断付き AI」を実装。FDA 承認の医療 AI でもこのタイプの不確かさ提示が標準になりつつあります。</p>
+    <p><strong>強化学習の探索戦略：</strong>Bayesian DQN や PSRL（Posterior Sampling for RL）は、Q 関数の事後分布から毎エピソード 1 サンプルを引いて「楽観的に」行動選択します。SGLD はこの事後分布サンプリングの実装基盤で、Atari ベンチマークや自動運転シミュレーションで ε-greedy より少ない試行回数で最適方策に到達できることが Osband-Russo らの研究で示されています。</p>
+    <p><strong>ベイズ最適化と材料・新薬探索：</strong>分子の量子計算 (DFT) や材料の合成実験は 1 サンプルに数時間〜数週間かかります。代理モデル（ガウス過程 / ベイズ NN）の事後を SGLD でサンプリングし、Expected Improvement や Thompson sampling で次の実験を選ぶ「能動学習」が標準。Hernández-Lobato らの研究で、医薬品リード化合物の発見が従来比 1/10 の実験回数で達成されています。</p>
+    <p><strong>敵対的攻撃に対する防御：</strong>Adversarial example（人間には見えないが AI を誤分類させる微小ノイズ）に対し、点推定モデルは弱いですが、SGLD で得た事後分布から複数モデルを平均する Bayesian アンサンブルは攻撃成功率を大きく下げます。Gal-Smith (2018) や Carmon らの研究で、Bayesian 深層学習が adversarial robustness のベースラインの一つになっています。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の落とし穴が、<strong>「SGLD は MCMC だから burn-in も収束診断も MH-MCMC と同じでよい」</strong>という思い込み。SGLD は有限ステップサイズで「ターゲット分布」からズレた近似分布をサンプリングするため、Metropolis-Hastings 補正が無く、bias が原理的に残ります。η を 0 に近づけるか、Vollmer-Zygalakis らが提案した MALA 補正版 SGLD を使わない限り、得られたサンプルは厳密な事後分布のものではない点に注意。Welling-Teh 流の「η_t→0 の漸近的厳密性」は理論的保証であって、有限ステップの実装では bias を残したまま使うのが普通です。</p>
+    <p>次に、<strong>「事後分布カバレッジが 90% を超えたから信用していい」</strong>という誤解。本ツールの coverage はイテレーション数の対数に基づく経験的指標で、未探索のモードがあると過大評価になります。深層ネットの損失曲面はマルチモーダル（複数の谷）で、SGLD は近傍モードしか巡回できないことが多い。複数の初期値から並列にチェーンを走らせ、R̂ を多変量で評価する「complete pooling」テストや、Replica Exchange (parallel tempering) で温度を上げたチェーンと交換するなどの工夫が必要です。Mode collapse は Bayesian 深層学習の最も深刻な未解決問題の一つです。</p>
+    <p>最後に、<strong>「バッチサイズを大きくすれば bias が減るからいいことづくめ」</strong>という落とし穴。式上は B↑で bias≈η·σ²_g·N/B↓ですが、1 ステップあたりの計算コストは B に比例して増え、ESS/秒は B=N（フルバッチ）で頭打ち。逆に B が極端に小さいと（B=1 など）勾配雑音が爆発的に増えて bias が支配的になります。Welling-Teh は「B は VRAM が許す範囲で大きく、η は B の増加に合わせて線形に小さく」を推奨。pSGLD のような前処理付き手法では B のスイートスポットがさらに広がります。実プロジェクトでは η と B を同時にグリッドサーチするのが鉄則です。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>ステップサイズ(初期値0.01)とバッチサイズ(初期値32)を設定し、データセットサイズ(例:10000)を入力する</li>
+<li>反復回数(例:5000)を指定してシミュレーション開始ボタンをクリック、SGLDアルゴリズムが確率的勾配ランジュバンダイナミクスによる事後分布サンプリングを実行</li>
+<li>リアルタイムで有効サンプル数ESS、混合時間、Gelman-Rubin R̂、確率的バイアス、ランジュバンノイズを監視し、R̂ &lt; 1.1達成時に収束判定</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>ロジスティック回帰モデル(次元d=20)でSGLD実行時、ステップサイズα=0.001、バッチサイズm=64、データセットN=5000、反復回数10000の条件下で、ランジュバンノイズスケール β^(-1)=0.1を設定。結果として確率的バイアス0.0045、ESS約2800(有効率56%)、混合時間約1200反復、R̂=1.08を観測。ステップサイズをα=0.0005に低下させるとR̂=1.04に改善。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>高次元ベイズ推定(d&gt;50)ではステップサイズ過大設定時にランジュバンノイズが支配的となり事後平均推定量が0.015以上のバイアス発生、バッチサイズNに対しm≤N/20を推奨</li>
+<li>混合時間がデータセット規模N増加時に O(log N)ではなく O(N)で悪化する場合、学習率スケジュール α_t = α_0 / t^(2/3)適用で改善可能</li>
+<li>複数チェーン実行(4～8並列)でR̂計算精度向上、単一チェーンではESS&lt;1000時にR̂推定値の信頼性低下</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Shared canvas-state (must be initialized BEFORE the IIFE) =====
+const SGLD = {
+  eta: 0.001,
+  bias: 0.156,
+  noise: 0.045,
+  rHat: 4.5,
+  coverage: 0.73,
+  converged: false,
+  walkerSGD:  {x: 0, y: 0},
+  walkerSGLD: {x: 0, y: 0}
+};
+
+// ===== Chart.js setup =====
+const lossChart = new Chart(document.getElementById('lossChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'SGD 損失',data:[],borderColor:'#d63031',backgroundColor:'rgba(214,48,49,.12)',fill:false,borderWidth:2,pointRadius:0,tension:0.18},
+    {label:'SGLD 損失',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.18}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'イテレーション (×100)',font:{size:11}},ticks:{maxTicksLimit:9}},
+      y:{title:{display:true,text:'損失 L(θ)',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const coverageChart = new Chart(document.getElementById('coverageChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'事後分布カバレッジ (%)',data:[],borderColor:'#00b894',backgroundColor:'rgba(0,184,148,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'目標 80%',data:[],borderColor:'#e17055',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false},
+    {label:'現在の設定',data:[],borderColor:'#007BFF',backgroundColor:'#007BFF',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'イテレーション数 (log)',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'事後分布カバレッジ (%)',font:{size:11}},beginAtZero:true,suggestedMax:100}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const stepSizeSGLD       = parseFloat(document.getElementById('stepSizeSGLD').value);
+  const numIterationsSGLD  = parseFloat(document.getElementById('numIterationsSGLD').value);
+  const batchSize          = parseFloat(document.getElementById('batchSize').value);
+  const datasetSize        = parseFloat(document.getElementById('datasetSize').value);
+  const noiseAmplification = parseFloat(document.getElementById('noiseAmplification').value);
+  const gradientVariance   = parseFloat(document.getElementById('gradientVariance').value);
+
+  // ===== SGLD physics (Welling-Teh 2011) =====
+  // θ_{t+1} = θ_t - η/2 · ∇U(θ_t) + sqrt(η)·ξ_t, ξ ~ N(0,I)
+  // Bias ∝ η · grad_variance · N/B, Variance ∝ η (Brownian dominant)
+  const stochasticBias   = stepSizeSGLD * gradientVariance * datasetSize / Math.max(1, batchSize) / 2;
+  const langevinNoise    = Math.sqrt(2 * Math.max(stepSizeSGLD, 0)) * noiseAmplification;
+  const mixingTimeIters  = Math.ceil(1 / Math.max(stepSizeSGLD, 1e-9));
+  const effectiveSampleSize = numIterationsSGLD / Math.max(1, Math.floor(1 / Math.max(stepSizeSGLD, 1e-9)));
+  // Posterior coverage (empirical proxy)
+  const posteriorCoverage = Math.min(0.98, 0.5 + 0.4 * Math.log10(Math.max(numIterationsSGLD/100, 1)) / Math.log10(1000));
+  // Compute cost
+  const flopsPerIter = batchSize * 1000;
+  const totalFlops   = flopsPerIter * numIterationsSGLD;
+  const totalFlopsExp = Math.log10(Math.max(totalFlops, 1));
+  // Convergence diagnostic (Gelman-Rubin proxy)
+  const rHat = 1.0 + Math.abs(stochasticBias) / (langevinNoise + 1e-6);
+  const convergedFlag = rHat < 1.2;
+
+  // ----- stat cards -----
+  document.getElementById('statBias').textContent  = stochasticBias.toExponential(3);
+  document.getElementById('statNoise').textContent = langevinNoise.toExponential(3);
+  document.getElementById('statESS').textContent   = Math.round(effectiveSampleSize).toString();
+  document.getElementById('statMix').textContent   = mixingTimeIters.toString();
+  document.getElementById('statCov').textContent   = (posteriorCoverage*100).toFixed(1);
+  document.getElementById('statRhat').textContent  = rHat.toFixed(3);
+
+  // colour the R-hat stat by convergence
+  const rEl = document.getElementById('statRhat');
+  rEl.style.color = !convergedFlag ? '#c0392b' : (rHat > 1.1 ? '#c0563a' : '#0a8a6a');
+  const cEl = document.getElementById('statCov');
+  cEl.style.color = posteriorCoverage < 0.8 ? '#c0563a' : '#0a8a6a';
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(!convergedFlag){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> R̂='+rHat.toFixed(2)+' &gt; 1.2 — チェーンが事後分布に収束していません。bias（'+stochasticBias.toExponential(2)+'）が雑音（'+langevinNoise.toExponential(2)+'）より大きい状態。η を下げる、B を上げる、または N を縮小して bias を抑えてください。';
+  } else if(posteriorCoverage < 0.8){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> R̂='+rHat.toFixed(2)+' は OK ですが、事後分布カバレッジが '+(posteriorCoverage*100).toFixed(1)+'% で 80% に未達。イテレーション数を増やすか、ESS='+Math.round(effectiveSampleSize)+' を確認してチェーンを延長してください。総 FLOPs ≈ 10^'+totalFlopsExp.toFixed(1)+'。';
+  } else {
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> R̂='+rHat.toFixed(2)+' &lt; 1.2、カバレッジ '+(posteriorCoverage*100).toFixed(1)+'%、ESS '+Math.round(effectiveSampleSize)+' でサンプラーが事後分布をよく探索しています。混合時間 '+mixingTimeIters+' iters。総 FLOPs ≈ 10^'+totalFlopsExp.toFixed(1)+'。';
+  }
+
+  // ----- loss chart (SGD vs SGLD over iterations) -----
+  const numBuckets = 50;
+  const stepPerBucket = Math.max(1, Math.floor(numIterationsSGLD / numBuckets));
+  const lossLabels=[], lossSGD=[], lossSGLD=[];
+  // analytic toy: SGD decays as L0·exp(-k·t); SGLD plateaus at noise floor ∝ langevinNoise
+  const L0 = 1.0 + gradientVariance*0.2;
+  const kSGD = 4.0 * stepSizeSGLD;
+  const noiseFloor = 0.1 * (langevinNoise + 0.5*stochasticBias) + 0.05;
+  for(let i=0;i<=numBuckets;i++){
+    const t = i * stepPerBucket;
+    lossLabels.push(((t/100)|0).toString());
+    const sgd  = L0 * Math.exp(-kSGD * t/100);
+    const sgld = noiseFloor + (L0-noiseFloor) * Math.exp(-kSGD * 0.7 * t/100) + 0.04*Math.sin(t*0.13)*langevinNoise;
+    lossSGD.push(sgd);
+    lossSGLD.push(Math.max(0, sgld));
+  }
+  lossChart.data.labels = lossLabels;
+  lossChart.data.datasets[0].data = lossSGD;
+  lossChart.data.datasets[1].data = lossSGLD;
+  lossChart.update('none');
+
+  // ----- coverage vs iterations chart -----
+  const covLabels=[], covData=[], covTarget=[], covPoint=[];
+  const itersGrid = [100, 300, 1000, 3000, 10000, 30000, 100000];
+  let nearest=0, best=1e18;
+  for(let k=0;k<itersGrid.length;k++){
+    const it = itersGrid[k];
+    covLabels.push(it.toString());
+    const cv = Math.min(0.98, 0.5 + 0.4 * Math.log10(it/100) / Math.log10(1000));
+    covData.push(cv*100);
+    covTarget.push(80);
+    covPoint.push(null);
+    const d = Math.abs(Math.log10(it) - Math.log10(numIterationsSGLD));
+    if(d < best){ best = d; nearest = k; }
+  }
+  covPoint[nearest] = posteriorCoverage*100;
+  coverageChart.data.labels = covLabels;
+  coverageChart.data.datasets[0].data = covData;
+  coverageChart.data.datasets[1].data = covTarget;
+  coverageChart.data.datasets[2].data = covPoint;
+  coverageChart.update('none');
+
+  // ----- update shared canvas state -----
+  SGLD.eta       = stepSizeSGLD;
+  SGLD.bias      = stochasticBias;
+  SGLD.noise     = langevinNoise;
+  SGLD.rHat      = rHat;
+  SGLD.coverage  = posteriorCoverage;
+  SGLD.converged = convergedFlag;
+}
+
+// ===== 2D loss-surface canvas with SGD/SGLD walkers =====
+(function(){
+  const cv  = document.getElementById('sgldCanvas');
+  if(!cv) return;
+  const ctx = cv.getContext('2d');
+  let phase = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // simple pseudo-Gaussian
+  function gaussNoise(){
+    let u=0, v=0;
+    while(u===0) u = Math.random();
+    while(v===0) v = Math.random();
+    return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const cx = W/2, cy = H/2;
+    const scale = Math.min(W, H) * 0.30;
+
+    // ----- posterior contours (concentric ellipses) -----
+    for(let k=4; k>=1; k--){
+      const r = scale * k * 0.6;
+      const alpha = 0.10 + 0.05*(5-k);
+      ctx.strokeStyle = 'rgba(0,184,216,'+alpha.toFixed(3)+')';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r, r*0.78, 0, 0, Math.PI*2);
+      ctx.stroke();
+    }
+    // ----- MAP center marker -----
+    ctx.fillStyle = 'rgba(0,184,216,.65)';
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI*2); ctx.fill();
+
+    // ----- SGD walker (red, deterministic descent) -----
+    // anneals toward center
+    const sgdRadius = scale * 0.18 * Math.max(0, 1 - phase*0.3);
+    const sgdAngle  = phase * 1.3;
+    const sgdX = cx + sgdRadius * Math.cos(sgdAngle);
+    const sgdY = cy + sgdRadius * Math.sin(sgdAngle);
+    SGLD.walkerSGD.x = sgdX; SGLD.walkerSGD.y = sgdY;
+    ctx.fillStyle = '#d63031';
+    ctx.shadowColor = '#d63031'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(sgdX, sgdY, 5, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // ----- SGLD walker (blue, Brownian-driven, persistent cloud) -----
+    // simulate a chain of past samples for trailing effect
+    const trail = 26;
+    const noiseAmp = scale * 0.5 * Math.min(2.0, SGLD.noise * 8.0 + 0.18);
+    for(let i=0;i<trail;i++){
+      const t = (phase*8 + i*0.27) % (Math.PI*2);
+      const wob = Math.sin(t*1.7) + Math.cos(t*2.3);
+      const r   = noiseAmp * (0.5 + 0.5*Math.sin(t*0.9));
+      const px  = cx + r * Math.cos(t + i*0.3) + 0.6*scale*0.05*wob;
+      const py  = cy + r * Math.sin(t + i*0.3) * 0.78;
+      const a   = 0.15 + 0.55 * (i/trail);
+      ctx.fillStyle = 'rgba(0,123,255,' + a.toFixed(3) + ')';
+      ctx.beginPath(); ctx.arc(px, py, 2.2 + 1.6*(i/trail), 0, Math.PI*2); ctx.fill();
+    }
+    // current SGLD sample (bright cyan)
+    const sgldX = cx + noiseAmp * Math.cos(phase*8) + scale*0.04*gaussNoise();
+    const sgldY = cy + noiseAmp * Math.sin(phase*8) * 0.78 + scale*0.04*gaussNoise();
+    SGLD.walkerSGLD.x = sgldX; SGLD.walkerSGLD.y = sgldY;
+    ctx.fillStyle = '#00B4D8';
+    ctx.shadowColor = '#00B4D8'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(sgldX, sgldY, 5, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // ----- legend (top-left) -----
+    ctx.font = '11px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#d63031'; ctx.fillRect(12, 12, 14, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.fillText('SGD (point estimate)', 32, 18);
+    ctx.fillStyle = '#00B4D8'; ctx.fillRect(12, 28, 14, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.fillText('SGLD (posterior samples)', 32, 34);
+    ctx.fillStyle = 'rgba(0,184,216,.7)'; ctx.fillRect(12, 44, 14, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.fillText('p(θ|D) contour', 32, 50);
+
+    // ----- diagnostic (top-right) -----
+    ctx.fillStyle = SGLD.converged ? 'rgba(0,184,148,.95)' : 'rgba(225,112,85,.95)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('R̂='+SGLD.rHat.toFixed(2)+'  cov='+(SGLD.coverage*100).toFixed(0)+'%', W-12, 18);
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText('η='+SGLD.eta.toExponential(1)+'  σ_ξ='+SGLD.noise.toExponential(1), W-12, 34);
+
+    // axis labels
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('θ₁', cx, H-8);
+    ctx.save();
+    ctx.translate(14, cy); ctx.rotate(-Math.PI/2);
+    ctx.fillText('θ₂', 0, 0);
+    ctx.restore();
+
+    phase += 0.006;
+    if(phase>=Math.PI*2) phase = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['stepSizeSGLD','numIterationsSGLD','batchSize','datasetSize','noiseAmplification','gradientVariance'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

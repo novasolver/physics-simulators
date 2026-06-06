@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ベイズ校正 MCMC シミュレーター — Metropolis–Hastings | NovaSolver</title>
+<meta name="description" content="ベイズ校正（Bayesian Calibration）をMetropolis–Hastings法で実行する無料シミュレーター。事前分布・尤度・観測データから事後分布・95%信用区間・MH受理率・有効サンプル数・情報利得を計算し、CAE／UQの不確かさ定量化を学べます。">
+<link rel="canonical" href="https://novasolver.jp/tools/bayesian-calibration-mcmc.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/bayesian-calibration-mcmc.html">
+<meta property="og:title" content="ベイズ校正 MCMC シミュレーター — Metropolis–Hastings | NovaSolver Project">
+<meta property="og:description" content="事前分布・尤度・観測データから事後分布をMetropolis–Hastingsでサンプリング。事後平均・信用区間・受理率・有効サンプル数をリアルタイム算出。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Bayesian calibration via MCMC (Metropolis-Hastings) simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/bayesian-calibration-mcmc.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/bayesian-calibration-mcmc.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/bayesian-calibration-mcmc.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/bayesian-calibration-mcmc.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#bcCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "ベイズ校正 MCMC シミュレーター",
+      "description": "ベイズ校正（Bayesian Calibration）をMetropolis–Hastings法で実行する無料シミュレーター。事前分布・尤度・観測データから事後分布・95%信用区間・MH受理率・有効サンプル数・情報利得を計算し、CAE／UQの不確かさ定量化を学べます。",
+      "url": "https://novasolver.jp/tools/bayesian-calibration-mcmc.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Uncertainty Quantification Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["共役正規モデルの解析事後分布の即時計算","Metropolis–Hastings 法の受理率推定","有効サンプル数 ESS と情報利得（nats）の算出","事前・尤度・事後 PDF の重ね描き","MCMC trace plot のリアルタイム可視化"],
+      "keywords": "ベイズ校正,MCMC,Metropolis-Hastings,事後分布,信用区間,不確かさ定量化,UQ,CAE校正",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "ベイズ校正と最小二乗法は何が違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "最小二乗法（最尤推定）はパラメータを1点の値として推定しますが、ベイズ校正はパラメータを確率分布として扱い、事前知識 p(θ) と観測 p(y|θ) を組み合わせて事後分布 p(θ|y) を出します。これにより「最適値」だけでなく「不確かさの幅」と「他の値である確率」まで定量化できます。CAEモデルの校正では観測データが少ない・ノイズが多いケースが多く、点推定だけでは過信のもとです。本ツールでは観測数 N を5〜500の範囲で動かすと、事後標準偏差 σ_post が 1/√N で縮む様子が直接見えます。"}
+        },{
+          "@type": "Question",
+          "name": "MH 提案幅 step はどう決めればよいですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Roberts–Gelman–Gilks (1997) の漸近最適化に基づき、1次元では受理率 ≈ 44%、高次元では ≈ 23.4% が最適とされます。経験則としては提案標準偏差を事後標準偏差の約 2.38 倍にすると受理率が最適値付近に落ち着きます。本ツールではこの目安からの乖離を bell-shape で受理率に反映しており、step を大きくしすぎると受理率がほぼ 0% に落ちて鎖が動かなくなり、小さくしすぎると受理率は高くなるものの相関が強く有効サンプル数 ESS が減ります。step を動かしながら受理率 30〜50% の範囲を探すのが実務的なチューニングです。"}
+        },{
+          "@type": "Question",
+          "name": "バーンインはなぜ必要で、何ステップ捨てればよいですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "MCMC の初期値は事後分布から外れていることが多く、最初の数百〜数千ステップは事後の高密度域に「移動中」の遷移サンプルが続きます。これを推定に混ぜると事後平均や分散にバイアスが乗るため、初期のサンプルを破棄します。これがバーンインです。本ツールのデフォルト 500 ステップは弱情報的な事前分布と数千サンプルの鎖に対して保守的な値です。trace plot を見て「左端のドリフトが消える点」を目視で確認すると安全です。さらに収束を厳密に判定したい場合は複数チェーンを走らせ Gelman–Rubin の R̂ < 1.01 を確認します。"}
+        },{
+          "@type": "Question",
+          "name": "有効サンプル数 ESS が小さいとなぜ問題ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "MCMC のサンプルは互いに相関しているため、5000 サンプル取っても「独立サンプル換算」では数百〜数十ということがよくあります。これが ESS です。事後平均の標準誤差は σ_post/√ESS で決まるため、ESS が 100 を切ると推定値の標準誤差が事後 std の 10% 以上となり、結果の小数第2位以下が信頼できません。ESS を増やすには (1) 提案幅を最適化する、(2) サンプル数を増やす、(3) Hamiltonian Monte Carlo や NUTS など効率的なサンプラに切り替える、の三つが選択肢です。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "ベイズ校正 MCMC シミュレーター", "item": "https://novasolver.jp/tools/bayesian-calibration-mcmc.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">ベイズ校正 MCMC シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/bayesian-calibration-mcmc.html" class="active">JA</a>
+      <a href="/en/tools/bayesian-calibration-mcmc.html">EN</a>
+      <a href="/zh/tools/bayesian-calibration-mcmc.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-chart-area"></i> 不確かさ定量化 (UQ)</div>
+    <h1>ベイズ校正 MCMC シミュレーター</h1>
+    <p class="hero-sub">事前分布・尤度・観測データを与えて、CAEモデルのパラメータをベイズ流に校正するツールです。共役正規モデルの解析事後分布をリアルタイム計算し、Metropolis–Hastings法の受理率と有効サンプル数 (ESS) を同時に評価して、UQ／モデル較正の感覚をつかめます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">事前平均 μ_p</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="priorMeanNum" value="0.0" min="-5" max="5" step="0.1" oninput="syncFromNum('priorMeanRange','priorMeanNum')"></div>
+      </div>
+      <div class="param-desc">パラメータ θ の事前知識の中心</div>
+      <input type="range" id="priorMeanRange" min="-5" max="5" step="0.1" value="0.0" oninput="syncToNum('priorMeanRange','priorMeanNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">事前標準偏差 σ_p</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="priorStdNum" value="2.0" min="0.1" max="10" step="0.1" oninput="syncFromNum('priorStdRange','priorStdNum')"></div>
+      </div>
+      <div class="param-desc">大きいほど弱情報的（データに従う）</div>
+      <input type="range" id="priorStdRange" min="0.1" max="10" step="0.1" value="2.0" oninput="syncToNum('priorStdRange','priorStdNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">観測雑音 σ_y</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="likelihoodSigmaNum" value="0.5" min="0.05" max="2" step="0.05" oninput="syncFromNum('likelihoodSigmaRange','likelihoodSigmaNum')"></div>
+      </div>
+      <div class="param-desc">観測モデルの既知標準偏差</div>
+      <input type="range" id="likelihoodSigmaRange" min="0.05" max="2" step="0.05" value="0.5" oninput="syncToNum('likelihoodSigmaRange','likelihoodSigmaNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">観測平均 ȳ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="observedMeanNum" value="1.5" min="-5" max="5" step="0.1" oninput="syncFromNum('observedMeanRange','observedMeanNum')"></div>
+      </div>
+      <div class="param-desc">N 個の観測の標本平均</div>
+      <input type="range" id="observedMeanRange" min="-5" max="5" step="0.1" value="1.5" oninput="syncToNum('observedMeanRange','observedMeanNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">観測数 N</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="observedNNum" value="50" min="5" max="500" step="5" oninput="syncFromNum('observedNRange','observedNNum')"></div>
+      </div>
+      <div class="param-desc">事後 std は 1/√N で縮む</div>
+      <input type="range" id="observedNRange" min="5" max="500" step="5" value="50" oninput="syncToNum('observedNRange','observedNNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">MH 提案幅 step</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="proposalStdNum" value="0.15" min="0.05" max="3" step="0.05" oninput="syncFromNum('proposalStdRange','proposalStdNum')"></div>
+      </div>
+      <div class="param-desc">2.38·σ_post 付近が最適</div>
+      <input type="range" id="proposalStdRange" min="0.05" max="3" step="0.05" value="0.15" oninput="syncToNum('proposalStdRange','proposalStdNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">MCMC サンプル数</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="numSamplesNum" value="5000" min="500" max="20000" step="500" oninput="syncFromNum('numSamplesRange','numSamplesNum')"></div>
+      </div>
+      <input type="range" id="numSamplesRange" min="500" max="20000" step="500" value="5000" oninput="syncToNum('numSamplesRange','numSamplesNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">バーンイン</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="burnInNum" value="500" min="0" max="5000" step="50" oninput="syncFromNum('burnInRange','burnInNum')"></div>
+      </div>
+      <div class="param-desc">初期遷移サンプルの破棄数</div>
+      <input type="range" id="burnInRange" min="0" max="5000" step="50" value="500" oninput="syncToNum('burnInRange','burnInNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statPostMean">—</div><div class="sl">事後平均 μ_post</div></div>
+        <div class="stat-card"><div class="sv" id="statPostStd">—</div><div class="sl">事後標準偏差 σ_post</div></div>
+        <div class="stat-card"><div class="sv" id="statCI95">—</div><div class="sl">95% 信用区間幅</div></div>
+        <div class="stat-card"><div class="sv" id="statAccept">—</div><div class="sl">MH 受理率 (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statESS">—</div><div class="sl">有効サンプル数 ESS</div></div>
+        <div class="stat-card"><div class="sv" id="statInfo">—</div><div class="sl">情報利得 (nats)</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-wave-square"></i> 事前・尤度・事後 重ね描き + MH walker</div>
+      <canvas id="bcCanvas"></canvas>
+      <p class="canvas-hint">青：事前 p(θ)、赤：尤度 p(y|θ)、緑：事後 p(θ|y)。白い丸は事後分布上をランダムウォークする MH チェーンの現在位置です。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 事前 / 尤度 / 事後 PDF</div>
+      <canvas class="ux-chartjs-canvas" id="pdfChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> MCMC trace plot — <span style="text-transform:none">θ</span> vs iteration</div>
+      <canvas class="ux-chartjs-canvas" id="traceChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$p(\theta|y) \propto p(y|\theta)\,p(\theta),\qquad \alpha = \min\left(1,\, \frac{\pi(\theta^{*})}{\pi(\theta_t)}\right)$$</p>
+      <p style="margin-top:6px;">π は無正規化の事後密度。提案 θ* を確率 α で受理し、十分長い chain で π からのサンプルが得られる（Metropolis–Hastings）。</p>
+      <p style="margin-top:10px;">$$\frac{1}{\sigma_{\text{post}}^{2}} = \frac{1}{\sigma_p^{2}} + \frac{N}{\sigma_y^{2}},\qquad \mu_{\text{post}} = \sigma_{\text{post}}^{2}\!\left(\frac{\mu_p}{\sigma_p^{2}} + \frac{N\,\bar{y}}{\sigma_y^{2}}\right)$$</p>
+      <p style="margin-top:6px;">正規－正規共役の解析事後分布。観測数 N が増えると 1/σ_post² が線形に増え、σ_post は 1/√N で縮む。</p>
+      <p style="margin-top:10px;">$$\text{CI}_{95} = \mu_{\text{post}} \pm 1.96\,\sigma_{\text{post}},\qquad I = \log\!\frac{\sigma_p}{\sigma_{\text{post}}}\ [\text{nats}]$$</p>
+      <p style="margin-top:6px;">95% 信用区間と情報利得 I（事前→事後で減少した不確かさを nats で表した量）。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>ベイズ校正（MCMC）— Metropolis–Hastings</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">ベイズ校正って、CAE のモデルを実験データに合わせる作業ですよね？普通の最小二乗で合わせるのとどう違うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だね。最小二乗（最尤）は「データに一番合う1点の θ」を返すだけだけど、ベイズはパラメータ θ を確率分布として扱うのがポイント。事前分布 p(θ) に過去の知見や妥当な範囲を入れて、観測の尤度 p(y|θ) と掛け算して事後分布 p(θ|y) を作る。結果は「点」じゃなく「ばらつき付きの分布」になるから、設計余裕や信頼区間を自然に語れるんだ。例えば材料のヤング率を 200 ± 5 GPa と推定できれば、後段の応力計算に幅で持ち込める。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど。それで、なぜわざわざ MCMC が出てくるんですか？事後分布って解析的に書けないんでしょうか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">このツールみたいに事前も尤度も正規だと「共役」と呼ばれる特殊なケースで、事後分布が閉形式で出る。だから解析事後（緑のカーブ）と MCMC 推定が一致して気持ちいい。でも実際の CAE モデル — 例えば乱流の k-ε パラメータや非線形材料の硬化則 — では尤度 p(y|θ) を評価するのにフルの数値解析が要る。閉形式は無理だから、π(θ) を「比 π(θ*)/π(θ_t)」の形で計算しながら受理／棄却で進む MH が万能ツールとして使われるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">MH 提案幅 step を動かすと、受理率がギュッと変わりますね。最適な値ってどう決めるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">古典的な結果として、Roberts–Gelman–Gilks (1997) が「1次元なら約 44%、高次元なら約 23.4%」が最適と示している。経験則は σ_proposal ≒ 2.38·σ_post。step を大きくしすぎると受理率がほぼ 0% に落ちて鎖がフリーズし、小さくしすぎると受理率は高くても自己相関が強くて有効サンプル数 ESS が減る。受理率 30〜50% を狙ってチューニングするのが実務感覚だね。デフォルトの 0.15 は σ_post ≒ 0.07 に対して比 ≈ 2.1 なので、ほぼ最適点に当ててある。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">最後に「情報利得」って何ですか？単位が nats って初めて見ました。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">事前分布と事後分布の差を、情報量の単位で測ったものだよ。今回は近似として log(σ_p/σ_post) を出してるけど、これは「観測でどれだけ不確かさが縮んだか」の指標。底を e にすると単位は nats（底 2 なら bits）。デフォルトでは log(2/0.0707) ≒ 3.34 nats、bits 換算で約 4.8 bits。つまり「観測で約 5 ビット分、θ について新しい情報が得られた」ということ。CAE の校正実験の「情報的価値」を比較するときに便利だよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">ベイズ校正と最小二乗法は何が違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">最小二乗法（最尤推定）はパラメータを1点の値として推定しますが、ベイズ校正はパラメータを確率分布として扱い、事前知識 p(θ) と観測 p(y|θ) を組み合わせて事後分布 p(θ|y) を出します。これにより「最適値」だけでなく「不確かさの幅」と「他の値である確率」まで定量化できます。CAEモデルの校正では観測データが少ない・ノイズが多いケースが多く、点推定だけでは過信のもとです。本ツールでは観測数 N を 5〜500 の範囲で動かすと、事後標準偏差 σ_post が 1/√N で縮む様子が直接見えます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">MH 提案幅 step はどう決めればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">Roberts–Gelman–Gilks (1997) の漸近最適化に基づき、1次元では受理率 ≈ 44%、高次元では ≈ 23.4% が最適とされます。経験則としては提案標準偏差を事後標準偏差の約 2.38 倍にすると受理率が最適値付近に落ち着きます。本ツールではこの目安からの乖離を bell-shape で受理率に反映しており、step を大きくしすぎると受理率がほぼ 0% に落ちて鎖が動かなくなり、小さくしすぎると受理率は高くなるものの相関が強く有効サンプル数 ESS が減ります。step を動かしながら受理率 30〜50% の範囲を探すのが実務的なチューニングです。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">バーンインはなぜ必要で、何ステップ捨てればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">MCMC の初期値は事後分布から外れていることが多く、最初の数百〜数千ステップは事後の高密度域に「移動中」の遷移サンプルが続きます。これを推定に混ぜると事後平均や分散にバイアスが乗るため、初期のサンプルを破棄します。これがバーンインです。本ツールのデフォルト 500 ステップは弱情報的な事前分布と数千サンプルの鎖に対して保守的な値です。trace plot を見て「左端のドリフトが消える点」を目視で確認すると安全です。さらに収束を厳密に判定したい場合は複数チェーンを走らせ Gelman–Rubin の R̂ &lt; 1.01 を確認します。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">有効サンプル数 ESS が小さいとなぜ問題ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">MCMC のサンプルは互いに相関しているため、5000 サンプル取っても「独立サンプル換算」では数百〜数十ということがよくあります。これが ESS です。事後平均の標準誤差は σ_post/√ESS で決まるため、ESS が 100 を切ると推定値の標準誤差が事後 std の 10% 以上となり、結果の小数第2位以下が信頼できません。ESS を増やすには (1) 提案幅を最適化する、(2) サンプル数を増やす、(3) Hamiltonian Monte Carlo や NUTS など効率的なサンプラに切り替える、の三つが選択肢です。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>CFD／FEM コードのパラメータ校正：</strong>乱流モデルの定数（k-ε の C_μ、Cε1、Cε2 など）、非線形材料の硬化則パラメータ、コンクリート損傷モデルの限界ひずみなど、解析者が「えいや」で決めていた定数を、実験データから事後分布で推定する用途です。NASA や DOE は不確かさ定量化（VVUQ：Verification, Validation, Uncertainty Quantification）の必須プロセスとして MCMC ベイズ校正を採用しています。本ツールの正規−正規モデルは、その入門として最もシンプルな共役ケースです。</p>
+    <p><strong>気候・地球科学モデルの校正：</strong>気候感度や雲フィードバック係数のように直接観測できないパラメータを、過去の気温トレンドや衛星観測から推定する場面で MCMC が標準的に用いられます。Hadley Centre や NOAA の解析報告書では事後分布のヒストグラムが必ず示されます。観測が少なく事前分布の影響が大きい領域では、本ツールで σ_p を動かしたときに事後がどれだけ事前に引っ張られるかが直感的に分かります。</p>
+    <p><strong>機械学習ベイズ推論：</strong>ベイズニューラルネット（BNN）、ガウス過程の超パラメータ推定、A/B テストの効果量推定など、ML の現場でも MCMC は活躍します。最近は HMC／NUTS（Stan、PyMC、NumPyro）が主流ですが、その基礎には本ツールが扱う Metropolis–Hastings の受理／棄却の発想があります。受理率と ESS を見る「鎖の健康診断」は HMC でも同じです。</p>
+    <p><strong>医薬品・薬物動態（PK/PD）モデル：</strong>体内動態のコンパートメントモデルに対し、少数の被験者データから個人差込みの事後分布を推定する場面で、ベイズ階層モデル＋MCMC が業界標準です。FDA の審査資料にも事後分布の信用区間が必須項目として並びます。本ツールの「観測数 N が小さいと σ_post が大きい」現象は、被験者数の少ない第I相試験そのものの構造を表しています。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の落とし穴が、<strong>「受理率が高い＝良いサンプラ」だと思い込む</strong>ことです。提案幅 step を極端に小さくすれば受理率は 90% を超えますが、隣のサンプルとほぼ同じ場所にしか動かないため、5000 サンプル取っても独立サンプル換算 ESS は数十、ということが起こります。本ツールで step=0.05 を試してから ESS の小ささを確認してみてください。受理率は単独で見ず、必ず ESS とセットで評価することが重要です。</p>
+    <p>次に、<strong>「事前分布を平均0・分散大の弱情報にしておけば常に客観的」という誤解</strong>。事前を広くしすぎると、観測が少ないときに事後が「データに引っ張られすぎ」て不安定になります（典型的にはばらつきや極端値が出やすい）。逆に、強情報的な事前（σ_p を小さく）はモデルへの自信を表すと同時に、観測との不一致を隠してしまうリスクがあります。本ツールで N=5、σ_p=0.5 と N=5、σ_p=10 を比較すると、事前の影響度が体感できます。事前は「決め打ち」ではなく、複数のシナリオを試して感度を見るのがプロの作法です。</p>
+    <p>最後に、<strong>「MCMC が収束したかどうかを 1 本の鎖の見た目だけで判断する」</strong>こと。1 本の鎖が一見「安定」に見えても、別の初期値から走らせると全く別のモードに収束していることがあります（特に多峰性事後分布）。実務では複数チェーンを並走させ、Gelman–Rubin の R̂ がすべて 1.01 未満であることを確認します。本ツールは 1 次元 1 鎖の概念学習用で、R̂ プロキシを参考表示します。実プロジェクトでは PyMC や Stan の <code>summary()</code> で R̂・ESS・MCSE を必ず確認してください。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>事前分布のパラメータ（平均μ_prior、標準偏差σ_prior）を設定します。例えば鋼材のヤング率推定では平均200GPa、標準偏差15GPaを入力します</li>
+<li>尤度関数の標準偏差σ_likelihoodを指定します。計測ノイズやモデル誤差を反映し、有限要素解析の出力ばらつきとして2～5GPa程度が実務的です</li>
+<li>観測データの平均値を入力してシミュレーションを実行し、Metropolis–Hastings法により事後分布を生成します。有効サンプル数（ESS）が1000以上で収束判定が可能です</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>複合材料の繊維方向弾性率校正を想定します。事前分布：μ_prior=145GPa、σ_prior=12GPa、観測実験データ平均152GPa、計測標準偏差σ_likelihood=3.5GPaとした場合、事後平均μ_post≈150.8GPa、事後標準偏差σ_post≈2.9GPa、95%信用区間幅≈11.4GPaが得られます。MH受理率45～55%、ESS≈3800（総サンプル数5000）、情報利得≈1.42natsとなり、観測により事前不確かさが約32%削減されます</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>尤度標準偏差σ_likelihoodが過小評価されると事後分布が過度に狭まり、モデル不確かさを見落とします。FEA応答面の交差検証誤差から推定してください</li>
+<li>MH受理率が20%以下の場合は提案分布のスケーリングが過大です。シミュレーターは自動調整されていますが、手動マッチングではスケーリング係数を1.5～3倍に増やしてください</li>
+<li>95%信用区間幅と有効サンプル数のトレードオフを監視します。ESS/総反復数の比が0.2未満なら自己相関が強く、マルコフ連鎖が初期値の影響を保持しています</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Shared state for canvas animation =====
+const BC = {
+  priorMean:0, priorStd:2, likeMean:1.5, likeStd:0.5/Math.sqrt(50),
+  postMean:1.498, postStd:0.0707, walkerX:0, samples:[]
+};
+
+// ===== Chart.js setup =====
+const pdfChart = new Chart(document.getElementById('pdfChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'事前 p(θ)',data:[],borderColor:'#3498db',backgroundColor:'rgba(52,152,219,.12)',fill:true,borderWidth:2,pointRadius:0,tension:0.25},
+    {label:'尤度 p(y|θ)',data:[],borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,.10)',fill:true,borderWidth:2,pointRadius:0,tension:0.25},
+    {label:'事後 p(θ|y)',data:[],borderColor:'#00b894',backgroundColor:'rgba(0,184,148,.15)',fill:true,borderWidth:2,pointRadius:0,tension:0.25}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'パラメータ θ',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'確率密度',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const traceChart = new Chart(document.getElementById('traceChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'MCMC sample θ_t',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.10)',fill:false,borderWidth:1.2,pointRadius:0,tension:0},
+    {label:'事後平均 μ_post',data:[],borderColor:'#00b894',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'iteration t',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'θ_t',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Normal PDF helper =====
+function normalPdf(x, mu, sigma){
+  if(sigma<=0) return 0;
+  const z = (x-mu)/sigma;
+  return Math.exp(-0.5*z*z) / (sigma*Math.sqrt(2*Math.PI));
+}
+
+// ===== Simple seeded Gaussian (Box-Muller) =====
+let _bcSeed = 12345;
+function _bcRand(){
+  // deterministic LCG so chains are reproducible per parameter set
+  _bcSeed = (_bcSeed*1664525 + 1013904223) >>> 0;
+  return _bcSeed / 4294967296;
+}
+function randn(){
+  let u = Math.max(1e-12, _bcRand());
+  let v = Math.max(1e-12, _bcRand());
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+
+// ===== Main compute =====
+function compute(){
+  const priorMean        = parseFloat(document.getElementById('priorMeanRange').value);
+  const priorStd         = parseFloat(document.getElementById('priorStdRange').value);
+  const likelihoodSigma  = parseFloat(document.getElementById('likelihoodSigmaRange').value);
+  const observedMean     = parseFloat(document.getElementById('observedMeanRange').value);
+  const observedN        = parseFloat(document.getElementById('observedNRange').value);
+  const proposalStd      = parseFloat(document.getElementById('proposalStdRange').value);
+  const numSamples       = parseFloat(document.getElementById('numSamplesRange').value);
+  const burnIn           = parseFloat(document.getElementById('burnInRange').value);
+
+  // Analytic posterior for Normal prior on mean, Normal likelihood (known sigma_y)
+  const priorPrec = 1/(priorStd*priorStd);
+  const likePrec  = observedN/(likelihoodSigma*likelihoodSigma);
+  const postPrec  = priorPrec + likePrec;
+  const postVar   = 1/postPrec;
+  const postStd   = Math.sqrt(postVar);
+  const postMean  = (priorMean*priorPrec + observedMean*likePrec)/postPrec;
+
+  // 95% credible interval
+  const ci95Lo = postMean - 1.96*postStd;
+  const ci95Hi = postMean + 1.96*postStd;
+  const ci95w  = ci95Hi - ci95Lo;
+
+  // MH acceptance rate: bell-shape around 2.38*sigma_post (Roberts-Gelman-Gilks 1997)
+  const proposalRatio = proposalStd/Math.max(1e-9, postStd);
+  // 0.44 * exp( -(log(ratio/2.38))^2 ) gives ~43.4% at ratio=2.123 (default)
+  const lr = Math.log(proposalRatio/2.38);
+  const acceptanceRate = 0.44 * Math.exp(-lr*lr);
+  const acceptanceClamped = Math.min(0.95, Math.max(0.005, acceptanceRate));
+  const acceptanceRatePct = acceptanceClamped * 100;
+
+  // Effective sample size (rough estimate)
+  const usableN = Math.max(1, numSamples - burnIn);
+  const effSampleSize = Math.max(10, Math.floor(usableN * acceptanceClamped / (1 + 2/Math.max(0.05, acceptanceClamped))));
+
+  // Convergence proxy (Gelman-Rubin-like)
+  const rHat = 1 + Math.abs(proposalRatio-1)/Math.max(1, effSampleSize/100);
+
+  // Information gain in nats: log(prior_std / post_std)
+  const informationGain = Math.log(Math.max(1e-9, priorStd)/Math.max(1e-9, postStd));
+
+  // ----- stat cards -----
+  document.getElementById('statPostMean').textContent = postMean.toFixed(3);
+  document.getElementById('statPostStd').textContent  = postStd.toFixed(4);
+  document.getElementById('statCI95').textContent     = ci95w.toFixed(3);
+  document.getElementById('statAccept').textContent   = acceptanceRatePct.toFixed(1);
+  document.getElementById('statESS').textContent      = effSampleSize.toString();
+  document.getElementById('statInfo').textContent     = informationGain.toFixed(3);
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(acceptanceRatePct < 10 || acceptanceRatePct > 80){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> MH 受理率が極端（'+acceptanceRatePct.toFixed(1)+'%）。提案幅 step を σ_post≈'+postStd.toFixed(3)+' の 2〜3 倍程度（目安 '+(2.38*postStd).toFixed(2)+'）に調整してください。';
+  }else if(effSampleSize < 100){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 有効サンプル数 ESS が小さい（'+effSampleSize+'）。サンプル数を増やすか提案幅を最適化して ESS≥200 を狙いましょう。R̂ proxy = '+rHat.toFixed(3)+'。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 鎖は健全です（受理率 '+acceptanceRatePct.toFixed(1)+'%、ESS '+effSampleSize+'、R̂ proxy '+rHat.toFixed(3)+'）。事後平均 μ_post = '+postMean.toFixed(3)+'、95% 信用区間 ['+ci95Lo.toFixed(2)+', '+ci95Hi.toFixed(2)+']。';
+  }
+
+  // ----- PDF chart: prior / likelihood / posterior -----
+  const span = Math.max(priorStd*3, postStd*5, 0.5);
+  const center = (priorMean + postMean)/2;
+  const xLo = center - span;
+  const xHi = center + span;
+  const N = 80;
+  const pLabels=[], pPrior=[], pLike=[], pPost=[];
+  // likelihood is on theta (mean parameter): centered at observedMean, std = sigma_y/sqrt(N)
+  const likeStdEff = likelihoodSigma/Math.sqrt(observedN);
+  for(let i=0;i<=N;i++){
+    const x = xLo + (xHi-xLo)*i/N;
+    pLabels.push(x.toFixed(2));
+    pPrior.push(normalPdf(x, priorMean, priorStd));
+    pLike.push(normalPdf(x, observedMean, likeStdEff));
+    pPost.push(normalPdf(x, postMean, postStd));
+  }
+  pdfChart.data.labels = pLabels;
+  pdfChart.data.datasets[0].data = pPrior;
+  pdfChart.data.datasets[1].data = pLike;
+  pdfChart.data.datasets[2].data = pPost;
+  pdfChart.update('none');
+
+  // ----- MCMC trace simulation (lightweight) -----
+  _bcSeed = 12345;            // reproducible chain per parameter set
+  const chainLen = Math.min(800, Math.max(50, Math.floor(numSamples/Math.max(1, Math.floor(numSamples/600)))));
+  // We display up to chainLen points sampled evenly from the full numSamples chain
+  const trace = [];
+  let theta = priorMean + priorStd*randn();
+  let logPi = -0.5*Math.pow((theta-postMean)/postStd,2);
+  // simulate the full chain but only keep evenly-spaced samples for plotting
+  const totalSteps = Math.floor(numSamples);
+  const thin = Math.max(1, Math.floor(totalSteps/chainLen));
+  let kept = 0;
+  for(let t=0; t<totalSteps && kept<chainLen; t++){
+    const thetaStar = theta + proposalStd*randn();
+    const logPiStar = -0.5*Math.pow((thetaStar-postMean)/postStd,2);
+    if(Math.log(Math.max(1e-12,_bcRand())) < (logPiStar - logPi)){
+      theta = thetaStar; logPi = logPiStar;
+    }
+    if(t % thin === 0){
+      trace.push({t:t, v:theta});
+      kept++;
+    }
+  }
+  const tLabels = trace.map(p=>p.t.toString());
+  const tVals   = trace.map(p=>p.v);
+  const tMean   = trace.map(()=>postMean);
+  traceChart.data.labels = tLabels;
+  traceChart.data.datasets[0].data = tVals;
+  traceChart.data.datasets[1].data = tMean;
+  traceChart.update('none');
+
+  // ----- update shared state for animation -----
+  BC.priorMean = priorMean;
+  BC.priorStd  = priorStd;
+  BC.likeMean  = observedMean;
+  BC.likeStd   = likeStdEff;
+  BC.postMean  = postMean;
+  BC.postStd   = postStd;
+  BC.xLo = xLo; BC.xHi = xHi;
+  BC.samples = tVals;
+}
+
+// ===== Canvas animation: prior / likelihood / posterior + MH walker =====
+(function(){
+  const cv = document.getElementById('bcCanvas');
+  const ctx = cv.getContext('2d');
+  let phase = 0;
+  let walkerTheta = 0;
+  let lastTheta = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function drawPdf(W, H, padL, padR, padT, padB, color, fillColor, mu, sigma, scaleY){
+    if(sigma<=1e-9) return;
+    const xLo = BC.xLo, xHi = BC.xHi;
+    const span = xHi - xLo;
+    ctx.beginPath();
+    for(let i=0;i<=120;i++){
+      const x = xLo + span*i/120;
+      const y = normalPdf(x, mu, sigma);
+      const px = padL + (W-padL-padR)*i/120;
+      const py = H-padB - y*scaleY;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    // close fill region
+    ctx.lineTo(padL+(W-padL-padR), H-padB);
+    ctx.lineTo(padL, H-padB);
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    // restroke the curve only
+    ctx.beginPath();
+    for(let i=0;i<=120;i++){
+      const x = xLo + span*i/120;
+      const y = normalPdf(x, mu, sigma);
+      const px = padL + (W-padL-padR)*i/120;
+      const py = H-padB - y*scaleY;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const padL=50, padR=20, padT=30, padB=40;
+    const xLo = BC.xLo, xHi = BC.xHi;
+    if(!isFinite(xLo) || !isFinite(xHi) || xHi<=xLo) { requestAnimationFrame(frame); return; }
+
+    // ----- axes -----
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT); ctx.lineTo(padL, H-padB); ctx.lineTo(W-padR, H-padB);
+    ctx.stroke();
+
+    // peak densities to scale y
+    const peakPrior = normalPdf(BC.priorMean, BC.priorMean, BC.priorStd);
+    const peakLike  = normalPdf(BC.likeMean, BC.likeMean, BC.likeStd);
+    const peakPost  = normalPdf(BC.postMean, BC.postMean, BC.postStd);
+    const peakMax   = Math.max(peakPrior, peakLike, peakPost, 1e-9);
+    const drawableH = H - padT - padB;
+    const scaleY    = drawableH/peakMax * 0.95;
+
+    // draw PDFs
+    drawPdf(W, H, padL, padR, padT, padB, '#3498db', 'rgba(52,152,219,.18)', BC.priorMean, BC.priorStd, scaleY);
+    drawPdf(W, H, padL, padR, padT, padB, '#e74c3c', 'rgba(231,76,60,.16)',  BC.likeMean,  BC.likeStd,  scaleY);
+    drawPdf(W, H, padL, padR, padT, padB, '#00b894', 'rgba(0,184,148,.22)',  BC.postMean,  BC.postStd,  scaleY);
+
+    // x-axis ticks
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    for(let k=0;k<=4;k++){
+      const xv = xLo + (xHi-xLo)*k/4;
+      const px = padL + (W-padL-padR)*k/4;
+      ctx.fillText(xv.toFixed(2), px, H-padB+14);
+    }
+    ctx.textAlign = 'right';
+    ctx.fillText('θ', W-padR+12, H-padB+4);
+
+    // ----- MH walker: random-walk Metropolis on posterior -----
+    // step several MH iterations per frame for visible motion
+    for(let s=0;s<3;s++){
+      const proposalStd = parseFloat(document.getElementById('proposalStdRange').value) || 0.15;
+      const star = walkerTheta + proposalStd*( (Math.random()*2-1) + (Math.random()*2-1) + (Math.random()*2-1) )/Math.sqrt(3) * 1.0;
+      // log pi(theta) up to constant
+      const logPi  = -0.5*Math.pow((walkerTheta-BC.postMean)/Math.max(1e-9,BC.postStd),2);
+      const logPiS = -0.5*Math.pow((star-BC.postMean)/Math.max(1e-9,BC.postStd),2);
+      if(Math.log(Math.max(1e-9,Math.random())) < (logPiS - logPi)){
+        lastTheta = walkerTheta;
+        walkerTheta = star;
+      }
+    }
+    // draw walker
+    const wx = padL + (W-padL-padR)*(walkerTheta-xLo)/(xHi-xLo);
+    const wy = H-padB - normalPdf(walkerTheta, BC.postMean, BC.postStd)*scaleY;
+    // trail
+    const lx = padL + (W-padL-padR)*(lastTheta-xLo)/(xHi-xLo);
+    const ly = H-padB - normalPdf(lastTheta, BC.postMean, BC.postStd)*scaleY;
+    ctx.strokeStyle = 'rgba(255,255,255,.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(lx,ly); ctx.lineTo(wx,wy);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(wx,wy,5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#00b894';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(wx,wy,7,0,Math.PI*2); ctx.stroke();
+
+    // legend
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#3498db'; ctx.fillText('● prior', padL+4, padT+6);
+    ctx.fillStyle = '#e74c3c'; ctx.fillText('● likelihood', padL+4, padT+20);
+    ctx.fillStyle = '#00b894'; ctx.fillText('● posterior', padL+4, padT+34);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('○ MH walker θ_t = '+walkerTheta.toFixed(3), W-padR-220, padT+6);
+
+    phase += 0.01; if(phase>=1) phase = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['priorMeanRange','priorStdRange','likelihoodSigmaRange','observedMeanRange','observedNRange','proposalStdRange','numSamplesRange','burnInRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

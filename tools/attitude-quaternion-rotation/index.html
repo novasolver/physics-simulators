@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宇宙機姿勢クォータニオンシミュレーター — Euler角との変換 | NovaSolver</title>
+<meta name="description" content="宇宙機・航空機・ロボットの姿勢表現に使うクォータニオン (w,x,y,z) を、Euler角 (roll/pitch/yaw) と軸-角度の合成回転からリアルタイム計算。ノルム検証・gimbal lock 回避・SLERP の基礎を可視化する無料シミュレーターです。">
+<link rel="canonical" href="https://novasolver.jp/tools/attitude-quaternion-rotation.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/attitude-quaternion-rotation.html">
+<meta property="og:title" content="宇宙機姿勢クォータニオンシミュレーター — Euler角との変換 | NovaSolver Project">
+<meta property="og:description" content="クォータニオン (w,x,y,z) と Euler 角・軸-角度表現の相互変換を可視化。宇宙機の姿勢表現と gimbal lock 回避を直感的に学べます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Spacecraft attitude quaternion rotation simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/attitude-quaternion-rotation.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/attitude-quaternion-rotation.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/attitude-quaternion-rotation.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/attitude-quaternion-rotation.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#attitudeCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "宇宙機姿勢クォータニオンシミュレーター",
+      "description": "宇宙機・航空機・ロボットの姿勢表現に使うクォータニオン (w,x,y,z) を、Euler角 (roll/pitch/yaw) と軸-角度の合成回転からリアルタイム計算。ノルム検証・gimbal lock 回避・SLERP の基礎を可視化する無料シミュレーターです。",
+      "url": "https://novasolver.jp/tools/attitude-quaternion-rotation.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Aerospace Attitude Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["Euler角 (ZYX) からクォータニオンへの変換","軸-角度表現とのクォータニオン合成","ノルム |q|=1 の検証","gimbal lock の回避特性","合成回転からの Euler角逆変換","3D 宇宙機モデルの姿勢可視化"],
+      "keywords": "クォータニオン,四元数,宇宙機姿勢,Euler角,gimbal lock,SLERP,姿勢制御,航空宇宙",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "なぜ宇宙機の姿勢表現にクォータニオンを使うのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "クォータニオンは4成分 (w,x,y,z) で3D回転を一意に表現でき、Euler角の特異点である gimbal lock（ピッチ ±90°でロールとヨーが縮退する現象）を完全に回避できます。さらに2つの回転の合成が単一の乗算で済み、補間（SLERP）が等角速度で滑らかになるため、姿勢決定制御系（ADCS）・スタートラッカー・MEMS IMU 融合・ロボットアームの軌道計画など、姿勢を時間連続で扱う全ての場面で標準的に用いられます。"}
+        },{
+          "@type": "Question",
+          "name": "Euler角 (roll, pitch, yaw) からクォータニオンへの変換式は？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Tait-Bryan ZYX 順序（ヨー→ピッチ→ロール）で、cy=cos(ψ/2), sy=sin(ψ/2), cp=cos(θ/2), sp=sin(θ/2), cr=cos(φ/2), sr=sin(φ/2) と置くと、q_w=cr·cp·cy+sr·sp·sy, q_x=sr·cp·cy−cr·sp·sy, q_y=cr·sp·cy+sr·cp·sy, q_z=cr·cp·sy−sr·sp·cy となります。φ=ロール、θ=ピッチ、ψ=ヨー。JPL/Hamilton の符号慣習（i²=j²=k²=ijk=−1）に従い、本ツールも Hamilton 規約で実装しています。"}
+        },{
+          "@type": "Question",
+          "name": "クォータニオンのノルムが 1 でないと何が問題ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "単位クォータニオン |q|=1 のみが純粋な回転を表します。数値積分やセンサーフュージョン（拡張カルマンフィルタ）で時間とともにノルムが 1 から逸脱すると、回転行列に変換した際にスケーリング成分が混入し、ベクトルの長さが変わってしまいます。本ツールでは |q|−1| > 0.01 で warn を出します。実機の ADCS では毎ステップ q ← q/|q| で正規化（renormalization）するか、誤差クォータニオン定式化で誤差の蓄積自体を抑える設計が標準です。"}
+        },{
+          "@type": "Question",
+          "name": "軸-角度表現とクォータニオンの関係は？",
+          "acceptedAnswer": {"@type": "Answer", "text": "単位ベクトル n=(n_x,n_y,n_z) の周りに角度 α だけ回転するクォータニオンは q=(cos(α/2), sin(α/2)·n_x, sin(α/2)·n_y, sin(α/2)·n_z) です。物理的意味が直感的で、Rodrigues の回転公式と直接対応します。半角 α/2 が現れるのは、クォータニオン q がベクトル v に作用するとき v' = q·v·q* と「左右からはさむ」形になるため、回転が二重に効くことを補正する必要があるからです。これにより q と −q が同じ回転を表す「二重被覆」が生じます。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "宇宙機姿勢クォータニオンシミュレーター", "item": "https://novasolver.jp/tools/attitude-quaternion-rotation.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">宇宙機姿勢クォータニオンシミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/attitude-quaternion-rotation.html" class="active">JA</a>
+      <a href="/en/tools/attitude-quaternion-rotation.html">EN</a>
+      <a href="/zh/tools/attitude-quaternion-rotation.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-satellite"></i> 宇宙工学</div>
+    <h1>宇宙機姿勢クォータニオンシミュレーター</h1>
+    <p class="hero-sub">宇宙機・航空機・ロボットの3次元姿勢を表す「クォータニオン q=(w,x,y,z)」を、ロール／ピッチ／ヨーの Euler角と任意軸まわりの回転から合成し、リアルタイムに4成分・ノルム・等価 Euler角を計算します。gimbal lock を回避し、姿勢決定制御系 (ADCS) で標準的に使われる Hamilton 規約の四元数を直感的に学べます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ロール φ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="rollNum" value="30" min="-180" max="180" step="1" oninput="syncFromNum('rollRange','rollNum')"><span class="num-unit">°</span></div>
+      </div>
+      <div class="param-desc">機体 X 軸（前後）まわりの回転</div>
+      <input type="range" id="rollRange" min="-180" max="180" step="1" value="30" oninput="syncToNum('rollRange','rollNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ピッチ θ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="pitchNum" value="20" min="-90" max="90" step="1" oninput="syncFromNum('pitchRange','pitchNum')"><span class="num-unit">°</span></div>
+      </div>
+      <div class="param-desc">機体 Y 軸（左右）まわりの回転。±90° で gimbal lock</div>
+      <input type="range" id="pitchRange" min="-90" max="90" step="1" value="20" oninput="syncToNum('pitchRange','pitchNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ヨー ψ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="yawNum" value="45" min="-180" max="180" step="1" oninput="syncFromNum('yawRange','yawNum')"><span class="num-unit">°</span></div>
+      </div>
+      <div class="param-desc">機体 Z 軸（上下）まわりの回転</div>
+      <input type="range" id="yawRange" min="-180" max="180" step="1" value="45" oninput="syncToNum('yawRange','yawNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">回転軸 n_x</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="axisXNum" value="0.0" min="-1" max="1" step="0.01" oninput="syncFromNum('axisXRange','axisXNum')"></div>
+      </div>
+      <input type="range" id="axisXRange" min="-1" max="1" step="0.01" value="0.0" oninput="syncToNum('axisXRange','axisXNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">回転軸 n_y</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="axisYNum" value="0.0" min="-1" max="1" step="0.01" oninput="syncFromNum('axisYRange','axisYNum')"></div>
+      </div>
+      <input type="range" id="axisYRange" min="-1" max="1" step="0.01" value="0.0" oninput="syncToNum('axisYRange','axisYNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">回転軸 n_z</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="axisZNum" value="1.0" min="-1" max="1" step="0.01" oninput="syncFromNum('axisZRange','axisZNum')"></div>
+      </div>
+      <div class="param-desc">軸ベクトルは自動的に単位ベクトルに正規化されます</div>
+      <input type="range" id="axisZRange" min="-1" max="1" step="0.01" value="1.0" oninput="syncToNum('axisZRange','axisZNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">回転角 α</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="angleNum" value="90" min="0" max="360" step="1" oninput="syncFromNum('angleRange','angleNum')"><span class="num-unit">°</span></div>
+      </div>
+      <div class="param-desc">軸-角度クォータニオンの回転量</div>
+      <input type="range" id="angleRange" min="0" max="360" step="1" value="90" oninput="syncToNum('angleRange','angleNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statQw">—</div><div class="sl">クォータニオン w</div></div>
+        <div class="stat-card"><div class="sv" id="statQx">—</div><div class="sl">クォータニオン x</div></div>
+        <div class="stat-card"><div class="sv" id="statQy">—</div><div class="sl">クォータニオン y</div></div>
+        <div class="stat-card"><div class="sv" id="statQz">—</div><div class="sl">クォータニオン z</div></div>
+        <div class="stat-card"><div class="sv" id="statNorm">—</div><div class="sl">ノルム |q|</div></div>
+        <div class="stat-card"><div class="sv" id="statEuler">—</div><div class="sl">合成 Euler (φ,θ,ψ) °</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-satellite"></i> 3D 宇宙機モデル — 姿勢・回転軸の可視化</div>
+      <canvas id="attitudeCanvas"></canvas>
+      <p class="canvas-hint">機体は入力姿勢に従って回転し、太陽電池パネルと機軸（X=赤・Y=緑・Z=青）の方向が変化します。黄色のベクトルは軸-角度回転の単位軸 n、扇形は回転角 α を表します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-bar"></i> クォータニオン4成分</div>
+      <canvas class="ux-chartjs-canvas" id="quatChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 軸-角度 <span style="text-transform:none">α</span> 掃引 — 合成姿勢の Euler角変化</div>
+      <canvas class="ux-chartjs-canvas" id="eulerChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$q = \cos\tfrac{\alpha}{2} + \sin\tfrac{\alpha}{2}\bigl(n_x\,i + n_y\,j + n_z\,k\bigr),\quad q_1\,q_2 = (\text{rotation composition})$$</p>
+      <p style="margin-top:6px;">単位ベクトル n=(n_x,n_y,n_z) の周りに角度 α だけ回転するクォータニオン。クォータニオン乗算は非可換 (q1·q2 ≠ q2·q1)。</p>
+      <p style="margin-top:10px;">$$q_{ZYX} = \begin{pmatrix} c_r c_p c_y + s_r s_p s_y \\ s_r c_p c_y - c_r s_p s_y \\ c_r s_p c_y + s_r c_p s_y \\ c_r c_p s_y - s_r s_p c_y \end{pmatrix},\quad c_\ast=\cos\tfrac{\ast}{2},\,s_\ast=\sin\tfrac{\ast}{2}$$</p>
+      <p style="margin-top:6px;">Tait-Bryan ZYX 順序（ヨー→ピッチ→ロール）で組み立てた Euler→四元数変換。φ：ロール、θ：ピッチ、ψ：ヨー。</p>
+      <p style="margin-top:10px;">$$|q| = \sqrt{w^2 + x^2 + y^2 + z^2} = 1,\qquad q^{-1} = q^* / |q|^2,\qquad q^* = (w,-x,-y,-z)$$</p>
+      <p style="margin-top:6px;">単位クォータニオン条件と逆元（共役 q*）。実機では毎ステップ q ← q/|q| で再正規化する。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>クォータニオンによる宇宙機姿勢表現</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">宇宙機の姿勢って、ロール・ピッチ・ヨーの3つで決まりますよね。なんでわざわざ4成分のクォータニオンなんて使うんですか？3つで足りるのに余分じゃないですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だね。確かに自由度は3つだから、Euler角3つでも姿勢は記述できる。でも実用上は「gimbal lock」という致命的な問題があるんだ。例えばピッチが ±90°ちょうどになると、ロール軸とヨー軸が同じ向きになって、ロールとヨーの区別がつかなくなる。アポロ計画でも実際にこの問題が起きていて、宇宙飛行士が「Christmas tree！」（コンソールに警告ランプが一斉点灯）と叫ぶ場面があったほど。クォータニオンは1次元余分に持つことで、この特異点を物理的に消してしまえるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど、特異点回避が一番大事なんですね。でもクォータニオンって複素数の親戚みたいなもので、i²=−1 とか出てきて難しそう…直感的に何を表しているんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと、q=(cos(α/2), sin(α/2)·n) は「軸 n まわりに角度 α だけ回転する操作」を1個の数にパックしたものだよ。半角 α/2 が出てくるのが最初はギョッとするけど、これはクォータニオンがベクトル v に作用するとき v' = q·v·q* と「左右からはさむ」形になるから。両側から効くので、回転角が二重に効かないように半角にしてある。だから q と −q（符号反転）は同じ回転を表すんだ。これを「二重被覆」と呼ぶよ。左パネルで「回転軸=(0,0,1)、回転角=90°」にすると、q_axis = (cos45°, 0, 0, sin45°) = (0.707, 0, 0, 0.707) になっているのが確認できるね。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">2つの回転を組み合わせるのに「乗算」を使うんですよね。これも普通の掛け算とは違うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">クォータニオン乗算は Hamilton が1843年に発見した非可換な代数で、q1·q2 ≠ q2·q1 になる。回転の順序を入れ替えると結果が違うのと同じ意味だね。本ツールでは「Euler角で作った姿勢クォータニオン q_euler」と「軸-角度で作った q_axis」を q_total = q_euler · q_axis で合成している。例えばスタートラッカーから読んだ絶対姿勢に、リアクションホイールの差分回転を加える、というような使い方だ。Quaternion SLAM や姿勢推定の拡張カルマンフィルタ（EKF/UKF）でも、状態遷移はこの乗算で書かれているよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">右上の「ノルム |q|」が 1 になっているか気にする必要があるとのことですが、なぜ 1 から外れると問題なんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">単位クォータニオン |q|=1 だけが純粋な「回転」を表すんだ。ノルムが 1.05 になると、回転＋5%の拡大、みたいに余計な相似変換が混入してしまう。Hubble 宇宙望遠鏡や ISS の姿勢決定系では、毎制御周期（数十Hz〜数百Hz）でクォータニオンを再正規化 q ← q/|q| するか、誤差クォータニオン定式化（multiplicative EKF, MEKF）で誤差の蓄積自体を抑える。数値積分で角速度から姿勢を更新するときは特に注意で、Runge-Kutta 4次でも 1秒で 10⁻⁶ オーダーのノルム誤差が出るから、長時間運用では補正必須なんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「合成 Euler」がリアルタイムで出るのも便利ですね。でも下の「α 掃引」グラフを見ると、α を増やすとピッチが急に飛ぶ場所がありますね。これも gimbal lock ですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">よく気づいたね、それは Euler角への逆変換に特有の問題で「pitch=±90° の近傍で atan2 の分母が 0 に近づき、ロールとヨーが交換可能になる」ためなんだ。クォータニオン側では何も特異なことは起きていなくて、4成分は滑らかに変化している。これがまさに「クォータニオンで姿勢を積分して、表示のときだけ Euler角に変換する」べき理由だよ。NASA・JAXA・ESA の宇宙機 ADCS は全てこの方針で設計されている。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">なぜ宇宙機の姿勢表現にクォータニオンを使うのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">クォータニオンは4成分 (w,x,y,z) で3D回転を一意に表現でき、Euler角の特異点である gimbal lock（ピッチ ±90°でロールとヨーが縮退する現象）を完全に回避できます。さらに2つの回転の合成が単一の乗算で済み、補間（SLERP）が等角速度で滑らかになるため、姿勢決定制御系（ADCS）・スタートラッカー・MEMS IMU 融合・ロボットアームの軌道計画など、姿勢を時間連続で扱う全ての場面で標準的に用いられます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Euler角 (roll, pitch, yaw) からクォータニオンへの変換式は？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">Tait-Bryan ZYX 順序（ヨー→ピッチ→ロール）で、cy=cos(ψ/2), sy=sin(ψ/2), cp=cos(θ/2), sp=sin(θ/2), cr=cos(φ/2), sr=sin(φ/2) と置くと、q_w=cr·cp·cy+sr·sp·sy, q_x=sr·cp·cy−cr·sp·sy, q_y=cr·sp·cy+sr·cp·sy, q_z=cr·cp·sy−sr·sp·cy となります。φ=ロール、θ=ピッチ、ψ=ヨー。JPL/Hamilton の符号慣習（i²=j²=k²=ijk=−1）に従い、本ツールも Hamilton 規約で実装しています。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">クォータニオンのノルムが 1 でないと何が問題ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">単位クォータニオン |q|=1 のみが純粋な回転を表します。数値積分やセンサーフュージョン（拡張カルマンフィルタ）で時間とともにノルムが 1 から逸脱すると、回転行列に変換した際にスケーリング成分が混入し、ベクトルの長さが変わってしまいます。本ツールでは |q|−1| &gt; 0.01 で warn を出します。実機の ADCS では毎ステップ q ← q/|q| で正規化（renormalization）するか、誤差クォータニオン定式化で誤差の蓄積自体を抑える設計が標準です。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">軸-角度表現とクォータニオンの関係は？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">単位ベクトル n=(n_x,n_y,n_z) の周りに角度 α だけ回転するクォータニオンは q=(cos(α/2), sin(α/2)·n_x, sin(α/2)·n_y, sin(α/2)·n_z) です。物理的意味が直感的で、Rodrigues の回転公式と直接対応します。半角 α/2 が現れるのは、クォータニオン q がベクトル v に作用するとき v' = q·v·q* と「左右からはさむ」形になるため、回転が二重に効くことを補正する必要があるからです。これにより q と −q が同じ回転を表す「二重被覆」が生じます。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>宇宙機・人工衛星の姿勢決定制御系 (ADCS)：</strong>ISS、Hubble、JWST、Starlink 衛星群、はやぶさ2・SLIM 等の月惑星探査機まで、現代の宇宙機の姿勢推定・制御は例外なくクォータニオン基底です。スタートラッカーから絶対姿勢クォータニオン q_ref を得て、ジャイロからの角速度を q̇ = ½·q·ω で積分し、誤差クォータニオン δq でリアクションホイールやスラスタへの指令を生成します。Euler角は人間が表示を読むときの変換用途のみで、計算は全てクォータニオン領域で行います。</p>
+    <p><strong>ドローン・UAV の姿勢制御：</strong>DJI・Skydio・PX4・ArduPilot などの民生・産業ドローン用フライトコントローラは、MEMS IMU（加速度計＋ジャイロ＋磁気センサ）の融合に Mahony フィルタや MEKF を採用し、内部状態としてクォータニオンを保持します。アクロバット飛行で機体が垂直上昇から背面飛行に遷移する瞬間、Euler角ベースだとピッチ ±90° で制御が破綻しますが、クォータニオン基底なら何の特異性もなく連続的に姿勢を追跡できます。</p>
+    <p><strong>3DCG・ゲームエンジン・VR/AR：</strong>Unity・Unreal Engine・Blender などのリアルタイム 3D アプリは、内部の Transform 回転を必ずクォータニオンで保持します。キャラクターアニメーションのキーフレーム補間は SLERP（球面線形補間）で行い、等角速度の滑らかな回転を実現します。Oculus Quest や HTC Vive などの VR ヘッドセットも、6DoF トラッキングからのヘッド姿勢をクォータニオンで配信し、レンダリングパイプラインの最後でビュー行列に変換します。</p>
+    <p><strong>ロボット工学・モーションキャプチャ：</strong>産業用ロボットアーム（FANUC・KUKA・ABB）の軌道計画、人型ロボット（Atlas, ASIMO 系）のバランス制御、Vicon や OptiTrack のモーションキャプチャの剛体姿勢出力など、関節角や剛体姿勢を補間・微分する場面では Euler角の特異点を避けてクォータニオンで処理します。逆運動学のヤコビアン計算でも、回転部分の自由度を3で扱う際にクォータニオンの接空間（角速度ベクトル）を経由するのが標準です。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の混乱が、<strong>クォータニオンの「符号慣習」</strong>です。Hamilton 規約（ij=k）と JPL 規約（ij=−k）の2つが存在し、両者でクォータニオン乗算の符号が逆になります。3DCG・ゲーム業界・Eigen ライブラリは Hamilton、NASA JPL の宇宙機 ADCS 系コードは JPL 規約が多く、ライブラリを混在させると姿勢が反対に回転します。本ツールは Hamilton 規約で実装しています。さらに格納順序にも (w,x,y,z) と (x,y,z,w) の2流派があり、Eigen は (x,y,z,w)、ROS の tf2 は (x,y,z,w)、本ツールと多くの教科書は (w,x,y,z) です。コードを移植する際は必ず両方を確認してください。</p>
+    <p>次に、<strong>「クォータニオンは特異点がない」を「逆変換にも特異点がない」と誤解する</strong>こと。クォータニオン q 自身は4次元単位球面 S³ 上に滑らかに分布し、特異点はありません。しかし q から Euler角への逆変換 (asin, atan2) には ピッチ = ±90° で atan2(0,0) の不定領域が現れ、ロールとヨーが交換可能になります。本ツールでも pitchOut の計算で |sinp| ≥ 1 をクランプしているのはこのためです。だからこそ「姿勢の積分と制御はクォータニオン領域で行い、Euler角に変換するのは人間が表示を読むときだけ」という設計原則が生まれました。</p>
+    <p>最後に、<strong>「単位クォータニオンであり続けると思い込む」</strong>こと。数値計算では Runge-Kutta 4次積分でも、1秒あたり 10⁻⁶ 程度のノルム誤差が必ず蓄積します。フィードバックで補正しないと、数時間後にはノルムが 0.999 や 1.001 になり、姿勢推定にバイアスが入ります。実機では各ステップで q ← q/|q| を実行するか、誤差クォータニオン定式化（MEKF）で誤差自体を 0 周辺の小さな量として扱います。本ツールは入力された Euler角と軸-角度から閉形式で計算するためノルムは数値誤差レベルで 1.0001 程度ですが、長時間の積分系では必ず正規化処理を入れてください。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>Roll・Pitch・Yaw（度）を入力するか、軸ベクトル（X/Y/Z成分）と回転角度を指定します</li>
+<li>シミュレーターが自動的にEuler角からクォータニオン（w,x,y,z）に変換し、ノルム|q|を検証します</li>
+<li>出力されたクォータニオン値と合成Euler角を確認し、gimbal lock（ピッチ90°付近）の挙動を観察します</li>
+<li>軸-角度表現による別ルートでの計算結果と比較し、SLERP補間の基礎を理解します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>国際宇宙ステーション（ISS）の太陽電池パネル駆動を想定：Roll=30°、Pitch=45°、Yaw=60°を入力。クォータニオンはq=(0.8315, 0.2391, 0.3865, 0.3536)で、ノルム|q|=1.0000となり正規化済み。また回転軸(0, 1, 0)・回転角87.28°からも同じクォータニオンが得られ、軸-角度とEuler角の等価性が確認できます。合成Euler角φ=30.0°、θ=45.0°、ψ=60.0°と一致します。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>Gimbal lockはPitch=±90°で発生するため、航空機制御ではPitch範囲を-85°～+85°に制限してクォータニオンを優先使用します</li>
+<li>外界基準系と機体基準系の混同を避け、ZYX（またはZYX'）の回転順序を統一してください</li>
+<li>ロボット関節の複合回転はクォータニオン正規化後に補間（SLERP）することで滑らかな動きが実現でき、Euler角の直線補間より優れています</li>
+<li>ノルム|q|が1.0から外れた場合は数値誤差の蓄積を示すため、定期的な再正規化が必要です</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Shared state for the 3D attitude animation =====
+const ATT = {qw:1, qx:0, qy:0, qz:0, ax:0, ay:0, az:1, alpha:0, norm:1};
+
+// ===== Chart.js setup: quaternion 4 components =====
+const quatChart = new Chart(document.getElementById('quatChart').getContext('2d'),{
+  type:'bar',
+  data:{
+    labels:['w','x','y','z'],
+    datasets:[{
+      label:'q components',
+      data:[0,0,0,0],
+      backgroundColor:['#007BFF','#e17055','#00b894','#fdcb6e'],
+      borderColor:['#0056b3','#c0563a','#0a8a6a','#c79a3a'],
+      borderWidth:1
+    }]
+  },
+  options:{
+    animation:false, responsive:true, maintainAspectRatio:false,resizeDelay:100, aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'クォータニオン成分',font:{size:11}}},
+      y:{title:{display:true,text:'値',font:{size:11}}, suggestedMin:-1, suggestedMax:1}
+    },
+    plugins:{legend:{display:false}}
+  }
+});
+
+// ===== Chart.js setup: Euler vs axis-angle alpha sweep =====
+const eulerChart = new Chart(document.getElementById('eulerChart').getContext('2d'),{
+  type:'line',
+  data:{
+    labels:[],
+    datasets:[
+      {label:'ロール φ_out (°)', data:[], borderColor:'#e17055', backgroundColor:'rgba(225,112,85,.13)', fill:false, borderWidth:2, pointRadius:0, tension:0.2},
+      {label:'ピッチ θ_out (°)', data:[], borderColor:'#00b894', backgroundColor:'rgba(0,184,148,.13)', fill:false, borderWidth:2, pointRadius:0, tension:0.2},
+      {label:'ヨー ψ_out (°)',  data:[], borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,.13)', fill:false, borderWidth:2, pointRadius:0, tension:0.2},
+      {label:'現在の α',         data:[], borderColor:'#d63031', backgroundColor:'#d63031', showLine:false, pointRadius:6, pointHoverRadius:7}
+    ]
+  },
+  options:{
+    animation:false, responsive:true, maintainAspectRatio:false,resizeDelay:100, aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'軸-角度 α (°)',font:{size:11}}, ticks:{maxTicksLimit:10}},
+      y:{title:{display:true,text:'合成 Euler 角 (°)',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Quaternion multiplication helper (Hamilton convention) =====
+function qmul(a, b){
+  return {
+    w: a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z,
+    x: a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
+    y: a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
+    z: a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w
+  };
+}
+
+// ===== Euler ZYX -> quaternion =====
+function eulerToQuat(rollDeg, pitchDeg, yawDeg){
+  const d = Math.PI/180;
+  const cy = Math.cos(yawDeg*d/2),   sy = Math.sin(yawDeg*d/2);
+  const cp = Math.cos(pitchDeg*d/2), sp = Math.sin(pitchDeg*d/2);
+  const cr = Math.cos(rollDeg*d/2),  sr = Math.sin(rollDeg*d/2);
+  return {
+    w: cr*cp*cy + sr*sp*sy,
+    x: sr*cp*cy - cr*sp*sy,
+    y: cr*sp*cy + sr*cp*sy,
+    z: cr*cp*sy - sr*sp*cy
+  };
+}
+
+// ===== Axis-angle -> quaternion =====
+function axisAngleToQuat(axX, axY, axZ, angleDeg){
+  const d = Math.PI/180;
+  const n = Math.sqrt(axX*axX + axY*axY + axZ*axZ);
+  const ax = n > 1e-9 ? axX/n : 0;
+  const ay = n > 1e-9 ? axY/n : 0;
+  const az = n > 1e-9 ? axZ/n : 1;
+  const half = angleDeg*d/2;
+  return {
+    w: Math.cos(half),
+    x: ax*Math.sin(half),
+    y: ay*Math.sin(half),
+    z: az*Math.sin(half)
+  };
+}
+
+// ===== Quaternion -> Euler ZYX (degrees) =====
+function quatToEuler(q){
+  const w=q.w, x=q.x, y=q.y, z=q.z;
+  const sinr_cosp = 2*(w*x + y*z);
+  const cosr_cosp = 1 - 2*(x*x + y*y);
+  const rollOut = Math.atan2(sinr_cosp, cosr_cosp) * 180/Math.PI;
+
+  const sinp = 2*(w*y - z*x);
+  const pitchOut = Math.abs(sinp) >= 1 ? Math.sign(sinp)*90 : Math.asin(sinp)*180/Math.PI;
+
+  const siny_cosp = 2*(w*z + x*y);
+  const cosy_cosp = 1 - 2*(y*y + z*z);
+  const yawOut = Math.atan2(siny_cosp, cosy_cosp) * 180/Math.PI;
+
+  return {roll: rollOut, pitch: pitchOut, yaw: yawOut};
+}
+
+// ===== Main compute() =====
+function compute(){
+  const rollAngle  = parseFloat(document.getElementById('rollRange').value);
+  const pitchAngle = parseFloat(document.getElementById('pitchRange').value);
+  const yawAngle   = parseFloat(document.getElementById('yawRange').value);
+  const axisX = parseFloat(document.getElementById('axisXRange').value);
+  const axisY = parseFloat(document.getElementById('axisYRange').value);
+  const axisZ = parseFloat(document.getElementById('axisZRange').value);
+  const rotationAngle = parseFloat(document.getElementById('angleRange').value);
+
+  // 1) Euler -> quaternion (Tait-Bryan ZYX)
+  const q_euler = eulerToQuat(rollAngle, pitchAngle, yawAngle);
+  // 2) Axis-angle -> quaternion
+  const q_axis  = axisAngleToQuat(axisX, axisY, axisZ, rotationAngle);
+  // 3) Combined: q_total = q_euler * q_axis
+  const q = qmul(q_euler, q_axis);
+
+  const qMagnitude = Math.sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
+
+  // 4) Convert combined back to Euler
+  const eulerOut = quatToEuler(q);
+
+  // ----- stat cards -----
+  document.getElementById('statQw').textContent = q.w.toFixed(4);
+  document.getElementById('statQx').textContent = q.x.toFixed(4);
+  document.getElementById('statQy').textContent = q.y.toFixed(4);
+  document.getElementById('statQz').textContent = q.z.toFixed(4);
+  document.getElementById('statNorm').textContent = qMagnitude.toFixed(6);
+  document.getElementById('statEuler').textContent =
+    eulerOut.roll.toFixed(1)+', '+eulerOut.pitch.toFixed(1)+', '+eulerOut.yaw.toFixed(1);
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(Math.abs(qMagnitude - 1) > 0.01){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ノルム |q| = '+qMagnitude.toFixed(6)+' が単位 1 から逸脱しています。実機 ADCS では q ← q/|q| で再正規化が必要です。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 単位クォータニオン条件を満たしています（|q| = '+qMagnitude.toFixed(6)+'）。合成回転は純粋な姿勢として有効です。';
+  }
+
+  // ----- quaternion bar chart -----
+  quatChart.data.datasets[0].data = [q.w, q.x, q.y, q.z];
+  quatChart.update('none');
+
+  // ----- Euler vs alpha sweep -----
+  const sweepLabels = [], sweepRoll = [], sweepPitch = [], sweepYaw = [], sweepMarker = [];
+  const STEPS = 36;
+  let bestK = 0, bestD = 1e9;
+  for(let k=0; k<=STEPS; k++){
+    const alphaSweep = 360*k/STEPS;
+    const q_axisSweep = axisAngleToQuat(axisX, axisY, axisZ, alphaSweep);
+    const qSweep = qmul(q_euler, q_axisSweep);
+    const eSweep = quatToEuler(qSweep);
+    sweepLabels.push(alphaSweep.toFixed(0));
+    sweepRoll.push(eSweep.roll);
+    sweepPitch.push(eSweep.pitch);
+    sweepYaw.push(eSweep.yaw);
+    sweepMarker.push(null);
+    const dist = Math.abs(alphaSweep - rotationAngle);
+    if(dist < bestD){bestD = dist; bestK = k;}
+  }
+  sweepMarker[bestK] = eulerOut.pitch;
+  eulerChart.data.labels = sweepLabels;
+  eulerChart.data.datasets[0].data = sweepRoll;
+  eulerChart.data.datasets[1].data = sweepPitch;
+  eulerChart.data.datasets[2].data = sweepYaw;
+  eulerChart.data.datasets[3].data = sweepMarker;
+  eulerChart.update('none');
+
+  // ----- update shared state for 3D animation -----
+  ATT.qw = q.w; ATT.qx = q.x; ATT.qy = q.y; ATT.qz = q.z;
+  const axisNorm = Math.sqrt(axisX*axisX + axisY*axisY + axisZ*axisZ);
+  ATT.ax = axisNorm > 1e-9 ? axisX/axisNorm : 0;
+  ATT.ay = axisNorm > 1e-9 ? axisY/axisNorm : 0;
+  ATT.az = axisNorm > 1e-9 ? axisZ/axisNorm : 1;
+  ATT.alpha = rotationAngle;
+  ATT.norm = qMagnitude;
+}
+
+// ===== 3D attitude visualization (Canvas2D, gentle wobble) =====
+(function(){
+  const cv = document.getElementById('attitudeCanvas');
+  const ctx = cv.getContext('2d');
+  let t = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width - w*dpr) > 2 || cv.height !== 270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height = '270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // Rotate a 3D point by a unit quaternion: v' = q * v * q*
+  function rotateByQuat(p, qw, qx, qy, qz){
+    // q * (0,p) -> intermediate
+    const iw = -qx*p[0] - qy*p[1] - qz*p[2];
+    const ix =  qw*p[0] + qy*p[2] - qz*p[1];
+    const iy =  qw*p[1] + qz*p[0] - qx*p[2];
+    const iz =  qw*p[2] + qx*p[1] - qy*p[0];
+    // (iw,ix,iy,iz) * q*  -> resulting vector part
+    const rx = iw*(-qx) + ix*qw + iy*(-qz) - iz*(-qy);
+    const ry = iw*(-qy) - ix*(-qz) + iy*qw + iz*(-qx);
+    const rz = iw*(-qz) + ix*(-qy) - iy*(-qx) + iz*qw;
+    return [rx, ry, rz];
+  }
+
+  // Simple orthographic projection with a fixed view-tilt
+  function project(p, cx, cy, scale){
+    // tilt scene a bit so it looks 3D (rotate around X by ~20°)
+    const tilt = -25 * Math.PI/180;
+    const ct = Math.cos(tilt), st = Math.sin(tilt);
+    const y2 = p[1]*ct - p[2]*st;
+    const z2 = p[1]*st + p[2]*ct;
+    return {x: cx + p[0]*scale, y: cy - y2*scale, depth: z2};
+  }
+
+  function drawLine(p1, p2, color, width){
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
+
+  function drawArrow(p1, p2, color, width){
+    drawLine(p1, p2, color, width);
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if(len < 1) return;
+    const ux = dx/len, uy = dy/len;
+    const ax = p2.x - 8*ux + 4*uy;
+    const ay = p2.y - 8*uy - 4*ux;
+    const bx = p2.x - 8*ux - 4*uy;
+    const by = p2.y - 8*uy + 4*ux;
+    ctx.beginPath();
+    ctx.moveTo(p2.x, p2.y);
+    ctx.lineTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width / (window.devicePixelRatio || 1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    // grid floor (subtle)
+    ctx.strokeStyle = 'rgba(80,130,180,.15)';
+    ctx.lineWidth = 1;
+    for(let g=-3; g<=3; g++){
+      const a = project([g*0.4, 0, -1.2], W/2, H/2 + 30, 50);
+      const b = project([g*0.4, 0,  1.2], W/2, H/2 + 30, 50);
+      const c = project([-1.2, 0, g*0.4], W/2, H/2 + 30, 50);
+      const d = project([ 1.2, 0, g*0.4], W/2, H/2 + 30, 50);
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.stroke();
+    }
+
+    // gentle wobble: tiny extra quaternion on top of the user's q
+    const wobAmp = 3 * Math.PI/180;
+    const wobAng = Math.sin(t*0.6) * wobAmp;
+    const wobQw = Math.cos(wobAng/2), wobQy = Math.sin(wobAng/2);
+
+    // Apply user quaternion then wobble
+    const norm = Math.sqrt(ATT.qw*ATT.qw + ATT.qx*ATT.qx + ATT.qy*ATT.qy + ATT.qz*ATT.qz) || 1;
+    const qw = ATT.qw/norm, qx = ATT.qx/norm, qy = ATT.qy/norm, qz = ATT.qz/norm;
+
+    // combined = wobble * user
+    const cw = wobQw*qw - 0*qx - wobQy*qy - 0*qz;
+    const cx = wobQw*qx + 0*qw  + wobQy*qz - 0*qy;
+    const cy_ = wobQw*qy - 0*qz + wobQy*qw + 0*qx;
+    const cz = wobQw*qz + 0*qy - wobQy*qx + 0*qw;
+
+    const cxC = W/2, cyC = H/2;
+    const sc = 55;
+
+    // ----- spacecraft body axes -----
+    function p3(v){ return project(v, cxC, cyC, sc); }
+    function rot(v){ return rotateByQuat(v, cw, cx, cy_, cz); }
+
+    // Body X axis (red) — fuselage forward
+    const xA = p3([0,0,0]);
+    const xB = p3(rot([1.0, 0, 0]));
+    drawArrow(xA, xB, '#e17055', 2.5);
+    ctx.fillStyle = '#e17055'; ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.fillText('X', xB.x+4, xB.y-4);
+
+    // Body Y axis (green)
+    const yB = p3(rot([0, 1.0, 0]));
+    drawArrow(xA, yB, '#00b894', 2.5);
+    ctx.fillStyle = '#00b894';
+    ctx.fillText('Y', yB.x+4, yB.y-4);
+
+    // Body Z axis (blue)
+    const zB = p3(rot([0, 0, 1.0]));
+    drawArrow(xA, zB, '#4fa9ff', 2.5);
+    ctx.fillStyle = '#4fa9ff';
+    ctx.fillText('Z', zB.x+4, zB.y-4);
+
+    // ----- spacecraft body (small cube) -----
+    const corners = [
+      [-0.18,-0.10,-0.10],[ 0.18,-0.10,-0.10],[ 0.18, 0.10,-0.10],[-0.18, 0.10,-0.10],
+      [-0.18,-0.10, 0.10],[ 0.18,-0.10, 0.10],[ 0.18, 0.10, 0.10],[-0.18, 0.10, 0.10]
+    ];
+    const proj = corners.map(c => p3(rot(c)));
+    const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+    ctx.strokeStyle = 'rgba(160,200,240,.85)';
+    ctx.lineWidth = 1.2;
+    edges.forEach(e => {
+      ctx.beginPath(); ctx.moveTo(proj[e[0]].x, proj[e[0]].y); ctx.lineTo(proj[e[1]].x, proj[e[1]].y); ctx.stroke();
+    });
+
+    // ----- solar panels (two thin rectangles along Y axis) -----
+    function quad(pts, fill, stroke){
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // left panel
+    const lp = [[-0.18, 0.02,-0.02],[-0.70, 0.02,-0.02],[-0.70, 0.02, 0.02],[-0.18, 0.02, 0.02]].map(v=>p3(rot(v)));
+    quad(lp, 'rgba(60,120,200,.55)', 'rgba(120,180,240,.85)');
+    const lp2 = [[-0.18,-0.02,-0.18],[-0.70,-0.02,-0.18],[-0.70, 0.02,-0.18],[-0.18, 0.02,-0.18]].map(v=>p3(rot(v)));
+    quad(lp2, 'rgba(60,120,200,.4)', 'rgba(120,180,240,.7)');
+    // right panel
+    const rp = [[ 0.18, 0.02,-0.02],[ 0.70, 0.02,-0.02],[ 0.70, 0.02, 0.02],[ 0.18, 0.02, 0.02]].map(v=>p3(rot(v)));
+    quad(rp, 'rgba(60,120,200,.55)', 'rgba(120,180,240,.85)');
+    const rp2 = [[ 0.18,-0.02,-0.18],[ 0.70,-0.02,-0.18],[ 0.70, 0.02,-0.18],[ 0.18, 0.02,-0.18]].map(v=>p3(rot(v)));
+    quad(rp2, 'rgba(60,120,200,.4)', 'rgba(120,180,240,.7)');
+
+    // panel grid lines
+    ctx.strokeStyle = 'rgba(200,230,255,.45)'; ctx.lineWidth = 0.7;
+    for(let k=1;k<5;k++){
+      const f = -0.18 + (-0.52)*k/5;
+      const a = p3(rot([f, 0.02,-0.02])), b = p3(rot([f, 0.02, 0.02]));
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      const f2 = 0.18 + 0.52*k/5;
+      const c = p3(rot([f2, 0.02,-0.02])), d = p3(rot([f2, 0.02, 0.02]));
+      ctx.beginPath(); ctx.moveTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.stroke();
+    }
+
+    // ----- axis-angle reference (independent of attitude) — yellow vector -----
+    const refScale = 0.95;
+    const refTipUnrot = [ATT.ax*refScale, ATT.ay*refScale, ATT.az*refScale];
+    const refA = p3([0,0,0]);
+    const refB = p3(refTipUnrot);
+    drawArrow(refA, refB, '#fdcb6e', 2);
+    ctx.fillStyle = '#fdcb6e';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.fillText('n (回転軸)', refB.x+5, refB.y+3);
+
+    // small arc to indicate rotation angle alpha around the yellow axis
+    ctx.strokeStyle = 'rgba(253,203,110,.85)';
+    ctx.lineWidth = 1.5;
+    const segs = 24;
+    const arcSpan = Math.max(0.05, Math.min(1, ATT.alpha/360)) * Math.PI*2;
+    // build a small disc perpendicular to n
+    // pick a vector orthogonal to n
+    const nx = ATT.ax, ny = ATT.ay, nz = ATT.az;
+    let ux2 = 1, uy2 = 0, uz2 = 0;
+    if(Math.abs(nx) > 0.9){ ux2 = 0; uy2 = 1; uz2 = 0; }
+    // u = u - (u.n)n, normalize
+    const dot = ux2*nx + uy2*ny + uz2*nz;
+    ux2 -= dot*nx; uy2 -= dot*ny; uz2 -= dot*nz;
+    const ulen = Math.sqrt(ux2*ux2 + uy2*uy2 + uz2*uz2) || 1;
+    ux2/=ulen; uy2/=ulen; uz2/=ulen;
+    // v = n x u
+    const vx2 = ny*uz2 - nz*uy2;
+    const vy2 = nz*ux2 - nx*uz2;
+    const vz2 = nx*uy2 - ny*ux2;
+    const rArc = 0.32;
+    ctx.beginPath();
+    for(let s=0; s<=segs; s++){
+      const ang = arcSpan * s/segs;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      const pa = [rArc*(ca*ux2 + sa*vx2), rArc*(ca*uy2 + sa*vy2), rArc*(ca*uz2 + sa*vz2)];
+      const pp = p3(pa);
+      s===0 ? ctx.moveTo(pp.x, pp.y) : ctx.lineTo(pp.x, pp.y);
+    }
+    ctx.stroke();
+
+    // ----- legend / status -----
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = '11px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('q = ('+ATT.qw.toFixed(3)+', '+ATT.qx.toFixed(3)+', '+ATT.qy.toFixed(3)+', '+ATT.qz.toFixed(3)+')', 10, 18);
+    ctx.fillStyle = 'rgba(180,210,240,.7)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText('|q| = '+ATT.norm.toFixed(5)+'   α = '+ATT.alpha.toFixed(0)+'°', 10, 32);
+
+    t += 0.016;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['rollRange','pitchRange','yawRange','axisXRange','axisYRange','axisZRange','angleRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

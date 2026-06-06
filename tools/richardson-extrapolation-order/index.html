@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Richardson補外と観測収束次数シミュレーター — 数値解析の収束評価 | NovaSolver</title>
+<meta name="description" content="3つの刻み幅で得た数値解から、観測収束次数 p と Richardson補外による真値推定 u_ext を実時間で計算。CFD/有限要素法のメッシュ収束（V&V）、ODE解法の精度評価、中点則・台形則・RK法の次数チェックに使える無料シミュレーターです。">
+<link rel="canonical" href="https://novasolver.jp/tools/richardson-extrapolation-order.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/richardson-extrapolation-order.html">
+<meta property="og:title" content="Richardson補外と観測収束次数シミュレーター — 数値解析 | NovaSolver Project">
+<meta property="og:description" content="3つの刻み幅の数値解から観測収束次数 p と Richardson補外値を計算。CFD・FEM・ODE解法の収束評価に。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Richardson extrapolation and observed order of accuracy simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/richardson-extrapolation-order.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/richardson-extrapolation-order.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/richardson-extrapolation-order.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/richardson-extrapolation-order.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#rxoCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Richardson補外と観測収束次数シミュレーター",
+      "description": "3つの刻み幅で得た数値解から、観測収束次数 p と Richardson補外による真値推定 u_ext を実時間で計算。CFD/有限要素法のメッシュ収束（V&V）、ODE解法の精度評価、中点則・台形則・RK法の次数チェックに使える無料シミュレーターです。",
+      "url": "https://novasolver.jp/tools/richardson-extrapolation-order.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Numerical Analysis Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["3刻み幅からの観測収束次数 p の計算","Richardson補外による真値推定 u_ext","打切り誤差・漸近誤差比の評価","log-log プロットによる収束次数の可視化","CFD/FEM の V&V とメッシュ収束チェック"],
+      "keywords": "Richardson補外,観測収束次数,数値解析,メッシュ収束,V&V,CFD,有限要素法,ODE",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "観測収束次数 p はどう計算しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "3つの刻み幅 h₁<h₂<h₃（ステップ比 r=h₂/h₁=h₃/h₂）で得た数値解 u₁,u₂,u₃ から、p = ln(|u₂−u₃|/|u₁−u₂|) / ln(r) で求まります。理論次数 p_theory（例：オイラー法=1、台形則やRK2=2、RK4=4）と一致すれば「コードと格子は漸近領域にある」と判定できます。p が理論値から大きくずれている場合、刻みがまだ粗い・コードにバグがある・境界条件で次数が落ちている、のいずれかを疑います。本ツールは r が等比でないときも同じ式で見積もります。"}
+        },{
+          "@type": "Question",
+          "name": "Richardson補外で求めた u_ext はどのくらい信用できますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Richardson補外値 u_ext = u₁ + (u₁−u₂)/(r^p − 1) は、漸近誤差展開の主項を消去した推定値です。3つの解が「漸近領域」にあるとき、u_ext の誤差は元の解の誤差より 1〜2桁小さくなります。判定の目安は漸近誤差比 e₁/e₂ が 1/r^p に近いこと。例えば r=2, p=2 なら e₁/e₂ ≈ 0.25 が期待値で、これから大きく外れる場合は次数を信用してはいけません。Roache (1998) の GCI (Grid Convergence Index) は安全係数 Fs=1.25 を掛けた誤差バンドを使います。"}
+        },{
+          "@type": "Question",
+          "name": "観測次数が理論次数と一致しないのはなぜですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "主な原因は4つです。(1) 刻みがまだ粗く漸近領域に入っていない — さらに細かい h で再計算。(2) 境界条件・初期条件が低次精度で実装されている（例：1次の階段近似） — これは離散誤差全体を支配し、観測次数が0.5〜1に落ちます。(3) 解に特異点や不連続がある（衝撃波、応力集中、リエントラント角） — 解の正則性で次数が決まり、滑らかな解の理論次数は得られません。(4) 反復ソルバーの収束が不十分で離散誤差より反復誤差が大きい — 残差を1桁以上小さく取り直します。"}
+        },{
+          "@type": "Question",
+          "name": "CFD や FEM のメッシュ依存性チェックに使えますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "はい、まさにこの目的のためのツールです。CFDの V&V では「3メッシュで同じ解析を行い、観測収束次数と Richardson補外値、GCIを報告すること」が AIAA G-077 や ASME V&V20 で要求されます。手順は、(1)粗・中・細の3メッシュで同条件・同モノマー計算、(2)代表量（抗力係数、ピーク応力、Nu数 など）を u₃,u₂,u₁ として入力、(3) p と u_ext と GCI を確認、です。観測次数 p が理論次数（FVM/FEMで通常2）と±0.5以内に収まれば信頼できる結果と判定します。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "Richardson補外と観測収束次数シミュレーター", "item": "https://novasolver.jp/tools/richardson-extrapolation-order.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">Richardson補外と観測収束次数シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/richardson-extrapolation-order.html" class="active">JA</a>
+      <a href="/en/tools/richardson-extrapolation-order.html">EN</a>
+      <a href="/zh/tools/richardson-extrapolation-order.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-arrow-trend-up"></i> 数値解析</div>
+    <h1>Richardson補外と観測収束次数シミュレーター</h1>
+    <p class="hero-sub">3つの刻み幅で得た数値解から、観測収束次数 p と Richardson補外による真値推定 u_ext をリアルタイムで計算します。CFD・FEMのメッシュ収束（V&V）、ODE解法の精度評価、中点則・台形則・RK法の次数チェックに使える数値解析ツールです。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">粗ステップ h₃</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="stepCoarseNum" value="0.4" min="0.01" max="2" step="0.01" oninput="syncFromNum('stepCoarseRange','stepCoarseNum')"></div>
+      </div>
+      <div class="param-desc">最も粗い刻み幅（h₃ = 最大）</div>
+      <input type="range" id="stepCoarseRange" min="0.01" max="2" step="0.01" value="0.4" oninput="syncToNum('stepCoarseRange','stepCoarseNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">中ステップ h₂</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="stepMediumNum" value="0.2" min="0.005" max="1" step="0.005" oninput="syncFromNum('stepMediumRange','stepMediumNum')"></div>
+      </div>
+      <div class="param-desc">中間の刻み幅（通常 h₃/2）</div>
+      <input type="range" id="stepMediumRange" min="0.005" max="1" step="0.005" value="0.2" oninput="syncToNum('stepMediumRange','stepMediumNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">細ステップ h₁</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="stepFineNum" value="0.1" min="0.001" max="0.5" step="0.001" oninput="syncFromNum('stepFineRange','stepFineNum')"></div>
+      </div>
+      <div class="param-desc">最も細い刻み幅（h₁ = 最小）</div>
+      <input type="range" id="stepFineRange" min="0.001" max="0.5" step="0.001" value="0.1" oninput="syncToNum('stepFineRange','stepFineNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">粗解 u₃</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="valueCoarseNum" value="0.8333" min="-10000" max="10000" step="0.001" oninput="syncFromNum('valueCoarseRange','valueCoarseNum')"></div>
+      </div>
+      <div class="param-desc">h₃ で得られた数値解</div>
+      <input type="range" id="valueCoarseRange" min="-10000" max="10000" step="0.001" value="0.8333" oninput="syncToNum('valueCoarseRange','valueCoarseNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">中解 u₂</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="valueMediumNum" value="0.8167" min="-10000" max="10000" step="0.001" oninput="syncFromNum('valueMediumRange','valueMediumNum')"></div>
+      </div>
+      <div class="param-desc">h₂ で得られた数値解</div>
+      <input type="range" id="valueMediumRange" min="-10000" max="10000" step="0.001" value="0.8167" oninput="syncToNum('valueMediumRange','valueMediumNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">細解 u₁</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="valueFineNum" value="0.8125" min="-10000" max="10000" step="0.001" oninput="syncFromNum('valueFineRange','valueFineNum')"></div>
+      </div>
+      <div class="param-desc">h₁ で得られた数値解</div>
+      <input type="range" id="valueFineRange" min="-10000" max="10000" step="0.001" value="0.8125" oninput="syncToNum('valueFineRange','valueFineNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statRatio">—</div><div class="sl">ステップ比 r = h₂/h₁</div></div>
+        <div class="stat-card"><div class="sv" id="statOrder">—</div><div class="sl">観測収束次数 p</div></div>
+        <div class="stat-card"><div class="sv" id="statExt">—</div><div class="sl">Richardson補外値 u_ext</div></div>
+        <div class="stat-card"><div class="sv" id="statTrunc">—</div><div class="sl">細解の打切り誤差</div></div>
+        <div class="stat-card"><div class="sv" id="statAsym">—</div><div class="sl">漸近誤差比 e₁/e₂</div></div>
+        <div class="stat-card"><div class="sv" id="statVerdict">—</div><div class="sl">次数の判定</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-arrow-trend-up"></i> log-log プロット — 誤差 vs ステップ h（傾き = p）</div>
+      <canvas id="rxoCanvas"></canvas>
+      <p class="canvas-hint">青点：3刻み h₁,h₂,h₃ の誤差。黄線：3点を通す回帰直線（傾き = 観測収束次数 p）。緑印：Richardson補外値（h→0）。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 解 vs ステップ h（補外値を含む）</div>
+      <canvas class="ux-chartjs-canvas" id="valueChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 誤差 vs ステップ h（両対数軸）</div>
+      <canvas class="ux-chartjs-canvas" id="errorChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$u_{exact} \approx u_1 + \frac{u_1-u_2}{r^p-1},\qquad p=\frac{\ln\bigl(|u_2-u_3|/|u_1-u_2|\bigr)}{\ln r}$$</p>
+      <p style="margin-top:6px;">r は刻み幅の比 (h₂/h₁)、p は観測収束次数。u₁,u₂,u₃ は細・中・粗の数値解。3解が漸近領域にあるとき、u_ext は元の解より1〜2桁小さい誤差で真値を近似する。</p>
+      <p style="margin-top:10px;">$$e_h \approx C\,h^{p},\qquad \frac{e_1}{e_2}=\frac{1}{r^{p}}$$</p>
+      <p style="margin-top:6px;">離散誤差 e_h は刻み h の p乗で減少する。漸近誤差比 e₁/e₂ が 1/r^p に近ければ漸近領域に入っており、観測次数は信頼できる。</p>
+      <p style="margin-top:10px;">$$\mathrm{GCI}=\frac{F_s\,|u_1-u_2|}{(r^p-1)\,|u_1|}$$</p>
+      <p style="margin-top:6px;">Grid Convergence Index（Roache 1998）。安全係数 F_s=1.25（3メッシュ）で、Richardson補外誤差の信頼バンドを与える。CFD の V&V 報告で標準。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>Richardson補外と収束次数</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「Richardson補外」って初めて聞きました。なんで3つも刻み幅で計算する必要があるんですか？1つで十分じゃないんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい疑問だね。1つの刻み h で計算した数値解 u_h には、未知の誤差 e_h が含まれている。これを「どれくらい外れているか」「どの方向に外れているか」を知るには、最低でも2つの刻みでの解の差を見ないといけない。そして「収束次数 p を未知数として推定する」となると、3点必要になるんだ。例えば h=0.1 で u=0.8125 と出ても、「真値は 0.81 か 0.82 か 0.85 か」は1点だけでは判断できない。3つあれば「ああ、これは 0.811 に向かって p=2 で収束しているな」と逆算できる。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど。じゃあ「観測収束次数」と「理論収束次数」って違うんですか？教科書には「中点則は2次精度」って書いてあるけど、それと別物？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そこが大事なところ。「理論次数」は紙の上で誘導した値（中点則=2、RK4=4 など）で、「観測次数」は実際にコードを走らせて出てきた値だ。両者が一致するのは、(1)プログラムにバグがない、(2)刻みが十分細かい（漸近領域）、(3)解が滑らか、の3条件が揃った時だけ。例えば「2次精度のはず」のコードで観測次数が 0.8 しか出なかったら、ほぼ確実に境界条件が1次に落ちている。Richardson補外は「自分のコードが本当に主張通りの精度を持っているか」を検証する診断ツールなんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">デフォルト値だと p=1.983 で「2次」って出ますね。これは中点則とかRK2とかですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、まさにそれ。この例は ∫₀¹ 1/(1+x²) dx = π/4 ≈ 0.7854 を中点則で計算した値だよ。中点則は理論的に2次精度（誤差 ∝ h²）で、観測値も 1.983 とほぼ2に乗った。Richardson補外値 u_ext=0.8111 も h=0.1 の解 0.8125 より真値に近い…と言いたいところだけど、この問題は実は対称性のおかげで中点則が「超収束」して、真値より少し離れた極限に向かっている。これは「観測次数だけ見て安心せず、収束先 u_ext が物理的に正しいか別途確かめる」べき教訓でもあるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">CFDで「メッシュ収束をやれ」って言われるけど、実務だとどう使うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">手順は3ステップだ。(1)同じ物理条件で、節点数が約2倍ずつ違う3メッシュ（粗・中・細）を作る、(2)代表量（抗力係数、圧損、最大温度など）を u₃,u₂,u₁ として記録、(3)このツールに入力して p と GCI を出す。学会・査読論文だと「観測次数 p が理論次数の±0.5以内、GCI が許容誤差以下」を達成して初めて「メッシュ非依存」と認められる。逆に言うと、シングルメッシュで「いい絵が出ました」だけのCFD報告は、V&V 観点では信頼度ゼロ。AIAA G-077 や ASME V&V20 はこの手順を標準化した文書だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">漸近誤差比 e₁/e₂ が「1/r^p に近いか」で漸近領域を判定するって書いてありますね。これがズレてたらどう解釈すれば？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">e₁/e₂ が期待値（r=2,p=2 なら 0.25）から大きく外れていたら、3点はまだ漸近領域に入っていない。つまり「次数 p の推定そのものが信頼できない」ということだ。対処法は2つあって、(a) もっと細いメッシュで4点目を取って 2:1 比のペアを追加、(b) 解に不連続や強い特異点がないか確認。例えば衝撃波がある流れや、応力集中のある構造解析では、解の正則性で次数が頭打ちになり、p が 1〜1.5 で止まることもよくある。その場合は無理に2次に押し込めず、「観測次数1.2で運用する」と素直に報告するのが正しい姿勢だね。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">観測収束次数 p はどう計算しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">3つの刻み幅 h₁&lt;h₂&lt;h₃（ステップ比 r=h₂/h₁=h₃/h₂）で得た数値解 u₁,u₂,u₃ から、p = ln(|u₂−u₃|/|u₁−u₂|) / ln(r) で求まります。理論次数 p_theory（例：オイラー法=1、台形則やRK2=2、RK4=4）と一致すれば「コードと格子は漸近領域にある」と判定できます。p が理論値から大きくずれている場合、刻みがまだ粗い・コードにバグがある・境界条件で次数が落ちている、のいずれかを疑います。本ツールは r が等比でないときも同じ式で見積もります。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Richardson補外で求めた u_ext はどのくらい信用できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">Richardson補外値 u_ext = u₁ + (u₁−u₂)/(r^p − 1) は、漸近誤差展開の主項を消去した推定値です。3つの解が「漸近領域」にあるとき、u_ext の誤差は元の解の誤差より 1〜2桁小さくなります。判定の目安は漸近誤差比 e₁/e₂ が 1/r^p に近いこと。例えば r=2, p=2 なら e₁/e₂ ≈ 0.25 が期待値で、これから大きく外れる場合は次数を信用してはいけません。Roache (1998) の GCI (Grid Convergence Index) は安全係数 Fs=1.25 を掛けた誤差バンドを使います。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">観測次数が理論次数と一致しないのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">主な原因は4つです。(1) 刻みがまだ粗く漸近領域に入っていない — さらに細かい h で再計算。(2) 境界条件・初期条件が低次精度で実装されている（例：1次の階段近似） — これは離散誤差全体を支配し、観測次数が0.5〜1に落ちます。(3) 解に特異点や不連続がある（衝撃波、応力集中、リエントラント角） — 解の正則性で次数が決まり、滑らかな解の理論次数は得られません。(4) 反復ソルバーの収束が不十分で離散誤差より反復誤差が大きい — 残差を1桁以上小さく取り直します。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">CFD や FEM のメッシュ依存性チェックに使えますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">はい、まさにこの目的のためのツールです。CFDの V&V では「3メッシュで同じ解析を行い、観測収束次数と Richardson補外値、GCIを報告すること」が AIAA G-077 や ASME V&V20 で要求されます。手順は、(1)粗・中・細の3メッシュで同条件・同モノマー計算、(2)代表量（抗力係数、ピーク応力、Nu数 など）を u₃,u₂,u₁ として入力、(3) p と u_ext と GCI を確認、です。観測次数 p が理論次数（FVM/FEMで通常2）と±0.5以内に収まれば信頼できる結果と判定します。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>CFD の V&V（検証・妥当性確認）：</strong>航空機の抗力計算、ターボ機械の効率、自動車外装の空力など、商用CFD（ANSYS Fluent、OpenFOAM、STAR-CCM+）の報告には観測収束次数と GCI の記載がほぼ必須です。AIAA G-077（航空宇宙）、ASME V&V20（流体・熱）、NAFEMS のガイドラインはいずれも「3メッシュ最小」「観測次数の確認」「GCI 報告」を要求しています。シングルメッシュの「いい絵」報告は学会では却下対象です。</p>
+    <p><strong>有限要素法の応力解析：</strong>応力集中部のピーク応力やJ積分は、メッシュ細分化で値が変動しやすい代表量です。粗・中・細の3メッシュで再計算し、Richardson補外で「真の応力」を推定。リエントラント角などの特異点があると観測次数は1以下に落ち込み、補外しても収束しないため「報告値は最も細いメッシュの値とその不確かさ」とすべきです。NAFEMS のベンチマーク問題の多くがこの種類の収束評価を含みます。</p>
+    <p><strong>ODE 解法の精度評価：</strong>新しい時間積分スキーム（Runge-Kutta、Adams-Bashforth、IMEX など）を実装したとき、ステップ Δt を半分にしたときに誤差がきちんと 2^p で減るかチェックします。バグがあると観測次数が「中途半端な値」（例：3.2 のはずが 1.8）になり、デバッグの強力な手がかりになります。教科書の演習問題や論文の数値実験で頻出する標準的な検証手法です。</p>
+    <p><strong>気象・海洋モデル：</strong>大気大循環モデル（GCM）や海洋モデル（NEMO、MITgcm）でも空間・時間解像度の収束評価が行われます。ただしこれらは強い非線形・乱流のため、観測次数が理論次数より低く出るのが普通で、漸近領域に入るのに膨大な計算資源が必要です。実務では「収束しないが、関心の物理量が定常的に変化しなくなる」点で打ち切ることも多く、Richardson補外の限界を学ぶ良い例でもあります。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最も多い誤りが、<strong>「3点の差が小さければ収束している」と思い込むこと</strong>です。例えば u₃=1.000, u₂=1.001, u₁=1.0011 と並んでいても、u₃→u₂ で 0.001 動き、u₂→u₁ で 0.0001 しか動かないと、観測次数は ln(10)/ln(2) ≈ 3.3 と計算されます。これを見て「3次精度だ！」と喜ぶのは早計で、もしかすると単に「3点全部が同じ間違った値（バイアス）に張り付いているだけ」かもしれません。Richardson補外は「収束方向と次数」を当てるツールであり、「真値を保証するツール」ではない。物理現象として妥当な値か、別の手法（解析解・実験・別ソルバー）と必ず突き合わせてください。</p>
+    <p>次に、<strong>「等比でないステップで p の式を使う」誤り</strong>。本ツールの p の式は、ステップ比 r=h₂/h₁=h₃/h₂ が等しいことを暗黙に仮定しています。CFD で「適応メッシュ」「ハイブリッドリファイン」を使うと、粗・中・細の比率が 2 / 1.7 などにバラけ、観測次数の推定値が大きく狂います。実務では Roache (1998) の不等比メッシュ用の式（反復解法で p を求める）を使うか、可能な限り厳密な r=2 のメッシュペアを作ってください。本ツールでは r ≒ const のときだけ意味のある値を返します。</p>
+    <p>最後に、<strong>「観測次数が高ければ細かいメッシュは不要」という誤解</strong>。p=4（RK4 や高次有限要素）が出ても、「現在のメッシュで誤差が許容値以下か」は別問題です。誤差は e ≈ C·h^p と書け、C（誤差定数）が大きいと p が高くてもメッシュは粗いほど大きな誤差になります。GCI の式に E_h = (u₁−u₂)/(r^p−1) として現れる「現在の誤差そのもの」をチェックすべきで、p だけで安心してはいけません。「次数が高い手法は同じ精度を粗いメッシュで達成できる」のは「漸近領域に入った後」の話で、入り口の粗いメッシュでは1次手法より誤差が大きいことすらあります。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>粗・中・細の3つの刻み幅h₁、h₂、h₃を入力（例：CFDメッシュの要素数から逆算、刻み幅比r=2推奨）</li>
+<li>各刻み幅で得た数値解u₁、u₂、u₃を入力（例：梁の最大たわみ、圧力抵抗、熱流束）</li>
+<li>シミュレーターが観測収束次数p、Richardson補外値u_ext、打切り誤差εを自動計算し、数値手法の収束性を判定</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>4点支持梁のFEM解析で、メッシュ分割数8→16→32要素（刻み幅比r=2）のとき、最大たわみu₁=10.24mm、u₂=10.12mm、u₃=10.08mmが得られた場合：p=（ln|u₁-u₂|/|u₂-u₃|）/ln(r)≈2.0となり、2次精度を確認。Richardson補外値u_ext≈10.07mmが真値推定値。RK2法やCrank-Nicolson法で同様に次数検証可能。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>刻み幅比r=2または3に統一；rが2未満だと丸め誤差に支配されp値が不安定になる</li>
+<li>観測pが理論次数（中点則p=2、RK4 p=4など）と大きく異なる場合、プログラムバグ、境界条件入力誤り、または漸近領域未到達を疑い、より細かいメッシュで再検証</li>
+<li>CFD/FEM報告書のV&V章では、3刻み幅データとp値、u_ext、相対誤差|u_ext-u₃|/|u_ext|を記載し、精度保証を立証</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// shared state for the log-log animation
+const RX = {h1:0.1,h2:0.2,h3:0.4,e1:0,e2:0,e3:0,p:0,uExt:0,uFine:0,highlight:0};
+
+// ===== Chart.js setup =====
+const valueChart = new Chart(document.getElementById('valueChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'数値解 u(h)',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:false,borderWidth:2,pointRadius:5,tension:0.0},
+    {label:'Richardson補外 u_ext (h→0)',data:[],borderColor:'#0a8a6a',backgroundColor:'#0a8a6a',showLine:false,pointRadius:8,pointStyle:'rectRot'}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'刻み幅 h',font:{size:11}},ticks:{maxTicksLimit:6}},
+      y:{title:{display:true,text:'数値解 u',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const errorChart = new Chart(document.getElementById('errorChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'|誤差| e(h)',data:[],borderColor:'#e17055',backgroundColor:'rgba(225,112,85,.16)',fill:true,borderWidth:2,pointRadius:5,tension:0.0},
+    {label:'C·h^p（推定）',data:[],borderColor:'#7a5af5',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{type:'logarithmic',title:{display:true,text:'刻み幅 h（対数）',font:{size:11}}},
+      y:{type:'logarithmic',title:{display:true,text:'|誤差|（対数）',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const stepCoarse  = parseFloat(document.getElementById('stepCoarseRange').value);
+  const stepMedium  = parseFloat(document.getElementById('stepMediumRange').value);
+  const stepFine    = parseFloat(document.getElementById('stepFineRange').value);
+  const valueCoarse = parseFloat(document.getElementById('valueCoarseRange').value);
+  const valueMedium = parseFloat(document.getElementById('valueMediumRange').value);
+  const valueFine   = parseFloat(document.getElementById('valueFineRange').value);
+
+  const ratio1 = stepMedium/stepFine;
+  const ratio2 = stepCoarse/stepMedium;
+  const errorEstimate1 = valueFine - valueMedium;
+  const errorEstimate2 = valueMedium - valueCoarse;
+  const ratioCheck = Math.abs(errorEstimate2/errorEstimate1);
+  let observedOrder = Math.log(ratioCheck)/Math.log(ratio1);
+  let extrapolatedExact, truncationError1, truncationError2, truncationError3, asymptoticRatio;
+  const safeOrder = (isFinite(observedOrder) && !isNaN(observedOrder)) ? observedOrder : 0;
+  const denomExt = Math.pow(ratio1, safeOrder) - 1;
+  if(Math.abs(denomExt) > 1e-9){
+    extrapolatedExact = valueFine + errorEstimate1/denomExt;
+  } else {
+    extrapolatedExact = valueFine;
+  }
+  truncationError1 = Math.abs(valueFine   - extrapolatedExact);
+  truncationError2 = Math.abs(valueMedium - extrapolatedExact);
+  truncationError3 = Math.abs(valueCoarse - extrapolatedExact);
+  asymptoticRatio = (Math.abs(errorEstimate2) > 1e-15) ? errorEstimate1/errorEstimate2 : 0;
+
+  // ----- stat cards -----
+  document.getElementById('statRatio').textContent  = isFinite(ratio1) ? ratio1.toFixed(2) : '—';
+  document.getElementById('statOrder').textContent  = isFinite(observedOrder) ? observedOrder.toFixed(3) : '—';
+  document.getElementById('statExt').textContent    = isFinite(extrapolatedExact) ? extrapolatedExact.toFixed(5) : '—';
+  document.getElementById('statTrunc').textContent  = isFinite(truncationError1) ? truncationError1.toExponential(3) : '—';
+  document.getElementById('statAsym').textContent   = isFinite(asymptoticRatio) ? asymptoticRatio.toFixed(4) : '—';
+
+  // verdict text for order classification
+  let verdictText = '中間次数 — 非標準';
+  if(isFinite(observedOrder)){
+    if(Math.abs(observedOrder-1) < 0.2) verdictText = '1次（Euler等）';
+    else if(Math.abs(observedOrder-2) < 0.2) verdictText = '2次（RK2・中心差分）';
+    else if(Math.abs(observedOrder-4) < 0.3) verdictText = '4次（RK4）';
+  }
+  document.getElementById('statVerdict').textContent = verdictText;
+
+  // colour the order stat
+  const orderEl = document.getElementById('statOrder');
+  if(isFinite(observedOrder)){
+    if(observedOrder < 0.5 || observedOrder > 6) orderEl.style.color = '#c0392b';
+    else if(Math.abs(observedOrder-Math.round(observedOrder)) < 0.2) orderEl.style.color = '#0a8a6a';
+    else orderEl.style.color = '#c0563a';
+  }
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(!isFinite(observedOrder) || observedOrder < 0.5 || observedOrder > 6){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 観測次数 p='+(isFinite(observedOrder)?observedOrder.toFixed(2):'NaN')+' は標準的な範囲外。3解が漸近領域に入っていない、または解にバイアス・特異点がある可能性。さらに細かい刻みで再計算してください。';
+  } else {
+    const expectedRatio = 1/Math.pow(ratio1, observedOrder);
+    const ratioDev = Math.abs(asymptoticRatio - expectedRatio);
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 観測次数 p='+observedOrder.toFixed(3)+' ('+verdictText+')、補外値 u_ext='+extrapolatedExact.toFixed(5)+'。漸近誤差比 '+asymptoticRatio.toFixed(4)+' ≈ 1/r^p='+expectedRatio.toFixed(4)+'（偏差 '+ratioDev.toFixed(4)+'）。';
+  }
+
+  // ----- value chart: u vs h, plus extrapolated point at h=0 -----
+  const vLabels = [stepFine.toFixed(4), stepMedium.toFixed(4), stepCoarse.toFixed(4)];
+  const vData   = [valueFine, valueMedium, valueCoarse];
+  const eData   = [null, null, null];
+  // prepend a virtual point at "0" (h→0) so user sees the extrapolation target
+  vLabels.unshift('0 (h→0)');
+  vData.unshift(null);
+  eData.unshift(extrapolatedExact);
+  valueChart.data.labels = vLabels;
+  valueChart.data.datasets[0].data = vData;
+  valueChart.data.datasets[1].data = eData;
+  valueChart.update('none');
+
+  // ----- error chart: |error| vs h on log-log -----
+  const eLabels = [stepFine, stepMedium, stepCoarse];
+  const eAbs    = [truncationError1, truncationError2, truncationError3];
+  // model line C*h^p sampled at a 40-point log range
+  const hMin = Math.min(stepFine, stepMedium, stepCoarse)*0.7;
+  const hMax = Math.max(stepFine, stepMedium, stepCoarse)*1.4;
+  const Csample = truncationError1/Math.pow(stepFine, observedOrder>0?observedOrder:1);
+  const mLabels=[], mData=[];
+  const N=24;
+  for(let i=0;i<=N;i++){
+    const h = hMin*Math.pow(hMax/hMin, i/N);
+    mLabels.push(h);
+    mData.push(Csample*Math.pow(h, observedOrder>0?observedOrder:1));
+  }
+  // combine: labels are h-values (numeric). For Chart.js logarithmic x to behave
+  // correctly we feed {x,y} points instead of labels.
+  errorChart.data.labels = [];
+  errorChart.data.datasets[0].data = eLabels.map((h,i)=>({x:h, y:eAbs[i]}));
+  errorChart.data.datasets[1].data = mLabels.map((h,i)=>({x:h, y:mData[i]}));
+  errorChart.update('none');
+
+  // ----- update shared state for animation -----
+  RX.h1 = stepFine; RX.h2 = stepMedium; RX.h3 = stepCoarse;
+  RX.e1 = truncationError1; RX.e2 = truncationError2; RX.e3 = truncationError3;
+  RX.p = observedOrder; RX.uExt = extrapolatedExact; RX.uFine = valueFine;
+}
+
+// ===== log-log canvas animation =====
+(function(){
+  const cv = document.getElementById('rxoCanvas');
+  const ctx = cv.getContext('2d');
+  let phase = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    // padding
+    const padL = 60, padR = 24, padT = 28, padB = 44;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+
+    // log range
+    const hVals = [RX.h1, RX.h2, RX.h3].filter(v=>v>0);
+    if(hVals.length<3){ requestAnimationFrame(frame); return; }
+    const eVals = [RX.e1, RX.e2, RX.e3].map(v=>Math.max(v, 1e-15));
+    const logHmin = Math.log10(Math.min.apply(null, hVals)*0.5);
+    const logHmax = Math.log10(Math.max.apply(null, hVals)*1.6);
+    const logEmin = Math.log10(Math.min.apply(null, eVals)*0.4);
+    const logEmax = Math.log10(Math.max.apply(null, eVals)*2.5);
+    const dH = logHmax - logHmin || 1;
+    const dE = logEmax - logEmin || 1;
+    const tx = lh => padL + ((lh - logHmin)/dH)*plotW;
+    const ty = le => padT + (1 - (le - logEmin)/dE)*plotH;
+
+    // axes
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+plotH); ctx.lineTo(padL+plotW, padT+plotH);
+    ctx.stroke();
+
+    // grid (log decades)
+    ctx.strokeStyle = 'rgba(255,255,255,.10)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.textAlign='center';
+    for(let lh=Math.ceil(logHmin); lh<=Math.floor(logHmax); lh++){
+      const x = tx(lh);
+      ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT+plotH); ctx.stroke();
+      ctx.fillText('10^'+lh, x, padT+plotH+14);
+    }
+    ctx.textAlign='right';
+    for(let le=Math.ceil(logEmin); le<=Math.floor(logEmax); le++){
+      const y = ty(le);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL+plotW, y); ctx.stroke();
+      ctx.fillText('10^'+le, padL-4, y+3);
+    }
+
+    // axis titles
+    ctx.fillStyle = 'rgba(200,225,245,.85)';
+    ctx.textAlign='center';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.fillText('刻み幅 h  (log)', padL+plotW/2, H-8);
+    ctx.save();
+    ctx.translate(14, padT+plotH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText('|誤差| e  (log)', 0, 0);
+    ctx.restore();
+
+    // line of slope p through three points (using fine-step anchor)
+    if(isFinite(RX.p)){
+      const Canchor = RX.e1 / Math.pow(RX.h1, RX.p>0?RX.p:1);
+      const lhA = logHmin, lhB = logHmax;
+      const leA = Math.log10(Math.max(1e-30, Canchor*Math.pow(Math.pow(10,lhA), RX.p>0?RX.p:1)));
+      const leB = Math.log10(Math.max(1e-30, Canchor*Math.pow(Math.pow(10,lhB), RX.p>0?RX.p:1)));
+      // gentle pulse highlight
+      const alpha = 0.55 + 0.35*Math.sin(phase*Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,210,80,'+alpha.toFixed(2)+')';
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = 'rgba(255,210,80,.6)'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.moveTo(tx(lhA), ty(leA)); ctx.lineTo(tx(lhB), ty(leB)); ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // slope label
+      ctx.fillStyle = 'rgba(255,210,80,.95)';
+      ctx.font = 'bold 12px Roboto Mono, monospace';
+      ctx.textAlign='left';
+      ctx.fillText('slope p = '+(isFinite(RX.p)?RX.p.toFixed(3):'—'), padL+12, padT+18);
+    }
+
+    // points (h_i, e_i)
+    const labels = ['h₁','h₂','h₃'];
+    for(let i=0;i<3;i++){
+      const lh = Math.log10(hVals[i]);
+      const le = Math.log10(eVals[i]);
+      const x = tx(lh), y = ty(le);
+      ctx.fillStyle = '#00b4d8';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(200,225,245,.95)';
+      ctx.font = '11px Roboto Mono, monospace';
+      ctx.textAlign='left';
+      ctx.fillText(labels[i]+'='+hVals[i].toFixed(3), x+9, y-7);
+    }
+
+    // extrapolated marker on the slope line, near smallest h (visual cue)
+    if(isFinite(RX.p) && RX.uExt !== undefined){
+      // place green diamond at the (h_min/5) position on the line
+      const lh = logHmin + 0.05*dH;
+      const Canchor = RX.e1 / Math.pow(RX.h1, RX.p>0?RX.p:1);
+      const le = Math.log10(Math.max(1e-30, Canchor*Math.pow(Math.pow(10,lh), RX.p>0?RX.p:1)));
+      const x = tx(lh), y = ty(le);
+      ctx.fillStyle = '#0a8a6a';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y-7); ctx.lineTo(x+7, y); ctx.lineTo(x, y+7); ctx.lineTo(x-7, y); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(120,225,180,.95)';
+      ctx.font = '10px Roboto Mono, monospace';
+      ctx.textAlign='left';
+      ctx.fillText('u_ext='+(isFinite(RX.uExt)?RX.uExt.toFixed(4):'—'), x+10, y+3);
+    }
+
+    // top-left badge
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign='left';
+    ctx.fillText('log-log: |error| vs step h', padL-30, 14);
+
+    phase += 0.004;
+    if(phase>=1) phase = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['stepCoarseRange','stepMediumRange','stepFineRange','valueCoarseRange','valueMediumRange','valueFineRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

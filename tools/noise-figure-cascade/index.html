@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カスケード雑音指数（フリス）シミュレーター — RF受信機のNF計算 | NovaSolver</title>
+<meta name="description" content="カスケード雑音指数をフリスの公式でシミュレーション。RF受信チェーンの総合NF・等価雑音温度をリアルタイム計算、LNA設計とノイズ最適化に対応。">
+<link rel="canonical" href="https://novasolver.jp/tools/noise-figure-cascade.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/noise-figure-cascade.html">
+<meta property="og:title" content="カスケード雑音指数（フリス）シミュレーター — RF受信機のNF計算 | NovaSolver Project">
+<meta property="og:description" content="カスケード雑音指数をフリスの公式でシミュレーション。RF受信チェーンの総合NF・等価雑音温度をリアルタイム計算、LNA設計とノイズ最適化に対応。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Cascade noise figure Friis simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/noise-figure-cascade.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/noise-figure-cascade.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/noise-figure-cascade.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/noise-figure-cascade.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#nfCanvas{display:block;width:100%;height:260px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "カスケード雑音指数（フリス）シミュレーター",
+      "description": "3段RF受信チェーンの総合雑音指数をフリスの公式で計算。各段の利得と雑音指数を変えて、総合NF・総合利得・等価雑音温度、各段の雑音寄与を可視化。なぜLNAを最前段に置くのかが直感的に分かる無料シミュレーターです。",
+      "url": "https://novasolver.jp/tools/noise-figure-cascade.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "RF / Communications Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["3段カスケードの総合雑音指数（フリスの公式）","総合利得と等価雑音温度の算出","各段の雑音寄与（線形雑音係数）の可視化","第1段が支配的かどうかの自動判定","累積NFの折れ線グラフと段別寄与の棒グラフ"],
+      "keywords": "雑音指数,フリスの公式,カスケード,RF受信機,LNA,雑音温度,雑音係数,電気通信",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "カスケード雑音指数はどの式で計算しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "縦続接続された段の総合雑音係数はフリスの公式 F_total = F1 + (F2−1)/G1 + (F3−1)/(G1·G2) で求めます。F は線形の雑音係数、G は線形の利得で、雑音指数 NF[dB] からは F = 10^(NF/10)、利得 G[dB] からは g = 10^(G/10) と換算します。総合雑音指数は NF_total = 10·log10(F_total) [dB] です。後段の雑音寄与が先行段の利得で割られる点が、この式の最大のポイントです。"}
+        },{
+          "@type": "Question",
+          "name": "なぜ受信機の最前段に低雑音増幅器（LNA）を置くのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "フリスの公式では、2段目の雑音寄与は (F2−1)/G1、3段目は (F3−1)/(G1·G2) と、先行する段の利得の積で割られます。つまり第1段の利得 G1 が大きいほど後段の雑音は薄められ、総合NFは第1段の NF1 にほぼ等しくなります。だから第1段には NF が小さく利得が大きいLNAを置くのが鉄則です。LNAの利得が十分なら、2段目が多少うるさくても総合性能はほとんど劣化しません。"}
+        },{
+          "@type": "Question",
+          "name": "等価雑音温度 Te とは何ですか？雑音指数とどう違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "等価雑音温度 Te は、雑音係数 F を温度の言葉で表したもので Te = (F−1)·T0 で定義されます。T0 は基準温度 290 K です。雑音指数 NF[dB] は商用無線でよく使われ、Te[K] は衛星通信や電波天文のように極端に低雑音な系で使われます。両者は同じ情報の別表現で、F = 1 + Te/T0 で相互変換できます。例えば NF=1.5 dB は F≈1.41、Te≈120 K に対応します。"}
+        },{
+          "@type": "Question",
+          "name": "総合雑音指数を下げるには何を変えればよいですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "最も効くのは第1段の雑音指数 NF1 を下げることです。総合NFは第1段にほぼ等しいため、NF1 を 0.5 dB 下げれば総合NFもほぼ 0.5 dB 下がります。次に第1段の利得 G1 を上げると、後段の雑音寄与 (F2−1)/G1 が小さくなり、後段の影響を抑えられます。逆に、第1段の前にケーブルやフィルタなど損失のある素子（利得が負）を入れると、その損失分がそのまま総合NFに上乗せされるため避けるべきです。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "カスケード雑音指数（フリス）シミュレーター", "item": "https://novasolver.jp/tools/noise-figure-cascade.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">カスケード雑音指数（フリス）シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/noise-figure-cascade.html" class="active">JA</a>
+      <a href="/en/tools/noise-figure-cascade.html">EN</a>
+      <a href="/zh/tools/noise-figure-cascade.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-tower-cell"></i> 電気・通信</div>
+    <h1>カスケード雑音指数（フリス）シミュレーター</h1>
+    <p class="hero-sub">3段で構成したRF受信チェーンの総合雑音指数を、フリスの公式でリアルタイムに計算するツールです。各段の利得と雑音指数を変えると、総合NF・等価雑音温度・各段の雑音寄与が分かり、なぜ低雑音増幅器（LNA）を最前段に置くのかが直感的に理解できます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">第1段 利得 G1</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="g1Num" value="15" min="0" max="40" step="0.5" oninput="syncFromNum('g1Range','g1Num')"><span class="num-unit">dB</span></div>
+      </div>
+      <div class="param-desc">最前段（LNA）の電力利得</div>
+      <input type="range" id="g1Range" min="0" max="40" step="0.5" value="15" oninput="syncToNum('g1Range','g1Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">第1段 雑音指数 NF1</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="nf1Num" value="1.5" min="0.5" max="10" step="0.1" oninput="syncFromNum('nf1Range','nf1Num')"><span class="num-unit">dB</span></div>
+      </div>
+      <div class="param-desc">最前段の雑音指数。総合NFをほぼ決める</div>
+      <input type="range" id="nf1Range" min="0.5" max="10" step="0.1" value="1.5" oninput="syncToNum('nf1Range','nf1Num');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">第2段 利得 G2</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="g2Num" value="20" min="0" max="40" step="0.5" oninput="syncFromNum('g2Range','g2Num')"><span class="num-unit">dB</span></div>
+      </div>
+      <input type="range" id="g2Range" min="0" max="40" step="0.5" value="20" oninput="syncToNum('g2Range','g2Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">第2段 雑音指数 NF2</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="nf2Num" value="4.0" min="0.5" max="15" step="0.1" oninput="syncFromNum('nf2Range','nf2Num')"><span class="num-unit">dB</span></div>
+      </div>
+      <input type="range" id="nf2Range" min="0.5" max="15" step="0.1" value="4.0" oninput="syncToNum('nf2Range','nf2Num');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">第3段 利得 G3</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="g3Num" value="10" min="-10" max="40" step="0.5" oninput="syncFromNum('g3Range','g3Num')"><span class="num-unit">dB</span></div>
+      </div>
+      <div class="param-desc">負の値はミキサ・フィルタ等の損失を表す</div>
+      <input type="range" id="g3Range" min="-10" max="40" step="0.5" value="10" oninput="syncToNum('g3Range','g3Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">第3段 雑音指数 NF3</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="nf3Num" value="6.0" min="0.5" max="20" step="0.1" oninput="syncFromNum('nf3Range','nf3Num')"><span class="num-unit">dB</span></div>
+      </div>
+      <input type="range" id="nf3Range" min="0.5" max="20" step="0.1" value="6.0" oninput="syncToNum('nf3Range','nf3Num');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statNF">—</div><div class="sl">総合雑音指数 NF_total (dB)</div></div>
+        <div class="stat-card"><div class="sv" id="statG">—</div><div class="sl">総合利得 (dB)</div></div>
+        <div class="stat-card"><div class="sv" id="statTe">—</div><div class="sl">等価雑音温度 Te (K)</div></div>
+        <div class="stat-card"><div class="sv" id="statT1">—</div><div class="sl">第1段の寄与（線形 F）</div></div>
+        <div class="stat-card"><div class="sv" id="statT2">—</div><div class="sl">第2段の寄与（線形）</div></div>
+        <div class="stat-card"><div class="sv" id="statDom">—</div><div class="sl">第1段が支配的か</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-tower-cell"></i> RF受信チェーン — 信号と雑音の流れ</div>
+      <canvas id="nfCanvas"></canvas>
+      <p class="canvas-hint">3段のブロックを信号（青）と雑音（赤）の波束が左から右へ流れます。信号レベルと雑音フロアがどちらも各段で上昇し、各段通過後の累積NFが表示されます。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 累積雑音指数（各段通過後）</div>
+      <canvas class="ux-chartjs-canvas" id="cumChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-column"></i> 各段の雑音寄与（フリスの3項）</div>
+      <canvas class="ux-chartjs-canvas" id="termChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$F_{total}=F_1+\frac{F_2-1}{G_1}+\frac{F_3-1}{G_1 G_2}$$</p>
+      <p style="margin-top:6px;">フリスのカスケード雑音公式。後段の雑音寄与は先行段の利得（の積）で割られるため、第1段の雑音係数が総合性能を支配する。</p>
+      <p style="margin-top:10px;">$$NF=10\log_{10}F,\qquad T_e=(F-1)\,T_0$$</p>
+      <p style="margin-top:6px;">雑音指数 NF[dB] と等価雑音温度 Te[K]。両者は雑音係数 F の別表現で、相互変換できる。基準温度 T₀ = 290 K。</p>
+      <p style="margin-top:10px;">ここで利得 G・雑音係数 F はすべて<strong>線形比（dB ではない）</strong>であり、F = 10^(NF/10)、G = 10^(G_dB/10) で換算する。基準温度 T₀ = 290 K。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>カスケード雑音指数とは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「雑音指数」って、受信機がどれくらい雑音を出すかの指標ですよね。それを段ごとに足していくだけじゃダメなんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いいところを突いてきたね。単純に足し算じゃないんだ。受信機はアンテナのあとにアンプ、ミキサ、フィルタ…と何段もつながった「縦続接続（カスケード）」になっている。各段は信号を増幅すると同時に、自分自身の雑音も加えてしまう。ここで効いてくるのが「後ろの段の雑音は、前の段で大きく増幅された信号と一緒に評価される」という事実なんだ。だから後段の雑音は、前段の利得で「薄められる」。これを正確に表すのがフリスの公式だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">薄められる、ですか。式だと F_total = F1 + (F2−1)/G1 + (F3−1)/(G1·G2) ですけど、この割り算が「薄める」部分なんですね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そのとおり。2段目の雑音寄与 (F2−1) は第1段の利得 G1 で割られ、3段目は G1·G2 で割られる。左のスライダーで第1段の利得 G1 を 15 dB から 30 dB に上げてみて。総合NFがほとんど第1段の NF1 に張り付くのが見えるはずだ。逆に G1 を 0 dB まで下げると、後段の雑音がそのまま漏れ出して総合NFが一気に悪化する。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど。じゃあ第1段がすごく重要ってことですか？2段目を頑張って低雑音にしても意味がない？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">まさにそれが「第1段支配」だ。だからRF受信機の最前段には、必ず「NFが小さくて利得が大きい」低雑音増幅器、いわゆるLNA（Low Noise Amplifier）を置く。デフォルト値で第2段の NF2 を 4 dB から 12 dB まで上げてみて。総合NFがほとんど動かないだろう？ 第1段のLNAが十分な利得を持っていれば、2段目が多少うるさくても受信機全体はびくともしない。逆に、お金と労力をかけるべきは第1段だけ、という設計判断ができるわけだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">下の棒グラフを見ると、第1段の寄与だけ飛び抜けて大きいです。これが「支配的」ってことなんですね。等価雑音温度っていうのも出てますけど、これは何ですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">等価雑音温度 Te は、雑音係数を「温度」の言葉で言い換えたものだよ。Te = (F−1)·T0、T0 は 290 K。NF が 1 dB を切るような超低雑音の系——衛星通信や電波天文の受信機——では、NF を dB で語るより Te を K（ケルビン）で語ったほうが差が見やすいんだ。例えば NF=0.5 dB と 0.3 dB の差は dB だとわずかだけど、Te だと 35 K と 21 K でかなり違って見える。両方とも同じ情報の別表現で、F = 1 + Te/T0 でいつでも行き来できる。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">カスケード雑音指数はどの式で計算しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">縦続接続された段の総合雑音係数はフリスの公式 F_total = F1 + (F2−1)/G1 + (F3−1)/(G1·G2) で求めます。F は線形の雑音係数、G は線形の利得で、雑音指数 NF[dB] からは F = 10^(NF/10)、利得 G[dB] からは g = 10^(G/10) と換算します。総合雑音指数は NF_total = 10·log10(F_total) [dB] です。後段の雑音寄与が先行段の利得で割られる点が、この式の最大のポイントです。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">なぜ受信機の最前段に低雑音増幅器（LNA）を置くのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">フリスの公式では、2段目の雑音寄与は (F2−1)/G1、3段目は (F3−1)/(G1·G2) と、先行する段の利得の積で割られます。つまり第1段の利得 G1 が大きいほど後段の雑音は薄められ、総合NFは第1段の NF1 にほぼ等しくなります。だから第1段には NF が小さく利得が大きいLNAを置くのが鉄則です。LNAの利得が十分なら、2段目が多少うるさくても総合性能はほとんど劣化しません。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">等価雑音温度 Te とは何ですか？雑音指数とどう違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">等価雑音温度 Te は、雑音係数 F を温度の言葉で表したもので Te = (F−1)·T0 で定義されます。T0 は基準温度 290 K です。雑音指数 NF[dB] は商用無線でよく使われ、Te[K] は衛星通信や電波天文のように極端に低雑音な系で使われます。両者は同じ情報の別表現で、F = 1 + Te/T0 で相互変換できます。例えば NF=1.5 dB は F≈1.41、Te≈120 K に対応します。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">総合雑音指数を下げるには何を変えればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">最も効くのは第1段の雑音指数 NF1 を下げることです。総合NFは第1段にほぼ等しいため、NF1 を 0.5 dB 下げれば総合NFもほぼ 0.5 dB 下がります。次に第1段の利得 G1 を上げると、後段の雑音寄与 (F2−1)/G1 が小さくなり、後段の影響を抑えられます。逆に、第1段の前にケーブルやフィルタなど損失のある素子（利得が負）を入れると、その損失分がそのまま総合NFに上乗せされるため避けるべきです。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>携帯電話・無線LANの受信フロントエンド：</strong>スマートフォンや Wi-Fi ルータの受信部は、アンテナのすぐ後ろにLNAを置き、その後にミキサ・IFアンプ・フィルタが続きます。受信感度はほぼ最前段のLNAの雑音指数で決まるため、メーカーはここに最も低NFのデバイスを投入します。本ツールで第1段の NF1 を動かすと、総合NFがほぼ同じだけ動くのが確認でき、なぜLNAの選定が最重要なのかが分かります。</p>
+    <p><strong>衛星通信・GPS受信機：</strong>静止衛星や測位衛星からの電波は極端に微弱で、受信機は等価雑音温度で性能を語ります。低雑音ブロックダウンコンバータ（LNB）は Te が数十Kオーダーの超低雑音設計で、アンテナ直下に置かれます。アンテナとLNBの間にケーブルを挟むと、その損失がそのまま雑音温度に上乗せされるため、LNBはアンテナフィードに直結するのが定石です。</p>
+    <p><strong>電波天文・レーダー：</strong>電波望遠鏡の受信系は、Te を可能な限り下げるために初段を冷却（クライオスタット）することすらあります。フリスの公式に従えば、初段の Te を下げ利得を確保すれば、後段のミキサや分光計の雑音は無視できるレベルまで薄められます。本ツールの「累積雑音指数」グラフは、この「初段でほぼ決まり、後段でほとんど増えない」様子を可視化しています。</p>
+    <p><strong>計測器・スペクトラムアナライザ設計：</strong>スペクトラムアナライザやネットワークアナライザの受信部も多段構成で、表示できる最小レベル（DANL）は総合NFで決まります。プリアンプを内蔵・外付けする際は、フリスの公式で「プリアンプを足すと総合NFがどこまで改善するか」を見積もります。利得の低いプリアンプを足しても効果が薄いことも、この式から説明できます。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の誤解が、<strong>「雑音指数は dB なので、段ごとに足し算すればよい」</strong>というものです。フリスの公式は雑音指数（dB）ではなく、線形の雑音係数 F と線形の利得 G で計算します。NF=3 dB は F=2、NF=6 dB は F≈4 であって、F どうしを式に入れてから最後に NF_total = 10·log10(F_total) で dB に戻します。dB のまま足したり割ったりすると、まったく違う答えになります。本ツールが内部で 10^(NF/10) の換算を行っているのはこのためです。</p>
+    <p>次に、<strong>「第1段の前に損失素子を入れても大したことはない」</strong>という油断です。アンテナとLNAの間にケーブル・コネクタ・帯域フィルタを挟むと、それは利得が負の「段」になります。損失 L dB の素子は雑音指数も L dB で、しかもそれが第1段になると、後続のLNAの寄与がその損失で割られて悪化します。結果として総合NFは「損失 + 元のNF」にほぼ等しくなります。1 dB のケーブル損失は、そのまま 1 dB の受信感度劣化です。だからLNAは可能な限りアンテナの直近に置きます。</p>
+    <p>最後に、<strong>「総合NFさえ良ければ受信機は完成」</strong>という思い込みです。フリスの公式が扱うのは小信号の雑音性能だけで、強い入力に対する歪み（IP3、1 dB 圧縮点）やダイナミックレンジは別問題です。第1段の利得を欲張って上げすぎると、後段が強信号で飽和・混変調を起こしやすくなります。実務では、NF を下げる方向と、線形性（歪みにくさ）を確保する方向のトレードオフを取りながら、各段の利得配分を決めます。雑音と歪みの両方を見て初めて、まともな受信機設計になります。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>第1段増幅器の利得G1（dB）と雑音指数NF1（dB）を入力。LNA設計では通常G1=20～30dB、NF1=0.5～1.5dBの範囲</li>
+<li>第2段増幅器の利得G2（dB）と雑音指数NF2（dB）を入力。ミキサー段ではG2=-8～0dB、NF2=8～12dBが一般的</li>
+<li>「計算」をクリックするとフリスの公式により総合NF、等価雑音温度Te、各段の寄与度を自動算出</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>衛星通信受信機で第1段LNA：G1=25dB、NF1=0.8dB、第2段増幅器：G2=-6dB、NF2=10dBの場合、フリス公式によると総合NF≈1.2dB、等価雑音温度Te≈95K、第1段寄与度≈85%となります。この設計では高利得LNAが支配的なため、第2段の劣化は抑制されます。対してG1=10dBに低下させると総合NF≈4.5dBに悪化し、Te≈350Kとなり、低ノイズ第1段の重要性が明確になります。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>第1段利得が3dB低下すると総合NFはほぼ同じ値だけ上昇する特性を利用し、LNA設計ではG1≥20dBを確保してから後段のノイズ指数最適化を実施</li>
+<li>衛星受信系では等価雑音温度Teと感度（EIRP必要値）が直結するため、Teを60K以下に抑えることが契約仕様。計算結果から必要なLNA仕様を逆算</li>
+<li>ミキサー段（第2段）でG2が負値の場合、分母が小さくなり第2段の寄与が相対的に増加。このため変換利得≥0dBのミキサー設計が重要</li>
+<li>温度変動によるNF変化（±0.3dB/25℃）を見込み、常温下でのシミュレーション結果に0.2dB安全率を追加するのが実務慣例</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== reference temperature =====
+const T0 = 290;   // K
+
+// shared state for the canvas animation
+const NS = {
+  g1:15, g2:20, g3:10, nf1:1.5, nf2:4.0, nf3:6.0,
+  nfTotal:0, gTotal:0, te:0,
+  nfCum:[0,0,0], dominant:true
+};
+
+// ===== Chart.js setup =====
+const cumChart = new Chart(document.getElementById('cumChart').getContext('2d'),{
+  type:'line',
+  data:{labels:['第1段まで','第1〜2段','第1〜3段'],datasets:[
+    {label:'累積雑音指数 (dB)',data:[0,0,0],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:true,borderWidth:2,pointRadius:5,pointHoverRadius:7,tension:0.15}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'カスケードの段数',font:{size:11}}},
+      y:{title:{display:true,text:'累積雑音指数 NF (dB)',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:false}}
+  }
+});
+
+const termChart = new Chart(document.getElementById('termChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['F1','(F2−1)/G1','(F3−1)/(G1·G2)'],datasets:[
+    {label:'雑音係数への寄与',data:[0,0,0],backgroundColor:['#d63031','#e17055','#00b894'],borderWidth:0}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{ y:{title:{display:true,text:'総合雑音係数への寄与（線形）',font:{size:11}},beginAtZero:true} },
+    plugins:{legend:{display:false}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const g1Db = parseFloat(document.getElementById('g1Range').value);   // dB
+  const nf1  = parseFloat(document.getElementById('nf1Range').value);  // dB
+  const g2Db = parseFloat(document.getElementById('g2Range').value);   // dB
+  const nf2  = parseFloat(document.getElementById('nf2Range').value);  // dB
+  const g3Db = parseFloat(document.getElementById('g3Range').value);   // dB
+  const nf3  = parseFloat(document.getElementById('nf3Range').value);  // dB
+
+  // ----- convert dB to linear -----
+  const F1 = Math.pow(10, nf1/10);     // linear noise factor, stage 1
+  const F2 = Math.pow(10, nf2/10);     // linear noise factor, stage 2
+  const F3 = Math.pow(10, nf3/10);     // linear noise factor, stage 3
+  const g1 = Math.pow(10, g1Db/10);    // linear gain, stage 1
+  const g2 = Math.pow(10, g2Db/10);    // linear gain, stage 2
+
+  // ----- Friis cascade noise factor -----
+  const term1 = F1;
+  const term2 = (F2 - 1) / g1;
+  const term3 = (F3 - 1) / (g1 * g2);
+  const Ftotal = term1 + term2 + term3;
+
+  // ----- derived quantities -----
+  const nfTotal = 10 * Math.log10(Ftotal);     // dB
+  const gTotal  = g1Db + g2Db + g3Db;          // dB
+  const Te      = (Ftotal - 1) * T0;           // K
+
+  // share of the total noise factor carried by stage 1
+  const share1 = term1 / Ftotal;
+  const dominant = share1 >= 0.9;
+
+  // ----- stat cards -----
+  document.getElementById('statNF').textContent  = nfTotal.toFixed(3);
+  document.getElementById('statG').textContent   = gTotal.toFixed(1);
+  document.getElementById('statTe').textContent  = Te.toFixed(1);
+  document.getElementById('statT1').textContent  = term1.toFixed(3);
+  document.getElementById('statT2').textContent  = term2.toFixed(4);
+  document.getElementById('statDom').textContent = dominant ? '第1段が支配的' : '後段の影響あり';
+
+  document.getElementById('statDom').style.color = dominant ? '#0a8a6a' : '#c0563a';
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  v.className = 'verdict ok';
+  v.innerHTML = '<i class="fas fa-check-circle"></i> フリスの公式では、後段の雑音寄与は先行する全段の利得で割られます。'
+    + 'そのため<strong>第1段の雑音指数が受信機全体を支配</strong>し、総合NF '+nfTotal.toFixed(2)+' dB は第1段の NF1 '+nf1.toFixed(1)+' dB のすぐ上に留まります。'
+    + 'これこそ、NFが小さく利得が大きいLNA（低雑音増幅器）を必ず最前段に置く理由です。'
+    + (dominant
+        ? ' 現在は第1段の寄与が総合雑音係数の '+(share1*100).toFixed(1)+'% を占め、後段がうるさくてもほとんど影響しません。'
+        : ' 現在は第1段の寄与が '+(share1*100).toFixed(1)+'% にとどまり、後段の影響が無視できません。第1段の利得を上げると改善します。');
+
+  // ----- cumulative noise figure chart -----
+  // NF after stage 1: F1 ; after 1-2: F1 + (F2-1)/g1 ; after 1-3: full Friis
+  const Fcum1 = F1;
+  const Fcum2 = F1 + (F2 - 1) / g1;
+  const Fcum3 = Ftotal;
+  const nfCum = [
+    10 * Math.log10(Fcum1),
+    10 * Math.log10(Fcum2),
+    10 * Math.log10(Fcum3)
+  ];
+  cumChart.data.datasets[0].data = nfCum;
+  cumChart.update('none');
+
+  // ----- per-stage noise contribution bar chart -----
+  termChart.data.datasets[0].data = [term1, term2, term3];
+  termChart.update('none');
+
+  // ----- shared state for the canvas -----
+  NS.g1=g1Db; NS.g2=g2Db; NS.g3=g3Db;
+  NS.nf1=nf1; NS.nf2=nf2; NS.nf3=nf3;
+  NS.nfTotal=nfTotal; NS.gTotal=gTotal; NS.te=Te;
+  NS.nfCum=nfCum; NS.dominant=dominant;
+}
+
+// ===== RF cascade chain animation =====
+(function(){
+  const cv = document.getElementById('nfCanvas');
+  const ctx = cv.getContext('2d');
+  let t = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==260*dpr){
+      cv.width = w*dpr; cv.height = 260*dpr; cv.style.height='260px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 260;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    // ----- layout: 3 stage blocks -----
+    const padL = 24, padR = 24;
+    const usable = W - padL - padR;
+    const blockW = Math.min(96, usable*0.22);
+    const gap = (usable - 3*blockW) / 3;     // space before each block / after last
+    const blkY = 96, blkH = 56;
+    const gains = [NS.g1, NS.g2, NS.g3];
+    const nfs   = [NS.nf1, NS.nf2, NS.nf3];
+
+    // baseline for the signal/noise track
+    const trackY = blkY + blkH/2;
+
+    // ----- connecting line -----
+    ctx.strokeStyle = 'rgba(120,160,200,.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padL, trackY);
+    ctx.lineTo(W-padR, trackY);
+    ctx.stroke();
+
+    // block x positions
+    const bx = [];
+    for(let i=0;i<3;i++){ bx.push(padL + gap*0.5 + i*(blockW+gap)); }
+
+    // ----- signal & noise level bars between blocks -----
+    // signal grows by total gain so far; noise floor grows too
+    const cumG = [gains[0], gains[0]+gains[1], gains[0]+gains[1]+gains[2]];
+    const sigBase = 14;
+    const sigH = [];
+    for(let i=0;i<3;i++){
+      sigH.push(Math.max(6, Math.min(58, sigBase + cumG[i]*0.7)));
+    }
+    // noise floor height tracks cumulative NF
+    const noiseH = [];
+    for(let i=0;i<3;i++){
+      noiseH.push(Math.max(4, Math.min(34, 6 + NS.nfCum[i]*3.2)));
+    }
+
+    // ----- draw signal level bars (below track) -----
+    for(let i=0;i<3;i++){
+      const x = bx[i] + blockW + gap*0.5 - 7;
+      // signal (blue) rising
+      ctx.fillStyle = 'rgba(0,123,255,.55)';
+      ctx.fillRect(x-6, trackY+38 - sigH[i], 14, sigH[i]);
+      // noise floor (red) rising on top of signal base
+      ctx.fillStyle = 'rgba(214,48,49,.7)';
+      ctx.fillRect(x-6, trackY+38 - sigH[i] - noiseH[i], 14, noiseH[i]);
+    }
+    ctx.fillStyle = 'rgba(0,123,255,.85)';
+    ctx.font = '9px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('信号', bx[2]+blockW+gap*0.5-7, trackY+52);
+    ctx.fillStyle = 'rgba(214,48,49,.9)';
+    ctx.fillText('雑音', bx[0]+blockW+gap*0.5-7, trackY+52);
+
+    // ----- stage blocks -----
+    const blkCols = ['#00b894','#0984e3','#6c5ce7'];
+    for(let i=0;i<3;i++){
+      const x = bx[i];
+      ctx.fillStyle = 'rgba(255,255,255,.06)';
+      ctx.fillRect(x, blkY, blockW, blkH);
+      ctx.strokeStyle = blkCols[i];
+      ctx.lineWidth = 2;
+      ctx.shadowColor = blkCols[i]; ctx.shadowBlur = 6;
+      ctx.strokeRect(x, blkY, blockW, blkH);
+      ctx.shadowBlur = 0;
+      // triangular amplifier symbol
+      ctx.fillStyle = blkCols[i];
+      ctx.beginPath();
+      ctx.moveTo(x+blockW*0.32, blkY+14);
+      ctx.lineTo(x+blockW*0.32, blkY+blkH-14);
+      ctx.lineTo(x+blockW*0.70, blkY+blkH/2);
+      ctx.closePath();
+      ctx.fill();
+      // labels
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.font = 'bold 11px Roboto Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Stage '+(i+1), x+blockW/2, blkY-22);
+      ctx.fillStyle = 'rgba(180,210,235,.9)';
+      ctx.font = '10px Roboto Mono, monospace';
+      ctx.fillText('G='+gains[i].toFixed(1)+'dB', x+blockW/2, blkY-9);
+      ctx.fillStyle = 'rgba(235,180,180,.92)';
+      ctx.fillText('NF='+nfs[i].toFixed(1)+'dB', x+blockW/2, blkY+blkH+15);
+      // cumulative NF after this stage
+      ctx.fillStyle = '#ffd24b';
+      ctx.font = 'bold 10px Roboto Mono, monospace';
+      ctx.fillText('累積NF '+NS.nfCum[i].toFixed(2)+'dB', x+blockW/2, blkY+blkH+30);
+    }
+
+    // ----- flowing signal & noise wavepackets (left to right) -----
+    const wpN = 5;
+    for(let k=0;k<wpN;k++){
+      const ph = (t + k/wpN) % 1;
+      const px = padL + ph*(W-padL-padR);
+      // amplitude grows as the packet passes blocks
+      let passed = 0;
+      for(let i=0;i<3;i++){ if(px > bx[i]+blockW) passed = i+1; }
+      const ampSig = 5 + (passed>0 ? cumG[passed-1]*0.18 : 0);
+      // signal wave (blue, sine)
+      ctx.strokeStyle = 'rgba(0,150,255,.85)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for(let dx=-10;dx<=10;dx++){
+        const xx = px+dx;
+        if(xx<padL||xx>W-padR) continue;
+        const yy = trackY - 4 - Math.sin((dx+ph*40)*0.6)*ampSig;
+        dx===-10?ctx.moveTo(xx,yy):ctx.lineTo(xx,yy);
+      }
+      ctx.stroke();
+      // noise speckles (red dots) - amplitude tracks cumulative NF
+      const ampNoise = 2 + (passed>0 ? NS.nfCum[passed-1]*0.9 : 0.6);
+      ctx.fillStyle = 'rgba(255,80,80,.8)';
+      for(let d=0;d<5;d++){
+        const xx = px - 8 + d*4;
+        if(xx<padL||xx>W-padR) continue;
+        const yy = trackY + 6 + Math.sin((d*7+t*60+k*11))*ampNoise;
+        ctx.beginPath();
+        ctx.arc(xx, yy, 1.6, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // ----- header text -----
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('信号は左から右へ流れ、各段で増幅される。雑音フロアも各段で上昇する。', padL, 22);
+    ctx.fillStyle = '#ffd24b';
+    ctx.font = 'bold 12px Roboto Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('総合NF '+NS.nfTotal.toFixed(2)+' dB  /  Te '+NS.te.toFixed(0)+' K', W-padR, 22);
+    ctx.fillStyle = NS.dominant ? '#00b894' : '#e17055';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText(NS.dominant ? '第1段が支配的' : '後段の影響あり', W-padR, H-12);
+
+    t += 0.006;
+    if(t>=1) t = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['g1Range','nf1Range','g2Range','nf2Range','g3Range','nf3Range'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

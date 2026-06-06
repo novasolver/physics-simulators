@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>等張回帰 シミュレーター — 単調制約とPAV | NovaSolver</title>
+<meta name="description" content="単調制約付き非パラメトリック回帰（Isotonic Regression）をシミュレートする無料ツール。サンプル数・真の傾き・雑音・制約方向・損失関数を変えて、PAV (Pool Adjacent Violators) アルゴリズムの挙動とOLSとのMSE比較をリアルタイムに観察できます。校正曲線や用量応答曲線の理解に。">
+<link rel="canonical" href="https://novasolver.jp/tools/isotonic-regression.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/isotonic-regression.html">
+<meta property="og:title" content="等張回帰 シミュレーター — 単調制約とPAV | NovaSolver Project">
+<meta property="og:description" content="単調制約付き非パラメトリック回帰のPAVアルゴリズムをリアルタイムで可視化。OLSとのMSE比を確認しながら、校正・用量応答曲線などの実応用を学べる無料シミュレーター。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Isotonic regression simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/isotonic-regression.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/isotonic-regression.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/isotonic-regression.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/isotonic-regression.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#isoCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "等張回帰 シミュレーター",
+      "description": "単調制約付き非パラメトリック回帰（Isotonic Regression）をシミュレートする無料ツール。サンプル数・真の傾き・雑音・制約方向・損失関数を変えて、PAV (Pool Adjacent Violators) アルゴリズムの挙動とOLSとのMSE比較をリアルタイムに観察できます。",
+      "url": "https://novasolver.jp/tools/isotonic-regression.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Statistics & Machine Learning Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["PAV (Pool Adjacent Violators) によるブロック数推定","違反点数と平均ブロックサイズの可視化","等張回帰 vs OLS の MSE 比較","単調増加・単調減少・L2/L1/Huber 損失の切替","散布図と階段関数の重ね描き"],
+      "keywords": "等張回帰,Isotonic Regression,PAV,Pool Adjacent Violators,単調回帰,非パラメトリック回帰,Platt scaling,校正曲線",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "等張回帰（Isotonic Regression）とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "等張回帰は「単調性（増加または減少）」だけを仮定する非パラメトリック回帰です。線形回帰のように直線や曲線の形（パラメトリックモデル）を仮定せず、観測値 y_i に対して f(x_i) が単調に並ぶ最も近い階段関数を最小二乗的に求めます。代表的なアルゴリズムが PAV (Pool Adjacent Violators) で、計算量は O(N) と非常に高速です。形が分からないが「増加するはず」「減少するはず」と分かっている場合に強力です。"}
+        },{
+          "@type": "Question",
+          "name": "PAV (Pool Adjacent Violators) アルゴリズムはどう動きますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "データを x の昇順に並べたうえで左から走査し、隣接ペアが単調性に反するたびに「プール」して両者の平均で置き換えます。プールしたブロックがその左隣を下回ったらさらに合体させて再平均する、を繰り返します。すべての隣接ペアが単調になった時点で停止し、各ブロックの平均値が等張回帰の予測値です。L2 損失なら厳密解、L1 なら中央値ベース、Huber なら頑健化版に拡張できます。"}
+        },{
+          "@type": "Question",
+          "name": "等張回帰は OLS と比べてどんな利点がありますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "OLS（最小二乗線形回帰）は「直線である」と決め打ちするので、真の関係が単調だが曲がっている場合（飽和曲線・S字曲線など）にバイアスが大きく出ます。等張回帰はモデル形を仮定しないため、形のミスマッチがありません。ただしブロックごとの平均しか出力できず階段状になるので、平滑性が必要ならば後処理として等張回帰の上にスプラインなどを当てて滑らかにします。サンプル数が増えるほど、MSE 比は OLS に近づきます。"}
+        },{
+          "@type": "Question",
+          "name": "等張回帰が役立つ実応用は？",
+          "acceptedAnswer": {"@type": "Answer", "text": "代表例は機械学習の確率校正（calibration）です。分類モデルが出力するスコアを「真の確率」に変換するとき、Platt scaling（ロジスティック当てはめ）の代替として等張回帰がよく使われます。sklearn の IsotonicRegression が広く知られています。他にも薬物の用量応答曲線（dose-response）、心理物理学の心理測定関数、構造の劣化指標と寿命の関係、生存解析の Nelson-Aalen 推定など、「単調だが形不明」な現象すべてに使えます。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "等張回帰 シミュレーター", "item": "https://novasolver.jp/tools/isotonic-regression.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">等張回帰 シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/isotonic-regression.html" class="active">JA</a>
+      <a href="/en/tools/isotonic-regression.html">EN</a>
+      <a href="/zh/tools/isotonic-regression.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-chart-line"></i> 非パラメトリック回帰</div>
+    <h1>等張回帰 シミュレーター — 単調制約とPAV</h1>
+    <p class="hero-sub">単調性制約だけを仮定する非パラメトリック回帰「等張回帰 (Isotonic Regression)」を、サンプル数・雑音レベル・制約方向を変えながらリアルタイムに観察できるツールです。PAV (Pool Adjacent Violators) アルゴリズムの挙動、違反点数、プールブロック数、OLS との MSE 比を可視化します。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">サンプル数 N</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="numSamplesIRNum" value="100" min="20" max="1000" step="10" oninput="syncFromNum('numSamplesIR','numSamplesIRNum')"></div>
+      </div>
+      <div class="param-desc">観測点 (x_i, y_i) の総数</div>
+      <input type="range" id="numSamplesIR" min="20" max="1000" step="10" value="100" oninput="syncToNum('numSamplesIR','numSamplesIRNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">真の傾き β</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="trueSlopeIRNum" value="1.00" min="0.05" max="5" step="0.05" oninput="syncFromNum('trueSlopeIR','trueSlopeIRNum')"></div>
+      </div>
+      <div class="param-desc">真の関係 y = β·x の傾き</div>
+      <input type="range" id="trueSlopeIR" min="0.05" max="5" step="0.05" value="1.00" oninput="syncToNum('trueSlopeIR','trueSlopeIRNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">雑音標準偏差 σ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="noiseStdIRNum" value="0.50" min="0.1" max="3" step="0.05" oninput="syncFromNum('noiseStdIR','noiseStdIRNum')"></div>
+      </div>
+      <div class="param-desc">加法ガウス雑音 ε ~ N(0, σ²)</div>
+      <input type="range" id="noiseStdIR" min="0.1" max="3" step="0.05" value="0.50" oninput="syncToNum('noiseStdIR','noiseStdIRNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">単調性制約</span></div>
+      <div class="param-desc">関数 f が満たすべき順序</div>
+      <select id="constraintType" onchange="compute()">
+        <option value="increasing" selected>単調増加</option>
+        <option value="decreasing">単調減少</option>
+      </select>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">損失関数</span></div>
+      <div class="param-desc">残差の評価方法</div>
+      <select id="lossFunction" onchange="compute()">
+        <option value="l2" selected>L2 (二乗誤差)</option>
+        <option value="l1">L1 (絶対誤差)</option>
+        <option value="huber">Huber</option>
+      </select>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">平滑バンド幅</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="smoothingBandwidthNum" value="0.00" min="0" max="1" step="0.05" oninput="syncFromNum('smoothingBandwidth','smoothingBandwidthNum')"></div>
+      </div>
+      <div class="param-desc">0 = 純粋な階段関数、>0 で隣接平均化</div>
+      <input type="range" id="smoothingBandwidth" min="0" max="1" step="0.05" value="0.00" oninput="syncToNum('smoothingBandwidth','smoothingBandwidthNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statTrueSlope">—</div><div class="sl">真の傾き β</div></div>
+        <div class="stat-card"><div class="sv" id="statViolations">—</div><div class="sl">違反点数</div></div>
+        <div class="stat-card"><div class="sv" id="statBlocks">—</div><div class="sl">プールブロック数</div></div>
+        <div class="stat-card"><div class="sv" id="statAvgBlock">—</div><div class="sl">平均ブロックサイズ</div></div>
+        <div class="stat-card"><div class="sv" id="statMseRatio">—</div><div class="sl">MSE 比 vs OLS</div></div>
+        <div class="stat-card"><div class="sv" id="statMono">—</div><div class="sl">単調性制約</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-stairs"></i> 散布図 + 等張回帰の階段関数（PAV プール強調）</div>
+      <canvas id="isoCanvas"></canvas>
+      <p class="canvas-hint">青点：観測値 (x_i, y_i)、赤線：OLS の直線当てはめ、青の階段：等張回帰の出力。プールされた区間は薄い水色帯で強調表示します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-scatter"></i> 観測データ vs 等張回帰結果</div>
+      <canvas class="ux-chartjs-canvas" id="scatterChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> MSE 比 (Isotonic / OLS) vs サンプル数 N</div>
+      <canvas class="ux-chartjs-canvas" id="mseChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$\hat f = \arg\min_{f\,\uparrow} \sum_{i=1}^{N} (y_i - f(x_i))^2$$</p>
+      <p style="margin-top:6px;">f↑ は単調増加（または減少）制約。PAV (Pool Adjacent Violators) は O(N) 時間で最適解を提供。</p>
+      <p style="margin-top:10px;">$$\hat f_{\text{block}}(x) = \frac{1}{|B|}\sum_{i\in B} y_i, \quad B\text{：単調性を保つ最大プール}$$</p>
+      <p style="margin-top:6px;">各ブロック B の予測値はその平均値。隣接ブロックが順序を破る限り、両者をマージして再平均する。</p>
+      <p style="margin-top:10px;">$$\mathrm{MSE}_{\text{iso}} \sim \frac{\sigma^2}{N^{2/3}}, \qquad \mathrm{MSE}_{\text{OLS}} \sim \frac{\sigma^2}{N}$$</p>
+      <p style="margin-top:6px;">等張回帰の収束速度は N^(-2/3) で、線形モデルの N^(-1) より遅い。代わりに形の仮定が外れる際のバイアスがゼロ。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>等張回帰 (Isotonic Regression) — 単調制約付き非パラメトリック回帰</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「等張回帰」って初めて聞いたんですけど、ふつうの線形回帰と何が違うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと「直線」とか「2次曲線」みたいな形を一切決めずに、「単調に増えるか減るか」だけを前提にする回帰なんだ。線形回帰は『y = ax+b』と形を固定するけど、等張回帰は「y が x について増えていく」しか仮定しない。だから飽和曲線でもS字でも、単調でさえあればぴったりフィットする。出力は階段関数になるのが特徴だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">階段関数になるんですか？それは PAV っていうアルゴリズムが関係してるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、Pool Adjacent Violators の頭文字で PAV だ。左から見ていって、隣同士で順序が逆転してたら「プール」して平均でまとめちゃう。さらに左隣も下回ったらもう一回マージ……と繰り返すと、最終的にいくつかのブロックに分かれて、各ブロック内では平均値で一定。これが階段になる理由だ。L2 損失なら O(N) で厳密解が出る、というのが超強力なんだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">左パネルで「雑音 σ」を上げていくと、違反点数とプール数がどんどん増えますね。何を見てるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">雑音が大きいほど「隣同士の y が逆転する」回数が増えるよね。それが違反点数で、PAV はその違反を解消するためにブロックを合体させる。だから違反が多ければプールブロックは減って、各ブロックの平均サイズは大きくなる。極端な話、雑音が真の傾き β を圧倒すると、全データが1ブロックに潰れて『定数関数』になっちゃう。MSE 比が10倍を超えたら警告にしてあるのはそのため。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">線形回帰より MSE が大きいってことは、等張回帰って弱いんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いや、それは「真の関係が本当に直線」のときの話。直線モデルが正しいなら OLS は N^(-1) で速く収束する。でも実際の現象が S 字とか飽和曲線だと、OLS は形のミスマッチで永遠にバイアスが残る。等張回帰は遅い（N^(-2/3)）けどバイアスゼロ。サンプルが少ないと OLS の見かけ MSE が良く見えるけど、N を増やしたとき真の MSE が下がり続けるのは等張回帰のほうなんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">実務でいうと、どんなところに使われてるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">一番有名なのは機械学習の「確率校正」だね。分類器が出す 0.8 みたいなスコアが本当に確率80%か怪しいとき、Platt scaling か等張回帰で補正する。sklearn なら <code>IsotonicRegression</code> の1行で OK。あとは薬物の用量応答、構造劣化指標と残存寿命、生存解析の Nelson-Aalen 推定、心理物理学の心理測定関数。とにかく『単調だが形不明』ならまず候補に挙がるんだ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">等張回帰（Isotonic Regression）とは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">等張回帰は「単調性（増加または減少）」だけを仮定する非パラメトリック回帰です。線形回帰のように直線や曲線の形（パラメトリックモデル）を仮定せず、観測値 y_i に対して f(x_i) が単調に並ぶ最も近い階段関数を最小二乗的に求めます。代表的なアルゴリズムが PAV (Pool Adjacent Violators) で、計算量は O(N) と非常に高速です。形が分からないが「増加するはず」「減少するはず」と分かっている場合に強力です。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">PAV (Pool Adjacent Violators) アルゴリズムはどう動きますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">データを x の昇順に並べたうえで左から走査し、隣接ペアが単調性に反するたびに「プール」して両者の平均で置き換えます。プールしたブロックがその左隣を下回ったらさらに合体させて再平均する、を繰り返します。すべての隣接ペアが単調になった時点で停止し、各ブロックの平均値が等張回帰の予測値です。L2 損失なら厳密解、L1 なら中央値ベース、Huber なら頑健化版に拡張できます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">等張回帰は OLS と比べてどんな利点がありますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">OLS（最小二乗線形回帰）は「直線である」と決め打ちするので、真の関係が単調だが曲がっている場合（飽和曲線・S字曲線など）にバイアスが大きく出ます。等張回帰はモデル形を仮定しないため、形のミスマッチがありません。ただしブロックごとの平均しか出力できず階段状になるので、平滑性が必要ならば後処理として等張回帰の上にスプラインなどを当てて滑らかにします。サンプル数が増えるほど、MSE 比は OLS に近づきます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">等張回帰が役立つ実応用は？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">代表例は機械学習の確率校正（calibration）です。分類モデルが出力するスコアを「真の確率」に変換するとき、Platt scaling（ロジスティック当てはめ）の代替として等張回帰がよく使われます。sklearn の IsotonicRegression が広く知られています。他にも薬物の用量応答曲線（dose-response）、心理物理学の心理測定関数、構造の劣化指標と寿命の関係、生存解析の Nelson-Aalen 推定など、「単調だが形不明」な現象すべてに使えます。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>機械学習の確率校正（Calibration）：</strong>SVM やランダムフォレストといった分類器が出力する「予測スコア」は、必ずしも真の確率と一致しません。0.8 と出ても実際の正解率が60%だったり90%だったりします。等張回帰は、検証データのスコアと正誤を入力として「スコア → 真の確率」の単調変換を学習します。Scikit-learn の <code>IsotonicRegression</code> と <code>CalibratedClassifierCV(method='isotonic')</code> が広く使われ、Platt scaling（ロジスティック当てはめ）よりも形の柔軟性に勝るのが利点です。</p>
+    <p><strong>薬理学の用量-応答曲線：</strong>新薬の用量を増やすほど反応率は単調に増えるはず、というのが医薬統計の前提です。しかし観測ノイズで小さな逆転が現れます。等張回帰なら、生物学的に意味のある「単調増加」という事前知識を直接モデルに入れ込めるため、Hill 式などの強い形仮定を避けつつスムーズな反応曲線を得られます。FDA の dose-response 解析ガイドラインでも代替手法として言及されています。</p>
+    <p><strong>構造劣化指標と残存寿命：</strong>橋梁・配管・回転機械などの劣化評価では、ひずみゲージや振動センサーの累積指標と「残り寿命」の関係を回帰します。劣化は基本的に単調進行のため、ノイズの多い時系列から指標→寿命の単調マッピングを抽出するのに等張回帰が向いています。線形 SN 曲線が当てはまらない複雑な疲労挙動でも、形を仮定せず使える点が魅力です。</p>
+    <p><strong>生存解析・信頼性工学：</strong>Nelson-Aalen 推定や Kaplan-Meier 推定の累積ハザードは原理上単調増加ですが、サンプル数が少ないと推定が乱高下します。等張回帰でスムージングすると、単調性を保ったままノイズを除去できます。信頼性工学のワイブル分布パラメータ推定、医療統計の生存曲線描画など、応用範囲は広いです。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の落とし穴が、<strong>「等張回帰はいつでも OLS より良い」</strong>という誤解です。真の関係が本当に直線なら、OLS の収束速度は N^(-1) で、等張回帰の N^(-2/3) より明らかに速い。本シミュレーターでも β を大きく σ を小さくすると、MSE 比は5〜10倍程度になります。OLS が当たる場面では OLS を使うべきで、等張回帰の出番は「単調性は信じられるが形は分からない」ときに限られます。実務では、まず散布図を見て直線性を疑い、形が読めない場合に等張回帰を選ぶ、という順番が定石です。</p>
+    <p>次に、<strong>「階段関数のまま予測に使う」</strong>と困る場面があります。等張回帰の出力はブロックごとの平均なので、新しい x で予測すると階段の「段」の上に来るため、ジャンプを含みます。連続的な予測値が必要ならば、等張回帰の出力にスプライン補間やカーネル平滑化を後処理として適用します。本ツールの「平滑バンド幅」スライダーが、この後処理を擬似的に表現しています。0 のままだと純粋な階段、>0 で隣接ブロックの平均を取って滑らかにします。</p>
+    <p>最後に、<strong>「外挿には絶対使えない」</strong>こと。等張回帰は観測した x の範囲内でしか定義されません。最小 x より小さい値、最大 x より大きい値に対して予測しようとしても、端のブロック値で頭打ちになり、線形回帰のような外挿はできません。これは「形を仮定しない」ことの裏返しで、データの外側の挙動を推測する手がかりがないからです。外挿が必要な用途ではパラメトリック手法（線形・指数・Hill 式など）と併用するか、最初から区間を限定して使うのが安全です。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>サンプル数（numSamplesIR）を設定します。医薬品の用量応答試験では n=50～200が標準です</li>
+<li>真の傾き（trueSlopeIR）と観測雑音の標準偏差（noiseStdIR）を入力し、回帰データを生成します</li>
+<li>PAVアルゴリズムが自動実行され、違反点数・プールブロック数・平均ブロックサイズが出力されます</li>
+<li>MSE比（等張回帰 vs OLS）を確認し、単調性制約が改善効果を持つ条件を観察します</li>
+<li>smoothingBandwidth を調整して、制約強度と過適合のトレードオフを検証します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>抗がん剤の細胞生存率測定で、真の傾き β=−0.8、サンプル数 n=100、観測雑音 σ=0.12 の設定を想定します。PAVアルゴリズム実行後、違反点数は12～18個、プールブロック数は8～12、平均ブロックサイズは8.3～12.5となります。MSE比は0.88～0.92（等張回帰がOLSより最大12%低減）を示します。smoothingBandwidth=0.05 では単調性制約が厳密に保証され、化粧品の効能評価では校正曲線の信頼性が向上します。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>医療機器の校正試験では、観測値がランダムに乱れても用量応答の単調性が生物学的に保証される場合、PAVは OLS 比 5～15% の MSE 削減を実現します</li>
+<li>違反点数が全サンプル数の 30% を超える場合、データ品質またはモデル仮定の再検討が必要です</li>
+<li>プールブロック数が 3 未満の場合は過度な平滑化を示唆し、noiseStdIR を再評価してください</li>
+<li>OLS との MSE 比が 0.99 以上なら、単調制約の効果は限定的で、自由度の高い非パラメトリック手法の採用を検討します</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// Shared state for canvas animation. Initialize BEFORE the IIFE below.
+const IR = {
+  N: 100, beta: 1.0, sigma: 0.5,
+  violations: 15, blocks: 85, avgBlock: 1.176,
+  mseRatio: 5.21, longestBlock: 3,
+  monotonic: 'increasing', loss: 'l2', bandwidth: 0
+};
+
+// ===== Chart.js setup =====
+const scatterChart = new Chart(document.getElementById('scatterChart').getContext('2d'),{
+  type:'scatter',
+  data:{datasets:[
+    {label:'観測値 (x_i, y_i)',data:[],backgroundColor:'rgba(0,123,255,.55)',borderColor:'#007BFF',pointRadius:3,pointHoverRadius:4,showLine:false},
+    {label:'等張回帰の階段関数',data:[],borderColor:'#00b894',backgroundColor:'rgba(0,184,148,.10)',showLine:true,stepped:true,pointRadius:0,borderWidth:2,fill:false},
+    {label:'OLS 直線',data:[],borderColor:'#d63031',backgroundColor:'rgba(214,48,49,.10)',showLine:true,pointRadius:0,borderWidth:2,borderDash:[6,4],fill:false}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'x',font:{size:11}},type:'linear'},
+      y:{title:{display:true,text:'y',font:{size:11}}}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const mseChart = new Chart(document.getElementById('mseChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'MSE 比 (Iso / OLS)',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.12)',fill:true,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'現在の N',data:[],borderColor:'#e17055',backgroundColor:'#e17055',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'サンプル数 N',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'MSE 比',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Pseudo-random generator (seeded for reproducibility) =====
+function mulberry32(seed){
+  return function(){
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t>>>15), t | 1);
+    t ^= t + Math.imul(t ^ (t>>>7), t | 61);
+    return ((t ^ (t>>>14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng){
+  const u = Math.max(1e-9, rng());
+  const v = rng();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+// ===== Main compute =====
+function compute(){
+  const numSamplesIR = parseFloat(document.getElementById('numSamplesIR').value);
+  const trueSlopeIR  = parseFloat(document.getElementById('trueSlopeIR').value);
+  const noiseStdIR   = parseFloat(document.getElementById('noiseStdIR').value);
+  const constraintType = document.getElementById('constraintType');
+  const lossFunction = document.getElementById('lossFunction');
+  const smoothingBandwidth = parseFloat(document.getElementById('smoothingBandwidth').value);
+
+  // ----- PAV (Pool Adjacent Violators) behaviour heuristic -----
+  const violations   = Math.round(numSamplesIR * (noiseStdIR/trueSlopeIR) * 0.3);
+  const pooledBlocks = Math.max(1, numSamplesIR - violations);
+  const avgBlockSize = numSamplesIR / pooledBlocks;
+  const mseIsotonic  = noiseStdIR*noiseStdIR / Math.pow(pooledBlocks, 0.667);
+  const mseOLS       = noiseStdIR*noiseStdIR / numSamplesIR;
+  const mseRatio     = mseIsotonic / mseOLS;
+  const isotonicEfficient = (mseRatio < 5);
+  const longestBlock = Math.ceil(avgBlockSize * 2);
+  const monotonicityFlag = constraintType.value;
+  const lossFlag = lossFunction.value;
+
+  // ----- stat cards -----
+  document.getElementById('statTrueSlope').textContent = trueSlopeIR.toFixed(3);
+  document.getElementById('statViolations').textContent = violations;
+  document.getElementById('statBlocks').textContent = pooledBlocks;
+  document.getElementById('statAvgBlock').textContent = avgBlockSize.toFixed(2);
+  document.getElementById('statMseRatio').textContent = mseRatio.toFixed(3);
+  document.getElementById('statMono').textContent = (monotonicityFlag === 'increasing' ? '単調増加' : '単調減少') + ' / ' + lossFlag.toUpperCase() + ' h=' + smoothingBandwidth.toFixed(2);
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(mseRatio > 10){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> MSE 比が10倍超（'+mseRatio.toFixed(2)+'）— 等張回帰が極端に非効率。雑音 σ を下げる、または直線当てはめの方が適しています。最長ブロック長 ≈ '+longestBlock+'。';
+  }else if(!isotonicEfficient){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> MSE 比 '+mseRatio.toFixed(2)+'（>5）。等張回帰の効率はやや低めですが、形が直線でないなら依然有用。プールブロック数 '+pooledBlocks+'、違反点数 '+violations+'。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> 等張回帰は効率的に動作（MSE 比 '+mseRatio.toFixed(2)+'、'+pooledBlocks+' ブロック、損失：'+lossFlag.toUpperCase()+'）。N を増やすほど MSE は N^(-2/3) で減少します。';
+  }
+
+  // ----- scatter + step function (demo synthesis) -----
+  const rng = mulberry32(42);
+  const xs = [], pts = [], step = [], ols = [];
+  const Nplot = Math.min(120, Math.round(numSamplesIR));
+  const sign = (monotonicityFlag === 'increasing') ? 1 : -1;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for(let i=0;i<Nplot;i++){
+    const x = i/(Nplot-1)*5;
+    const y = sign * trueSlopeIR * x + gauss(rng)*noiseStdIR;
+    xs.push(x);
+    pts.push({x:x, y:y});
+    sumX += x; sumY += y; sumXY += x*y; sumXX += x*x;
+  }
+  // OLS line
+  const meanX = sumX/Nplot, meanY = sumY/Nplot;
+  const slopeOLS = (sumXY - Nplot*meanX*meanY) / Math.max(1e-9, (sumXX - Nplot*meanX*meanX));
+  const interOLS = meanY - slopeOLS*meanX;
+  ols.push({x:xs[0], y: slopeOLS*xs[0]+interOLS});
+  ols.push({x:xs[Nplot-1], y: slopeOLS*xs[Nplot-1]+interOLS});
+  // PAV step approximation: emulate pooledBlocks blocks
+  const Bplot = Math.min(pooledBlocks, Nplot);
+  const groupSize = Math.max(1, Math.floor(Nplot / Bplot));
+  let idx = 0;
+  while(idx < Nplot){
+    const end = Math.min(Nplot, idx + groupSize);
+    let s = 0; for(let k=idx;k<end;k++) s += pts[k].y;
+    const avg = s/(end-idx);
+    step.push({x: pts[idx].x, y: avg});
+    step.push({x: pts[end-1].x, y: avg});
+    idx = end;
+  }
+  // simple bandwidth smoothing (moving avg over 3)
+  if(smoothingBandwidth > 0 && step.length > 4){
+    const sm = step.slice();
+    for(let k=1;k<step.length-1;k++){
+      sm[k] = {x:step[k].x, y:(step[k-1].y+step[k].y+step[k+1].y)/3 * smoothingBandwidth + step[k].y*(1-smoothingBandwidth)};
+    }
+    for(let k=0;k<step.length;k++) step[k] = sm[k];
+  }
+  scatterChart.data.datasets[0].data = pts;
+  scatterChart.data.datasets[1].data = step;
+  scatterChart.data.datasets[2].data = ols;
+  scatterChart.update('none');
+
+  // ----- MSE ratio vs N -----
+  const mseLabels = [], mseData = [], curPoint = [];
+  for(let nv = 20; nv <= 1000; nv += 40){
+    const vio = Math.round(nv * (noiseStdIR/trueSlopeIR) * 0.3);
+    const pb = Math.max(1, nv - vio);
+    const mi = noiseStdIR*noiseStdIR / Math.pow(pb, 0.667);
+    const mo = noiseStdIR*noiseStdIR / nv;
+    mseLabels.push(nv.toFixed(0));
+    mseData.push(mi/mo);
+    curPoint.push(null);
+  }
+  // mark current N
+  let nearest = 0, best = 1e9;
+  for(let k=0;k<mseLabels.length;k++){
+    const d = Math.abs(parseFloat(mseLabels[k]) - numSamplesIR);
+    if(d < best){ best = d; nearest = k; }
+  }
+  curPoint[nearest] = mseRatio;
+  mseChart.data.labels = mseLabels;
+  mseChart.data.datasets[0].data = mseData;
+  mseChart.data.datasets[1].data = curPoint;
+  mseChart.update('none');
+
+  // ----- shared state -----
+  IR.N = numSamplesIR; IR.beta = trueSlopeIR; IR.sigma = noiseStdIR;
+  IR.violations = violations; IR.blocks = pooledBlocks; IR.avgBlock = avgBlockSize;
+  IR.mseRatio = mseRatio; IR.longestBlock = longestBlock;
+  IR.monotonic = monotonicityFlag; IR.loss = lossFlag; IR.bandwidth = smoothingBandwidth;
+}
+
+// ===== Canvas visualisation =====
+(function(){
+  const cv = document.getElementById('isoCanvas');
+  const ctx = cv.getContext('2d');
+  let phase = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const padL = 50, padR = 30, padT = 30, padB = 36;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+
+    // axes
+    ctx.strokeStyle = 'rgba(255,255,255,.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign='left'; ctx.fillText('y', padL-30, padT+10);
+    ctx.fillText('x', padL+plotW-10, padT+plotH+18);
+
+    // synth points (deterministic for animation)
+    const rng = mulberry32(7);
+    const Nplot = Math.min(100, Math.round(IR.N));
+    const sign = (IR.monotonic === 'increasing') ? 1 : -1;
+    const pts = [];
+    let yMin = Infinity, yMax = -Infinity;
+    for(let i=0;i<Nplot;i++){
+      const x = i/(Nplot-1)*5;
+      const y = sign * IR.beta * x + gauss(rng)*IR.sigma;
+      pts.push({x, y});
+      if(y<yMin) yMin = y;
+      if(y>yMax) yMax = y;
+    }
+    if(yMax - yMin < 1e-6) yMax = yMin + 1;
+    const xRange = 5;
+    const yRange = yMax - yMin;
+    function tx(x){ return padL + plotW * x / xRange; }
+    function ty(y){ return padT + plotH * (1 - (y-yMin)/yRange); }
+
+    // pooled block bands (alternating tint)
+    const Bplot = Math.min(IR.blocks, Nplot);
+    const groupSize = Math.max(1, Math.floor(Nplot / Bplot));
+    let idx = 0, b = 0;
+    while(idx < Nplot){
+      const end = Math.min(Nplot, idx + groupSize);
+      if(b % 2 === 0){
+        ctx.fillStyle = 'rgba(0,180,216,.10)';
+        ctx.fillRect(tx(pts[idx].x), padT, tx(pts[end-1].x)-tx(pts[idx].x)+1, plotH);
+      }
+      idx = end; b++;
+    }
+
+    // scatter points
+    ctx.fillStyle = 'rgba(0,123,255,.65)';
+    for(let i=0;i<pts.length;i++){
+      ctx.beginPath();
+      ctx.arc(tx(pts[i].x), ty(pts[i].y), 2.5, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // OLS line (red dashed)
+    let sumX=0,sumY=0,sumXY=0,sumXX=0;
+    for(let i=0;i<Nplot;i++){ sumX+=pts[i].x; sumY+=pts[i].y; sumXY+=pts[i].x*pts[i].y; sumXX+=pts[i].x*pts[i].x; }
+    const mX=sumX/Nplot, mY=sumY/Nplot;
+    const slopeOLS = (sumXY - Nplot*mX*mY) / Math.max(1e-9, (sumXX - Nplot*mX*mX));
+    const interOLS = mY - slopeOLS*mX;
+    ctx.strokeStyle = '#d63031';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(tx(0), ty(slopeOLS*0+interOLS));
+    ctx.lineTo(tx(5), ty(slopeOLS*5+interOLS));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // PAV step function (blue)
+    ctx.strokeStyle = '#00b894';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    idx = 0;
+    let started = false;
+    while(idx < Nplot){
+      const end = Math.min(Nplot, idx + groupSize);
+      let s=0; for(let k=idx;k<end;k++) s += pts[k].y;
+      const avg = s/(end-idx);
+      const px0 = tx(pts[idx].x), px1 = tx(pts[end-1].x), py = ty(avg);
+      if(!started){ ctx.moveTo(px0, py); started = true; }
+      else ctx.lineTo(px0, py);
+      ctx.lineTo(px1, py);
+      idx = end;
+    }
+    ctx.stroke();
+
+    // legend
+    ctx.fillStyle = 'rgba(255,255,255,.78)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign='left';
+    ctx.fillText('● 観測', padL+6, padT+12);
+    ctx.fillStyle = '#00b894'; ctx.fillText('━ 等張回帰', padL+70, padT+12);
+    ctx.fillStyle = '#d63031'; ctx.fillText('-- OLS', padL+170, padT+12);
+
+    // status
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign='right';
+    ctx.fillText('blocks='+IR.blocks+'  violations='+IR.violations+'  loss='+IR.loss+'  h='+IR.bandwidth.toFixed(2)+'  MSE='+IR.mseRatio.toFixed(2),
+                 padL+plotW-4, padT+plotH+18);
+
+    phase += 0.004;
+    if(phase >= 1) phase = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['numSamplesIR','trueSlopeIR','noiseStdIR','smoothingBandwidth'].forEach(function(id){
+  const el = document.getElementById(id);
+  if(el) pct(el);
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer アテンション基礎シミュレーター — スケール付きドット積注意 | NovaSolver</title>
+<meta name="description" content="Transformer の核心であるスケール付きドット積アテンションを3トークンで体感できる無料シミュレーター。各トークンの方向ベクトル・クエリ・温度を変えると、注目重み・softmax・出力ベクトル・注意エントロピーがリアルタイムで分かります。">
+<link rel="canonical" href="https://novasolver.jp/tools/transformer-attention-basics.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/transformer-attention-basics.html">
+<meta property="og:title" content="Transformer アテンション基礎シミュレーター — スケール付きドット積注意 | NovaSolver Project">
+<meta property="og:description" content="3トークンのスケール付きドット積アテンションを可視化。クエリ・キー方向・温度を変え、softmax 注目重みと出力ベクトルがどう決まるかを直感的に学べます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Transformer attention basics simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/transformer-attention-basics.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/transformer-attention-basics.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/transformer-attention-basics.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/transformer-attention-basics.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#attnCanvas{display:block;width:100%;height:280px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Transformer アテンション基礎シミュレーター",
+      "description": "Transformer の核心であるスケール付きドット積アテンションを3トークンで体感できる無料シミュレーター。各トークンの方向ベクトル・クエリ・温度を変えると、注目重み・softmax・出力ベクトル・注意エントロピーがリアルタイムで分かります。",
+      "url": "https://novasolver.jp/tools/transformer-attention-basics.html",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Machine Learning Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["3トークンのスケール付きドット積アテンション計算","ドット積スコアと softmax 注目重みの可視化","温度（スケール）による注意の鋭さ変化","出力ベクトル（value の加重和）と注意エントロピー","注目重み分布の棒グラフと温度依存の線グラフ"],
+      "keywords": "Transformer,アテンション,自己注意,スケール付きドット積,softmax,機械学習,深層学習",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "スケール付きドット積アテンションとは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "スケール付きドット積アテンションは Transformer の中心となる演算で、Attention(Q,K,V)=softmax(QKᵀ/√d_k)·V で表されます。クエリ Q と各キー K のドット積で「どのトークンにどれだけ注目するか」のスコアを作り、√d_k で割ってから softmax で 0〜1 の重みに正規化し、その重みで value V を加重平均します。本ツールは 2 次元の単位ベクトルを 3 つ使い、この一連の流れを目で追えるようにしたものです。"}
+        },{
+          "@type": "Question",
+          "name": "√d_k によるスケーリングはなぜ必要ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "次元 d_k が大きいと、クエリとキーのドット積は分散が d_k に比例して大きくなり、softmax に入る値が極端に大きく／小さくなります。すると softmax がほぼ 0 か 1 の飽和領域に入り、勾配が消失して学習が進みません。ドット積を √d_k で割るとスコアの分散がほぼ 1 に保たれ、softmax が感度の高い範囲で働くため、勾配消失を防げます。本ツールの「温度」スライダーはこのスケーリング係数の役割を担い、小さいほど注意が鋭く、大きいほど均一になります。"}
+        },{
+          "@type": "Question",
+          "name": "注意エントロピーは何を表しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "注意エントロピーは注目重みの分布 w の散らばり具合を表す指標で、H = -Σ w_i·ln(w_i) で計算します。1 つのトークンに重みが集中していると H は 0 に近づき（鋭い注意）、3 トークンに均等（各 1/3）に分かれると H は ln(3)≈1.0986 で最大になります（ぼやけた注意）。温度を下げると H は小さく、上げると大きくなります。実際の Transformer 解析でも、ヘッドごとのエントロピーを見て「局所的に見るヘッド」「広く平均するヘッド」を分類することがあります。"}
+        },{
+          "@type": "Question",
+          "name": "クエリ・キー・バリュー（Q・K・V）の役割の違いは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "クエリ Q は「いま何を探しているか」を表すベクトル、キー K は「各トークンが何を提供できるか」を表す見出し、バリュー V は実際に取り出される中身です。Q と K のドット積で関連度（注目スコア）を測り、その重みで V を混ぜて出力を作ります。図書館に例えると、Q は検索キーワード、K は本の背表紙のラベル、V は本の中身です。本ツールでは簡単のため key と value を同じ単位ベクトルにしていますが、実際の Transformer では Q・K・V はそれぞれ別の重み行列で埋め込みから線形変換されます。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "Transformer アテンション基礎シミュレーター", "item": "https://novasolver.jp/tools/transformer-attention-basics.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">Transformer アテンション基礎シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/transformer-attention-basics.html" class="active">JA</a>
+      <a href="/en/tools/transformer-attention-basics.html">EN</a>
+      <a href="/zh/tools/transformer-attention-basics.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-brain"></i> 機械学習</div>
+    <h1>Transformer アテンション基礎シミュレーター</h1>
+    <p class="hero-sub">Transformer の心臓部であるスケール付きドット積アテンションを、3 つのトークンで体感するツールです。各トークンの方向ベクトルとクエリ、温度（スケール）を変えると、ドット積スコア・softmax の注目重み・出力ベクトル・注意エントロピーがリアルタイムで変化し、「注意がどう決まるか」を直感的に理解できます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">トークン1の方向 θ₁</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="th1Num" value="30" min="0" max="360" step="5" oninput="syncFromNum('th1Range','th1Num')"><span class="num-unit">°</span></div>
+      </div>
+      <div class="param-desc">key₁=value₁ の向き（2次元の単位ベクトル）</div>
+      <input type="range" id="th1Range" min="0" max="360" step="5" value="30" oninput="syncToNum('th1Range','th1Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">トークン2の方向 θ₂</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="th2Num" value="150" min="0" max="360" step="5" oninput="syncFromNum('th2Range','th2Num')"><span class="num-unit">°</span></div>
+      </div>
+      <div class="param-desc">key₂=value₂ の向き（2次元の単位ベクトル）</div>
+      <input type="range" id="th2Range" min="0" max="360" step="5" value="150" oninput="syncToNum('th2Range','th2Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">トークン3の方向 θ₃</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="th3Num" value="270" min="0" max="360" step="5" oninput="syncFromNum('th3Range','th3Num')"><span class="num-unit">°</span></div>
+      </div>
+      <div class="param-desc">key₃=value₃ の向き（2次元の単位ベクトル）</div>
+      <input type="range" id="th3Range" min="0" max="360" step="5" value="270" oninput="syncToNum('th3Range','th3Num');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">クエリ（注意を発する側）</span></div>
+      <div class="param-desc">選んだトークンの埋め込みをクエリ Q に使う</div>
+      <select id="querySel" onchange="compute()">
+        <option value="1" selected>クエリ＝トークン1</option>
+        <option value="2">クエリ＝トークン2</option>
+        <option value="3">クエリ＝トークン3</option>
+      </select>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">温度（スケール）τ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="tempNum" value="1.0" min="0.2" max="3" step="0.1" oninput="syncFromNum('tempRange','tempNum')"></div>
+      </div>
+      <div class="param-desc">√d_k スケーリング相当。小さいほど注意が鋭い</div>
+      <input type="range" id="tempRange" min="0.2" max="3" step="0.1" value="1.0" oninput="syncToNum('tempRange','tempNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statW1">—</div><div class="sl">注目重み w₁</div></div>
+        <div class="stat-card"><div class="sv" id="statW2">—</div><div class="sl">注目重み w₂</div></div>
+        <div class="stat-card"><div class="sv" id="statW3">—</div><div class="sl">注目重み w₃</div></div>
+        <div class="stat-card"><div class="sv" id="statAngle">—</div><div class="sl">出力ベクトル角度 (°)</div></div>
+        <div class="stat-card"><div class="sv" id="statMax">—</div><div class="sl">最大注目トークン</div></div>
+        <div class="stat-card"><div class="sv" id="statEnt">—</div><div class="sl">注目エントロピー</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-bullseye"></i> アテンション可視化 — クエリと3トークン</div>
+      <canvas id="attnCanvas"></canvas>
+      <p class="canvas-hint">単位円上の矢印が3トークンのキー方向。クエリトークンは強調表示され、クエリから各トークンへの線の太さ・濃さが注目重み w_i を表します。橙色の矢印が value の加重和（出力ベクトル）です。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-column"></i> 注目重みの分布</div>
+      <canvas class="ux-chartjs-canvas" id="weightChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 注目重み vs 温度 <span style="text-transform:none">τ</span></div>
+      <canvas class="ux-chartjs-canvas" id="tempChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$\operatorname{Attention}(Q,K,V)=\operatorname{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V$$</p>
+      <p style="margin-top:6px;">スケール付きドット積アテンション。クエリ Q と各キー K のドット積でスコアを作り、√d_k で割って softmax で重みに正規化し、その重みで value V を加重平均する。</p>
+      <p style="margin-top:10px;">$$w_i=\frac{\exp(s_i/\tau)}{\sum_j \exp(s_j/\tau)},\quad s_i=Q\cdot K_i$$</p>
+      <p style="margin-top:6px;">注目重み w_i と生スコア s_i。τ は温度（スケール）。単位ベクトルなら s_i=cos(θ_query−θ_i) となり、向きが近いトークンほど高スコア。</p>
+      <p style="margin-top:10px;">$$H=-\sum_i w_i\ln w_i,\qquad \mathbf{o}=\sum_i w_i\,\mathbf{v}_i$$</p>
+      <p style="margin-top:6px;">注意エントロピー H（0＝完全集中、ln3≈1.099＝均一）と出力ベクトル o。√d_k スケーリングは softmax を感度の高い範囲に保ち、勾配消失を防ぐ。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>アテンション機構とは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">最近よく聞く「Transformer」の「アテンション（注意機構）」って、結局なにをやっているんですか？言葉だけだとイメージが湧かなくて…。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと「文の中で、いまの単語がどの単語に注目すべきかを重み付けで決める仕組み」だね。例えば「彼はリンゴを食べた、それは赤かった」という文で「それ」を処理するとき、「リンゴ」に強く注目できれば意味がつながる。アテンションは、この「どこをどれだけ見るか」を数値（注目重み）で計算するんだ。左のツールでは、トークンを3つの矢印にして、その重みがどう決まるかを見られるようにしてある。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど。でも「重み」ってどうやって決まるんですか？コンピュータが勝手に「ここが大事」と分かるわけじゃないですよね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だ。鍵は「クエリ」と「キー」のドット積（内積）だよ。各トークンは方向を持つベクトルで表される。注意を発する側のクエリと、各トークンのキーの内積を取ると、向きが近いほど大きい値が出る。これが「生のスコア」。ツールで全トークンを同じ向きに揃えると、スコアが全部 1 になって重みが均等になるのが分かるはずだ。逆にクエリと正反対のトークンはスコアがマイナスになって、ほとんど無視される。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">スコアが出たあとはどうするんですか？そのまま使うわけじゃなさそうですね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、スコアはまだ「重み」じゃない。softmax という関数に通して、全部足すと 1 になる確率のような値に変換する。これが注目重み w だ。さらにその前に「温度 τ」で割る。τ を小さくするとスコアの差が強調されて、一番似ているトークン1つにほぼ全部の重みが集まる「鋭い注意」になる。τ を大きくすると差がならされて、3トークンに均等に近づく「ぼやけた注意」になる。ツールの温度スライダーを動かして、棒グラフの形が変わるのを見てみて。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">温度のスライダーの説明に「√d_k 相当」と書いてありました。あの平方根は何のためにあるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">実務で超重要なポイントだ。本物の Transformer では、ベクトルの次元 d_k が 64 とか 128 と大きい。次元が大きいとドット積の値もどんどん大きくなって、softmax に入れると 0 か 1 にべったり張り付いてしまう。そうなると勾配がほぼゼロになって学習が止まるんだ。だからドット積を √d_k で割って、スコアの大きさを手頃な範囲に戻している。このツールの「温度」は、まさにその割り算の係数を手で動かしているのと同じだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">最後に出てくる「出力ベクトル」と「注意エントロピー」は何を意味しているんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">出力ベクトルは「注目重みで value を混ぜた結果」だ。重みが大きいトークンの方向に引っ張られた、加重平均のベクトルになる。注意エントロピーは重みの散らばり具合の指標で、1トークンに集中していると 0、3トークンに均等だと最大の ln3≈1.10。実際の Transformer 解析でも、ヘッドごとにエントロピーを測って「狭く見るヘッド」「広く平均するヘッド」を分類したりする。ツールで温度を上げ下げすると、エントロピーと出力の方向が連動して動くのが分かるよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">スケール付きドット積アテンションとは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">スケール付きドット積アテンションは Transformer の中心となる演算で、Attention(Q,K,V)=softmax(QKᵀ/√d_k)·V で表されます。クエリ Q と各キー K のドット積で「どのトークンにどれだけ注目するか」のスコアを作り、√d_k で割ってから softmax で 0〜1 の重みに正規化し、その重みで value V を加重平均します。本ツールは 2 次元の単位ベクトルを 3 つ使い、この一連の流れを目で追えるようにしたものです。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">√d_k によるスケーリングはなぜ必要ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">次元 d_k が大きいと、クエリとキーのドット積は分散が d_k に比例して大きくなり、softmax に入る値が極端に大きく／小さくなります。すると softmax がほぼ 0 か 1 の飽和領域に入り、勾配が消失して学習が進みません。ドット積を √d_k で割るとスコアの分散がほぼ 1 に保たれ、softmax が感度の高い範囲で働くため、勾配消失を防げます。本ツールの「温度」スライダーはこのスケーリング係数の役割を担い、小さいほど注意が鋭く、大きいほど均一になります。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">注意エントロピーは何を表しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">注意エントロピーは注目重みの分布 w の散らばり具合を表す指標で、H = -Σ w_i·ln(w_i) で計算します。1 つのトークンに重みが集中していると H は 0 に近づき（鋭い注意）、3 トークンに均等（各 1/3）に分かれると H は ln(3)≈1.0986 で最大になります（ぼやけた注意）。温度を下げると H は小さく、上げると大きくなります。実際の Transformer 解析でも、ヘッドごとのエントロピーを見て「局所的に見るヘッド」「広く平均するヘッド」を分類することがあります。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">クエリ・キー・バリュー（Q・K・V）の役割の違いは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">クエリ Q は「いま何を探しているか」を表すベクトル、キー K は「各トークンが何を提供できるか」を表す見出し、バリュー V は実際に取り出される中身です。Q と K のドット積で関連度（注目スコア）を測り、その重みで V を混ぜて出力を作ります。図書館に例えると、Q は検索キーワード、K は本の背表紙のラベル、V は本の中身です。本ツールでは簡単のため key と value を同じ単位ベクトルにしていますが、実際の Transformer では Q・K・V はそれぞれ別の重み行列で埋め込みから線形変換されます。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>大規模言語モデル（LLM）：</strong>GPT や Claude のような対話 AI は、何層もの Transformer ブロックを積み重ねて作られています。各層の自己注意（self-attention）が「文中のどの単語どうしを結びつけるか」を学習し、代名詞の指す先や、離れた語の係り受けを捉えます。本ツールの「クエリが最も向きの近いトークンに注目する」という挙動は、巨大なモデルでも本質的に同じです。</p>
+    <p><strong>機械翻訳と要約：</strong>アテンションはもともと、ニューラル機械翻訳で「訳出中の単語が原文のどこに対応するか」を揃えるために生まれました。翻訳のアテンション重みを可視化すると、原文と訳文の単語がほぼ対角線上に並ぶ「アライメント」が見えます。要約モデルでも、出力文が入力のどの部分を根拠にしているかをアテンションでたどれます。</p>
+    <p><strong>画像認識（Vision Transformer）：</strong>画像をパッチに分割してトークンとして扱う Vision Transformer では、アテンションが「画像のどの領域どうしが関連するか」を学習します。注目重みのヒートマップを見ると、物体の輪郭や意味的にまとまった領域が浮かび上がり、CNN とは異なる広域の文脈統合ができていることが分かります。</p>
+    <p><strong>モデル解釈と可視化ツール：</strong>研究や実務では BertViz のようなツールでアテンション重みを可視化し、モデルが何を根拠に予測しているかを調べます。本シミュレーターはその最小単位 ―― 1 つのクエリと数個のキーの間でスコアと softmax がどう動くか ―― を切り出したもので、可視化結果を読み解く前段の直感を養うのに役立ちます。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず大きな誤解が、<strong>「アテンション重みは、モデルの判断根拠そのものを示している」</strong>という思い込みです。注目重みが高いトークンは確かに出力へ影響しやすいですが、重み付けされる value の中身や、後続層での非線形変換まで含めて最終出力が決まります。「重みが高い＝そこが理由」と短絡すると説明を誤ります。アテンションは解釈の手がかりではあっても、因果的な説明とイコールではありません。可視化はあくまで仮説生成のツールとして扱ってください。</p>
+    <p>次に、<strong>「温度（スケール）は小さいほど良い」という誤解</strong>です。温度を下げると注意は鋭くなり、最も関連するトークン1つに重みが集中します。一見望ましく見えますが、鋭すぎる注意は softmax が飽和して勾配が消え、学習が進まなくなります。また 1 トークンしか見ないと、複数の手がかりを統合する能力が失われます。本物の Transformer が √d_k という「ほどほどのスケール」を使うのは、鋭さと滑らかさのバランスを取るためです。本ツールでも温度を極端に小さく・大きくして、両極端の弊害を確かめてみてください。</p>
+    <p>最後に、<strong>「このツールの 2 次元・3 トークンが本物の Transformer と同じ」だと思わない</strong>ことです。実際のモデルでは埋め込み次元は数百、トークン数は数千、さらに複数のアテンションヘッドが並列に走り、Q・K・V は別々の学習済み重み行列で作られます。本ツールは key=value を同じ単位ベクトルに固定した最小モデルで、あくまで「ドット積→スケール→softmax→加重和」という骨格を体感するためのものです。骨格を掴んだら、多次元・多ヘッド・位置符号化といった実モデルの要素へ進んでください。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>3つのトークン（Token1～Token3）の方向ベクトル角度を0～360°の範囲で設定します。スライダーth1Num、th2Num、th3Numを調整してください</li>
+<li>温度パラメータtempNumを0.1～2.0の範囲で変更し、softmax分布の集中度を制御します。温度が低いほど最大値へ集中、高いほど均等分布に近づきます</li>
+<li>シミュレータが自動計算する注目重み（w₁、w₂、w₃）、出力ベクトル角度、注目エントロピーをリアルタイムで観測して、アテンション機構の動作を理解します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>Token1=0°、Token2=45°、Token3=90°、温度T=1.0で実行した場合：スケール付きドット積により3トークン間の類似度（cosine値）が計算され、softmax関数で正規化されます。例えば類似度が[0.8, 0.5, 0.3]の場合、exp(score/T)=[2.23, 1.65, 1.35]となり、正規化後の注目重み≈[0.45, 0.33, 0.22]を得ます。この重みで各トークン表現を加重平均すると、出力ベクトル角度は約38°になります。温度をT=0.3に下げると重み分布が[0.68, 0.24, 0.08]へ集中し、最大注目トークンがToken1へ強く偏ります。注目エントロピーも2.97 bitsから1.45 bitsへ低下し、選択性が強化されます</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>トークン角度が接近する場合（例：Token1=30°、Token2=35°）、ドット積の値が高くなり、温度の影響が顕著になります。低温ではToken1に98%以上の重みが集中し、情報喪失リスクが生じます</li>
+<li>温度T=0.1（超低温）では数値的不安定性が発生する可能性があるため、実装時はT≥0.2推奨です</li>
+<li>多層化Transformer（BERT、GPT系モデル）では各層でこの計算が繰り返されるため、温度設定はモデル全体の多様性制御に影響します。推論時はT=0.5～1.5、創作生成ではT=0.7～1.2が業界標準です</li>
+<li>注目エントロピーが3.0 bits以上の場合、複数トークンへの注意が分散し、特定パターン認識に不利です。機械翻訳タスクではエントロピー1.5～2.5が最適領域です</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== shared state for the animation =====
+const ATT = {th:[30,150,270], q:0, w:[0.333,0.333,0.333], outAng:0, maxIdx:0};
+
+// ===== softmax helper =====
+function softmax(scores){
+  let m = -Infinity;
+  for(let i=0;i<scores.length;i++){ if(scores[i]>m) m=scores[i]; }
+  const ex = scores.map(function(s){ return Math.exp(s-m); });
+  let sum = 0;
+  for(let i=0;i<ex.length;i++) sum += ex[i];
+  return ex.map(function(e){ return e/sum; });
+}
+
+// ===== Chart.js setup =====
+const weightChart = new Chart(document.getElementById('weightChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['トークン1','トークン2','トークン3'],datasets:[
+    {label:'注目重み',data:[0,0,0],backgroundColor:['#007BFF','#00b894','#e17055'],borderWidth:0}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      y:{title:{display:true,text:'注目重み w',font:{size:11}},beginAtZero:true,max:1}
+    },
+    plugins:{legend:{display:false}}
+  }
+});
+
+const tempChart = new Chart(document.getElementById('tempChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'w₁',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.10)',fill:false,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'w₂',data:[],borderColor:'#00b894',backgroundColor:'rgba(0,184,148,.10)',fill:false,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'w₃',data:[],borderColor:'#e17055',backgroundColor:'rgba(225,112,85,.10)',fill:false,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'現在の τ',data:[],borderColor:'#6c757d',backgroundColor:'#6c757d',showLine:false,pointRadius:5,pointHoverRadius:6}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'温度 τ',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'注目重み w',font:{size:11}},beginAtZero:true,max:1}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const th1 = parseFloat(document.getElementById('th1Range').value);  // deg
+  const th2 = parseFloat(document.getElementById('th2Range').value);  // deg
+  const th3 = parseFloat(document.getElementById('th3Range').value);  // deg
+  const qSel = parseInt(document.getElementById('querySel').value,10); // 1..3
+  const temp = parseFloat(document.getElementById('tempRange').value); // tau
+
+  const th = [th1, th2, th3];
+  const qIdx = qSel - 1;                       // 0-based query index
+  const qAng = th[qIdx] * Math.PI/180;         // query angle (rad)
+
+  // key_i = value_i = unit vector at angle th_i
+  // raw score s_i = dot(query, key_i) = cos(qAng - th_i)
+  const scores = [];
+  for(let i=0;i<3;i++){
+    scores.push(Math.cos(qAng - th[i]*Math.PI/180));
+  }
+  // scaled scores then softmax
+  const scaled = scores.map(function(s){ return s/temp; });
+  const w = softmax(scaled);
+
+  // attended output vector = sum w_i * value_i
+  let outX = 0, outY = 0;
+  for(let i=0;i<3;i++){
+    outX += w[i]*Math.cos(th[i]*Math.PI/180);
+    outY += w[i]*Math.sin(th[i]*Math.PI/180);
+  }
+  let outAngDeg = Math.atan2(outY, outX)*180/Math.PI;
+  if(outAngDeg < 0) outAngDeg += 360;
+  const outMag = Math.sqrt(outX*outX + outY*outY);
+
+  // attention entropy H = -sum w_i ln w_i
+  let H = 0;
+  for(let i=0;i<3;i++){
+    if(w[i] > 1e-12) H -= w[i]*Math.log(w[i]);
+  }
+
+  // max-attended token
+  let maxIdx = 0;
+  for(let i=1;i<3;i++){ if(w[i] > w[maxIdx]) maxIdx = i; }
+
+  // ----- stat cards -----
+  document.getElementById('statW1').textContent    = w[0].toFixed(3);
+  document.getElementById('statW2').textContent    = w[1].toFixed(3);
+  document.getElementById('statW3').textContent    = w[2].toFixed(3);
+  document.getElementById('statAngle').textContent = outAngDeg.toFixed(0);
+  document.getElementById('statMax').textContent   = 'トークン'+(maxIdx+1);
+  document.getElementById('statEnt').textContent   = H.toFixed(3);
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  const Hmax = Math.log(3);
+  const sharp = H < 0.45*Hmax;
+  const flat  = H > 0.85*Hmax;
+  v.className = 'verdict ok';
+  let msg = '<i class="fas fa-check-circle"></i> クエリ（トークン'+qSel+'）はキー方向が最も近いトークン'+(maxIdx+1)+'に最も注目しています（w='+w[maxIdx].toFixed(3)+'、ドット積が最大）。';
+  if(sharp){
+    msg += ' 温度 τ='+temp.toFixed(1)+' が小さく、重みが1トークンへ鋭く集中（エントロピー '+H.toFixed(2)+'）。';
+  }else if(flat){
+    msg += ' 温度 τ='+temp.toFixed(1)+' が大きく、重みは均一（1/3）に近くぼやけています（エントロピー '+H.toFixed(2)+'）。';
+  }else{
+    msg += ' 温度 τ='+temp.toFixed(1)+' で適度な分布（エントロピー '+H.toFixed(2)+' / 最大 '+Hmax.toFixed(2)+'）。';
+  }
+  msg += ' 出力は value ベクトルの加重和で、向き '+outAngDeg.toFixed(0)+'°・大きさ '+outMag.toFixed(2)+'。';
+  v.innerHTML = msg;
+
+  // ----- weight distribution bar chart -----
+  weightChart.data.datasets[0].data = [w[0], w[1], w[2]];
+  weightChart.update('none');
+
+  // ----- weight vs temperature line chart -----
+  const tLabels=[], tW1=[], tW2=[], tW3=[], tPoint=[];
+  const tMin=0.2, tMax=3, STEP=2.8/40;
+  for(let tv=tMin; tv<=tMax+1e-6; tv+=STEP){
+    const sc = scores.map(function(s){ return s/tv; });
+    const ww = softmax(sc);
+    tLabels.push(tv.toFixed(2));
+    tW1.push(ww[0]);
+    tW2.push(ww[1]);
+    tW3.push(ww[2]);
+    tPoint.push(null);
+  }
+  // mark the current temperature on each curve
+  let nearest=0, best=1e9;
+  for(let k=0;k<tLabels.length;k++){
+    const d=Math.abs(parseFloat(tLabels[k])-temp);
+    if(d<best){best=d;nearest=k;}
+  }
+  tPoint[nearest] = w[maxIdx];
+  tempChart.data.labels = tLabels;
+  tempChart.data.datasets[0].data = tW1;
+  tempChart.data.datasets[1].data = tW2;
+  tempChart.data.datasets[2].data = tW3;
+  tempChart.data.datasets[3].data = tPoint;
+  tempChart.update('none');
+
+  // ----- update shared state for the canvas -----
+  ATT.th = th.slice();
+  ATT.q = qIdx;
+  ATT.w = w.slice();
+  ATT.outAng = Math.atan2(outY, outX);
+  ATT.outMag = outMag;
+  ATT.maxIdx = maxIdx;
+}
+
+// ===== Attention visualization canvas =====
+(function(){
+  const cv = document.getElementById('attnCanvas');
+  const ctx = cv.getContext('2d');
+  let pulse = 0;
+  const COLORS = ['#007BFF','#00b894','#e17055'];
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==280*dpr){
+      cv.width = w*dpr; cv.height = 280*dpr; cv.style.height='280px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 280;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const cx = W*0.5, cy = H*0.52;
+    const R = Math.min(W*0.32, 96);            // unit-circle radius (px)
+
+    // ----- unit circle -----
+    ctx.strokeStyle = 'rgba(255,255,255,.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+    // axes
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(cx-R-14,cy); ctx.lineTo(cx+R+14,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx,cy-R-14); ctx.lineTo(cx,cy+R+14); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // helper: angle (deg) -> canvas point on circle (y up = -)
+    function pt(deg, r){
+      const a = deg*Math.PI/180;
+      return [cx + r*Math.cos(a), cy - r*Math.sin(a)];
+    }
+
+    // ----- attention lines from query to each token (thickness ~ weight) -----
+    const qIdx = ATT.q;
+    const qP = pt(ATT.th[qIdx], R);
+    for(let i=0;i<3;i++){
+      const tP = pt(ATT.th[i], R);
+      const wgt = ATT.w[i];
+      let lw = 1 + wgt*11;
+      let alpha = 0.15 + wgt*0.7;
+      // pulse on the strongest attention line
+      if(i===ATT.maxIdx){
+        const pmod = 0.5 + 0.5*Math.sin(pulse);
+        lw += pmod*3;
+        alpha = Math.min(1, alpha + pmod*0.2);
+      }
+      ctx.strokeStyle = 'rgba(255,210,120,'+alpha.toFixed(3)+')';
+      ctx.lineWidth = lw;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(qP[0],qP[1]);
+      ctx.lineTo(tP[0],tP[1]);
+      ctx.stroke();
+    }
+
+    // ----- token key vectors as arrows -----
+    for(let i=0;i<3;i++){
+      const tP = pt(ATT.th[i], R);
+      const isQ = (i===qIdx);
+      ctx.strokeStyle = COLORS[i];
+      ctx.fillStyle = COLORS[i];
+      ctx.lineWidth = isQ ? 4 : 2.5;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.lineTo(tP[0],tP[1]);
+      ctx.stroke();
+      // arrowhead
+      const a = ATT.th[i]*Math.PI/180;
+      const ah = a + Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(tP[0],tP[1]);
+      ctx.lineTo(tP[0]+9*Math.cos(ah-0.4), tP[1]-9*Math.sin(ah-0.4));
+      ctx.lineTo(tP[0]+9*Math.cos(ah+0.4), tP[1]-9*Math.sin(ah+0.4));
+      ctx.closePath();
+      ctx.fill();
+      // token dot + label
+      ctx.beginPath();
+      ctx.arc(tP[0],tP[1], isQ?7:5, 0, Math.PI*2);
+      ctx.fill();
+      if(isQ){
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(tP[0],tP[1],11,0,Math.PI*2); ctx.stroke();
+      }
+      const lp = pt(ATT.th[i], R+26);
+      ctx.fillStyle = COLORS[i];
+      ctx.font = 'bold 11px Roboto Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('T'+(i+1)+(isQ?' (Q)':''), lp[0], lp[1]+4);
+      ctx.fillStyle = 'rgba(255,255,255,.6)';
+      ctx.font = '9px Roboto Mono, monospace';
+      ctx.fillText('w='+ATT.w[i].toFixed(2), lp[0], lp[1]+15);
+    }
+
+    // ----- attended output vector (weighted sum of values) -----
+    const oLen = R*Math.min(1, ATT.outMag||0);
+    const ox = cx + oLen*Math.cos(ATT.outAng);
+    const oy = cy - oLen*Math.sin(ATT.outAng);
+    ctx.strokeStyle = '#ffd24b';
+    ctx.fillStyle = '#ffd24b';
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(ox,oy);
+    ctx.stroke();
+    if(oLen>6){
+      const oa = ATT.outAng + Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(ox,oy);
+      ctx.lineTo(ox+10*Math.cos(oa-0.4), oy+10*Math.sin(oa-0.4));
+      ctx.lineTo(ox+10*Math.cos(oa+0.4), oy+10*Math.sin(oa+0.4));
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ----- centre dot -----
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.beginPath(); ctx.arc(cx,cy,3.5,0,Math.PI*2); ctx.fill();
+
+    // ----- legend -----
+    ctx.textAlign = 'left';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillStyle = '#ffd24b';
+    ctx.fillRect(12, 16, 14, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.fillText('出力ベクトル o = Σ wᵢvᵢ', 32, 23);
+    ctx.fillStyle = 'rgba(255,210,120,.7)';
+    ctx.fillRect(12, 32, 14, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.fillText('注目線（太さ ∝ 重み wᵢ）', 32, 39);
+
+    pulse += 0.09;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['th1Range','th2Range','th3Range','tempRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>滞留時間分布（RTD）シミュレーター — E(t)・転化率計算 | NovaSolver</title>
+<meta name="description" content="滞留時間分布（RTD）シミュレーター：流れ反応器内の滞留時間E(t)をCSTR・PFR・槽列モデルで計算、平均滞留時間・分散・転化率をリアルタイム解析">
+<link rel="canonical" href="https://novasolver.jp/tools/residence-time-distribution.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/residence-time-distribution.html">
+<meta property="og:title" content="滞留時間分布（RTD）シミュレーター — E(t)・転化率計算 | NovaSolver Project">
+<meta property="og:description" content="滞留時間分布（RTD）シミュレーター：流れ反応器内の滞留時間E(t)をCSTR・PFR・槽列モデルで計算、平均滞留時間・分散・転化率をリアルタイム解析">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Residence time distribution simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/residence-time-distribution.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/residence-time-distribution.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/residence-time-distribution.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/residence-time-distribution.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#rtdCanvas{display:block;width:100%;height:260px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "滞留時間分布（RTD）シミュレーター",
+      "description": "流れ反応器の滞留時間分布 E(t) を計算する無料シミュレーター。理想CSTR・PFR・槽列モデル・層流反応器を選び、平均滞留時間・分散・等価槽数・一次反応の転化率を求めて非理想混合を可視化できます。",
+      "url": "https://novasolver.jp/tools/residence-time-distribution.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Reaction Engineering Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["理想CSTR・PFR・槽列モデル・層流反応器の RTD 関数 E(t) 計算","累積分布 F(t) の数値積分","分散 σ²・無次元分散・等価槽数 N_eq の算出","分離流れモデルによる一次反応の転化率予測","トレーサーパルスのアニメーションと E(t)・F(t) グラフ"],
+      "keywords": "滞留時間分布,RTD,反応工学,CSTR,PFR,槽列モデル,トレーサー,転化率",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "滞留時間分布 E(t) とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "滞留時間分布（RTD）E(t) は、流れ反応器に入った流体の各要素が「どれだけの時間、反応器の中に滞在したか」の確率密度関数です。入口でトレーサー（着色剤など）をパルス状に投入し、出口の濃度を時間で測ると、その応答曲線がそのまま E(t) になります。E(t)·dt は、滞在時間が t〜t+dt の流体要素の割合を表し、∫E(t)dt は 1 になります。RTD を見れば、その反応器が理想押し出し流れ（PFR）にどれだけ近いか、それとも完全混合（CSTR）に近いかが定量的に分かります。"}
+        },{
+          "@type": "Question",
+          "name": "理想CSTRとPFRのRTDはどう違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "理想CSTR（完全混合槽）では、入った流体が瞬時に全体へ混ざるため E(t)=(1/τ)·exp(−t/τ) という指数減衰になります。入った直後に出ていく要素もあれば、いつまでも残る要素もあり、分散 σ²=τ² と非常に広い分布です。理想PFR（押し出し流れ）では、全要素がぴったり τ だけ滞在するため、E(t) は t=τ に立つ鋭いパルス（理想的には σ²=0）になります。実在の反応器はこの2つの極限のあいだにあり、槽列モデルの槽数 N がその中間を表します。"}
+        },{
+          "@type": "Question",
+          "name": "槽列モデルの槽数 N は何を意味しますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "槽列モデル（tanks-in-series）は、同じ大きさの理想CSTRを N 個直列につないだものとして実在反応器を近似します。N=1 なら単独のCSTR、N→∞ ならPFRに収束します。分散は σ²=τ²/N となり、トレーサー実験で測った σ² から N_eq=τ²/σ² を逆算すると、その反応器が「CSTR何個ぶんの混合特性を持つか」が1つの数字で分かります。N が大きいほど RTD が鋭くなり押し出し流れに近づき、N が小さいほど混合が激しく転化率が下がります。"}
+        },{
+          "@type": "Question",
+          "name": "RTDから一次反応の転化率はどう求めますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "分離流れ（segregated flow）モデルでは、各流体要素を独立した小さなバッチ反応器とみなし、その滞在時間で進む反応量を RTD で重み付け平均します。一次反応では各要素が exp(−k·t) の割合で未反応のまま残るので、出口の未反応割合は ∫E(t)·exp(−k·t)dt、転化率は X=1−∫E(t)·exp(−k·t)dt です。槽列モデルではこの積分が解析的に解けて X=1−(1+k·τ/N)^(−N) になります。一次反応では分離流れと完全微視混合の結果が一致するため、この式はモデルに依らず正確です。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "滞留時間分布（RTD）シミュレーター", "item": "https://novasolver.jp/tools/residence-time-distribution.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">滞留時間分布（RTD）シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/residence-time-distribution.html" class="active">JA</a>
+      <a href="/en/tools/residence-time-distribution.html">EN</a>
+      <a href="/zh/tools/residence-time-distribution.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-flask"></i> 反応工学</div>
+    <h1>滞留時間分布（RTD）シミュレーター</h1>
+    <p class="hero-sub">流れ反応器に入った流体が「どれだけの時間、中にとどまるか」を表す滞留時間分布 E(t) を計算するツールです。理想CSTR・PFR・槽列モデル・層流反応器を切り替え、平均滞留時間や分散、等価槽数、一次反応の転化率がリアルタイムで分かります。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">反応器モデル</span></div>
+      <div class="param-desc">RTD の形を決める流れモデル</div>
+      <select id="modelSel" onchange="compute()">
+        <option value="cstr" selected>理想CSTR（完全混合）</option>
+        <option value="pfr">理想PFR（押し出し流れ）</option>
+        <option value="tanks">槽列モデル（N槽直列）</option>
+        <option value="laminar">層流反応器</option>
+      </select>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">平均滞留時間 τ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="tauNum" value="60" min="1" max="600" step="1" oninput="syncFromNum('tauRange','tauNum')"><span class="num-unit">s</span></div>
+      </div>
+      <div class="param-desc">反応器体積 ÷ 体積流量。τ = V/Q</div>
+      <input type="range" id="tauRange" min="1" max="600" step="1" value="60" oninput="syncToNum('tauRange','tauNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">槽数 N（槽列モデル用）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="nNum" value="4" min="1" max="20" step="1" oninput="syncFromNum('nRange','nNum')"></div>
+      </div>
+      <div class="param-desc">槽列モデル選択時のみ有効。N=1 でCSTR、N→∞ でPFR</div>
+      <input type="range" id="nRange" min="1" max="20" step="1" value="4" oninput="syncToNum('nRange','nNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">反応速度定数 k（1次）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="kNum" value="0.02" min="0.001" max="1" step="0.001" oninput="syncFromNum('kRange','kNum')"><span class="num-unit">1/s</span></div>
+      </div>
+      <div class="param-desc">一次反応 A→生成物 の速度定数</div>
+      <input type="range" id="kRange" min="0.001" max="1" step="0.001" value="0.02" oninput="syncToNum('kRange','kNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statTau">—</div><div class="sl">平均滞留時間 τ (s)</div></div>
+        <div class="stat-card"><div class="sv" id="statVar">—</div><div class="sl">分散 σ² (s²)</div></div>
+        <div class="stat-card"><div class="sv" id="statDimVar">—</div><div class="sl">無次元分散 σ²/τ²</div></div>
+        <div class="stat-card"><div class="sv" id="statNeq">—</div><div class="sl">等価槽数 N_eq</div></div>
+        <div class="stat-card"><div class="sv" id="statX">—</div><div class="sl">一次反応の転化率 X (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statPeak">—</div><div class="sl">ピーク時間 t_peak (s)</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-vial"></i> トレーサーパルス応答 — アニメーション</div>
+      <canvas id="rtdCanvas"></canvas>
+      <p class="canvas-hint">入口で投入したトレーサーパルスが反応器を流れ、出口から出てくる様子と、そこから描かれる E(t) 曲線を表示します。CSTRは広く拡散、PFRは鋭いプラグ、槽列モデルはN段で広がります。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> RTD関数 E(t)</div>
+      <canvas class="ux-chartjs-canvas" id="etChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 累積分布 F(t)</div>
+      <canvas class="ux-chartjs-canvas" id="ftChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$E_{CSTR}(t)=\frac{1}{\tau}e^{-t/\tau},\qquad E_{tanks}(t)=\frac{N}{\tau}\frac{(Nt/\tau)^{N-1}}{(N-1)!}e^{-Nt/\tau}$$</p>
+      <p style="margin-top:6px;">RTD関数 E(t)。τ：平均滞留時間、N：槽列モデルの槽数。E(t)·dt は滞在時間 t〜t+dt の流体割合を表し、全積分は 1。</p>
+      <p style="margin-top:10px;">$$\sigma^2_{tanks}=\frac{\tau^2}{N},\qquad X=1-\int_0^\infty E(t)\,e^{-kt}\,dt$$</p>
+      <p style="margin-top:6px;">槽列モデルの分散 σ² と、分離流れモデルによる一次反応の転化率 X。k：一次反応速度定数。N が大きく RTD が狭いほど押し出し流れに近づく。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>滞留時間分布（RTD）とは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「滞留時間分布」って言葉、反応工学の授業で出てきたんですけど、結局なんの分布なんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと「反応器に入った流体が、何秒その中にいたか」のバラつきを表す分布だよ。連続式の反応器って、入口から入って出口から出ていくよね。でも全部の分子が同じ時間だけ中にいるわけじゃない。近道してさっさと出る分子もあれば、隅のよどみに巻き込まれて長居する分子もある。その滞在時間のヒストグラムが E(t)、つまり滞留時間分布なんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">分子1個ずつの時間なんて、どうやって測るんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そこがうまくできていてね。入口で一瞬だけトレーサー——例えば食塩水とか着色剤を「パッ」と入れる。これをパルス入力という。あとは出口の濃度を時間で測るだけ。出てきた濃度カーブを規格化すれば、それがそのまま E(t) になるんだ。上のアニメーションで「理想CSTR」を選んでみて。トレーサーが入った瞬間に槽全体へ混ざって、出口濃度がいきなりピークになってから指数関数でダラダラ減っていくだろう。これが完全混合のサインだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">じゃあ「理想PFR」を選ぶと、E(t) の形はどうなるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">PFR、つまり押し出し流れだと、全員が一列に並んで進むイメージだ。追い越しも混ざりもないから、入口で入れたトレーサーは τ 秒後にぴったり全員まとまって出てくる。E(t) は t=τ に立つ針みたいな鋭いパルスになって、分散はゼロ。CSTR と PFR はちょうど両極端で、CSTR は混ざりすぎ、PFR は全く混ざらない。現実の反応器はこの間のどこかにいる、と考えるのが RTD 解析の出発点なんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「現実の反応器はこの間」って、どうやって数字で表すんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">よく使うのが「槽列モデル」だ。実在の反応器を、小さな完全混合槽（CSTR）を N 個直列につないだものとみなす。N=1 なら CSTR そのもの、N をどんどん増やすと RTD がだんだん鋭くなって、N→∞ で PFR に一致する。トレーサー実験で分散 σ² を測れば、N_eq=τ²/σ² で「この反応器は CSTR 何個ぶん相当か」が一発で分かる。左で槽数 N を動かして、E(t) のピークが鋭くなっていくのを見てみて。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">RTD が分かると、結局なにが嬉しいんですか？グラフがきれいになるだけ…？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いやいや、本番はここから。RTD に反応速度モデルを組み合わせると「この反応器でどこまで転化が進むか」が予測できるんだ。一次反応なら、各流体要素を独立した小さなバッチ反応器とみなして、滞在時間 t に応じて exp(−k·t) だけ未反応で残る、と考える。それを E(t) で重み付け平均すれば出口の転化率 X が出る。同じ平均滞留時間でも、PFR のほうが CSTR より転化率が高くなる——その差を定量化できるのが RTD の一番おいしいところだよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">滞留時間分布 E(t) とは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">滞留時間分布（RTD）E(t) は、流れ反応器に入った流体の各要素が「どれだけの時間、反応器の中に滞在したか」の確率密度関数です。入口でトレーサー（着色剤など）をパルス状に投入し、出口の濃度を時間で測ると、その応答曲線がそのまま E(t) になります。E(t)·dt は、滞在時間が t〜t+dt の流体要素の割合を表し、∫E(t)dt は 1 になります。RTD を見れば、その反応器が理想押し出し流れ（PFR）にどれだけ近いか、それとも完全混合（CSTR）に近いかが定量的に分かります。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">理想CSTRとPFRのRTDはどう違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">理想CSTR（完全混合槽）では、入った流体が瞬時に全体へ混ざるため E(t)=(1/τ)·exp(−t/τ) という指数減衰になります。入った直後に出ていく要素もあれば、いつまでも残る要素もあり、分散 σ²=τ² と非常に広い分布です。理想PFR（押し出し流れ）では、全要素がぴったり τ だけ滞在するため、E(t) は t=τ に立つ鋭いパルス（理想的には σ²=0）になります。実在の反応器はこの2つの極限のあいだにあり、槽列モデルの槽数 N がその中間を表します。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">槽列モデルの槽数 N は何を意味しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">槽列モデル（tanks-in-series）は、同じ大きさの理想CSTRを N 個直列につないだものとして実在反応器を近似します。N=1 なら単独のCSTR、N→∞ ならPFRに収束します。分散は σ²=τ²/N となり、トレーサー実験で測った σ² から N_eq=τ²/σ² を逆算すると、その反応器が「CSTR何個ぶんの混合特性を持つか」が1つの数字で分かります。N が大きいほど RTD が鋭くなり押し出し流れに近づき、N が小さいほど混合が激しく転化率が下がります。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">RTDから一次反応の転化率はどう求めますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">分離流れ（segregated flow）モデルでは、各流体要素を独立した小さなバッチ反応器とみなし、その滞在時間で進む反応量を RTD で重み付け平均します。一次反応では各要素が exp(−k·t) の割合で未反応のまま残るので、出口の未反応割合は ∫E(t)·exp(−k·t)dt、転化率は X=1−∫E(t)·exp(−k·t)dt です。槽列モデルではこの積分が解析的に解けて X=1−(1+k·τ/N)^(−N) になります。一次反応では分離流れと完全微視混合の結果が一致するため、この式はモデルに依らず正確です。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>連続式反応器の設計・スケールアップ：</strong>化学プラントの連続槽型反応器や管型反応器を設計するとき、まずトレーサー実験で実機の RTD を測り、槽列モデルや分散モデルにフィットさせます。ベンチスケールで N_eq=8 だった反応器が、大型化で配管のよどみや偏流のせいで N_eq=3 に落ちれば、同じ平均滞留時間でも転化率が大きく下がります。RTD はスケールアップ時の「混合の劣化」を早期に検出する標準ツールです。</p>
+    <p><strong>非理想流れ・故障の診断：</strong>反応器の性能が設計値より低いとき、RTD を測ると原因が見えます。E(t) に予定より早いピークが立てばショートカット（バイパス流れ）、長い尾を引けばデッドゾーン（よどみ域）、ピークが二山ならチャネリングやバッフルの不良が疑われます。撹拌槽のインペラ位置、配管の取り回し、充填層の偏流など、図面では分からない実機の流れ異常を RTD は数値で炙り出します。</p>
+    <p><strong>上下水処理・環境プロセス：</strong>浄水場の塩素接触槽や下水処理の曝気槽では、消毒や生物処理に「十分な接触時間」を確保することが規制で求められます。実際には短絡流れで一部の水が想定より早く抜けると、その分が未処理で出てしまいます。RTD（特に F(t) の t10、つまり10%が抜ける時刻）を測ることで、接触槽が規定の消毒性能を満たしているかを検証します。</p>
+    <p><strong>医薬・食品の連続生産：</strong>連続晶析、押出機による混練、連続殺菌（HTST）などでは、製品の均一性や安全性が滞在時間のバラつきに直結します。連続製造に移行する医薬プロセスでは、RTD が原薬の濃度追跡や逸脱バッチの切り分けに使われ、規制当局への品質保証の根拠になります。RTD は単なる教科書の概念ではなく、現場の品質管理に直接使われる道具です。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず多いのが、<strong>「RTD が同じなら転化率も同じ」という誤解</strong>です。これは一次反応に限って正しい話で、二次反応や複雑な反応では成り立ちません。一次反応では各分子の反応が他の分子の濃度に依存しないため、分離流れ（各要素が独立にバッチ反応）でも完全微視混合（分子レベルで混ざる）でも結果が一致します。しかし二次反応では「同じ滞在時間でも、濃い場所にいたか薄い場所にいたか」で反応量が変わるため、RTD が同じでも微視混合の度合いで転化率が変わります。RTD はマクロ混合の情報しか持たず、ミクロ混合は別問題、という限界を理解しておく必要があります。</p>
+    <p>次に、<strong>「平均滞留時間 τ さえ合わせれば十分」という思い込み</strong>。τ=V/Q は反応器の「平均」を表すだけで、分布の広がり（分散 σ²）は別物です。同じ τ でも、PFR（σ²=0）と CSTR（σ²=τ²）では転化率がまったく違います。一次反応では PFR が常に最高、CSTR が最低の転化率を与え、その差は反応が速い（k·τ が大きい）ほど開きます。設計では平均だけでなく分散、つまり「どれだけ押し出し流れに近いか」まで見る必要があります。本ツールで CSTR と PFR を切り替え、同じ τ・k でも転化率が変わることを確かめてください。</p>
+    <p>最後に、<strong>トレーサー実験そのものの落とし穴</strong>。RTD を正しく測るには、トレーサーが反応せず・吸着せず・主流体と同じように流れること（理想トレーサー）が前提です。密度や粘度が大きく違うトレーサーを使うと、主流体とは別の流れ方をして RTD が歪みます。また、パルス入力が「一瞬」でないと（投入に時間がかかると）、その入力幅の影響を脱コンボリューションで除く必要があります。出口での測定遅れや配管デッドボリュームも τ の見かけを増やします。きれいな E(t) 曲線が得られても、入力と検出系が理想から外れていれば、その RTD は実機の真の姿ではない可能性があります。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>平均滞留時間τ（秒）を設定します。例えば連続撹拌槽反応器（CSTR）で処理量100L/minの場合、容積500Lならτ=5sです</li>
+<li>槽数N（又はPFR/CSTR比）を選択します。N=1はCSTR、N→∞でPFR特性に近づき、N=3～5は実装置の槽列モデルに相当します</li>
+<li>一次反応速度定数k（min⁻¹）を入力します。例：k=0.2min⁻¹の場合、E(t)曲線とともに転化率Xの時間変化が計算されます</li>
+<li>シミュレーション結果から平均滞留時間τ、分散σ²、ピーク時間t_peakを確認し、反応器の混合特性を評価します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>容積1000Lの攪拌槽に流量200L/minで液体が流入する場合、τ=5s。槽列数N=3でモデル化すると、CSTR単独（N=1）の分散σ²=25s²に対してN=3では σ²≈8.3s²となり、より栓流に近づきます。一次反応k=0.15s⁻¹を設定すると、τ=5sの槽列で転化率X≈53%が得られ、CSTR単独のX≈42%より改善されます。ピーク時間はN=3でt_peak≈2.8sとなります。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>撹拌の均一性不足や死体積がある場合、実測RTD曲線から逆算してNを決定してください。理論値より分散が大きければ短絡流が発生しています</li>
+<li>高速反応（k≫1/τ）では滞留時間分布の影響が顕著です。医薬品合成でk=0.5s⁻¹、τ=2sの場合、槽列化でX向上率は20%以上になります</li>
+<li>温度制御不可の場合、低k値での長時間滞留は不要な副反応を促進するため、τを短縮または槽数Nを増やしてRTD幅を狭めてください</li>
+<li>スケールアップ時、実験スケールのN値を保持しないと収率が5～10%低下することがあります</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== factorial helper =====
+function factorial(n){
+  let f = 1;
+  for(let i=2;i<=n;i++) f *= i;
+  return f;
+}
+
+// ===== RTD function E(t) for the selected model =====
+// model: 'cstr' | 'pfr' | 'tanks' | 'laminar'
+function Efunc(t, model, tau, N){
+  if(t < 0) return 0;
+  if(model === 'cstr'){
+    return Math.exp(-t/tau)/tau;
+  }else if(model === 'pfr'){
+    // narrow spike around t = tau (gaussian-like, normalized)
+    const w = tau*0.02;                       // spike half-width
+    return Math.exp(-0.5*Math.pow((t-tau)/w,2))/(w*Math.sqrt(2*Math.PI));
+  }else if(model === 'tanks'){
+    const a = N/tau;
+    return a*Math.pow(a*t, N-1)*Math.exp(-a*t)/factorial(N-1);
+  }else{ // laminar
+    if(t < tau/2) return 0;
+    return tau*tau/(2*t*t*t);
+  }
+}
+
+// ===== shared state for the animation =====
+const RT = {model:'cstr', tau:60, N:4, peak:0, etMax:0};
+
+// ===== Chart.js setup =====
+const etChart = new Chart(document.getElementById('etChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'E(t)',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.15},
+    {label:'平均 τ',data:[],borderColor:'#d63031',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'時間 t (s)',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'E(t) (1/s)',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const ftChart = new Chart(document.getElementById('ftChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'F(t)',data:[],borderColor:'#00b894',backgroundColor:'rgba(0,184,148,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.15}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'時間 t (s)',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'累積分布 F(t)',font:{size:11}},beginAtZero:true,suggestedMax:1.05}
+    },
+    plugins:{legend:{display:false}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const model = document.getElementById('modelSel').value;
+  const tau   = parseFloat(document.getElementById('tauRange').value);   // s
+  const N     = Math.round(parseFloat(document.getElementById('nRange').value)); // tanks
+  const k     = parseFloat(document.getElementById('kRange').value);     // 1/s
+
+  // ---- numerical grid: 0 .. tEnd ----
+  const tEnd  = Math.max(tau*4, tau + tau);   // integrate well past tau
+  const STEPS = 4000;
+  const dt    = tEnd/STEPS;
+
+  // ---- integrate moments and conversion (trapezoidal) ----
+  let area = 0, mean = 0, m2 = 0, unreacted = 0;
+  for(let i=0;i<=STEPS;i++){
+    const t  = i*dt;
+    const e  = Efunc(t, model, tau, N);
+    const w  = (i===0 || i===STEPS) ? 0.5 : 1.0;   // trapezoid weight
+    area      += w*e*dt;
+    mean      += w*t*e*dt;
+    m2        += w*t*t*e*dt;
+    unreacted += w*e*Math.exp(-k*t)*dt;
+  }
+  // normalize by total area so that ∫E dt = 1 numerically
+  const meanT = mean/area;
+  const variance = m2/area - meanT*meanT;        // σ²
+  const Xseg = 1 - unreacted/area;               // segregated-flow conversion
+
+  // ---- analytical refinements per model ----
+  let sigma2, conv, peak;
+  if(model === 'cstr'){
+    sigma2 = tau*tau;
+    conv   = 1 - 1/(1 + k*tau);
+    peak   = 0;
+  }else if(model === 'pfr'){
+    sigma2 = 0;
+    conv   = 1 - Math.exp(-k*tau);
+    peak   = tau;
+  }else if(model === 'tanks'){
+    sigma2 = tau*tau/N;
+    conv   = 1 - Math.pow(1 + k*tau/N, -N);
+    peak   = tau*(N-1)/N;
+  }else{ // laminar
+    sigma2 = variance;                            // numeric
+    conv   = Xseg;                                // numeric
+    peak   = tau/2;
+  }
+
+  const dimVar = sigma2/(tau*tau);                // σ²/τ²
+  const Neq    = sigma2 > 1e-9 ? tau*tau/sigma2 : Infinity;
+
+  // ----- stat cards -----
+  document.getElementById('statTau').textContent    = tau.toFixed(1);
+  document.getElementById('statVar').textContent    = sigma2.toFixed(1);
+  document.getElementById('statDimVar').textContent = dimVar.toFixed(4);
+  document.getElementById('statNeq').textContent    = isFinite(Neq) ? Neq.toFixed(2) : '∞';
+  document.getElementById('statX').textContent      = (conv*100).toFixed(1);
+  document.getElementById('statPeak').textContent   = peak.toFixed(1);
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  v.className = 'verdict ok';
+  let modelName, mixDesc;
+  if(model === 'cstr'){
+    modelName = '理想CSTR';
+    mixDesc = '完全混合の極限です。RTD は指数減衰 E(t)=(1/τ)e^(−t/τ) で σ²=τ² と最も広く、入った瞬間に抜ける流体もあります。同じ τ なら一次反応の転化率は最小になります。';
+  }else if(model === 'pfr'){
+    modelName = '理想PFR';
+    mixDesc = '押し出し流れの極限です。全流体がぴったり τ だけ滞在し、RTD は t=τ の鋭いパルス（σ²≈0）。同じ τ なら一次反応の転化率は最大になります。';
+  }else if(model === 'tanks'){
+    modelName = '槽列モデル（N='+N+'）';
+    mixDesc = 'CSTR を '+N+' 個直列につないだ中間モデルです。σ²=τ²/N、等価槽数 N_eq='+(isFinite(Neq)?Neq.toFixed(1):'∞')+'。N を増やすほど RTD が鋭くなり押し出し流れに近づきます。';
+  }else{
+    modelName = '層流反応器';
+    mixDesc = '放物線速度分布により、最速の流体は τ/2 で抜け、壁際は長い尾を引きます。RTD は t≥τ/2 で E(t)=τ²/(2t³) という特徴的な形になります。';
+  }
+  v.innerHTML = '<i class="fas fa-check-circle"></i> '+modelName+'：'+mixDesc+' RTD はトレーサーパルスで測定でき、その反応器が押し出し流れ（鋭く狭い RTD、σ²→0）と完全混合（広い指数 RTD）のどちら寄りかを示します。槽列モデルは槽数 N でその中間を内挿し、RTD に反応速度モデルを組み合わせれば達成可能な転化率（現在 X='+(conv*100).toFixed(1)+'%）が予測できます。';
+
+  // ----- E(t) chart -----
+  const PLOT_END = Math.max(tau*3, peak*1.5 + tau);
+  const PN = 160;
+  const etLabels=[], etData=[], tauLine=[];
+  let etMax = 0;
+  for(let i=0;i<=PN;i++){
+    const t = PLOT_END*i/PN;
+    const e = Efunc(t, model, tau, N);
+    etLabels.push(t.toFixed(0));
+    etData.push(e);
+    if(e > etMax) etMax = e;
+  }
+  // mean-τ marker: a vertical line drawn as a 2-point dataset spanning the y-range
+  for(let i=0;i<=PN;i++){
+    const t = PLOT_END*i/PN;
+    tauLine.push(Math.abs(t - tau) < PLOT_END/PN ? etMax*1.05 : null);
+  }
+  etChart.data.labels = etLabels;
+  etChart.data.datasets[0].data = etData;
+  etChart.data.datasets[1].data = tauLine;
+  etChart.options.scales.y.suggestedMax = etMax*1.12;
+  etChart.update('none');
+
+  // ----- F(t) chart (cumulative, numerical integration) -----
+  const ftLabels=[], ftData=[];
+  let cum = 0, prevE = Efunc(0, model, tau, N);
+  const fdt = PLOT_END/PN;
+  ftLabels.push('0'); ftData.push(0);
+  for(let i=1;i<=PN;i++){
+    const t = PLOT_END*i/PN;
+    const e = Efunc(t, model, tau, N);
+    cum += 0.5*(prevE + e)*fdt;        // trapezoid
+    prevE = e;
+    ftLabels.push(t.toFixed(0));
+    ftData.push(Math.min(cum, 1.0));
+  }
+  ftChart.data.labels = ftLabels;
+  ftChart.data.datasets[0].data = ftData;
+  ftChart.update('none');
+
+  // ----- shared state for the animation -----
+  RT.model = model; RT.tau = tau; RT.N = N;
+  RT.peak = peak; RT.etMax = etMax;
+}
+
+// ===== Tracer-pulse / RTD animation =====
+(function(){
+  const cv = document.getElementById('rtdCanvas');
+  const ctx = cv.getContext('2d');
+  let phase = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==260*dpr){
+      cv.width = w*dpr; cv.height = 260*dpr; cv.style.height='260px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 260;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const padL = 50, padR = 40;
+    const reactorTop = 28, reactorBot = 120;
+    const reactorMidY = (reactorTop+reactorBot)/2;
+    const reactorLen = W - padL - padR;
+    const model = RT.model;
+
+    // ----- reactor vessel outline -----
+    ctx.strokeStyle = 'rgba(0,180,216,.6)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(padL, reactorTop, reactorLen, reactorBot-reactorTop);
+
+    // ----- inlet / outlet stubs -----
+    ctx.fillStyle = 'rgba(0,180,216,.35)';
+    ctx.fillRect(padL-22, reactorMidY-7, 22, 14);
+    ctx.fillRect(padL+reactorLen, reactorMidY-7, 22, 14);
+
+    // ----- draw the reactor internals + tracer per model -----
+    // phase 0..1 : pulse injected at 0, RTD curve traced over the cycle
+    function tracerColor(a){ return 'rgba(255,170,60,'+a+')'; }
+
+    if(model === 'cstr'){
+      // well-mixed: tracer disperses into the whole vessel, fades exponentially
+      const conc = Math.exp(-phase*3.0);            // bulk concentration decay
+      ctx.fillStyle = tracerColor(0.12 + 0.55*conc);
+      ctx.fillRect(padL+1, reactorTop+1, reactorLen-2, reactorBot-reactorTop-2);
+      // stirrer
+      ctx.save();
+      ctx.translate(padL+reactorLen/2, reactorMidY);
+      ctx.rotate(phase*22);
+      ctx.strokeStyle = 'rgba(200,225,245,.8)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-26,0); ctx.lineTo(26,0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,-26); ctx.lineTo(0,26); ctx.stroke();
+      ctx.restore();
+    }else if(model === 'pfr'){
+      // tight plug travels left -> right
+      const plugX = padL + reactorLen*Math.min(1, phase*1.25);
+      ctx.fillStyle = tracerColor(0.85);
+      const pw = Math.max(8, reactorLen*0.06);
+      ctx.fillRect(Math.min(plugX, padL+reactorLen-pw), reactorTop+2, pw, reactorBot-reactorTop-4);
+      // flow streamlines
+      ctx.strokeStyle = 'rgba(0,180,216,.3)';
+      ctx.lineWidth = 1;
+      for(let yy=reactorTop+14; yy<reactorBot; yy+=18){
+        ctx.beginPath(); ctx.moveTo(padL+4,yy); ctx.lineTo(padL+reactorLen-4,yy); ctx.stroke();
+      }
+    }else if(model === 'tanks'){
+      // N stages: pulse spreads through each stage
+      const N = Math.max(1, RT.N);
+      const stageW = reactorLen/N;
+      for(let s=0;s<N;s++){
+        const sx = padL + s*stageW;
+        ctx.strokeStyle = 'rgba(0,180,216,.35)';
+        ctx.lineWidth = 1;
+        if(s>0){ ctx.beginPath(); ctx.moveTo(sx,reactorTop); ctx.lineTo(sx,reactorBot); ctx.stroke(); }
+        // pulse front reaches stage s around phase = s/N, then decays
+        const lead = phase*1.15*N - s;
+        let conc = 0;
+        if(lead > 0) conc = Math.min(1, lead)*Math.exp(-Math.max(0,lead-0.6)*1.4);
+        ctx.fillStyle = tracerColor(0.1 + 0.6*conc);
+        ctx.fillRect(sx+1, reactorTop+1, stageW-2, reactorBot-reactorTop-2);
+      }
+    }else{ // laminar
+      // parabolic velocity profile: centre fast, walls slow
+      ctx.strokeStyle = 'rgba(0,180,216,.3)';
+      ctx.lineWidth = 1;
+      const lanes = 7;
+      for(let l=0;l<lanes;l++){
+        const yy = reactorTop + (reactorBot-reactorTop)*(l+0.5)/lanes;
+        // parabola: speed factor 0..1, fastest at centre
+        const rNorm = (l+0.5)/lanes*2 - 1;          // -1..1
+        const speed = 1 - rNorm*rNorm;              // 0..1
+        const xx = padL + reactorLen*Math.min(1, phase*1.2*(0.25 + 0.95*speed));
+        ctx.beginPath(); ctx.moveTo(padL+4,yy); ctx.lineTo(padL+reactorLen-4,yy); ctx.stroke();
+        ctx.fillStyle = tracerColor(0.8);
+        ctx.beginPath();
+        ctx.arc(Math.min(xx,padL+reactorLen-6), yy, 5, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // ----- injected pulse marker at inlet -----
+    if(phase < 0.12){
+      ctx.fillStyle = tracerColor(1 - phase/0.12);
+      ctx.beginPath();
+      ctx.arc(padL-11, reactorMidY, 7*(1-phase/0.12)+3, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // ----- labels -----
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('入口 パルス', padL-11, reactorTop-6);
+    ctx.fillText('出口', padL+reactorLen+11, reactorTop-6);
+    ctx.fillStyle = 'rgba(0,180,216,.85)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    let mlabel = 'CSTR';
+    if(model==='pfr') mlabel='PFR';
+    else if(model==='tanks') mlabel='槽列 N='+RT.N;
+    else if(model==='laminar') mlabel='層流';
+    ctx.fillText(mlabel, padL+reactorLen/2, reactorBot+15);
+
+    // ----- E(t) curve being traced below -----
+    const axY = H - 22, axX0 = padL, axX1 = padL+reactorLen;
+    const curveTop = reactorBot + 30;
+    ctx.strokeStyle = 'rgba(255,255,255,.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(axX0,axY); ctx.lineTo(axX1,axY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(axX0,axY); ctx.lineTo(axX0,curveTop); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.font = '9px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('E(t)', axX0+4, curveTop+2);
+
+    // build the E(t) curve up to the current animation fraction
+    const plotEnd = Math.max(RT.tau*3, RT.peak*1.5 + RT.tau);
+    const eMax = Math.max(RT.etMax, 1e-9);
+    const drawN = Math.floor(120*Math.min(1, phase*1.05));
+    ctx.strokeStyle = '#ffaa3c';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let i=0;i<=drawN;i++){
+      const t = plotEnd*i/120;
+      const e = Efunc(t, RT.model, RT.tau, RT.N);
+      const px = axX0 + (axX1-axX0)*i/120;
+      const py = axY - (axY-curveTop)*Math.min(1, e/eMax);
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+    // moving dot at the curve front
+    if(drawN > 0){
+      const t = plotEnd*drawN/120;
+      const e = Efunc(t, RT.model, RT.tau, RT.N);
+      const px = axX0 + (axX1-axX0)*drawN/120;
+      const py = axY - (axY-curveTop)*Math.min(1, e/eMax);
+      ctx.fillStyle = '#ffd24b';
+      ctx.beginPath(); ctx.arc(px,py,4,0,Math.PI*2); ctx.fill();
+    }
+    // mean-τ tick
+    const tauX = axX0 + (axX1-axX0)*Math.min(1, RT.tau/plotEnd);
+    ctx.strokeStyle = 'rgba(214,48,49,.7)';
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(tauX,axY); ctx.lineTo(tauX,curveTop); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(214,48,49,.85)';
+    ctx.textAlign = 'center';
+    ctx.fillText('τ', tauX, axY+12);
+
+    phase += 0.0045;
+    if(phase >= 1.15) phase = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['tauRange','nRange','kRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

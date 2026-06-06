@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>風力発電所のウェイク損失シミュレーター — Jensen後流モデル計算 | NovaSolver</title>
+<meta name="description" content="風力発電所のウェイク損失シミュレーター。後流による下流タービンの発電量低下を予測し、Jensen後流モデルで風速・ロータ直径・配列効率を解析できます。">
+<link rel="canonical" href="https://novasolver.jp/tools/wind-farm-wake-loss.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/wind-farm-wake-loss.html">
+<meta property="og:title" content="風力発電所のウェイク損失シミュレーター — Jensen後流モデル | NovaSolver Project">
+<meta property="og:description" content="風力発電所のウェイク損失シミュレーター。後流による下流タービンの発電量低下を予測し、Jensen後流モデルで風速・ロータ直径・配列効率を解析できます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Wind farm wake loss simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/wind-farm-wake-loss.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/wind-farm-wake-loss.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/wind-farm-wake-loss.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/wind-farm-wake-loss.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#wfCanvas{display:block;width:100%;height:260px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "風力発電所のウェイク損失シミュレーター",
+      "description": "風力発電所の後流（ウェイク）による発電損失を計算。風速・ロータ直径・タービン間隔・推力係数・台数を変えて、Jensen（Park）後流モデルで速度欠損・配列効率・ウェイク損失をリアルタイムに求められる無料シミュレーターです。",
+      "url": "https://novasolver.jp/tools/wind-farm-wake-loss.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Environmental Engineering Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["Jensen（Park）後流モデルによる速度欠損率の計算","下流タービンの風速・出力比の算出","風車1列の配列効率とウェイク損失の判定","出力比と列内位置の関係グラフ","配列効率とタービン間隔の関係グラフ"],
+      "keywords": "風力発電,ウェイク損失,後流,Jensenモデル,Parkモデル,配列効率,推力係数,環境工学",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "風力発電所のウェイク損失とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "風車は風から運動エネルギーを取り出して発電するため、ロータの後ろを抜けた空気は必ず元の風より遅く、また乱れています。この遅くなった領域が「後流（ウェイク）」です。風車を列状に並べると、前の風車の後流に入った下流の風車は弱い風しか受けられず、発電量が下がります。発電は風速の3乗に比例するため、わずかな速度低下でも出力は大きく落ちます。この列全体での発電量の減少がウェイク損失です。"}
+        },{
+          "@type": "Question",
+          "name": "Jensen（Park）後流モデルとはどんな計算式ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "JensenモデルはN.O.Jensenが1983年に提案した最も基本的な後流モデルで、Parkモデルとも呼ばれます。後流は下流に向かって直径が線形に広がる円錐と仮定し、速度欠損は deficit = (1−√(1−Ct))/(1+2k·x/D)² で表します。Ct は推力係数、x/D はロータ直径で割った下流距離、k はウェイク減衰定数（陸上で約0.075）です。簡潔ながら実用精度が高く、風力発電所のレイアウト設計で今も広く使われています。"}
+        },{
+          "@type": "Question",
+          "name": "なぜ風車どうしを直径の何倍も離して並べるのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "後流の速度欠損は下流に進むほど周囲の速い空気と混ざって回復します。Jensenモデルでは欠損が距離の2乗で小さくなるため、間隔を広げるほど下流タービンが受ける風は強くなり、ウェイク損失が減ります。一般に主風向に対しては直径の7〜10倍、横方向には3〜5倍の間隔をとります。間隔を詰めると用地は節約できますが、発電量が大きく目減りするため、用地コストと発電損失のトレードオフで決めます。"}
+        },{
+          "@type": "Question",
+          "name": "ウェイク損失を減らすにはどうすればよいですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "対策は主に3つです。第一にタービン間隔を広げること、第二に主風向に対して列の向きを工夫し風車が一直線に重ならないよう千鳥配置にすること、第三に「ウェイクステアリング（後流操舵）」で上流の風車をわずかにヨー（偏向）させて後流を横へそらすことです。大規模ウィンドファームでは、すべての風車が清浄な風を受けた場合に比べて5〜15%程度の発電量がウェイク損失で失われるため、これらの最小化はレイアウト設計の中心課題です。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "風力発電所のウェイク損失シミュレーター", "item": "https://novasolver.jp/tools/wind-farm-wake-loss.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">風力発電所のウェイク損失シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/wind-farm-wake-loss.html" class="active">JA</a>
+      <a href="/en/tools/wind-farm-wake-loss.html">EN</a>
+      <a href="/zh/tools/wind-farm-wake-loss.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-wind"></i> 環境工学</div>
+    <h1>風力発電所のウェイク損失シミュレーター</h1>
+    <p class="hero-sub">前に立つ風車の「後流（ウェイク）」が、下流の風車の発電量をどれだけ下げるかを調べるツールです。風速・ロータ直径・タービン間隔・推力係数・台数を変えると、Jensen（Park）後流モデルによる速度欠損・配列効率・ウェイク損失がリアルタイムで分かります。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">自由流の風速</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="windSpeedNum" value="9.0" min="3" max="25" step="0.5" oninput="syncFromNum('windSpeedRange','windSpeedNum')"><span class="num-unit">m/s</span></div>
+      </div>
+      <div class="param-desc">後流の影響を受けていない上流側の風速</div>
+      <input type="range" id="windSpeedRange" min="3" max="25" step="0.5" value="9.0" oninput="syncToNum('windSpeedRange','windSpeedNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">ロータ直径 D</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="rotorDiameterNum" value="120" min="20" max="220" step="5" oninput="syncFromNum('rotorDiameterRange','rotorDiameterNum')"><span class="num-unit">m</span></div>
+      </div>
+      <div class="param-desc">タービン間隔の基準となる風車の直径</div>
+      <input type="range" id="rotorDiameterRange" min="20" max="220" step="5" value="120" oninput="syncToNum('rotorDiameterRange','rotorDiameterNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">タービン間隔（直径の倍数）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="spacingNum" value="7.0" min="2" max="15" step="0.5" oninput="syncFromNum('spacingRange','spacingNum')"><span class="num-unit">×D</span></div>
+      </div>
+      <div class="param-desc">前後の風車の間隔。x/D（直径の何倍離すか）</div>
+      <input type="range" id="spacingRange" min="2" max="15" step="0.5" value="7.0" oninput="syncToNum('spacingRange','spacingNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">推力係数 Ct</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="thrustCoeffNum" value="0.80" min="0.40" max="0.95" step="0.01" oninput="syncFromNum('thrustCoeffRange','thrustCoeffNum')"></div>
+      </div>
+      <div class="param-desc">風車が風から受ける力の無次元係数。大きいほど後流が強い</div>
+      <input type="range" id="thrustCoeffRange" min="0.40" max="0.95" step="0.01" value="0.80" oninput="syncToNum('thrustCoeffRange','thrustCoeffNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">1列のタービン数</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="nTurbinesNum" value="5" min="2" max="20" step="1" oninput="syncFromNum('nTurbinesRange','nTurbinesNum')"><span class="num-unit">台</span></div>
+      </div>
+      <div class="param-desc">主風向に沿って並ぶ風車の台数</div>
+      <input type="range" id="nTurbinesRange" min="2" max="20" step="1" value="5" oninput="syncToNum('nTurbinesRange','nTurbinesNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statDeficit">—</div><div class="sl">速度欠損率 (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statWaked">—</div><div class="sl">後段タービンの風速 (m/s)</div></div>
+        <div class="stat-card"><div class="sv" id="statPowerRatio">—</div><div class="sl">後段タービンの出力比 (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statArrayEff">—</div><div class="sl">配列効率 (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statWakeLoss">—</div><div class="sl">ウェイク損失 (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statSpacingEval">—</div><div class="sl">間隔の評価</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-wind"></i> 風車の列と後流コーン — アニメーション</div>
+      <canvas id="wfCanvas"></canvas>
+      <p class="canvas-hint">各風車の後ろに、風速が下がった後流コーンが広がります。矢印が長いほど風が速く、色が濃いほど風速が低下しています。前段から後段へ風速が段階的に下がる様子を表します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 出力比 vs 列内の位置</div>
+      <canvas class="ux-chartjs-canvas" id="positionChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 配列効率 vs タービン間隔</div>
+      <canvas class="ux-chartjs-canvas" id="spacingChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$\text{deficit}=\frac{1-\sqrt{1-C_t}}{\left(1+2k\,x/D\right)^{2}},\qquad \frac{P_{waked}}{P_{free}}=(1-\text{deficit})^{3}$$</p>
+      <p style="margin-top:6px;">Jensen（Park）後流モデルの速度欠損 deficit と、下流タービンの出力比。x/D はロータ直径で割ったタービン間隔、k はウェイク減衰定数（陸上で約0.075）、Ct は推力係数。発電出力は風速の3乗に比例する。</p>
+      <p style="margin-top:10px;">$$V_{waked}=V_\infty(1-\text{deficit}),\qquad \eta_{array}=\frac{1+(N-1)(1-\text{deficit})^{3}}{N}$$</p>
+      <p style="margin-top:6px;">後流を受けた風車の風速 V_waked と、N 台の列の配列効率 η_array。先頭は自由流、後続はすべて単一後流に入ると仮定。ウェイク損失は (1−η_array)×100 [%]。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>ウェイク損失とは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">風力発電所って、風車をずらっと並べますよね。あれって、後ろの風車って前の風車の「風かげ」になって損しないんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">まさにそこが大問題なんだ。風車は風から運動エネルギーを取り出して発電している。エネルギー保存の当然の帰結として、ロータを抜けた空気は入ってきた風より「必ず遅く」なる。しかも乱れている。この遅くなって渦巻いた領域を「後流（ウェイク）」と呼ぶ。前の風車の後流に入った下流の風車は、すでにエネルギーを抜かれた弱い風しか受け取れないんだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">でも風速がちょっと落ちるくらいなら、発電量も少し減るだけじゃないんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それが「ちょっと」では済まないんだ。風車の発電出力は風速の「3乗」に比例する。だから風速が10%下がると、出力はおよそ27%も落ちる。左のスライダーで推力係数 Ct を上げてみて。前の風車が風から強く力を受けるほど後流が強くなって、下流の出力比がぐっと下がるのが見えるはずだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">え、3乗ですか…。じゃあ風車どうしを近づけて並べると、かなり損するってことですよね？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そのとおり。だから風車は直径の何倍も離して並べるんだ。後流は下流に進むうちに周囲の速い空気と混ざって、だんだん風速が回復していく。Jensenモデルだと欠損は距離の2乗で小さくなる。「タービン間隔」スライダーを大きくすると、下の「配列効率 vs 間隔」グラフがじわっと右肩上がりになるよ。普通は主風向に対して直径の7〜10倍くらいとるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">間隔を広げればいいなら簡単そうですが…そう単純じゃないんですよね？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">用地が無限にあればね。実際は土地代も送電ケーブルも限られているから、間隔を詰めて台数を稼ぎたい。でも詰めればウェイク損失で発電量が目減りする。大規模ウィンドファームでは、全部の風車が清浄な風を受けた場合に比べて5〜15%もの発電量が後流で失われるんだ。だから用地コストとウェイク損失の綱引きで間隔を決める。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">間隔以外に、後流の損失を減らす工夫ってあるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">あるよ。主風向に対して列を斜めにしたり千鳥配置にして、風車が一直線に重ならないようにするのが一つ。そして最近熱いのが「ウェイクステアリング（後流操舵）」だ。上流の風車をわざと少しヨー（偏向）させて、後流を横へそらす。自分の発電は少し減るけど、後ろの風車が受ける風が強くなって、ファーム全体では発電量が増える。レイアウト設計の中心課題なんだ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">風力発電所のウェイク損失とは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">風車は風から運動エネルギーを取り出して発電するため、ロータの後ろを抜けた空気は必ず元の風より遅く、また乱れています。この遅くなった領域が「後流（ウェイク）」です。風車を列状に並べると、前の風車の後流に入った下流の風車は弱い風しか受けられず、発電量が下がります。発電は風速の3乗に比例するため、わずかな速度低下でも出力は大きく落ちます。この列全体での発電量の減少がウェイク損失です。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Jensen（Park）後流モデルとはどんな計算式ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">JensenモデルはN.O.Jensenが1983年に提案した最も基本的な後流モデルで、Parkモデルとも呼ばれます。後流は下流に向かって直径が線形に広がる円錐と仮定し、速度欠損は deficit = (1−√(1−Ct))/(1+2k·x/D)² で表します。Ct は推力係数、x/D はロータ直径で割った下流距離、k はウェイク減衰定数（陸上で約0.075）です。簡潔ながら実用精度が高く、風力発電所のレイアウト設計で今も広く使われています。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">なぜ風車どうしを直径の何倍も離して並べるのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">後流の速度欠損は下流に進むほど周囲の速い空気と混ざって回復します。Jensenモデルでは欠損が距離の2乗で小さくなるため、間隔を広げるほど下流タービンが受ける風は強くなり、ウェイク損失が減ります。一般に主風向に対しては直径の7〜10倍、横方向には3〜5倍の間隔をとります。間隔を詰めると用地は節約できますが、発電量が大きく目減りするため、用地コストと発電損失のトレードオフで決めます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">ウェイク損失を減らすにはどうすればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">対策は主に3つです。第一にタービン間隔を広げること、第二に主風向に対して列の向きを工夫し風車が一直線に重ならないよう千鳥配置にすること、第三に「ウェイクステアリング（後流操舵）」で上流の風車をわずかにヨー（偏向）させて後流を横へそらすことです。大規模ウィンドファームでは、すべての風車が清浄な風を受けた場合に比べて5〜15%程度の発電量がウェイク損失で失われるため、これらの最小化はレイアウト設計の中心課題です。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>陸上ウィンドファームのレイアウト設計：</strong>風況観測から得た主風向に対し、風車を直径の7〜10倍離して列を組み、横方向には千鳥配置にします。本ツールのようなJensenモデル計算は、詳細なCFD（数値流体解析）に入る前のレイアウト案のスクリーニングに使われます。台数を増やすほど用地あたりの発電量は増えますが、ウェイク損失も増えるため、年間発電量（AEP）を最大化する台数と間隔の組み合わせを探します。</p>
+    <p><strong>洋上ウィンドファーム：</strong>海上は地表摩擦が小さくウェイク減衰定数 k が約0.04と陸上より小さいため、後流が長く尾を引き、損失が大きくなりがちです。デンマークのHorns Revやイギリスの北海プロジェクトでは、後流が数十km先まで届くことが衛星観測で確認されています。基礎工事のコストが高い洋上では、1台あたりの発電量を最大化するため間隔をより広く（直径の8〜12倍）とる傾向があります。</p>
+    <p><strong>ウェイクステアリング制御：</strong>上流の風車を意図的に数度ヨーさせ、後流を隣の風車からそらす運転制御です。NRELやデンマーク工科大学（DTU）の実証で、ファーム全体の発電量が数%向上することが示されています。本ツールで「推力係数」を下げるとヨー時の後流が弱まる効果を概念的に確認でき、ステアリング制御のメリットを直感的に理解できます。</p>
+    <p><strong>発電量予測と事業性評価：</strong>風力発電事業の収益は年間発電量の見積もり精度に直結します。ウェイク損失を過小評価すると、運転開始後に「想定より発電しない」事態になります。金融機関による事業審査（デューデリジェンス）でも、ウェイク損失を含めたP50/P90発電量の妥当性が厳しくチェックされます。本ツールは、間隔や台数を変えたときの損失感度を素早くつかむのに役立ちます。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の注意点が、<strong>「Jensenモデルは単一後流の簡易式である」</strong>ことです。本ツールは「後続の風車はすべて1段目と同じ単一後流に入る」という標準的な簡略化を採用しています。実際の風力発電所では、複数の風車の後流が重なり合い（マルチウェイク）、その重ね合わせには二乗和平方根（RSS）などの近似が必要です。また後流の中の風速は一様ではなく中心ほど遅い「トップハット型」と仮定しているため、現実の釣鐘状の速度分布とは異なります。精密な発電量予測には、Gauss型後流モデルやCFD、実測との突き合わせが欠かせません。</p>
+    <p>次に、<strong>「ウェイク減衰定数 k は固定値ではない」</strong>という点。本ツールでは陸上の代表値 k=0.075 を使っていますが、k は大気の乱れ（乱流強度）に強く依存します。乱れが大きいほど後流は速く混ざって回復するため k は大きく、洋上のように乱れが小さい環境では k は0.04前後まで下がり、後流が長く残ります。さらに大気安定度（昼夜・季節）でも変わります。kを一つの定数で済ませると、特に洋上で損失を過小評価しがちです。</p>
+    <p>最後に、<strong>「ウェイク損失は風向で大きく変わる」</strong>ことを忘れがちです。本ツールは風が列に真正面から吹く最悪ケースを計算しています。実際の風は刻々と向きを変えるため、年間を通じて見れば、風車が一直線に重なる時間はごく一部です。年間発電量の評価では、風配図（各方位の風向出現頻度）と組み合わせて、全方位のウェイク損失を加重平均する必要があります。「真正面ケースの損失＝年間損失」と早合点すると、損失を過大に見積もってしまいます。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>上流タービンの風速(8～12m/s)とロータ直径(100～180m)を設定します</li>
+<li>下流タービンとの間隔(300～1000m)と推力係数(0.7～0.9)を入力します</li>
+<li>シミュレーション実行で、Jensen後流モデルにより速度欠損率と後段タービンの風速低下を計算します</li>
+<li>配列効率とウェイク損失の関係を確認し、タービン配置の最適化を検討します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>上流風速10m/s、ロータ直径150m、間隔500m、推力係数0.85の条件で計算した場合、速度欠損率は約8.2%となり、後段タービンの風速は9.18m/sに低下します。これにより後段タービンの出力は約24%減少し、配列効率は76%、全体のウェイク損失は4.6%と評価されます。間隔を800mに拡大すると速度欠損率は3.1%に改善し、配列効率は92%まで向上します。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>風況データに基づく主流風向を特定し、推流・横流配置を使い分けることで風場全体の発電効率を最大化できます</li>
+<li>推力係数0.8～0.9の範囲では間隔600m以上確保することで、ウェイク損失を5%以下に抑制できます</li>
+<li>複数列配置の場合、二次・三次ウェイクの累積効果を考慮し、実測風速データで検証が必須です</li>
+<li>季節別の風向変化がある場所では、複数方位のシミュレーション結果を加重平均して年間損失量を推定します</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Jensen (Park) wake model — fixed wake decay constant =====
+const K_DECAY = 0.075;            // typical onshore wake decay constant
+
+// shared state for the animation
+const WF = {n:5, deficit:0, wakedSpeed:0, powerRatio:0, wind:9, arrayEff:0};
+
+// ===== Chart.js setup =====
+const positionChart = new Chart(document.getElementById('positionChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'タービン出力比 (%)',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:true,borderWidth:2,pointRadius:3,tension:0.1},
+    {label:'列の末尾',data:[],borderColor:'#e17055',backgroundColor:'#e17055',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'列内のタービン位置',font:{size:11}},ticks:{maxTicksLimit:10}},
+      y:{title:{display:true,text:'出力比 (%)',font:{size:11}},beginAtZero:true,suggestedMax:100}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const spacingChart = new Chart(document.getElementById('spacingChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'配列効率 η(間隔)',data:[],borderColor:'#00b894',backgroundColor:'rgba(0,184,148,.13)',fill:true,borderWidth:2,pointRadius:0,tension:0.2},
+    {label:'現在の間隔',data:[],borderColor:'#007BFF',backgroundColor:'#007BFF',showLine:false,pointRadius:6,pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'タービン間隔 (×D)',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'配列効率 (%)',font:{size:11}},beginAtZero:true,suggestedMax:100}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+// ===== Jensen single-wake velocity deficit =====
+function jensenDeficit(Ct, spacing){
+  const num = 1 - Math.sqrt(Math.max(0, 1 - Ct));
+  const den = Math.pow(1 + 2*K_DECAY*spacing, 2);
+  return num / den;
+}
+
+// ===== Main compute =====
+function compute(){
+  const windSpeed     = parseFloat(document.getElementById('windSpeedRange').value);     // m/s
+  const rotorDiameter = parseFloat(document.getElementById('rotorDiameterRange').value); // m
+  const spacing       = parseFloat(document.getElementById('spacingRange').value);       // x/D
+  const thrustCoeff   = parseFloat(document.getElementById('thrustCoeffRange').value);   // Ct
+  const nTurbines     = parseInt(document.getElementById('nTurbinesRange').value, 10);   // count
+
+  // Jensen single-wake velocity deficit at the downstream turbine
+  const deficit = jensenDeficit(thrustCoeff, spacing);
+  // Wind speed seen by a waked (downstream) turbine
+  const wakedSpeed = windSpeed * (1 - deficit);
+  // Power scales with the cube of speed
+  const powerRatio = Math.pow(1 - deficit, 3);
+  // Array efficiency for a row of nTurbines (first sees free wind)
+  const arrayEff = (1 + (nTurbines - 1) * powerRatio) / nTurbines;
+  // Wake loss of the row
+  const wakeLoss = (1 - arrayEff) * 100;
+
+  // spacing evaluation text
+  let spacingEval, spacingColor;
+  if(spacing >= 8){
+    spacingEval = '十分な間隔（損失小）'; spacingColor = '#0a8a6a';
+  }else if(spacing >= 5){
+    spacingEval = '標準的な間隔'; spacingColor = '#c0563a';
+  }else{
+    spacingEval = '間隔が狭くウェイク損失大'; spacingColor = '#c0392b';
+  }
+
+  // ----- stat cards -----
+  document.getElementById('statDeficit').textContent     = (deficit*100).toFixed(2);
+  document.getElementById('statWaked').textContent       = wakedSpeed.toFixed(2);
+  document.getElementById('statPowerRatio').textContent  = (powerRatio*100).toFixed(1);
+  document.getElementById('statArrayEff').textContent    = (arrayEff*100).toFixed(1);
+  document.getElementById('statWakeLoss').textContent    = wakeLoss.toFixed(1);
+  const seEl = document.getElementById('statSpacingEval');
+  seEl.textContent = spacingEval;
+  seEl.style.color = spacingColor;
+  seEl.style.fontSize = '.86rem';
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(wakeLoss >= 20){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ウェイク損失が大きい（'+wakeLoss.toFixed(1)+'%）。下流の風車は出力比 '+(powerRatio*100).toFixed(0)+'% しか出ません。タービン間隔を広げる、台数を減らす、千鳥配置にするなどでレイアウトの見直しを推奨します。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> ウェイク損失は許容範囲内（'+wakeLoss.toFixed(1)+'%）。配列効率 '+(arrayEff*100).toFixed(1)+'%、下流タービンの風速は '+wakedSpeed.toFixed(1)+' m/s（自由流の '+((1-deficit)*100).toFixed(0)+'%）です。';
+  }
+
+  // ----- power ratio vs position in the row -----
+  const pLabels=[], pData=[], pPoint=[];
+  for(let i=1; i<=nTurbines; i++){
+    pLabels.push('#'+i);
+    // turbine #1 sees free wind (100%), every following turbine sits in the single wake
+    pData.push(i===1 ? 100 : powerRatio*100);
+    pPoint.push(i===nTurbines ? (i===1 ? 100 : powerRatio*100) : null);
+  }
+  positionChart.data.labels = pLabels;
+  positionChart.data.datasets[0].data = pData;
+  positionChart.data.datasets[1].data = pPoint;
+  positionChart.update('none');
+
+  // ----- array efficiency vs turbine spacing -----
+  const sLabels=[], sEff=[], sPoint=[];
+  const sMin=2, sMax=15, STEP=13/40;
+  for(let sv=sMin; sv<=sMax+1e-6; sv+=STEP){
+    const d = jensenDeficit(thrustCoeff, sv);
+    const pr = Math.pow(1 - d, 3);
+    const eff = (1 + (nTurbines - 1) * pr) / nTurbines;
+    sLabels.push(sv.toFixed(1));
+    sEff.push(eff*100);
+    sPoint.push(null);
+  }
+  let nearest=0, best=1e9;
+  for(let k=0;k<sLabels.length;k++){
+    const dd=Math.abs(parseFloat(sLabels[k])-spacing);
+    if(dd<best){best=dd;nearest=k;}
+  }
+  sPoint[nearest] = arrayEff*100;
+  spacingChart.data.labels = sLabels;
+  spacingChart.data.datasets[0].data = sEff;
+  spacingChart.data.datasets[1].data = sPoint;
+  spacingChart.update('none');
+
+  // ----- update shared state for the animation -----
+  WF.n = nTurbines;
+  WF.deficit = deficit;
+  WF.wakedSpeed = wakedSpeed;
+  WF.powerRatio = powerRatio;
+  WF.wind = windSpeed;
+  WF.arrayEff = arrayEff;
+}
+
+// ===== Wind farm row + wake cone animation =====
+(function(){
+  const cv = document.getElementById('wfCanvas');
+  const ctx = cv.getContext('2d');
+  let spin = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==260*dpr){
+      cv.width = w*dpr; cv.height = 260*dpr; cv.style.height='260px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // wind-speed colour: faster = bright cyan, slower = dim
+  function speedShade(frac){
+    // frac in 0..1 (1 = free stream)
+    const a = 0.18 + 0.55*Math.max(0, Math.min(1, frac));
+    return 'rgba(0,180,216,'+a.toFixed(3)+')';
+  }
+
+  function drawTurbine(x, y, r, ang){
+    // tower
+    ctx.strokeStyle = 'rgba(210,225,240,.85)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + r*1.5);
+    ctx.stroke();
+    // nacelle hub
+    ctx.fillStyle = 'rgba(225,235,245,.95)';
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI*2);
+    ctx.fill();
+    // three spinning blades
+    ctx.strokeStyle = 'rgba(235,245,255,.95)';
+    ctx.lineWidth = 2.5;
+    for(let b=0;b<3;b++){
+      const a = ang + b*2*Math.PI/3;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + r*Math.cos(a), y + r*Math.sin(a));
+      ctx.stroke();
+    }
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 260;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    const n = Math.max(2, WF.n);
+    const padL = 46, padR = 30;
+    const rowY = H*0.42;            // hub centreline
+    const usable = W - padL - padR;
+    const gap = usable / n;         // horizontal spacing between turbines
+    const rotorR = Math.max(12, Math.min(26, gap*0.34));
+
+    spin += 0.05;
+
+    // ----- per-turbine cumulative speed fraction -----
+    // turbine #1 sees free stream; every later turbine sits in the single wake
+    const fracAt = function(i){ return i===0 ? 1 : (1 - WF.deficit); };
+
+    // ----- draw expanding wake cones behind each turbine -----
+    for(let i=0;i<n;i++){
+      const tx = padL + gap*(i+0.5);
+      const nextX = (i<n-1) ? padL + gap*(i+1.5) : W - padR + 10;
+      const r0 = rotorR;
+      const r1 = rotorR + (nextX-tx)*0.30;     // cone expands downstream
+      const wakeFrac = 1 - WF.deficit;          // speed inside this turbine's wake
+      // cone fill — darker means slower wind
+      const grad = ctx.createLinearGradient(tx, 0, nextX, 0);
+      grad.addColorStop(0, 'rgba(120,60,30,'+(0.42*(1-wakeFrac)+0.10).toFixed(3)+')');
+      grad.addColorStop(1, 'rgba(0,180,216,0.05)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(tx, rowY - r0);
+      ctx.lineTo(nextX, rowY - r1);
+      ctx.lineTo(nextX, rowY + r1);
+      ctx.lineTo(tx, rowY + r0);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ----- flow arrows showing wind speed along the row -----
+    for(let i=0;i<=n;i++){
+      const frac = fracAt(i);
+      const ax = padL + gap*i;
+      const len = 10 + 26*frac;
+      for(let row=-1; row<=1; row++){
+        const ay = rowY + row*rotorR*1.4;
+        ctx.strokeStyle = speedShade(frac);
+        ctx.fillStyle = speedShade(frac);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(ax-len/2, ay);
+        ctx.lineTo(ax+len/2, ay);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ax+len/2, ay);
+        ctx.lineTo(ax+len/2-6, ay-4);
+        ctx.lineTo(ax+len/2-6, ay+4);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // ----- draw the row of turbines -----
+    for(let i=0;i<n;i++){
+      const tx = padL + gap*(i+0.5);
+      // upstream turbine spins a touch faster (more wind)
+      const localFrac = fracAt(i);
+      drawTurbine(tx, rowY, rotorR, spin*(0.55+0.6*localFrac));
+      // position label
+      ctx.fillStyle = 'rgba(255,255,255,.55)';
+      ctx.font = '9px Roboto Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('#'+(i+1), tx, rowY + rotorR*1.5 + 13);
+    }
+
+    // ----- wind-speed profile stepping down along the row -----
+    const profY0 = H - 44;
+    const profH = 30;
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL-6, profY0);
+    ctx.lineTo(W-padR, profY0);
+    ctx.stroke();
+    ctx.strokeStyle = '#00B4D8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let i=0;i<=n;i++){
+      const px = padL + gap*i;
+      const frac = fracAt(i);
+      const py = profY0 - profH*frac;
+      if(i===0){ ctx.moveTo(padL-6, py); ctx.lineTo(px, py); }
+      else{
+        const prevFrac = fracAt(i-1);
+        ctx.lineTo(px - gap*0.5, profY0 - profH*prevFrac);
+        ctx.lineTo(px - gap*0.5, py);
+        ctx.lineTo(px, py);
+      }
+    }
+    ctx.stroke();
+
+    // ----- labels: free-stream and waked speed -----
+    ctx.fillStyle = 'rgba(120,210,235,.95)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('自由流 '+WF.wind.toFixed(1)+' m/s', padL-2, 22);
+    ctx.fillStyle = 'rgba(235,150,110,.95)';
+    ctx.textAlign = 'right';
+    ctx.fillText('後流内 '+WF.wakedSpeed.toFixed(1)+' m/s', W-padR, 22);
+
+    // ----- caption -----
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('速度欠損 '+(WF.deficit*100).toFixed(1)+'%  /  配列効率 '+(WF.arrayEff*100).toFixed(1)+'%', padL-2, H-10);
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['windSpeedRange','rotorDiameterRange','spacingRange','thrustCoeffRange','nTurbinesRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

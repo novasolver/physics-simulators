@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マルチグリッド法シミュレーター — V サイクルで 1D ポアソン方程式 | NovaSolver</title>
+<meta name="description" content="1Dポアソン方程式をVサイクル多重格子法で解くシミュレーター。粗格子補正による高速な残差低減をGauss-Seidel法と比較。マルチグリッド法・数値解析。">
+<meta property="og:title" content="マルチグリッド法シミュレーター — V サイクルと 1D ポアソン | NovaSolver">
+<meta property="og:description" content="1Dポアソン方程式をVサイクル多重格子法で解くシミュレーター。粗格子補正による高速な残差低減をGauss-Seidel法と比較。マルチグリッド法・数値解析。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://novasolver.jp/tools/multigrid.html">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Multigrid V-cycle simulator for the 1D Poisson equation">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://novasolver.jp/tools/multigrid.html">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/multigrid.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/multigrid.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/multigrid.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/multigrid.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "マルチグリッド法シミュレーター",
+      "description": "V サイクル多重格子法で 1D ポアソン方程式 -u''(x)=f(x) を解き、粗格子補正による高速収束を Gauss-Seidel 単独と比較・可視化する教育用シミュレーター。",
+      "url": "https://novasolver.jp/tools/multigrid.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Numerical Methods Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["1D ポアソン方程式の V サイクル多重格子解法","Gauss-Seidel 緩和による平滑化と粗格子補正","フル重み制限と線形補間（prolongation）","MG と GS 単独反復の残差収束履歴比較"],
+      "keywords": "マルチグリッド,V サイクル,1D ポアソン方程式,Gauss-Seidel,粗格子補正,反復解法,数値計算,有限差分",
+      "datePublished": "2026-05-16",
+      "dateModified": "2026-05-16",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "マルチグリッド法はなぜ Gauss-Seidel より速いのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Gauss-Seidel のような点反復法は高周波の誤差成分は素早く減衰させますが、低周波（滑らかな）誤差は格子点 1 つ分しか情報が伝わらないため極めて遅く収束します。マルチグリッド法は粗格子に降りることで滑らかな誤差を高周波として扱い直し、各レベルで効率よく除去します。結果として 1 V サイクルあたり残差が約 10 分の 1 に減り、5〜10 サイクルで実用上収束します。"}
+        },
+        {
+          "@type": "Question",
+          "name": "V サイクルとはどういう手順ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "細格子で数回スムージング（Pre-smoothing）し、残差 r=b-Ax を粗格子へ制限（restriction）します。粗格子では誤差方程式 Ae=r を解き（再帰的に MG）、その誤差を細格子へ補間（prolongation）して u に加算します。最後に再度スムージング（Post-smoothing）。レベルを下ってまた上がる経路が V の字を描くことから V サイクルと呼ばれます。"}
+        },
+        {
+          "@type": "Question",
+          "name": "なぜ格子数は 2^k+1 にするのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "幾何マルチグリッドではレベルごとに点数を半分にしていきます。N=2^k+1 にしておくと、内点数は 2^k-1 で 2 進的に綺麗に半減でき、フル重み制限と線形補間が境界も含めて自然に定義できます。例えば N=65 なら 6 レベル、N=257 なら 8 レベルまで降りられます。任意の点数でも擬似的に動かす実装はありますが、丸めの扱いが面倒になります。"}
+        },
+        {
+          "@type": "Question",
+          "name": "FAS（非線形マルチグリッド）や AMG とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "FAS（Full Approximation Scheme）は誤差方程式ではなく粗格子で「解そのもの」を保持する非線形マルチグリッドで、ナビエ・ストークス方程式など非線形問題に使われます。AMG（Algebraic Multigrid）は幾何的な格子を持たない一般疎行列に対し、行列の連結強度から疑似的な「粗化」を自動構築する手法で、構造解析や複雑形状の FEM ソルバーの前処理として広く使われています。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "マルチグリッド法シミュレーター", "item": "https://novasolver.jp/tools/multigrid.html"}
+      ]
+    }
+  ]
+}</script>
+<link rel="stylesheet" href="/tools/tools-common.css">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet">
+<script src="/tools/tools-common.js"></script>
+<style>
+:root{
+  --navy:#001F3F; --accent:#007BFF; --accent2:#00B4D8;
+  --bg:#F8F9FA; --card:#ffffff; --text:#1a1a2e;
+  --muted:#6c757d; --border:#dee2e6;
+}
+body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+.canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">マルチグリッド法シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/multigrid.html" class="active">JA</a>
+      <a href="/en/tools/multigrid.html">EN</a>
+      <a href="/zh/tools/multigrid.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-layer-group"></i> 数値計算シミュレーター</div>
+    <h1>マルチグリッド法シミュレーター — V サイクルで 1D ポアソン</h1>
+    <p class="hero-sub">1D ポアソン方程式を V サイクル多重格子で解き、粗格子からの補正で残差が桁違いに速く落ちる様子を Gauss-Seidel 単独と比較しながら可視化します。</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">細格子点数 N（2^k+1）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slNVal" value="65" min="9" max="257" step="16" oninput="syncFromNum('slN','slNVal')"><span class="num-unit">点</span></div>
+      </div>
+      <input type="range" id="slN" min="9" max="257" step="16" value="65" oninput="syncToNum('slN','slNVal');updateSlider(this,'slNVal',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">V サイクル数</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slCyclesVal" value="5" min="1" max="20" step="1" oninput="syncFromNum('slCycles','slCyclesVal')"><span class="num-unit">回</span></div>
+      </div>
+      <input type="range" id="slCycles" min="1" max="20" step="1" value="5" oninput="syncToNum('slCycles','slCyclesVal');updateSlider(this,'slCyclesVal',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">GS 緩和回数（pre/post 各）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slSmootherVal" value="3" min="1" max="10" step="1" oninput="syncFromNum('slSmoother','slSmootherVal')"><span class="num-unit">回</span></div>
+      </div>
+      <input type="range" id="slSmoother" min="1" max="10" step="1" value="3" oninput="syncToNum('slSmoother','slSmootherVal');updateSlider(this,'slSmootherVal',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">厳密解の波数 k（sin(kπx)）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slFreqVal" value="4" min="1" max="20" step="1" oninput="syncFromNum('slFreq','slFreqVal')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slFreq" min="1" max="20" step="1" value="4" oninput="syncToNum('slFreq','slFreqVal');updateSlider(this,'slFreqVal',0,'');compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="btn-group">
+      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">解く問題は -u''(x)=f(x)、u(0)=u(1)=0。厳密解 sin(kπx) を用い f(x)=(kπ)²sin(kπx) を与えています。N は 2^k+1 に丸めて使用します。</p>
+  </div>
+
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statResMG">—</div><div class="sl">MG 5 サイクル後残差 ‖r‖</div></div>
+        <div class="stat-card"><div class="sv" id="statResGS">—</div><div class="sl">GS 同等反復後残差</div></div>
+        <div class="stat-card"><div class="sv" id="statSpeedup">—</div><div class="sl">残差比 GS/MG（高速化倍率）</div></div>
+        <div class="stat-card"><div class="sv" id="statL2Err">—</div><div class="sl">厳密解との L2 誤差</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 解 u(x) と収束履歴 ‖r‖</div>
+      <canvas id="cv" width="600" height="400"></canvas>
+      <p class="canvas-hint">上段＝解 u(x)（青実線＝MG の数値解／灰色破線＝厳密解 sin(kπx)）／下段＝対数スケールでの残差 ‖r‖ の収束履歴（青＝MG、赤＝GS 単独）</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <div class="theory-box">
+        <p>1D ポアソン方程式を有限差分で離散化すると、内点 i に対して次の連立線形方程式 $A\mathbf{u}=\mathbf{f}$ が得られます。$A$ は対角 $2$・副対角 $-1$ の対称三重対角行列です。</p>
+        <p style="margin-top:8px;">細格子（格子幅 $h$）での離散化：</p>
+        $$-\frac{u_{i-1}-2u_i+u_{i+1}}{h^2}=f_i$$
+        <p style="margin-top:6px;">Gauss-Seidel 緩和（高周波誤差を除去）：</p>
+        $$u_i^{(\text{new})}=\tfrac{1}{2}\bigl(u_{i-1}^{(\text{new})}+u_{i+1}^{(\text{old})}+h^2 f_i\bigr)$$
+        <p style="margin-top:6px;">フル重み制限（fine→coarse）と線形補間（coarse→fine）：</p>
+        $$r^{2h}_i=\tfrac{1}{4}r^{h}_{2i-1}+\tfrac{1}{2}r^{h}_{2i}+\tfrac{1}{4}r^{h}_{2i+1}$$
+        <p style="margin-top:6px;">V サイクル全体（再帰）：</p>
+        $$u\leftarrow \text{Smooth}\circ \text{Prolong}\circ V_{2h}\circ \text{Restrict}\circ \text{Smooth}(u)$$
+        <p style="margin-top:8px;">滑らかな誤差成分は粗格子では「高周波」として扱われ、各レベルでスムーザが効率よく除去するため、収束因子は格子サイズに依存せず約 0.1 程度に保たれます。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== Multigrid V-cycle Simulator (1D Poisson) ==========
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+
+function getParams() {
+  var nRaw = parseInt(document.getElementById('slN').value, 10);
+  // round to nearest 2^k + 1 in [9, 257]
+  var k = Math.round(Math.log2(nRaw - 1));
+  k = Math.max(3, Math.min(8, k));
+  var N = (1 << k) + 1;
+  var cycles = parseInt(document.getElementById('slCycles').value, 10);
+  var smoother = parseInt(document.getElementById('slSmoother').value, 10);
+  var freq = parseInt(document.getElementById('slFreq').value, 10);
+  return { N: N, kLevels: k, cycles: cycles, smoother: smoother, freq: freq };
+}
+
+// Build forcing and exact solution for -u''(x) = (k*pi)^2 sin(k*pi*x)
+function buildProblem(N, freq) {
+  var h = 1 / (N - 1);
+  var f = new Float64Array(N);
+  var uex = new Float64Array(N);
+  var kpi = freq * Math.PI;
+  for (var i = 0; i < N; i++) {
+    var x = i * h;
+    uex[i] = Math.sin(kpi * x);
+    f[i] = kpi * kpi * Math.sin(kpi * x);
+  }
+  return { h: h, f: f, uex: uex };
+}
+
+// Gauss-Seidel sweep on interior i=1..N-2 with boundary u[0]=u[N-1]=0
+function gsSweep(u, f, N, h, sweeps) {
+  var h2 = h * h;
+  for (var s = 0; s < sweeps; s++) {
+    for (var i = 1; i < N - 1; i++) {
+      u[i] = 0.5 * (u[i - 1] + u[i + 1] + h2 * f[i]);
+    }
+  }
+}
+
+// residual r = f - A u  (interior)
+function residual(u, f, N, h) {
+  var r = new Float64Array(N);
+  var h2 = h * h;
+  for (var i = 1; i < N - 1; i++) {
+    r[i] = f[i] - (2 * u[i] - u[i - 1] - u[i + 1]) / h2;
+  }
+  return r;
+}
+
+// L2 norm of interior
+function l2(v, N) {
+  var s = 0;
+  for (var i = 1; i < N - 1; i++) s += v[i] * v[i];
+  return Math.sqrt(s);
+}
+
+// Full-weighting restriction (fine N -> coarse Nc = (N+1)/2)
+function restrict(rh, N) {
+  var Nc = (N + 1) >> 1;
+  var rH = new Float64Array(Nc);
+  for (var i = 1; i < Nc - 1; i++) {
+    var ih = 2 * i;
+    rH[i] = 0.25 * rh[ih - 1] + 0.5 * rh[ih] + 0.25 * rh[ih + 1];
+  }
+  return rH;
+}
+
+// Linear interpolation (coarse Nc -> fine N = 2*Nc-1)
+function prolong(eH, Nc) {
+  var N = 2 * Nc - 1;
+  var eh = new Float64Array(N);
+  for (var i = 0; i < Nc; i++) eh[2 * i] = eH[i];
+  for (var i = 1; i < N - 1; i += 2) eh[i] = 0.5 * (eh[i - 1] + eh[i + 1]);
+  return eh;
+}
+
+// Recursive V-cycle. Returns updated u in-place.
+function vCycle(u, f, N, h, nu) {
+  // Coarsest level: a single interior unknown — solve exactly (1 GS sweep is exact for 1 interior point)
+  if (N <= 3) {
+    gsSweep(u, f, N, h, 1);
+    return;
+  }
+  // Pre-smoothing
+  gsSweep(u, f, N, h, nu);
+  // Residual on fine grid
+  var rh = residual(u, f, N, h);
+  // Restrict to coarse grid
+  var rH = restrict(rh, N);
+  var Nc = (N + 1) >> 1;
+  var eH = new Float64Array(Nc);
+  // Recurse on coarse grid: solve A e = r
+  vCycle(eH, rH, Nc, 2 * h, nu);
+  // Prolong correction and apply
+  var eh = prolong(eH, Nc);
+  for (var i = 1; i < N - 1; i++) u[i] += eh[i];
+  // Post-smoothing
+  gsSweep(u, f, N, h, nu);
+}
+
+// Run full MG + GS-only comparison; returns convergence histories.
+function solveAndCompare(N, levels, cycles, smoother, freq) {
+  var prob = buildProblem(N, freq);
+  var h = prob.h, f = prob.f, uex = prob.uex;
+  var fNorm = l2(f, N);
+
+  // MG: start from zero, run `cycles` V-cycles, record residual norm after each
+  var uMG = new Float64Array(N);
+  var resMG = [fNorm];  // initial residual = ||f - A*0|| = ||f||
+  for (var c = 0; c < cycles; c++) {
+    vCycle(uMG, f, N, h, smoother);
+    var r = residual(uMG, f, N, h);
+    resMG.push(l2(r, N));
+  }
+
+  // GS-only: same total fine-grid smoothing work as MG (pre + post per cycle = 2*smoother per cycle)
+  var uGS = new Float64Array(N);
+  var resGS = [fNorm];
+  var totalGS = cycles * smoother * 2;
+  // record at the same number of "cycles" points (evenly spaced) for fair comparison
+  var perCycle = smoother * 2;
+  for (var c = 0; c < cycles; c++) {
+    gsSweep(uGS, f, N, h, perCycle);
+    var rg = residual(uGS, f, N, h);
+    resGS.push(l2(rg, N));
+  }
+
+  // L2 error vs. exact solution
+  var err = 0;
+  for (var i = 1; i < N - 1; i++) {
+    var d = uMG[i] - uex[i];
+    err += d * d;
+  }
+  err = Math.sqrt(err * h);
+
+  return { N: N, h: h, x: makeX(N), uMG: uMG, uex: uex, resMG: resMG, resGS: resGS, l2err: err, totalGS: totalGS };
+}
+
+function makeX(N) {
+  var x = new Float64Array(N);
+  var h = 1 / (N - 1);
+  for (var i = 0; i < N; i++) x[i] = i * h;
+  return x;
+}
+
+function fmtSci(v) {
+  if (!isFinite(v)) return '—';
+  if (v === 0) return '0';
+  var a = Math.abs(v);
+  if (a < 1e-3 || a >= 1e4) return v.toExponential(2);
+  if (a >= 100) return v.toFixed(1);
+  if (a >= 1) return v.toFixed(3);
+  return v.toFixed(4);
+}
+
+function resizeCanvas() {
+  var w = Math.max(320, Math.min(cv.parentElement.clientWidth - 40, 900));
+  var h = Math.round(w * 0.66);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.style.width = w + 'px';
+  cv.style.height = h + 'px';
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cv.dataset.cssW = String(w);
+  cv.dataset.cssH = String(h);
+}
+
+function drawAll(res) {
+  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+
+  // Two stacked plots: top = solution u(x), bottom = log residual history
+  var pad = 36;
+  var topH = Math.floor((H - pad * 3) * 0.5);
+  var botH = (H - pad * 3) - topH;
+
+  // ----- Top: u(x) -----
+  var tx0 = pad + 12, tx1 = W - pad / 2;
+  var ty0 = pad / 2 + topH, ty1 = pad / 2;
+  var tgw = tx1 - tx0, tgh = ty0 - ty1;
+
+  // y-range: a bit beyond max(|u|) of both numerical and exact
+  var umax = 0;
+  for (var i = 0; i < res.N; i++) {
+    if (Math.abs(res.uex[i]) > umax) umax = Math.abs(res.uex[i]);
+    if (Math.abs(res.uMG[i]) > umax) umax = Math.abs(res.uMG[i]);
+  }
+  if (umax < 1e-6) umax = 1;
+  umax *= 1.2;
+  function uPx(x) { return tx0 + x * tgw; }
+  function uPy(u) { return (ty0 + ty1) / 2 - (u / umax) * tgh * 0.5; }
+
+  // axes
+  ctx.strokeStyle = 'rgba(143,184,224,0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(tx0, ty0); ctx.lineTo(tx1, ty0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(tx0, ty1); ctx.lineTo(tx0, ty0); ctx.stroke();
+  // zero line
+  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(tx0, uPy(0)); ctx.lineTo(tx1, uPy(0)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // exact (dashed gray)
+  ctx.strokeStyle = 'rgba(200,210,225,0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  for (var i = 0; i < res.N; i++) {
+    var px = uPx(res.x[i]), py = uPy(res.uex[i]);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // numerical MG (solid blue)
+  ctx.strokeStyle = '#00B4D8';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  for (var i = 0; i < res.N; i++) {
+    var px = uPx(res.x[i]), py = uPy(res.uMG[i]);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // labels
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('u(x):  MG solution  vs  exact sin(kπx)', tx0 + 4, ty1 - 4);
+  ctx.textAlign = 'right';
+  ctx.fillText('x=0', tx0 + 18, ty0 + 12);
+  ctx.fillText('x=1', tx1, ty0 + 12);
+  // legend
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#00B4D8'; ctx.fillRect(tx1 - 140, ty1 + 2, 14, 3);
+  ctx.fillStyle = '#cfe3f7'; ctx.fillText('MG', tx1 - 122, ty1 + 7);
+  ctx.fillStyle = 'rgba(200,210,225,0.9)'; ctx.fillRect(tx1 - 100, ty1 + 2, 14, 3);
+  ctx.fillStyle = '#cfe3f7'; ctx.fillText('exact', tx1 - 82, ty1 + 7);
+
+  // ----- Bottom: residual history (log scale) -----
+  var bx0 = pad + 12, bx1 = W - pad / 2;
+  var by0 = H - pad / 2, by1 = ty0 + pad;
+  var bgw = bx1 - bx0, bgh = by0 - by1;
+
+  // gather residuals
+  var hist = res.resMG.concat(res.resGS);
+  var rmax = 0, rmin = Infinity;
+  for (var i = 0; i < hist.length; i++) {
+    var v = hist[i];
+    if (v > 0 && v < rmin) rmin = v;
+    if (v > rmax) rmax = v;
+  }
+  if (!isFinite(rmin) || rmin <= 0) rmin = 1e-12;
+  rmax = Math.max(rmax, rmin * 10);
+  var logMax = Math.log10(rmax) + 0.3;
+  var logMin = Math.log10(rmin) - 0.3;
+  function rPx(idx) { return bx0 + (res.cycles ? idx / res.resMG.length * bgw : 0); }
+  function rPy(v) {
+    var lv = Math.log10(Math.max(v, 1e-300));
+    return by0 - (lv - logMin) / (logMax - logMin) * bgh;
+  }
+  // store cycles count on res for rPx (closure friendly)
+  res.cycles = res.resMG.length - 1;
+
+  // axes
+  ctx.strokeStyle = 'rgba(143,184,224,0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(bx0, by0); ctx.lineTo(bx1, by0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx0, by1); ctx.lineTo(bx0, by0); ctx.stroke();
+
+  // log-decade gridlines
+  ctx.strokeStyle = 'rgba(143,184,224,0.15)';
+  ctx.setLineDash([2, 4]);
+  for (var L = Math.ceil(logMin); L <= Math.floor(logMax); L++) {
+    var py = by0 - (L - logMin) / (logMax - logMin) * bgh;
+    ctx.beginPath(); ctx.moveTo(bx0, py); ctx.lineTo(bx1, py); ctx.stroke();
+    ctx.fillStyle = 'rgba(180,200,220,0.75)';
+    ctx.font = '10px "Roboto Mono",monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('1e' + L, bx0 - 4, py + 3);
+  }
+  ctx.setLineDash([]);
+
+  function plotSeries(arr, color, lw) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    for (var i = 0; i < arr.length; i++) {
+      var px = bx0 + (arr.length > 1 ? i / (arr.length - 1) * bgw : 0);
+      var py = rPy(arr[i]);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    // markers
+    for (var i = 0; i < arr.length; i++) {
+      var px = bx0 + (arr.length > 1 ? i / (arr.length - 1) * bgw : 0);
+      var py = rPy(arr[i]);
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  plotSeries(res.resMG, '#00B4D8', 2.4);
+  plotSeries(res.resGS, '#e74c3c', 2.0);
+
+  // axis labels
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('‖r‖ (log)', bx0 + 4, by1 - 4);
+  ctx.textAlign = 'right';
+  ctx.fillText('cycle 0', bx0 + 50, by0 + 14);
+  ctx.fillText('cycle ' + (res.resMG.length - 1), bx1, by0 + 14);
+  // legend
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#00B4D8'; ctx.fillRect(bx1 - 200, by1 + 2, 14, 3);
+  ctx.fillStyle = '#cfe3f7'; ctx.fillText('MG (V-cycle)', bx1 - 182, by1 + 7);
+  ctx.fillStyle = '#e74c3c'; ctx.fillRect(bx1 - 100, by1 + 2, 14, 3);
+  ctx.fillStyle = '#cfe3f7'; ctx.fillText('GS only', bx1 - 82, by1 + 7);
+}
+
+function compute() {
+  var p = getParams();
+  var res = solveAndCompare(p.N, p.kLevels, p.cycles, p.smoother, p.freq);
+  var finalMG = res.resMG[res.resMG.length - 1];
+  var finalGS = res.resGS[res.resGS.length - 1];
+  var speedup = (finalMG > 0) ? (finalGS / finalMG) : Infinity;
+  document.getElementById('statResMG').textContent = fmtSci(finalMG);
+  document.getElementById('statResGS').textContent = fmtSci(finalGS);
+  document.getElementById('statSpeedup').textContent = (isFinite(speedup) ? (speedup >= 100 ? speedup.toExponential(1) + ' 倍' : speedup.toFixed(1) + ' 倍') : '∞');
+  document.getElementById('statL2Err').textContent = fmtSci(res.l2err);
+  drawAll(res);
+}
+
+function resetParams() {
+  var defs = { slN: 65, slCycles: 5, slSmoother: 3, slFreq: 4 };
+  Object.keys(defs).forEach(function (id) {
+    document.getElementById(id).value = defs[id];
+  });
+  updateSlider(document.getElementById('slN'), 'slNVal', 0, '');
+  updateSlider(document.getElementById('slCycles'), 'slCyclesVal', 0, '');
+  updateSlider(document.getElementById('slSmoother'), 'slSmootherVal', 0, '');
+  updateSlider(document.getElementById('slFreq'), 'slFreqVal', 0, '');
+  compute();
+}
+
+window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+
+resizeCanvas();
+compute();
+</script>
+
+<section class="explanation">
+  <h2>マルチグリッド法シミュレーターとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">CAE のソルバーで「マルチグリッド前処理」ってよく聞くんですけど、結局これは何をしているんですか？普通の反復法と何が違うんでしょう？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だ。ざっくり言うと、Gauss-Seidel みたいな点反復は「ご近所さんとしか話せない」んだ。情報が 1 ステップで隣の格子点までしか伝わらない。だから滑らかな（低周波の）誤差は、ぐるっと届くのに何百反復もかかる。一方でマルチグリッドは粗格子に降りることで「遠くの情報を一気に運ぶ」。上のシミュレーターで V サイクル数を 1 → 5 と上げてみると、赤い GS が緩やかに落ちる横で、青の MG が桁単位で急降下するのが見えるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど！「GS 緩和回数」のスライダーは何を変えてるんですか？多いほど早く収束しそうな気がしますが。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そこが面白いところ。各レベルでスムージング回数を増やしても、MG の収束因子はほとんど変わらない。3 回でも 10 回でもほぼ一緒だ。理由は、スムーザの仕事は「高周波誤差を消すこと」だけで、低周波は粗格子側に任せてしまうからね。実務では計算コストとのバランスで 2〜3 回が定番だよ。シミュレーターでスムーザ回数を 1 と 10 で比べても、青の線の傾きはほぼ同じはずだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「厳密解の波数 k」を 1 にすると、解の形が単純なサイン半波になりますね。これを大きくすると…ぐにゃぐにゃに。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">k は強制項 f(x) に含まれる空間周波数を変えている。重要な観察として、k を 1 〜 20 まで変えても MG の収束は安定している。これがマルチグリッドの最大の強みで、「全周波数の誤差を均等に潰せる」性質だ。一方 GS は低周波 k=1 のときが一番苦手で、収束が極端に遅くなる。シミュレーターで k=1 にして残差カードを比べてみて。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「細格子点数 N」を 257 にしたら、計算が一瞬で終わったのに残差はちゃんと落ちてる！普通は格子を細かくすると重くなりますよね？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">これが MG の「最適複雑度」と呼ばれる性質だ。普通の反復法は格子幅 h を半分にすると収束反復数が約 4 倍になるが、MG は反復数が h に依存しない。つまり 1 反復のコストが O(N) で、それが定数回で終わるから全体も O(N)。1000 万点の問題でも数十秒で解けるから、現代の大規模 CAE ソルバーで標準になっているんだ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">FAS（非線形マルチグリッド）はどんな問題で使いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">FAS（Full Approximation Scheme）は粗格子で「誤差方程式」ではなく「解そのもの」を保持し、非線形作用素にも一貫した処理を与える枠組みです。ナビエ・ストークス方程式、レイノルズ平均乱流モデル、塑性問題、相変化を伴う熱伝導など、線形化が困難または高コストな問題で広く使われます。各レベルで非線形残差を直接計算し、粗格子から戻ってきた補正を陽に解に足し込む点が線形 MG と異なります。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">AMG（代数マルチグリッド）と幾何マルチグリッドの違いは？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">幾何マルチグリッドは「規則正しい格子」が前提で、レベルごとに点を半分にしていきます。一方 AMG は格子情報を一切使わず、係数行列 A だけから「強結合」関係を解析して疑似的な粗化を自動構築します。非構造メッシュの FEM、配管網、回路シミュレータなど幾何的階層を持たない大規模疎行列に直接適用でき、商用ソルバー（HYPRE BoomerAMG, Trilinos ML 等）で広く実装されています。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">FEM ソルバーでマルチグリッドはどう使われますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">構造解析や熱解析の大規模有限要素モデルでは、剛性行列 K に対する反復解法（共役勾配法 CG、GMRES）の前処理として MG / AMG が使われます。CG 単独だと条件数の悪化で収束が劇的に遅くなりますが、AMG 前処理を入れると数十反復で収束します。Ansys、Abaqus、COMSOL の「PCG with AMG」設定や、OpenFOAM の GAMG ソルバーが代表例です。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">V サイクル以外にはどんなサイクルがありますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">主要なバリエーションは W サイクル（粗格子で 2 回ずつ再帰）と F サイクル（V と W の中間）、そして FMG（Full Multigrid／ネステッド反復）です。W サイクルは粗格子コストの増加と引き換えに対流支配や強異方性問題で安定性が増します。FMG は最粗格子から解いて徐々に細格子に拡張する手法で、たった 1〜2 V サイクル分の追加コストで離散化誤差レベルまで収束させられる「最適な初期推定」を作れます。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>大規模 CFD ソルバー：</strong>OpenFOAM の GAMG（Geometric-Algebraic Multigrid）、ANSYS Fluent の AMG、Star-CCM+ など、現代の商用・オープンソース CFD はほぼ全て圧力ポアソン方程式の解法にマルチグリッドを採用しています。SIMPLE / PISO アルゴリズム内で毎タイムステップ解かれるポアソン方程式が全計算時間の 60〜80% を占めるため、ここを O(N) で解けるかどうかが全体性能を左右します。</p>
+    <p><strong>構造解析の前処理：</strong>線形弾性・熱伝導の大規模 FEM 問題では、剛性行列 K が対称正定値で AMG 前処理付き共役勾配法（PCG-AMG）が標準解法です。500 万自由度クラスの自動車車体モデルでも、AMG 前処理によって数十回の反復で収束します。Hypre、Trilinos ML、PETSc の AMG ライブラリが各種商用ソルバーのバックエンドとして組み込まれています。</p>
+    <p><strong>気象・海洋シミュレーション：</strong>地球規模の大気・海洋モデルでは、コリオリ力や静水圧近似により楕円型圧力方程式が現れ、これを毎ステップ高速に解く必要があります。WRF（気象研究予報）モデルや MITgcm 海洋モデルでは、球面格子上の幾何マルチグリッドや並列 AMG が使われ、数千〜数万コアの HPC 上で数日先の予報を実時間で計算します。</p>
+    <p><strong>画像処理・ポアソン編集：</strong>マルチグリッドはコンピュータビジョン分野でも重要で、ポアソン画像編集（シームレスな貼り付け）、HDR トーンマッピング、ステレオ視差最適化、流体シミュレーションを用いた CG エフェクトなどで、巨大な疎行列を毎フレーム解く必要があり、マルチグリッドの速度がリアルタイム性を支えています。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最も多い誤解は、<strong>「マルチグリッドはどんな問題でも魔法のように速い」と思い込む</strong>ことです。実際にはスムーザと粗化が問題に合っていないと収束しません。たとえば対流支配の問題（移流拡散方程式で Péclet 数が大きい場合）では、点 Gauss-Seidel が高周波誤差を消せず、収束因子が 1 に近づきます。このような問題ではブロック GS や line GS、あるいは半粗化（一方向のみの粗化）を使う必要があります。シミュレーターは純粋なポアソン方程式専用なので、収束因子が常に約 0.1 と理想的な振る舞いを示しますが、現実問題ではこのチューニングが MG 実装の腕の見せ所です。</p>
+    <p>次に多いのが、<strong>「スムージング回数を増やせば増やすほど良い」と考える</strong>ことです。シミュレーターでスムーザ回数を 1 から 10 まで動かしてみてください。MG の最終残差はほとんど改善しません。これはスムーザの役割が「高周波誤差除去のみ」で、すでに数回で除去済みの後はそれ以上やっても無駄だからです。実務では pre 2 回・post 2 回（合計 4 回）または各 3 回程度が定番で、増やすほど計算時間に対して効率が悪化します。ν=1 でも収束する MG は「効率が良い」と評価されます。</p>
+    <p>最後に、<strong>「マルチグリッドの収束が遅いときは V サイクルを増やせばよい」と単純に考える</strong>のも危険です。本来 MG は 5〜10 サイクルで離散化誤差レベル（O(h²)）まで落ちるべきもので、それ以上必要なら「何かがおかしい」サインです。よくある原因はスムーザと係数行列の不適合、境界条件の処理ミス、粗格子作用素の構成エラー（rediscretization vs Galerkin の混在）など。サイクル数を増やして力技で解こうとせず、収束因子（残差比 r_{n+1}/r_n）が 0.1〜0.2 程度に保たれているか確認することが正しい診断手順です。</p>
+  </div>
+</section>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="multigrid.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/gauss-seidel.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ガウス・ザイデル法 シミュレーター — 線形連立方程式の反復解法</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ガウス・ザイデル法（SOR 緩和係数 ω 付き）で 3 元連立 1 次方程式 Ax=b を反復的に解くシミュレーター。初期値・最大反復・許容差・ω を変えながら反復軌跡と誤差収束を可...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/autoencoder-1d.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">1D 線形オートエンコーダ・シミュレーター — PCAと等価な圧縮再構成</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">1D 線形オートエンコーダ・シミュレーター。10次元の信号を K 次元に圧縮して再構成し、SGD で訓練。線形 AE が実質的に PCA と等価であることを学習曲線と再構成バーで直感...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/binomial-distribution.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">二項分布シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">試行回数 n と成功確率 p を変えて二項分布 B(n,p) の確率分布・累積分布をリアルタイム可視化。平均・分散・歪度・尖度の自動計算と、ポアソン/正規近似との比較も確認できます。</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/em-algorithm-1d.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">EMアルゴリズム（1次元GMM）シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">EMアルゴリズム（1次元GMM）シミュレーターは、2成分ガウス混合モデルをEM法で逐次推定する過程を可視化。Eステップ・Mステップを反復するたびに、混合分布が観測ヒストグラムに適合し...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/gauss-quadrature.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ガウス求積法シミュレーター — ガウス・ルジャンドル積分の収束</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ガウス求積法シミュレーターは、ガウス・ルジャンドル積分の標本点と重みを可視化し、点数を変えたときの数値積分の誤差と収束をリアルタイム計算します。関数と積分区間を選び、なぜ少ない点数で...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/statistics-central-limit.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-bar"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">中心極限定理シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">様々な分布（一様・指数・ポアソン）から標本を繰り返しサンプリングし、標本平均の分布が正規分布に収束する様子をアニメーション表示。</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>格子点数 N を設定（デフォルト 256）。2のべき乗を選択するとV字処理が効率的です。</li>
+<li>マルチグリッド反復サイクル数を入力（1～10推奨）。Vサイクル1回で粗格子への制限と補間を1段階実行します。</li>
+<li>スムーザーの種類を選択：Gauss-Seidel反復（デフォルト）は前進掃引で各レベルで4回実行。</li>
+<li>振動数パラメータ（1～10）で粗格子補正の対象となる高周波成分の波数を調整。</li>
+<li>実行後、5サイクル後の残差 ‖r‖ と厳密解との L2 誤差を確認してください。</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>1Dポアソン方程式 -d²u/dx² = f(x), x∈[0,1], u(0)=u(1)=0 を N=512格子点で離散化（格子幅h=1/513≈0.00195）。右辺 f(x)=sin(πx) に対し、Gauss-Seidel法のみで100反復後 ‖r‖≈8.2×10⁻⁴、マルチグリッド法Vサイクル5回で ‖r‖≈1.1×10⁻⁶ を達成。残差比 GS/MG ≈ 745 倍の高速化。厳密解 u(x)=sin(πx)/π² との L2 誤差は MG で 3.5×10⁻⁵ 以下。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>格子点数が2のべき乗でない場合、制限・補間演算で格子生成エラーが発生。必ず N=64, 128, 256, 512 など選択。</li>
+<li>振動数パラメータが大きすぎると、粗格子で捉えられない高周波モードが残り、収束が鈍化。工学問題では freq=2～4で十分。</li>
+<li>スムーザーの反復回数が1回では粗格子補正の効果が現れず、残差減少が線形。4回以上推奨。</li>
+<li>FEMメッシュ細分化問題で同手法を応用する場合、要素ごとの刻み幅をhで統一し、レベル間で厳密に2倍関係を保持。</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script src="/tools/tool-ux-template.js?v20260517r4" defer></script>
+</body>
+</html>

@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>露点温度・相対湿度計算ツール — Magnus 近似 | NovaSolver</title>
+<meta name="description" content="乾球温度と相対湿度から露点温度・湿球温度・水蒸気圧を Magnus近似で計算。結露判定と空気の含水量を即時算出できるエンジニア向けツール。">
+<meta property="og:title" content="露点温度・相対湿度計算ツール — Magnus 近似 | NovaSolver">
+<meta property="og:description" content="乾球温度と相対湿度から露点温度・湿球温度・水蒸気圧を Magnus近似で計算。結露判定と空気の含水量を即時算出できるエンジニア向けツール。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://novasolver.jp/tools/dew-point-rh.html">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Dew point and relative humidity simulator (Magnus approximation)">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://novasolver.jp/tools/dew-point-rh.html">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/dew-point-rh.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/dew-point-rh.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/dew-point-rh.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/dew-point-rh.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "露点温度・相対湿度計算ツール",
+      "description": "Magnus 近似で乾球温度と相対湿度から露点温度・湿球温度・水蒸気圧・絶対湿度をリアルタイムに計算・可視化する教育用シミュレーター。",
+      "url": "https://novasolver.jp/tools/dew-point-rh.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "HVAC Calculator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["Magnus 近似による飽和水蒸気圧の高精度計算","露点温度・湿球温度・水蒸気圧・絶対湿度の同時表示","RH 等値線付き e-T 図","SI / USCS 単位切替"],
+      "keywords": "露点温度,相対湿度,Magnus式,湿球温度,水蒸気圧,絶対湿度,結露,空調,HVAC",
+      "datePublished": "2026-05-16",
+      "dateModified": "2026-05-16",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "露点温度とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "現在の空気を冷却していき、含まれる水蒸気がちょうど飽和状態になる温度のことです。物体表面の温度が露点温度を下回ると、その表面で結露が始まります。冷房コイル・窓ガラス・配管・データセンターのサーバー表面など、温度差が生じるあらゆる場所で結露リスクの基準となる重要な指標です。"}
+        },
+        {
+          "@type": "Question",
+          "name": "Magnus 近似はどれくらい正確ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Magnus 式 e_s = 6.112·exp(17.62·T/(243.12+T)) hPa は、−40 °C から +50 °C の範囲で実測値に対する誤差が 0.4 % 以下と非常に高精度です。WMO（世界気象機関）も実用式として採用しており、空調設計・気象観測・農業環境管理など実務で広く使われています。本ツールはこの WMO 推奨係数を採用しています。"}
+        },
+        {
+          "@type": "Question",
+          "name": "湿球温度と露点温度はどう違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "露点温度は空気を「定圧で冷却するだけ」で飽和に到達する温度、湿球温度は「水を蒸発させて断熱冷却した」ときに到達する温度です。湿球温度は乾球温度と露点温度の中間に位置し、蒸発冷却塔・打ち水・気化式加湿器の到達下限を決めます。本ツールでは Stull 近似を用いて湿球温度を即時に表示します。"}
+        },
+        {
+          "@type": "Question",
+          "name": "絶対湿度 (g/kg DA) はなぜ重要ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "相対湿度は温度が変わると大きく変化しますが、絶対湿度（乾き空気 1 kg に対する水蒸気の質量）は加湿・除湿が行われない限り一定です。そのため空気の加熱・冷却プロセスを線図上で追跡する際の「保存量」として使われます。空調機の加湿量・除湿量の設計、外気導入量の決定、CFD 解析の境界条件設定などに直結します。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "露点温度・相対湿度計算ツール", "item": "https://novasolver.jp/tools/dew-point-rh.html"}
+      ]
+    }
+  ]
+}</script>
+<link rel="stylesheet" href="/tools/tools-common.css">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet">
+<script src="/tools/tools-common.js"></script>
+<style>
+:root{
+  --navy:#001F3F; --accent:#007BFF; --accent2:#00B4D8;
+  --bg:#F8F9FA; --card:#ffffff; --text:#1a1a2e;
+  --muted:#6c757d; --border:#dee2e6;
+}
+body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+.canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">露点温度・相対湿度計算ツール</span>
+    <nav class="lang-nav">
+      <a href="/tools/dew-point-rh.html" class="active">JA</a>
+      <a href="/en/tools/dew-point-rh.html">EN</a>
+      <a href="/zh/tools/dew-point-rh.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-tint"></i> 熱流体・空調シミュレーター</div>
+    <h1>露点温度・相対湿度計算ツール — Magnus 近似</h1>
+    <p class="hero-sub">乾球温度と相対湿度を変えると、露点温度・湿球温度・水蒸気圧・絶対湿度を Magnus 近似で即時計算。結露が始まる温度と、空気が含む水分量を直感的に把握できます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">乾球温度 T</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slTVal" value="25" min="-30" max="50" step="0.5" oninput="syncFromNum('slT','slTVal')"><span class="num-unit">°C</span></div>
+      </div>
+      <input type="range" id="slT" min="-30" max="50" step="0.5" value="25" oninput="syncToNum('slT','slTVal');updateSlider(this,'slTVal',1,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">相対湿度 RH</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slRHVal" value="60" min="1" max="100" step="1" oninput="syncFromNum('slRH','slRHVal')"><span class="num-unit">%</span></div>
+      </div>
+      <input type="range" id="slRH" min="1" max="100" step="1" value="60" oninput="syncToNum('slRH','slRHVal');updateSlider(this,'slRHVal',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">大気圧 p_atm</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slPVal" value="1013" min="800" max="1050" step="1" oninput="syncFromNum('slP','slPVal')"><span class="num-unit">hPa</span></div>
+      </div>
+      <input type="range" id="slP" min="800" max="1050" step="1" value="1013" oninput="syncToNum('slP','slPVal');updateSlider(this,'slPVal',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">表示単位</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slUnitVal" value="0" min="0" max="1" step="1" oninput="syncFromNum('slUnit','slUnitVal')"><span class="num-unit">0=SI/1=USCS</span></div>
+      </div>
+      <input type="range" id="slUnit" min="0" max="1" step="1" value="0" oninput="syncToNum('slUnit','slUnitVal');updateSlider(this,'slUnitVal',0,'');compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="btn-group">
+      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">Magnus 係数 (a=17.62, b=243.12 °C) は WMO 推奨値。湿球温度は Stull 近似 (大気圧 1013 hPa 付近で精度約 ±0.3 °C) を使用。</p>
+  </div>
+
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statTd">—</div><div class="sl">露点温度 T_d</div></div>
+        <div class="stat-card"><div class="sv" id="statTw">—</div><div class="sl">湿球温度 T_w</div></div>
+        <div class="stat-card"><div class="sv" id="statE">—</div><div class="sl">水蒸気圧 e</div></div>
+        <div class="stat-card"><div class="sv" id="statW">—</div><div class="sl">絶対湿度 w (g/kg DA)</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 飽和曲線と RH 等値線（e-T 線図）</div>
+      <canvas id="cv"></canvas>
+      <p class="canvas-hint">青実線＝飽和水蒸気圧 e_s(T)／破線＝RH 等値線 (20/40/60/80 %)／赤丸＝現在の (T, e)／緑×＝露点位置 (T_d, e)</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <div class="theory-box">
+        <p>Magnus 近似は飽和水蒸気圧を温度のみの関数で表す実用式で、−40〜+50 °C の空調・気象範囲で誤差 0.4 % 以下と高精度です。</p>
+        <p style="margin-top:8px;">飽和水蒸気圧 e_s（T は °C、e_s は hPa）：</p>
+        $$e_s(T) = 6.112\,\exp\!\left(\dfrac{17.62\,T}{243.12 + T}\right)$$
+        <p style="margin-top:6px;">実水蒸気圧 e と露点温度 T_d（γ は補助変数）：</p>
+        $$e = \dfrac{\mathrm{RH}}{100}\,e_s(T), \qquad T_d = \dfrac{243.12\,\gamma}{17.62 - \gamma}, \quad \gamma = \ln\!\dfrac{\mathrm{RH}}{100} + \dfrac{17.62\,T}{243.12 + T}$$
+        <p style="margin-top:6px;">絶対湿度 w（乾き空気 1 kg 当たりの水蒸気質量、g/kg DA）：</p>
+        $$w = 622\,\dfrac{e}{p_\text{atm} - e}$$
+        <p style="margin-top:6px;">湿球温度 T_w の Stull 近似（大気圧 1013 hPa 付近、RH は %）：</p>
+        $$T_w \approx T\,\arctan\!\big(0.1520\sqrt{\mathrm{RH}+8.314}\big) + \arctan(T+\mathrm{RH}) - \arctan(\mathrm{RH}-1.676) + 0.00392\,\mathrm{RH}^{1.5}\arctan(0.0231\,\mathrm{RH}) - 4.686$$
+        <p style="margin-top:8px;">物体表面の温度が露点温度 T_d を下回ると、その表面で結露が始まります。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== Dew Point & RH (Magnus) Simulator ==========
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+
+var MAG_A = 17.62, MAG_B = 243.12;
+
+function getParams() {
+  var T = parseFloat(document.getElementById('slT').value);
+  var RH = parseFloat(document.getElementById('slRH').value);
+  var p = parseFloat(document.getElementById('slP').value);
+  var unit = parseInt(document.getElementById('slUnit').value, 10) || 0;
+  return { T: T, RH: RH, p: p, unit: unit };
+}
+
+// physics
+function eSat(T) { return 6.112 * Math.exp(MAG_A * T / (MAG_B + T)); }
+function dewPoint(T, RH) {
+  var rh = Math.max(RH, 0.01);
+  var gamma = Math.log(rh / 100) + MAG_A * T / (MAG_B + T);
+  return MAG_B * gamma / (MAG_A - gamma);
+}
+function humidityRatio(e, p) {
+  if (p - e <= 0) return NaN;
+  return 622 * e / (p - e);
+}
+function wetBulbStull(T, RH) {
+  var rh = Math.max(RH, 0.01);
+  return T * Math.atan(0.151977 * Math.sqrt(rh + 8.313659))
+       + Math.atan(T + rh)
+       - Math.atan(rh - 1.676331)
+       + 0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh)
+       - 4.686035;
+}
+
+// unit conversion (°C -> °F, hPa -> inHg, g/kg unchanged)
+function cToF(c) { return c * 9 / 5 + 32; }
+function hPaToInHg(h) { return h * 0.029530; }
+
+function resizeCanvas() {
+  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
+  var h = Math.round(w * 0.62);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.style.width = w + 'px';
+  cv.style.height = h + 'px';
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cv.dataset.cssW = String(w);
+  cv.dataset.cssH = String(h);
+}
+
+function drawChart(p) {
+  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+  var mx = 56, my = 32;
+  var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
+  var gw = x1 - x0, gh = y0 - y1;
+  // axis range: T in [-10, 50] °C, e in [0, 80] hPa
+  var Tmin = -10, Tmax = 50, emin = 0, emax = 80;
+  function tx(T) { return x0 + (T - Tmin) / (Tmax - Tmin) * gw; }
+  function ty(e) { return y0 - (e - emin) / (emax - emin) * gh; }
+
+  // axes
+  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+  // grid + ticks
+  ctx.fillStyle = '#8fb8e0';
+  ctx.font = '10px "Roboto Mono",monospace';
+  ctx.textAlign = 'center';
+  for (var T = Tmin; T <= Tmax; T += 10) {
+    var gx = tx(T);
+    ctx.strokeStyle = 'rgba(143,184,224,0.12)';
+    ctx.beginPath(); ctx.moveTo(gx, y1); ctx.lineTo(gx, y0); ctx.stroke();
+    ctx.fillText(T + '°C', gx, y0 + 13);
+  }
+  ctx.textAlign = 'right';
+  for (var e = 0; e <= emax; e += 20) {
+    var gy = ty(e);
+    ctx.strokeStyle = 'rgba(143,184,224,0.12)';
+    ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x1, gy); ctx.stroke();
+    ctx.fillStyle = '#8fb8e0';
+    ctx.fillText(e.toFixed(0), x0 - 4, gy + 3);
+  }
+
+  // RH iso-lines (20, 40, 60, 80 %)
+  var rhVals = [20, 40, 60, 80];
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 1.2;
+  rhVals.forEach(function (rh) {
+    ctx.strokeStyle = 'rgba(0,180,216,' + (0.3 + rh / 200) + ')';
+    ctx.beginPath();
+    var first = true;
+    for (var T = Tmin; T <= Tmax; T += 0.5) {
+      var e = rh / 100 * eSat(T);
+      if (e > emax) continue;
+      var X = tx(T), Y = ty(e);
+      if (first) { ctx.moveTo(X, Y); first = false; } else ctx.lineTo(X, Y);
+    }
+    ctx.stroke();
+    // label near right
+    var Tlbl = Tmax - 4;
+    var elbl = rh / 100 * eSat(Tlbl);
+    if (elbl <= emax) {
+      ctx.fillStyle = 'rgba(0,180,216,0.85)';
+      ctx.textAlign = 'left';
+      ctx.font = '10px "Roboto Mono",monospace';
+      ctx.fillText(rh + '%', tx(Tlbl) + 4, ty(elbl) + 3);
+    }
+  });
+  ctx.setLineDash([]);
+
+  // saturation curve e_s(T)
+  ctx.strokeStyle = '#00B4D8';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  var first2 = true;
+  for (var T2 = Tmin; T2 <= Tmax; T2 += 0.4) {
+    var es = eSat(T2);
+    if (es > emax) continue;
+    var X = tx(T2), Y = ty(es);
+    if (first2) { ctx.moveTo(X, Y); first2 = false; } else ctx.lineTo(X, Y);
+  }
+  ctx.stroke();
+  // saturation label
+  ctx.fillStyle = '#00B4D8';
+  ctx.font = 'bold 11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('e_s(T)  100%', tx(30) + 4, ty(eSat(30)) - 6);
+
+  // axis labels
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '11px "Noto Sans JP",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('乾球温度 T (°C)', (x0 + x1) / 2, H - 8);
+  ctx.save();
+  ctx.translate(14, (y0 + y1) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('水蒸気圧 e (hPa)', 0, 0);
+  ctx.restore();
+
+  // current state (T, e)
+  var T = p.T, RH = p.RH;
+  var es = eSat(T);
+  var eNow = RH / 100 * es;
+  if (T >= Tmin && T <= Tmax && eNow <= emax) {
+    var cx = tx(T), cy = ty(eNow);
+    // crosshair
+    ctx.strokeStyle = 'rgba(255,209,102,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, y0); ctx.lineTo(cx, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0, cy); ctx.lineTo(cx, cy); ctx.stroke();
+    // red dot
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.fillStyle = '#e74c3c';
+    ctx.shadowColor = '#e74c3c'; ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#cfe3f7';
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('(' + T.toFixed(1) + '°C, ' + eNow.toFixed(1) + ' hPa)', cx + 10, cy - 8);
+  }
+
+  // dew point on saturation curve at e = eNow
+  var Td = dewPoint(T, RH);
+  if (isFinite(Td) && Td >= Tmin && Td <= Tmax && eNow <= emax) {
+    var dx = tx(Td), dy = ty(eNow);
+    ctx.strokeStyle = '#7CFFB2';
+    ctx.lineWidth = 2;
+    var s = 7;
+    ctx.beginPath();
+    ctx.moveTo(dx - s, dy - s); ctx.lineTo(dx + s, dy + s);
+    ctx.moveTo(dx + s, dy - s); ctx.lineTo(dx - s, dy + s);
+    ctx.stroke();
+    ctx.fillStyle = '#7CFFB2';
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('T_d = ' + Td.toFixed(1) + '°C', dx - 10, dy - 8);
+  }
+}
+
+function compute() {
+  var p = getParams();
+  if (!isFinite(p.T) || !isFinite(p.RH) || !isFinite(p.p)) return;
+  var es = eSat(p.T);
+  var e = p.RH / 100 * es;
+  var Td = dewPoint(p.T, p.RH);
+  var Tw = wetBulbStull(p.T, p.RH);
+  var w = humidityRatio(e, p.p);
+
+  var statTd = document.getElementById('statTd');
+  var statTw = document.getElementById('statTw');
+  var statE = document.getElementById('statE');
+  var statW = document.getElementById('statW');
+
+  if (p.unit === 1) {
+    // USCS: °F, inHg, gr/lb (grains per pound)
+    statTd.textContent = isFinite(Td) ? cToF(Td).toFixed(1) + ' °F' : '—';
+    statTw.textContent = isFinite(Tw) ? cToF(Tw).toFixed(1) + ' °F' : '—';
+    statE.textContent = isFinite(e) ? hPaToInHg(e).toFixed(2) + ' inHg' : '—';
+    statW.textContent = isFinite(w) ? (w * 7).toFixed(1) + ' gr/lb' : '—';
+  } else {
+    statTd.textContent = isFinite(Td) ? Td.toFixed(2) + ' °C' : '—';
+    statTw.textContent = isFinite(Tw) ? Tw.toFixed(1) + ' °C' : '—';
+    statE.textContent = isFinite(e) ? e.toFixed(2) + ' hPa' : '—';
+    statW.textContent = isFinite(w) ? w.toFixed(2) + ' g/kg' : '—';
+  }
+  drawChart(p);
+}
+
+function resetParams() {
+  var defs = { slT: 25, slRH: 60, slP: 1013, slUnit: 0 };
+  Object.keys(defs).forEach(function (id) {
+    document.getElementById(id).value = defs[id];
+  });
+  updateSlider(document.getElementById('slT'), 'slTVal', 1, '');
+  updateSlider(document.getElementById('slRH'), 'slRHVal', 0, '');
+  updateSlider(document.getElementById('slP'), 'slPVal', 0, '');
+  updateSlider(document.getElementById('slUnit'), 'slUnitVal', 0, '');
+  compute();
+}
+
+window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+
+resizeCanvas();
+compute();
+</script>
+
+<section class="explanation">
+  <h2>露点温度・相対湿度計算ツールとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">冬の窓ガラスに水滴が付くのって、結露ですよね。あれってどんな条件で起こるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと「窓ガラスの表面温度が、部屋の空気の露点温度を下回ったとき」だ。上のツールで T=25°C、RH=60% にしてみて。露点温度カードが約 16.7°C を示しているはず。つまり窓ガラスの表面が 16.7°C より冷たくなった瞬間から結露が始まる、ということだよ。シングルガラスだと外気が氷点下になると簡単にそこまで冷える。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">じゃあ湿度を下げれば結露しないってことですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、RH スライダーを 60% から 40% に下げてみて。露点温度が約 10.5°C まで下がる。同じ室温でも、空気が乾けば結露しにくくなる。逆に風呂上がりで湿度が 80% になると露点は 21°C ぐらいまで上がり、ちょっと冷たい配管でもびっしり結露する。これがデータセンターや精密機器室で湿度管理が厳しい理由だ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「湿球温度」っていうのは何ですか？露点とは別物？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">別物だよ。露点は「冷やすだけで飽和に達する温度」。湿球温度は「水を蒸発させながら断熱冷却したときの到達温度」。打ち水で気温が下がる仕組みや、冷却塔の出口水温の下限はこの湿球温度で決まる。乾燥した日（RH=30% で T=30°C）に湿球温度カードを見てごらん。19°C 前後まで下がる。これが気化冷却の限界だ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「絶対湿度」と「相対湿度」、設計ではどっちを使うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">空気を加熱・冷却するプロセスを追うときは絶対湿度 (g/kg DA) を使う。なぜなら加湿も除湿もしなければこの値は一定で「保存量」になるからね。例えば外気 5°C・RH 60% で絶対湿度は約 3.3 g/kg、これを室内で 22°C まで暖めると RH は 20% 以下まで急降下する——でも g/kg は変わらない。加湿器の必要能力は「目標 g/kg − 外気 g/kg」で計算する。本ツールの絶対湿度カードは設計の出発点だよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">Magnus 式の係数 17.62 と 243.12 はどこから来ていますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">WMO（世界気象機関）が 2008 年に推奨した水面上の飽和水蒸気圧用の Magnus 係数です。Sonntag や Alduchov-Eskridge による実測フィッティングに基づき、−40 °C から +50 °C で誤差 0.4 % 以下を達成しています。氷面上では別の係数（22.46, 272.62）を使うのが一般的ですが、本ツールは空調・気象用途を想定し水面上係数のみを採用しています。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">大気圧スライダーを変えると何が変わりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">飽和水蒸気圧 e_s と露点温度 T_d は大気圧にほぼ依存しません（Magnus 式は温度のみの関数）。一方、絶対湿度 w = 622·e/(p_atm − e) は大気圧の影響を受けます。高地（800 hPa 程度）では同じ水蒸気圧でも w が約 1.3 倍に増えるため、富士山頂や航空機内の空調設計では大気圧補正が必須です。スライダーを動かすと w カードのみが変化することを確認できます。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">湿球温度の Stull 近似はどれくらい正確ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">Stull (2011) の解析的近似は、大気圧 1013 hPa 付近で乾球温度 −20〜50 °C、相対湿度 5〜99 % の範囲で、厳密解（飽和エンタルピー反復計算）に対し平均誤差 ±0.3 °C 以内です。精密空調・湿度制御では厳密解を使うべきですが、設計概算・現場確認・教育目的では十分な精度を持ちます。極低湿（RH &lt; 5 %）では誤差が大きくなる点に注意してください。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">SI と USCS の切替はどんな単位に変わりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">表示単位スライダーを 1 にすると、温度は °C → °F、水蒸気圧は hPa → inHg、絶対湿度は g/kg → gr/lb（grains per pound、1 g/kg ≈ 7 gr/lb）に切り替わります。米国 ASHRAE 基準や輸入冷凍機の銘板を読むときに便利です。スライダー入力は SI のままなので、入力値の体感を保ったまま出力単位だけ変換できます。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>建築の結露・カビ対策：</strong>窓ガラスや北側外壁の表面温度を、室内空気の露点温度より高く保つことが結露防止の基本原則です。本ツールで露点温度を確認し、断熱性能（複層ガラス・内窓・外断熱）の必要レベルを判断します。結露が継続するとカビが繁殖し、シックハウス症候群やアレルギーの原因になります。</p>
+    <p><strong>データセンター・サーバールームの精密空調：</strong>ASHRAE TC9.9 のサーバー室推奨環境は露点温度 5.5〜15 °C、相対湿度 60 % 以下。露点が低すぎると静電気で IC が破壊され、高すぎるとサーバー筐体表面で結露し短絡事故になります。本ツールで運転条件の露点を確認すると、加湿器・除湿器の設定が妥当か即座に判断できます。</p>
+    <p><strong>気化冷却塔・打ち水・気化式加湿器：</strong>これらの装置の到達下限温度はすべて湿球温度 T_w で決まります。例えば乾球 35 °C・RH 30 % の真夏の屋上では湿球温度約 22 °C まで冷却塔出口水温が下がり、空冷の代わりに大幅な省エネが可能です。湿球温度カードで地域・季節ごとの省エネポテンシャルを評価できます。</p>
+    <p><strong>食品・医薬・倉庫の品質保持：</strong>チョコレートのファットブルーム、医薬品錠剤の吸湿崩壊、紙・木材の寸法変化はすべて露点温度と保管表面温度の関係で起こります。本ツールで保管空気の露点を求め、それより十分高い表面温度を維持するよう温調・断熱を設計します。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最も多い誤解は<strong>「相対湿度が低ければ結露は起こらない」</strong>という思い込みです。本ツールで T=22 °C・RH=40 % を入力すると露点は約 8 °C。これは一見「乾いた」状態ですが、冬の外気で冷えた窓サッシ表面が 8 °C 以下になれば容赦なく結露します。重要なのは「相対湿度」ではなく「露点温度と表面温度の差」です。本ツールで露点温度カードを優先的に確認する習慣を付けてください。</p>
+    <p>次に多いのが、<strong>「温度を上げれば湿度が下がるので快適」</strong>という誤解です。確かに RH スライダーは下がりますが、本ツールで絶対湿度 w カードを見れば値は変わっていません。空気中の水分量自体は同じで、人間の肌が感じる「乾燥感」は呼気からの水分蒸発速度に依存します。冬の暖房で喉が乾く・肌が荒れるのはこの絶対湿度が低いままだから。RH 表示に頼らず w を見て加湿の必要性を判断しましょう。</p>
+    <p>最後に、<strong>「Magnus 式は万能」と思い込まない</strong>こと。本ツールが採用する水面上 Magnus 係数は −40〜+50 °C で高精度ですが、−40 °C 以下の極低温（氷面上飽和）、150 °C 以上の高圧蒸気、海水中の塩分影響などは別モデルが必要です。空調・建築・農業・気象という日常スケールでは十分実用的ですが、燃料電池・蒸気タービン・宇宙服など特殊環境では IAPWS-IF97 などの厳密モデルを使ってください。</p>
+  </div>
+</section>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="dew-point-rh.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/psychrometrics.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">湿り空気線図（サイクロメトリクス）計算ツール</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">湿り空気線図（サイクロメトリクス）の状態値を瞬時に計算・可視化するオンラインツールです。乾球温度と相対湿度を入力するだけで、絶対湿度・露点温度・比エンタルピー・比容積をリアルタイムに...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/sensible-latent-heat-ratio.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">顕熱比 SHF 計算ツール — 空調負荷バランス</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">顕熱比 SHF 計算ツールは、人体・照明・機器・外気導入による室内顕熱負荷 Q_s と潜熱負荷 Q_L を集計し、SHF=Q_s/Q_t を即座に算出。空気線図上に SHF 線として...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/cooling-coil-load.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">冷却コイル熱負荷シミュレーター — 顕熱・潜熱・除湿</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">冷却コイル熱負荷シミュレーターで、入口・出口の空気状態から顕熱負荷・潜熱負荷・全熱負荷・除湿量・顕熱比SHFをリアルタイム計算。空気線図上に冷却過程を可視化し、空調設計の基本を直感的...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/duct-sizing.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">HVAC ダクトサイジング シミュレーター — 矩形ダクトの圧損計算</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">HVAC 矩形ダクトのサイジング・圧損計算シミュレーター。風量・幅・高さ・ダクト長から、水力直径 D_h・平均風速 V・摩擦係数 f・単位長圧損 ΔP/L・総圧損 ΔP をスワミー・...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/wbgt-heat-index.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">WBGT（湿球黒球温度）暑熱指数シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">WBGT（湿球黒球温度）暑熱指数シミュレーターは、乾球温度・相対湿度・日射量から自然湿球温度・黒球温度・WBGT 指数をリアルタイム計算します。厚生労働省・JIS Z 8504 基準...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/cooling-tower.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-droplet"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">冷却塔シミュレーター（Merkel法）</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">冷却塔シミュレーターで向流・交差流の性能をMerkel法(NTU法)により解析。アプローチ温度や冷却範囲、補給水量をリアルタイム計算。湿球温度の影響を考慮した空調熱工学シミュレーショ...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>乾球温度スライダーで現在の気温を設定します（例：25℃）</li>
+<li>相対湿度スライダーで空気の湿り具合を入力します（例：60%）</li>
+<li>気圧値を設定し、計算ボタンを押すと露点温度・湿球温度・水蒸気圧・含水量が即座に算出されます</li>
+<li>露点温度が表面温度より低い場合、その表面では結露が発生しません</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>冷凍倉庫の入口で乾球温度5℃、相対湿度85%、気圧101.325kPaを測定した場合、Magnus近似により露点温度は2.1℃、水蒸気圧は0.87kPa、絶対湿度は5.2g/kg(DA)と算出されます。壁面温度が0℃の場合、結露発生の危険があります。一方、室内25℃・相対湿度45%・気圧101.325kPaでは露点温度は13.8℃、水蒸気圧は1.41kPa、含水量は7.1g/kgとなり、結露リスクは低い環境です。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>食品工場や医薬品製造では相対湿度を±5%以内で管理するため、露点温度の監視が必須です。露点-5℃管理では乾球温度20℃時の目標相対湿度は約34%になります</li>
+<li>HVACシステム設計では、除湿装置の出口空気の露点を-10℃以下に設定することで表面結露を確実に防止できます</li>
+<li>Magnus係数（a=17.27、b=237.7℃）は0～60℃の範囲で精度±0.5℃です。極低温や高温領域では専用の相湿計算式を使用してください</li>
+<li>結露判定時は壁材の熱容量を考慮し、測定点より低い部分の温度を確認することが重要です</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script src="/tools/tool-ux-template.js?v20260517r4" defer></script>
+</body>
+</html>

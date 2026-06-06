@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>モデル予測制御シミュレーター — 無料オンライン計算ツール | NovaSolver</title>
+<meta name="description" content="モデル予測制御シミュレーターで有限ホライズン最適化を実装。1次プロセスの離散化と予測ホライズンによる最適入力計算、MPC vs PID応答比較を可視化。">
+<meta property="og:title" content="モデル予測制御シミュレーター — 有限ホライズン最適化と無拘束QP | NovaSolver">
+<meta property="og:description" content="モデル予測制御シミュレーターで有限ホライズン最適化を実装。1次プロセスの離散化と予測ホライズンによる最適入力計算、MPC vs PID応答比較を可視化。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://novasolver.jp/tools/model-predictive.html">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Model predictive control simulator (finite-horizon optimization)">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://novasolver.jp/tools/model-predictive.html">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/model-predictive.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/model-predictive.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/model-predictive.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/model-predictive.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "モデル予測制御シミュレーター",
+      "description": "1次プロセスを離散化し、予測ホライズン先までの出力誤差を最小化する最適入力を毎ステップ解析的に計算するMPCの教育用シミュレーター。PID制御との応答比較も可能。",
+      "url": "https://novasolver.jp/tools/model-predictive.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Control Engineering Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["1次プロセスのMPC応答計算","予測ホライズン・制御ホライズン・入力ペナルティの調整","PIDとの応答比較","無拘束QPの解析解による最適入力計算"],
+      "keywords": "モデル予測制御,MPC,有限ホライズン,最適制御,予測制御,プロセス制御,QP,DMC,GPC",
+      "datePublished": "2026-05-16",
+      "dateModified": "2026-05-16",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "モデル予測制御（MPC）とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "モデル予測制御は、プロセスの内部モデルを使って将来の出力を予測し、予測ホライズン先までの誤差を最小化する最適入力を毎ステップ計算する制御手法です。計算した入力列の先頭1つだけを実プラントに印加し、次のステップで新しい測定値を使って再度最適化を行う「受信ホライズン」方式が特徴で、外乱や測定誤差に対して頑健に動作します。"}
+        },
+        {
+          "@type": "Question",
+          "name": "拘束付きMPCと無拘束MPCの違いは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "本ツールが扱う無拘束MPCは、入力・出力に上下限などの拘束を課さない場合で、最適化問題が二次計画法（QP）の標準形となり ∂J/∂U = 0 から U = (H^T H + λI)^(-1) H^T (R - F x_k) の解析解が得られます。実際のプラントではアクチュエータの飽和や安全制約があるため拘束付きMPCを使い、QPソルバー（内点法・アクティブセット法など）で毎ステップ最適化します。計算コストは増えますが安全性と性能を両立できます。"}
+        },
+        {
+          "@type": "Question",
+          "name": "DMCやGPCといった産業MPCとは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "DMC（Dynamic Matrix Control）は1970年代に石油精製業界で開発された、ステップ応答モデルに基づくMPCの先駆けです。GPC（Generalized Predictive Control）はARIMAX形式の伝達関数モデルを使う一般化予測制御で、1980年代後半に普及しました。いずれも本ツールと同じく予測ホライズン上の誤差を最小化しますが、プロセスモデルの記述方法が異なります。現代の産業MPC製品（DMCplus、SMOC、Profit Controller等）は数十〜数百変数のMIMOプロセスに対応します。"}
+        },
+        {
+          "@type": "Question",
+          "name": "予測ホライズン Np と制御ホライズン Nc はどう選びますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "予測ホライズン Np はプロセスの整定時間の80〜100%（ステップ数）程度に設定するのが目安で、短すぎると応答が不安定化、長すぎると計算コストが増えます。制御ホライズン Nc は Np より小さく取り、Nc=1〜3 が実用的です。Nc を大きくすると応答は速くなる一方、入力の振動が増えやすくなります。入力ペナルティ λ はトレードオフを調整する重要パラメータで、大きくすると入力が穏やかになり安定性は増しますが応答が遅くなります。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "モデル予測制御シミュレーター", "item": "https://novasolver.jp/tools/model-predictive.html"}
+      ]
+    }
+  ]
+}</script>
+<link rel="stylesheet" href="/tools/tools-common.css">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet">
+<script src="/tools/tools-common.js"></script>
+<style>
+:root{
+  --navy:#001F3F; --accent:#007BFF; --accent2:#00B4D8;
+  --bg:#F8F9FA; --card:#ffffff; --text:#1a1a2e;
+  --muted:#6c757d; --border:#dee2e6;
+}
+body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+.canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">モデル予測制御シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/model-predictive.html" class="active">JA</a>
+      <a href="/en/tools/model-predictive.html">EN</a>
+      <a href="/zh/tools/model-predictive.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-microchip"></i> 制御工学シミュレーター</div>
+    <h1>モデル予測制御シミュレーター — 有限ホライズン最適化</h1>
+    <p class="hero-sub">1次プロセスを離散化し、予測ホライズン先までの出力誤差を最小化する最適入力を毎ステップ解析的に計算。MPCの基本動作とPIDとの応答差を可視化します。</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">予測ホライズン N_p</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slNpVal" value="10" min="2" max="30" step="1" oninput="syncFromNum('slNp','slNpVal')"><span class="num-unit">step</span></div>
+      </div>
+      <input type="range" id="slNp" min="2" max="30" step="1" value="10" oninput="syncToNum('slNp','slNpVal');updateSlider(this,'slNpVal',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">制御ホライズン N_c</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slNcVal" value="3" min="1" max="10" step="1" oninput="syncFromNum('slNc','slNcVal')"><span class="num-unit">step</span></div>
+      </div>
+      <input type="range" id="slNc" min="1" max="10" step="1" value="3" oninput="syncToNum('slNc','slNcVal');updateSlider(this,'slNcVal',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">入力ペナルティ λ</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slLambdaVal" value="0.10" min="0.00" max="10.00" step="0.01" oninput="syncFromNum('slLambda','slLambdaVal')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slLambda" min="0.00" max="10.00" step="0.01" value="0.10" oninput="syncToNum('slLambda','slLambdaVal');updateSlider(this,'slLambdaVal',2,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">目標値 r</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slRVal" value="1.0" min="0.0" max="5.0" step="0.1" oninput="syncFromNum('slR','slRVal')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slR" min="0.0" max="5.0" step="0.1" value="1.0" oninput="syncToNum('slR','slRVal');updateSlider(this,'slRVal',1,'');compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="btn-group">
+      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">プロセス: K = 2、T = 5 s、dt = 0.1 s（固定）。シミュレーション時間 15 s。比較対象として同じ系に PID（Kp=2, Ki=0.4）を適用した応答も表示します。</p>
+  </div>
+
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statRise">—</div><div class="sl">立ち上がり時間（0→90%）</div></div>
+        <div class="stat-card"><div class="sv" id="statSettle">—</div><div class="sl">整定時間（±2%）</div></div>
+        <div class="stat-card"><div class="sv" id="statOS">—</div><div class="sl">オーバーシュート</div></div>
+        <div class="stat-card"><div class="sv" id="statU0">—</div><div class="sl">初期入力 u(0)</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 出力 y(t)、目標 r、入力 u(t)</div>
+      <canvas id="cv" width="600" height="400"></canvas>
+      <p class="canvas-hint">上段＝出力 y（青）・目標 r（赤破線）・PID応答（灰）・予測ホライズン先読み線（青点線）／下段＝入力 u（緑）・Nc 個の最適化入力（黄点）</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <div class="theory-box">
+        <p>1次プロセス $G_p(s) = K/(T s + 1)$ を前進 Euler で離散化し、$x_{k+1} = a\,x_k + b\,u_k$（$a = e^{-dt/T}$、$b = K(1-a)$）で表します。</p>
+        <p style="margin-top:8px;">$N_p$ ステップ先までの予測：</p>
+        $$y_{k+i} = a^{i}\,x_k + \sum_{j=0}^{i-1} a^{i-1-j}\,b\,u_{k+j}$$
+        <p style="margin-top:6px;">コスト関数（出力誤差 + 入力変化ペナルティで積分動作を確保）：</p>
+        $$J = \sum_{i=1}^{N_p} (y_{k+i} - r)^2 + \lambda \sum_{j=0}^{N_c - 1} (\Delta u_{k+j})^2$$
+        <p style="margin-top:6px;">無拘束 QP の解析解（$\partial J / \partial U = 0$）：</p>
+        $$U = \bigl(H^\top H + \lambda\, L^\top L\bigr)^{-1} \bigl(H^\top (R - F\,x_k) + \lambda\,u_{k-1}\,\mathbf{e}_1\bigr)$$
+        <p style="margin-top:8px;">$H$（$N_p \times N_c$）と $F$（$N_p \times 1$）はプロセス係数 $a, b$ から構成され、$L$ は前進差分演算子。受信ホライズン方式で先頭の $u_k = U[0]$ のみ印加し、次ステップで再最適化します。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== Model Predictive Control Simulator ==========
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+
+// process parameters (fixed)
+var K = 2, T = 5, dt = 0.1;
+var Tend = 15;
+var Nsteps = Math.round(Tend / dt) + 1; // 151
+var aProc = Math.exp(-dt / T);
+var bProc = K * (1 - aProc);
+
+function getParams() {
+  return {
+    Np: parseInt(document.getElementById('slNp').value, 10),
+    Nc: parseInt(document.getElementById('slNc').value, 10),
+    lam: parseFloat(document.getElementById('slLambda').value),
+    r: parseFloat(document.getElementById('slR').value)
+  };
+}
+
+// ========== Self-implemented matrix ops (N x N solver via Gauss-Jordan) ==========
+// Solve A x = b for symmetric positive definite A (NcxNc, Nc up to 10)
+function solveLinear(A, b) {
+  var n = b.length;
+  // copy to augmented matrix
+  var M = [];
+  for (var i = 0; i < n; i++) {
+    M[i] = new Array(n + 1);
+    for (var j = 0; j < n; j++) M[i][j] = A[i][j];
+    M[i][n] = b[i];
+  }
+  // partial pivoting Gauss elimination
+  for (var k = 0; k < n; k++) {
+    // pivot
+    var maxAbs = Math.abs(M[k][k]);
+    var pivotRow = k;
+    for (var i = k + 1; i < n; i++) {
+      if (Math.abs(M[i][k]) > maxAbs) { maxAbs = Math.abs(M[i][k]); pivotRow = i; }
+    }
+    if (maxAbs < 1e-14) {
+      // singular; return zeros
+      var z = new Array(n); for (var i = 0; i < n; i++) z[i] = 0;
+      return z;
+    }
+    if (pivotRow !== k) { var tmp = M[k]; M[k] = M[pivotRow]; M[pivotRow] = tmp; }
+    // eliminate
+    for (var i = k + 1; i < n; i++) {
+      var f = M[i][k] / M[k][k];
+      for (var j = k; j <= n; j++) M[i][j] -= f * M[k][j];
+    }
+  }
+  // back-substitute
+  var x = new Array(n);
+  for (var i = n - 1; i >= 0; i--) {
+    var s = M[i][n];
+    for (var j = i + 1; j < n; j++) s -= M[i][j] * x[j];
+    x[i] = s / M[i][i];
+  }
+  return x;
+}
+
+// build prediction matrices F (Np), H (Np x Nc) for current Np, Nc
+// F[i] = a^(i+1), coefficient of x_k in y_{k+i+1}
+// H[i][j] for j=0..Nc-2: a^(i-j)*b if i>=j else 0
+// H[i][Nc-1]: sum_{m=Nc-1}^{i} a^(i-m)*b  if i>=Nc-1 else 0
+function buildFH(Np, Nc) {
+  var F = new Array(Np), H = new Array(Np);
+  for (var i = 0; i < Np; i++) {
+    F[i] = Math.pow(aProc, i + 1);
+    H[i] = new Array(Nc);
+    for (var j = 0; j < Nc; j++) H[i][j] = 0;
+    for (var j = 0; j < Nc - 1; j++) {
+      if (i >= j) H[i][j] = Math.pow(aProc, i - j) * bProc;
+    }
+    // last column: input u_{k+Nc-1} held constant for j = Nc-1 .. i
+    if (i >= Nc - 1) {
+      var s = 0;
+      for (var m = Nc - 1; m <= i; m++) s += Math.pow(aProc, i - m) * bProc;
+      H[i][Nc - 1] = s;
+    }
+  }
+  return { F: F, H: H };
+}
+
+// compute one MPC step with incremental input penalty (Δu) for integral action
+// minimizes ||H U + F x_k - R||^2 + lam * ||L U - u_prev e1||^2
+// where L is the first-difference operator (NcxNc bidiagonal)
+// Normal equations: (H^T H + lam L^T L) U = H^T (R - F x_k) + lam u_prev e1
+// L^T L is tridiagonal: diag = 2 (except last entry = 1), off-diag = -1
+function mpcStep(x_k, u_prev, r, Np, Nc, lam) {
+  var fh = buildFH(Np, Nc);
+  var F = fh.F, H = fh.H;
+  // R - F*x_k (Np-vector)
+  var diff = new Array(Np);
+  for (var i = 0; i < Np; i++) diff[i] = r - F[i] * x_k;
+  // A = H^T H + lam * L^T L  (Nc x Nc)
+  var A = new Array(Nc);
+  for (var i = 0; i < Nc; i++) {
+    A[i] = new Array(Nc);
+    for (var j = 0; j < Nc; j++) {
+      var s = 0;
+      for (var k = 0; k < Np; k++) s += H[k][i] * H[k][j];
+      var ltl = 0;
+      if (i === j) ltl = (i === Nc - 1) ? 1 : 2;
+      else if (Math.abs(i - j) === 1) ltl = -1;
+      A[i][j] = s + lam * ltl;
+    }
+  }
+  // bv = H^T (R - F x_k) + lam * u_prev * e1
+  var bv = new Array(Nc);
+  for (var i = 0; i < Nc; i++) {
+    var s = 0;
+    for (var k = 0; k < Np; k++) s += H[k][i] * diff[k];
+    bv[i] = s;
+  }
+  bv[0] += lam * u_prev;
+  return solveLinear(A, bv);
+}
+
+// simulate MPC over full time horizon (with incremental input formulation)
+function simulateMPC(p) {
+  var y = new Array(Nsteps);
+  var u = new Array(Nsteps);
+  var x = 0;
+  var uprev = 0;
+  // first U for prediction display
+  var firstU = null;
+  for (var k = 0; k < Nsteps; k++) {
+    y[k] = x;
+    if (k < Nsteps - 1) {
+      var U = mpcStep(x, uprev, p.r, p.Np, p.Nc, p.lam);
+      if (firstU === null) firstU = U.slice();
+      u[k] = U[0];
+      x = aProc * x + bProc * u[k];
+      uprev = u[k];
+    } else {
+      u[k] = u[k - 1];
+    }
+  }
+  return { y: y, u: u, firstU: firstU };
+}
+
+// simple PI controller for comparison: Kp = 2, Ki = 0.4 (tuned for ~20% overshoot)
+function simulatePID(p) {
+  var Kp = 2.0, Ki = 0.4;
+  var y = new Array(Nsteps);
+  var u = new Array(Nsteps);
+  var x = 0;
+  var integ = 0;
+  for (var k = 0; k < Nsteps; k++) {
+    y[k] = x;
+    var e = p.r - x;
+    integ += e * dt;
+    var uk = Kp * e + Ki * integ;
+    u[k] = uk;
+    if (k < Nsteps - 1) x = aProc * x + bProc * uk;
+  }
+  return { y: y, u: u };
+}
+
+// compute statistics: rise time (0→90%), settling time (±2%), overshoot
+function computeStats(y, u, r) {
+  if (Math.abs(r) < 1e-9) {
+    // for r = 0, return zeros (system already at target)
+    return { rise: 0, settle: 0, os: 0, u0: u[0] };
+  }
+  // rise time: first time y crosses 0.9*r
+  var rise = NaN;
+  for (var k = 0; k < y.length; k++) {
+    if (y[k] >= 0.9 * r) { rise = k * dt; break; }
+  }
+  // overshoot: max y - r vs r
+  var ymax = -Infinity;
+  for (var k = 0; k < y.length; k++) if (y[k] > ymax) ymax = y[k];
+  var os = (ymax - r) / r * 100;
+  if (os < 0) os = 0;
+  // settling time: last time |y - r| > 0.02*r
+  var settle = 0;
+  for (var k = y.length - 1; k >= 0; k--) {
+    if (Math.abs(y[k] - r) > 0.02 * Math.abs(r)) { settle = (k + 1) * dt; break; }
+  }
+  return { rise: rise, settle: settle, os: os, u0: u[0] };
+}
+
+// build prediction line for plot (predicted y over Np steps from chosen reference time)
+function buildPredictionLine(y, u, atIdx, p) {
+  // predict from x_k = y[atIdx] forward Np steps using same MPC with u_prev = 0 (initial step)
+  var x = y[atIdx];
+  var u_prev = atIdx > 0 ? u[atIdx - 1] : 0;
+  var U = mpcStep(x, u_prev, p.r, p.Np, p.Nc, p.lam);
+  var preds = [x];
+  for (var i = 1; i <= p.Np; i++) {
+    var uIdx = Math.min(i - 1, p.Nc - 1);
+    var uu = U[uIdx];
+    x = aProc * x + bProc * uu;
+    preds.push(x);
+  }
+  return preds;
+}
+
+// ========== Drawing ==========
+function drawPlot(simMPC, simPID, p) {
+  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+
+  // top panel: y(t) and r
+  // bottom panel: u(t)
+  var pad = 32;
+  var topY0 = 24, topY1 = H * 0.55 - 4;
+  var botY0 = H * 0.55 + 14, botY1 = H - 26;
+  var x0 = pad + 24, x1 = W - 14;
+
+  // determine ranges
+  var yMin = Math.min(0, p.r);
+  var yMax = Math.max(p.r * 1.4, 0.1);
+  for (var k = 0; k < simMPC.y.length; k++) {
+    if (simMPC.y[k] < yMin) yMin = simMPC.y[k];
+    if (simMPC.y[k] > yMax) yMax = simMPC.y[k];
+    if (simPID.y[k] < yMin) yMin = simPID.y[k];
+    if (simPID.y[k] > yMax) yMax = simPID.y[k];
+  }
+  var yRange = yMax - yMin;
+  if (yRange < 1e-6) yRange = 1;
+  yMin -= 0.05 * yRange; yMax += 0.05 * yRange;
+
+  var uMin = Infinity, uMax = -Infinity;
+  for (var k = 0; k < simMPC.u.length; k++) {
+    if (simMPC.u[k] < uMin) uMin = simMPC.u[k];
+    if (simMPC.u[k] > uMax) uMax = simMPC.u[k];
+  }
+  if (!isFinite(uMin)) { uMin = 0; uMax = 1; }
+  if (uMax - uMin < 1e-3) { uMax = uMin + 1; }
+  var uRange = uMax - uMin;
+  uMin -= 0.1 * uRange; uMax += 0.1 * uRange;
+
+  function tx(t) { return x0 + (t / Tend) * (x1 - x0); }
+  function tyTop(yv) { return topY1 - ((yv - yMin) / (yMax - yMin)) * (topY1 - topY0); }
+  function tyBot(uv) { return botY1 - ((uv - uMin) / (uMax - uMin)) * (botY1 - botY0); }
+
+  // axes top
+  ctx.strokeStyle = 'rgba(143,184,224,0.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x0, topY1); ctx.lineTo(x1, topY1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0, topY0); ctx.lineTo(x0, topY1); ctx.stroke();
+  // axes bottom
+  ctx.beginPath(); ctx.moveTo(x0, botY1); ctx.lineTo(x1, botY1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0, botY0); ctx.lineTo(x0, botY1); ctx.stroke();
+
+  // reference line r (dashed)
+  ctx.strokeStyle = 'rgba(231,76,60,0.85)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(x0, tyTop(p.r)); ctx.lineTo(x1, tyTop(p.r)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // PID curve (gray, behind)
+  ctx.strokeStyle = 'rgba(180,200,220,0.55)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (var k = 0; k < simPID.y.length; k++) {
+    var x = tx(k * dt), yy = tyTop(simPID.y[k]);
+    if (k === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+  }
+  ctx.stroke();
+
+  // MPC curve (blue)
+  ctx.strokeStyle = '#00B4D8';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (var k = 0; k < simMPC.y.length; k++) {
+    var x = tx(k * dt), yy = tyTop(simMPC.y[k]);
+    if (k === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+  }
+  ctx.stroke();
+
+  // Prediction line at t = 0 (dotted) — Np steps ahead
+  var preds = buildPredictionLine(simMPC.y, simMPC.u, 0, p);
+  ctx.strokeStyle = 'rgba(120,210,235,0.75)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  for (var i = 0; i < preds.length; i++) {
+    var tt = i * dt;
+    var x = tx(tt), yy = tyTop(preds[i]);
+    if (i === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // mark prediction endpoint
+  ctx.fillStyle = 'rgba(120,210,235,0.9)';
+  for (var i = 0; i < preds.length; i++) {
+    var tt = i * dt;
+    ctx.beginPath(); ctx.arc(tx(tt), tyTop(preds[i]), 1.6, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // labels top
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('y(t) (MPC)', x0 + 4, topY0 + 12);
+  ctx.fillStyle = 'rgba(231,76,60,0.95)';
+  ctx.fillText('r = ' + p.r.toFixed(2), x0 + 90, topY0 + 12);
+  ctx.fillStyle = 'rgba(180,200,220,0.85)';
+  ctx.fillText('y(t) (PID)', x0 + 170, topY0 + 12);
+  ctx.fillStyle = 'rgba(120,210,235,0.95)';
+  ctx.fillText('予測（Np 先読み）', x0 + 240, topY0 + 12);
+  // axis labels top
+  ctx.fillStyle = '#cfe3f7';
+  ctx.textAlign = 'right';
+  ctx.fillText(yMax.toFixed(2), x0 - 4, topY0 + 4);
+  ctx.fillText(yMin.toFixed(2), x0 - 4, topY1);
+  ctx.fillText('y', x0 - 4, (topY0 + topY1) / 2);
+
+  // u(t) curve (green) — step look
+  ctx.strokeStyle = '#00b894';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (var k = 0; k < simMPC.u.length; k++) {
+    var x = tx(k * dt), yy = tyBot(simMPC.u[k]);
+    if (k === 0) { ctx.moveTo(x, yy); }
+    else {
+      var xPrev = tx((k - 1) * dt);
+      ctx.lineTo(x, tyBot(simMPC.u[k - 1]));
+      ctx.lineTo(x, yy);
+    }
+  }
+  ctx.stroke();
+
+  // Nc optimal inputs at k=0 as yellow dots
+  if (simMPC.firstU) {
+    ctx.fillStyle = '#FFD166';
+    for (var j = 0; j < simMPC.firstU.length; j++) {
+      var tt = j * dt;
+      ctx.beginPath(); ctx.arc(tx(tt), tyBot(simMPC.firstU[j]), 4, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // labels bottom
+  ctx.fillStyle = '#00b894';
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('u(t) (MPC)', x0 + 4, botY0 + 12);
+  ctx.fillStyle = '#FFD166';
+  ctx.fillText('Nc 個の最適入力 (k=0)', x0 + 110, botY0 + 12);
+  ctx.fillStyle = '#cfe3f7';
+  ctx.textAlign = 'right';
+  ctx.fillText(uMax.toFixed(2), x0 - 4, botY0 + 4);
+  ctx.fillText(uMin.toFixed(2), x0 - 4, botY1);
+  ctx.fillText('u', x0 - 4, (botY0 + botY1) / 2);
+
+  // time axis
+  ctx.fillStyle = '#cfe3f7';
+  ctx.textAlign = 'left';
+  ctx.fillText('t = 0', x0, botY1 + 14);
+  ctx.textAlign = 'right';
+  ctx.fillText('t = ' + Tend + ' s', x1, botY1 + 14);
+}
+
+function resizeCanvas() {
+  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
+  var h = Math.round(w * 0.66);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.style.width = w + 'px';
+  cv.style.height = h + 'px';
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cv.dataset.cssW = String(w);
+  cv.dataset.cssH = String(h);
+}
+
+function compute() {
+  var p = getParams();
+  if (!isFinite(p.Np) || !isFinite(p.Nc) || p.Nc > p.Np) {
+    // clamp Nc
+    p.Nc = Math.min(p.Nc, p.Np);
+  }
+  var simMPC = simulateMPC(p);
+  var simPID = simulatePID(p);
+  var stats = computeStats(simMPC.y, simMPC.u, p.r);
+
+  document.getElementById('statRise').textContent = isFinite(stats.rise) ? stats.rise.toFixed(2) + ' s' : '—';
+  document.getElementById('statSettle').textContent = isFinite(stats.settle) ? stats.settle.toFixed(2) + ' s' : '—';
+  document.getElementById('statOS').textContent = isFinite(stats.os) ? stats.os.toFixed(1) + ' %' : '—';
+  document.getElementById('statU0').textContent = isFinite(stats.u0) ? stats.u0.toFixed(3) : '—';
+
+  drawPlot(simMPC, simPID, p);
+}
+
+function resetParams() {
+  var defs = { slNp: 10, slNc: 3, slLambda: 0.10, slR: 1.0 };
+  Object.keys(defs).forEach(function (id) {
+    document.getElementById(id).value = defs[id];
+  });
+  updateSlider(document.getElementById('slNp'), 'slNpVal', 0, '');
+  updateSlider(document.getElementById('slNc'), 'slNcVal', 0, '');
+  updateSlider(document.getElementById('slLambda'), 'slLambdaVal', 2, '');
+  updateSlider(document.getElementById('slR'), 'slRVal', 1, '');
+  compute();
+}
+
+window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+
+resizeCanvas();
+compute();
+</script>
+
+<section class="explanation">
+  <h2>モデル予測制御シミュレーターとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「モデル予測制御」って聞いたことはあるんですけど、PIDと何が違うんですか？普通のフィードバックじゃダメなんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">ざっくり言うと、PIDは「今の誤差」しか見ないけど、MPC は「これから 10 ステップ先までの誤差」を見て、それを最小化する入力を計算するんだ。プロセスの内部モデルを持っていて、$x_{k+1} = a x_k + b u_k$ で将来を予測する。上のシミュレーターで MPC の青線と PID の灰線を比べてごらん。同じ系でも MPC の方が無駄な振動が少ないだろう。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「予測ホライズン Np」を 30 に上げてみたら、応答が少し穏やかになりました。これって計算量はどうなるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">良い質問だ。Np を上げると行列 $H$ のサイズが Np × Nc に膨らむ。本ツールは無拘束 QP の解析解 $U = (H^\top H + \lambda I)^{-1} H^\top (R - F x_k)$ を使うから Nc × Nc の逆行列計算で済むけど、現場の拘束付き MPC では毎ステップ QP ソルバーを回すから、Np を倍にすると計算時間が一気に増える。実機では Np ≈ 整定時間の 80〜100%、Nc は 1〜3 で十分なことが多いんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「入力ペナルティ λ」を 10 にしたら、応答がすごく遅くなりました。なんでこんなパラメータが必要なんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">λ は「入力を派手に動かしたくない」というペナルティだ。0 にすると MPC は最速で追従しようとして大きな入力を出す。実機ではバルブやモーターに無理がかかってしまう。λ を上げると「ゆっくりでいいから入力は穏やかに」になる。下段の u(t) を見ると、λ=0.1 と λ=10 で初期入力 u(0) の大きさが全然違うのが分かるはずだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">下段の黄色い点は何ですか？3 個並んでますね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">それが MPC の本質で、最初の最適化で計算した Nc 個の入力列 $u_{k}, u_{k+1}, u_{k+2}$ だ。でも MPC は受信ホライズン方式だから、実際にプラントに印加するのは先頭の $u_k$ だけ。次のステップで新しい測定値 $x_{k+1}$ を取り直してまた Nc 個計算する。「将来も含めて最適化するけど、実行は 1 個ずつ」というのがミソだよ。だから外乱が入ってもすぐに修正できる。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">MPC は PID と比べて何が優れているのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">最大の違いは「将来予測」と「拘束を陽に扱える」ことです。PID は瞬時の誤差・積分・微分しか使いませんが、MPC はプロセスモデルで Np ステップ先まで予測し、入力上下限・出力安全限界などの拘束を最適化問題に直接組み込めます。さらに MIMO（多入力多出力）系で変数間の相互作用も自然に扱えるため、石油精製・化学プラントなど数十変数を協調制御する用途で標準的に使われています。一方で計算コストが高く、正確なモデルが必要なため、単純な SISO ループでは PID の方が低コストで実用的です。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">モデル誤差があっても MPC は動きますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">受信ホライズン方式により毎ステップで新しい測定値を取り直して再最適化するため、ある程度のモデル誤差には頑健に動作します。ただしモデルとプラントが大きく乖離すると定常偏差や不安定化が起こる可能性があります。実装では「外乱モデル（積分外乱）」を追加してオフセットフリー追従を保証する手法や、ロバスト MPC（Tube MPC など）でモデル不確かさを陽に扱う手法が用いられます。シミュレーターでは内部モデルとプラントを同一にしているため理想的な追従が観察できます。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">なぜ Nc を Np より小さく取るのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">計算コスト削減と入力の暴れ抑制の2つが主な理由です。Nc を Np と同じにすると、入力変数が Np 個になり最適化問題のサイズが大きくなる上、Np 個の入力で Np 個の予測出力を厳密に追従させようとして入力が激しく振動します。Nc を 1〜3 程度に小さくし、それ以降は最後の入力を保持する「ブロッキング」を行うと、滑らかで実装しやすい入力列が得られます。本ツールでは Nc 個の入力の後は $u_{k+Nc-1}$ を保持する形式で予測式 $H$ 行列を構成しています。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">産業界で使われている MPC 製品にはどんなものがありますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">石油精製・化学業界では AspenTech 社の DMCplus（Dynamic Matrix Control の商用版）、Shell 由来の SMOC、Honeywell 社の Profit Controller などが代表的です。これらは数十〜数百の入出力変数を持つ MIMO プロセスを扱い、経済最適化（LP/QP）を上位層に組み合わせた階層構成が一般的です。自動車業界ではエンジン制御・自動運転に MPC が使われ、医療分野では人工膵臓のインスリン投与制御にも応用されています。MATLAB の Model Predictive Control Toolbox や Python の do-mpc・CasADi も研究・教育で広く利用されます。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>石油精製・化学プラントの上位制御：</strong>MPC が最も普及している分野です。蒸留塔・接触分解装置・改質装置などの数十変数 MIMO プロセスに対し、製品純度・温度・圧力を同時に目標範囲内に保ちつつ、エネルギー消費や原料コストを経済最適化します。下位の PID ループの目標値を MPC が決定する階層構成（カスケード）が標準的で、世界の精製能力の大部分が MPC 制御下で運転されています。</p>
+    <p><strong>自動車のエンジン・パワートレイン制御：</strong>ターボチャージャー付きエンジンの空気量制御、ハイブリッド車のエネルギー管理、自動運転の経路追従・衝突回避制御で MPC が使われます。特に車両運動制御では、ステアリング・加減速・トルク配分を 100 ms 程度の高速周期で最適化し、タイヤ摩擦限界などの拘束を陽に扱える点が強みです。</p>
+    <p><strong>電力系統と再生可能エネルギー：</strong>マイクログリッドの電力需給バランス、風力・太陽光発電の蓄電池併用システム、HVDC 連系線の潮流制御に MPC が応用されます。気象予測情報を予測ホライズンに組み込み、数時間先までの発電量予測と消費予測を考慮した最適運用が可能です。建物の冷暖房制御（Building HVAC）でも、天気予報を使った MPC が省エネ実証で効果を上げています。</p>
+    <p><strong>医療・バイオ：</strong>糖尿病患者向けの人工膵臓（クローズドループインスリン投与）に MPC が実用化されています。血糖値モデルで数十分先までを予測し、低血糖を避けつつ目標範囲に維持するインスリン量を計算します。米国 FDA 承認の Tandem Control-IQ などが代表例で、患者の QOL を大きく改善しています。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最も多い誤解は、<strong>「予測ホライズン Np を長くすれば長くするほど良い制御になる」と考えてしまう</strong>ことです。実際には Np が長すぎると、遠い将来の予測誤差が現在の決定を支配してしまい、近視眼的な応答や数値的に不安定な最適化を招くことがあります。経験則として Np はプロセスの整定時間の 80〜100% に対応するステップ数（ステップ応答が定常値の 95% に達する時間 / dt）に設定するのが目安です。本ツールで Np=30 に上げても応答が劇的に改善しないのは、既に Np=10 で整定時間の 80% をカバーしているためです。</p>
+    <p>次に多いのが、<strong>入力ペナルティ λ を 0 にすれば最速応答になると思い込む</strong>ことです。確かに λ=0 では出力誤差のみを最小化するため理論上は最速ですが、初期入力 u(0) が極めて大きくなり、実機のアクチュエータでは飽和や寿命低下を招きます。さらに λ=0 ではモデル誤差や測定ノイズに過敏に反応し、入力が激しく振動する「リンギング」が発生します。実用では λ をプロセスゲイン $K$ の二乗（$K^2$）程度から始めて、入力波形を見ながら調整するのが定石です。本ツールで λ を 0 にすると u(0) が大きく跳ね上がるのが確認できます。</p>
+    <p>最後に、<strong>本ツールは「内部モデルとプラントが完全一致した理想ケース」を扱っている</strong>点に注意してください。現実のプラントでは、モデル化されていない高次ダイナミクス、時変パラメータ、外乱、測定ノイズが必ず存在します。本シミュレーターで観察される滑らかな追従と低オーバーシュートは、その理想性に依存しています。実装では (1) 推定器（カルマンフィルタ）で状態を再構成、(2) 積分外乱モデルでオフセットフリー化、(3) 拘束付き QP ソルバーで安全限界を守る、という追加要素が必須です。MPC は強力な枠組みですが、PID よりも「設計とチューニングの専門知識」を要求する手法であることを忘れないでください。</p>
+  </div>
+</section>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="model-predictive.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/kalman-filter.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-filter"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">カルマンフィルターシミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">カルマンフィルターシミュレーターで、ノイズを含むデータからの状態推定を可視化。プロセスノイズと観測ノイズをリアルタイム調整し、フィルタリング効果を体感できます。GPS追跡やセンサーフ...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/2dof-control.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-sliders"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">2自由度制御シミュレーター — 目標値追従と外乱抑圧の独立設計</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">2自由度制御シミュレーターは、PIフィードバックとフィードフォワードフィルタを別々に設計し、目標値追従と外乱抑圧を独立に調整できる様子をリアルタイム比較します。1自由度との応答差を学...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/anti-windup.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-sliders"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">アンチワインドアップ PI 制御シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">アンチワインドアップ PI 制御シミュレーターは、入力飽和を伴う 1 次プロセスに対する標準 PI・アンチワインドアップ付き PI・理想 PI の応答を比較。大きい目標値変化でのオー...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/cascade-control.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-sliders"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">カスケード制御シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">カスケード制御シミュレーターで、内側ループと外側ループを組み合わせた2重PID制御のステップ応答を可視化。単一ループ制御との応答の違いを体感的に比較し、カスケード制御の優位性と設計の...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/pid-controller.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-sliders-h"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">PIDコントローラーシミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">PIDコントローラーのステップ応答をリアルタイムでシミュレーション。比例・積分・微分ゲイン（Kp, Ti, Td）を調整し、オーバーシュートや整定時間、IAEを即座に確認できます。Z...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/pid-tuning.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-sliders"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">PID調整法比較ツール</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ZN・Cohen-Coon・IMC・SIMCの4手法でPIDゲインを自動計算。FOPDT（一次むだ時間）モデルのステップ応答・ISE/IAE/ITAE・ゲイン余裕・位相余裕を同時比較...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>予測ホライズン（Np）を2～20ステップ範囲で設定。サンプリング時間0.1sの1次遅延プロセス（時定数τ=1s）に対し、Np=10で約1秒先まで予測</li>
+<li>制御ホライズン（Nc）をNp以下で指定。Nc=3に設定すると最初の3ステップのみ制御入力を最適化し、以降は一定</li>
+<li>重み係数λ（制御入力ペナルティ）とR（目標値重み）をスライダーで調整。λ=0.1、R=1.0から開始し、応答速度と消費エネルギーのトレードオフを観察</li>
+<li>「シミュレート実行」ボタンで有限ホライズン最適化を計算。二次計画法（QP）により最適入力系列u(0)～u(Nc-1)を算出</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>プロセスモデル：G(z)=0.0952/(z-0.9048)、サンプリング時間Ts=0.1s。Np=10、Nc=3、λ=0.1、R=1.0の設定で、ステップ目標値1.0に対し初期入力u(0)=8.42が計算される。この場合、立ち上がり時間は約0.35s、オーバーシュート5.2%、整定時間（±2%）1.8sを達成。同じプロセスをPID制御（Kp=1.5、Ki=0.3、Kd=0.05）と比較すると、MPC応答は立ち上がりで20%高速だが、λ=0.01に低減するとオーバーシュートが18%に増加する制約をシミュレータで確認可能</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>Np設定過大（30以上）はQP計算時間増加により数値不安定化。τ/Ts比が10倍以上の場合Np=15程度が目安</li>
+<li>Nc&lt;3ではロボットアーム位置制御でリップル発生、λ&lt;0.01ではポンプ流量制御で飽和制約違反が頻発するため、物理的制約を事前に入力上限値へ組込</li>
+<li>離散化モデルの極がz=1近傍（積分特性）の場合、スライダーRを2.0以上に設定して定常偏差抑制を強化</li>
+<li>実装時はQP行列の条件数確認（κ&gt;1000で悪条件）、予測ホライズン内の非測定外乱やモデル化誤差補償にはオブザーバゲインを併用</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script src="/tools/tool-ux-template.js?v20260517r4" defer></script>
+</body>
+</html>

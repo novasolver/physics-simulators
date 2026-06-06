@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sobol 感度指標 (S₁/S_T) シミュレーター — 大域感度解析 | NovaSolver</title>
+<meta name="description" content="ANOVA分解に基づく Sobol 感度指標（1次 S_i・全 S_Ti・相互作用 S_ij）をリアルタイム計算。f = a₁X₁ + a₂X₂ + a₃X₁X₂ の解析モデルで、入力分散と相互作用係数を変えて寄与率の構造を直感的に学べる UQ 教材ツール。">
+<link rel="canonical" href="https://novasolver.jp/tools/sobol-sensitivity-indices.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/sobol-sensitivity-indices.html">
+<meta property="og:title" content="Sobol 感度指標シミュレーター — 大域感度解析 (S₁・S_T・S₁₂) | NovaSolver Project">
+<meta property="og:description" content="Sobol 1次・全・相互作用指標を解析式で可視化。CFD・FEM・ML モデルの入力スクリーニングと次元削減に使える UQ の標準手法を体験できる無料ツール。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Sobol sensitivity indices simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/sobol-sensitivity-indices.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/sobol-sensitivity-indices.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/sobol-sensitivity-indices.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/sobol-sensitivity-indices.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#sobolCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Sobol 感度指標シミュレーター",
+      "description": "ANOVA分解に基づく Sobol 感度指標（1次 S_i・全 S_Ti・相互作用 S_ij）をリアルタイム計算。f = a₁X₁ + a₂X₂ + a₃X₁X₂ の解析モデルで、入力分散と相互作用係数を変えて寄与率の構造を直感的に学べる UQ 教材ツール。",
+      "url": "https://novasolver.jp/tools/sobol-sensitivity-indices.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Uncertainty Quantification",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["1次 Sobol 指標 S_i の解析計算","全 Sobol 指標 S_Ti の解析計算","相互作用指標 S_ij の寄与可視化","入力分散 σ² と相互作用係数 a₃ の感度比較","ANOVA 分散分解の積み上げ棒グラフ"],
+      "keywords": "Sobol 感度指標,大域感度解析,GSA,ANOVA分解,不確かさ定量化,UQ,分散分解,相互作用,スクリーニング",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Sobol 1次指標 S_i と全指標 S_Ti は何が違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "1次指標 S_i は「入力 X_i 単独」の主効果による分散寄与率で、S_i = V_i/Var[Y] です。全指標 S_Ti は X_i を含む全ての項（主効果＋全ての相互作用）の寄与率で、S_Ti = S_i + Σ_{j≠i} S_{ij} + … になります。両者の差 S_Ti − S_i が「X_i が他の入力とどれだけ絡んで効いているか」の指標で、これが大きい入力は単独で固定しても出力分散が思ったほど減らない、という診断に使えます。"}
+        },{
+          "@type": "Question",
+          "name": "なぜ Morris や PCC ではなく Sobol を使うべきなのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Morris法（要素的初等効果）や偏相関係数 PCC・標準化回帰係数 SRC は計算が速い反面、入力分布の局所での感度しか見ません。出力が非線形・非加法的な場合、これらの局所指標は誤った順位を返すことがあります。Sobol は「入力の確率分布全体」を考慮した大域感度解析（GSA）で、加法性も線形性も仮定しません。代わりに収束には N×(d+2) 程度の評価が必要（Saltelli推定）でコストが高いため、まず Morris でスクリーニングし、絞った数本に Sobol を当てる、という二段構えが実務的です。"}
+        },{
+          "@type": "Question",
+          "name": "Sobol 指標を計算するには何回モデルを評価する必要がありますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Saltelli 法では、入力次元 d と基底サンプル数 N に対して合計 N×(d+2) 回の評価で S_i と S_Ti を両方とも推定できます（拡張型は N×(2d+2)）。例えば d=5、N=1024 なら約 7,000 回のモデル評価が必要です。CFD/FEM など 1 回数十分かかる解析では、サロゲートモデル（クリギング・PCE・ニューラルネット）を先に学習し、その上で Sobol を回すのが定石です。本ツールのように解析式が分かっていれば閉形式で正確な値が出ますが、現実のモデルではほぼ常にサンプリング法を使います。"}
+        },{
+          "@type": "Question",
+          "name": "S_T が小さい入力はモデルから削っても問題ありませんか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "S_Ti ≈ 0 の入力は出力分散にほぼ寄与しないので、UQ の範囲内では「固定値に置き換えてもよい入力」と判断できます。これが Sobol の代表的な用途である「次元削減」と「スクリーニング」です。ただし注意点が2つあります。第一に、削るのは「現在の入力分布の範囲内」での話で、分布範囲を広げると寄与が復活する可能性があること。第二に、S_T は分散ベースの指標なので、出力の平均値（バイアス）には影響する入力を見落とすこと。安全率や設計許容値など平均値が重要な量には、別途感度を確認してください。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "Sobol 感度指標シミュレーター", "item": "https://novasolver.jp/tools/sobol-sensitivity-indices.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">Sobol 感度指標シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/sobol-sensitivity-indices.html" class="active">JA</a>
+      <a href="/en/tools/sobol-sensitivity-indices.html">EN</a>
+      <a href="/zh/tools/sobol-sensitivity-indices.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-chart-pie"></i> 不確かさ定量化 (UQ)</div>
+    <h1>Sobol 感度指標 (S₁/S_T) シミュレーター</h1>
+    <p class="hero-sub">入力の不確かさが出力分散にどう効くかを「主効果」と「相互作用」に分解して見える化する大域感度解析ツールです。解析モデル f = a₁X₁ + a₂X₂ + a₃X₁X₂ で、係数と分散をスライダーで変えながら 1次 Sobol 指標 S_i、全 Sobol 指標 S_Ti、相互作用 S_ij の寄与率をリアルタイムに比較できます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">a₁ (X₁線形係数)</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="a1Num" value="3.0" min="-10" max="10" step="0.1" oninput="syncFromNum('a1Coeff','a1Num')"></div>
+      </div>
+      <div class="param-desc">X₁ の主効果の強さ。0 にすると X₁ の主効果は消える</div>
+      <input type="range" id="a1Coeff" min="-10" max="10" step="0.1" value="3.0" oninput="syncToNum('a1Coeff','a1Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">a₂ (X₂線形係数)</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="a2Num" value="2.0" min="-10" max="10" step="0.1" oninput="syncFromNum('a2Coeff','a2Num')"></div>
+      </div>
+      <div class="param-desc">X₂ の主効果の強さ</div>
+      <input type="range" id="a2Coeff" min="-10" max="10" step="0.1" value="2.0" oninput="syncToNum('a2Coeff','a2Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">a₃ (X₁X₂相互作用係数)</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="a3Num" value="1.0" min="-10" max="10" step="0.1" oninput="syncFromNum('a3Coeff','a3Num')"></div>
+      </div>
+      <div class="param-desc">交互作用項の強さ。0 で加法モデルになり S_T = S が成立</div>
+      <input type="range" id="a3Coeff" min="-10" max="10" step="0.1" value="1.0" oninput="syncToNum('a3Coeff','a3Num');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">X₁の分散 σ₁²</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="varX1Num" value="1.0" min="0.01" max="10" step="0.01" oninput="syncFromNum('varX1','varX1Num')"></div>
+      </div>
+      <div class="param-desc">X₁ の不確かさ（平均 0 を仮定）</div>
+      <input type="range" id="varX1" min="0.01" max="10" step="0.01" value="1.0" oninput="syncToNum('varX1','varX1Num');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">X₂の分散 σ₂²</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="varX2Num" value="1.0" min="0.01" max="10" step="0.01" oninput="syncFromNum('varX2','varX2Num')"></div>
+      </div>
+      <div class="param-desc">X₂ の不確かさ（平均 0 を仮定、X₁と独立）</div>
+      <input type="range" id="varX2" min="0.01" max="10" step="0.01" value="1.0" oninput="syncToNum('varX2','varX2Num');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statVar">—</div><div class="sl">全分散 Var[Y]</div></div>
+        <div class="stat-card"><div class="sv" id="statS1">—</div><div class="sl">1次 Sobol S₁</div></div>
+        <div class="stat-card"><div class="sv" id="statS2">—</div><div class="sl">1次 Sobol S₂</div></div>
+        <div class="stat-card"><div class="sv" id="statST1">—</div><div class="sl">全 Sobol S_T₁</div></div>
+        <div class="stat-card"><div class="sv" id="statST2">—</div><div class="sl">全 Sobol S_T₂</div></div>
+        <div class="stat-card"><div class="sv" id="statS12">—</div><div class="sl">相互作用 S₁₂ (%)</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-project-diagram"></i> ANOVA 分解の可視化 — 入力分布から出力分散へ</div>
+      <canvas id="sobolCanvas"></canvas>
+      <p class="canvas-hint">X₁ と X₂ の入力分布から f(X) の出力分布が生まれ、その分散が V₁・V₂・V₁₂ の3成分に分解されます。色の幅が各寄与の大きさ（S_i）を表します。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-bar"></i> 寄与率の積み上げ棒 — V₁ / V₂ / V₁₂</div>
+      <canvas class="ux-chartjs-canvas" id="contribChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 相互作用係数 a₃ に対する全指標 S_T₁ の変化</div>
+      <canvas class="ux-chartjs-canvas" id="sweepChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$Var[Y] = \sum_i V_i + \sum_{i\lt j} V_{ij} + \cdots,\quad S_i = \frac{V_i}{Var[Y]},\quad S_{Ti} = S_i + \sum_{j\neq i} S_{ij} + \cdots$$</p>
+      <p style="margin-top:6px;">ANOVA分解で全分散を主効果 V_i と交互作用 V_{ij} に分解する。1次指標 S_i と全指標 S_Ti の差が、入力 i が他の入力と絡んで効く「交互作用の重要度」を示す。</p>
+      <p style="margin-top:10px;">$$f(X_1,X_2) = a_1 X_1 + a_2 X_2 + a_3 X_1 X_2,\quad V_1 = a_1^2\sigma_1^2,\; V_2 = a_2^2\sigma_2^2,\; V_{12} = a_3^2\sigma_1^2\sigma_2^2$$</p>
+      <p style="margin-top:6px;">独立な X₁・X₂（平均 0）に対しては各成分が閉形式で求まる。a₃ = 0 のとき加法モデルとなり S_T = S が成立する。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>Sobol感度指標と大域感度解析</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「感度解析」って、入力を少し動かして出力がどれだけ変わるか見るやつですよね？それと「Sobol 指標」って何が違うんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いいところを突くね。学部で習う感度って ∂f/∂x をある点で計算する「局所感度」がほとんどなんだけど、Sobol はそれと別物で「大域感度解析（GSA）」と呼ばれる流派なんだ。入力 X_i を確率変数とみなして、その分布全体を回したときに出力 Y の分散がどれだけ X_i のせいで動いているか、を寄与率（0〜1）で答える。だから出力が非線形・非加法的でも正確に効き目を比べられる。CFD や気候モデルみたいに動作点が広範囲なものでは、これがほぼ標準だね。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">右下の「1次 S₁」と「全 S_T₁」って、似てるけど別の値が出てますね。デフォルトだと S₁=0.643 で S_T₁=0.714。この差は何ですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そこが Sobol の一番面白いところ。1次 S_i は「X_i 単独で固定したときに出力分散がどれだけ減るか」、つまり主効果だけの寄与率。全 S_Ti は「X_i 以外を全部固定したときに残る分散の割合」、つまり主効果＋他の入力との交互作用を全部含めた寄与率なんだ。差 S_T₁ − S₁ = 0.071 がちょうど「X₁ が X₂ と絡んで効いている量」で、これがゼロなら加法モデル、ゼロでなければ非加法。スライダーの a₃ を 0 にすると S₁ と S_T₁ が一致するのが見えるよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど！じゃあ、相互作用係数 a₃ を大きくすると、S_T₁ がどんどん大きくなる…ってことですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう。下の「a₃ に対する S_T₁ の変化」グラフを見ると、|a₃| を増やすほど S_T₁ が 1 に近づくのが分かる。物理的には「X₁ の効きが X₂ の値次第で変わる」状況。例えば翼の揚力係数を「迎角×マッハ数」の関数で考えると、迎角の効きはマッハ数によって全然違うよね。そういう場面では、S₁ だけ見て「迎角は中くらい重要」と判断するとミスリードで、S_T を見て初めて「本当の重要度」が分かるんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">実際の CFD や FEM では、こんなにキレイな解析式は無いと思うんですが、どうやって Sobol を計算してるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">サンプリングだね。Saltelli の推定法というのが標準で、入力次元 d に対し N×(d+2) 回モデルを評価して S_i と S_Ti を一気に出す。例えば d=10、N=1024 なら約 12,000 回。CFD で 1 ケース 1 時間なら 500 日コース…なので、実務では先に「サロゲートモデル」（クリギング・PCE・NN）を作って、安いその上で Sobol を回す。さらに、まず Morris の初等効果でスクリーニングして S_T が大きそうな数本に絞る、という二段構えがコスパ的に主流だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">S_T が小さい入力は、もうモデルから消しちゃっていいんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">基本的にはイエスで、それが「次元削減」と呼ばれる Sobol のもう一つの主用途。S_Ti ≈ 0 なら出力分散にほぼ効かないので、平均値で固定してパラメータ数を減らせる。ただし2点だけ注意。まず「今の入力分布範囲内」での話なので、レンジを広げると寄与が復活することがある。もう一つ、Sobol は分散ベースなので「平均値（バイアス）には効くけど分散には効かない」入力を見落とす。安全率や設計余裕みたいに「平均がどこにあるか」が大事な量には、別途感度を見ること。これ忘れて「S_T 小さいから無視」とやって痛い目を見るチーム、けっこう多いよ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Sobol 1次指標 S_i と全指標 S_Ti は何が違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">1次指標 S_i は「入力 X_i 単独」の主効果による分散寄与率で、S_i = V_i/Var[Y] です。全指標 S_Ti は X_i を含む全ての項（主効果＋全ての相互作用）の寄与率で、S_Ti = S_i + Σ_{j≠i} S_{ij} + … になります。両者の差 S_Ti − S_i が「X_i が他の入力とどれだけ絡んで効いているか」の指標で、これが大きい入力は単独で固定しても出力分散が思ったほど減らない、という診断に使えます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">なぜ Morris や PCC ではなく Sobol を使うべきなのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">Morris法（要素的初等効果）や偏相関係数 PCC・標準化回帰係数 SRC は計算が速い反面、入力分布の局所での感度しか見ません。出力が非線形・非加法的な場合、これらの局所指標は誤った順位を返すことがあります。Sobol は「入力の確率分布全体」を考慮した大域感度解析（GSA）で、加法性も線形性も仮定しません。代わりに収束には N×(d+2) 程度の評価が必要（Saltelli推定）でコストが高いため、まず Morris でスクリーニングし、絞った数本に Sobol を当てる、という二段構えが実務的です。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">Sobol 指標を計算するには何回モデルを評価する必要がありますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">Saltelli 法では、入力次元 d と基底サンプル数 N に対して合計 N×(d+2) 回の評価で S_i と S_Ti を両方とも推定できます（拡張型は N×(2d+2)）。例えば d=5、N=1024 なら約 7,000 回のモデル評価が必要です。CFD/FEM など 1 回数十分かかる解析では、サロゲートモデル（クリギング・PCE・ニューラルネット）を先に学習し、その上で Sobol を回すのが定石です。本ツールのように解析式が分かっていれば閉形式で正確な値が出ますが、現実のモデルではほぼ常にサンプリング法を使います。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">S_T が小さい入力はモデルから削っても問題ありませんか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">S_Ti ≈ 0 の入力は出力分散にほぼ寄与しないので、UQ の範囲内では「固定値に置き換えてもよい入力」と判断できます。これが Sobol の代表的な用途である「次元削減」と「スクリーニング」です。ただし注意点が2つあります。第一に、削るのは「現在の入力分布の範囲内」での話で、分布範囲を広げると寄与が復活する可能性があること。第二に、S_T は分散ベースの指標なので、出力の平均値（バイアス）には影響する入力を見落とすこと。安全率や設計許容値など平均値が重要な量には、別途感度を確認してください。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>CFD 設計最適化：</strong>翼型まわりの抗力係数 C_D を出力にして、迎角・マッハ数・レイノルズ数・乱流モデル定数など 10〜30 個の入力で Sobol を回すと、設計に対する真の支配パラメータが分かります。「マッハ数の S_T₁ が 0.7」など定量的な順位が出るので、設計空間の絞り込みやサロゲート学習サンプリングの優先度付けに直結します。OpenFOAM + Dakota や SU2 + UQpy の組み合わせが典型例です。</p>
+    <p><strong>FEM 構造解析の許容設計：</strong>材料定数（ヤング率・降伏応力・密度）と形状寸法（厚さ・R 形状）のばらつきが、最大応力や固有振動数の分散にどう寄与するかを Sobol で評価します。S_T が突出した入力は許容公差を厳しくする、S_T がほぼ 0 の入力は規格上限まで緩めてコストを下げる、といった設計判断ができます。航空・自動車の認証文書でも UQ レポートが要求されつつあります。</p>
+    <p><strong>気候・環境モデル：</strong>大気循環モデル GCM では数百のパラメタライゼーション定数があり、雲量や気温感度（ECS）の不確かさのどれが何由来かを解きほぐすのに Sobol が標準ツール。IPCC 報告書の不確かさ評価でも分散分解の考え方が使われています。1 回数時間〜数日のモデルを直接 Sobol するのは無理なので、PCE（多項式カオス展開）でサロゲートを作り、その上で計算するのが主流です。</p>
+    <p><strong>機械学習モデルの説明性：</strong>近年は ML モデル（NN、勾配ブースティング）の特徴量重要度を SHAP の代わりに Sobol で算出する研究が増えています。SHAP がローカルな寄与に強いのに対し、Sobol は入力分布全体での寄与を見るので、データセット全体の挙動を要約するのに向いています。バイオ・医療・金融の規制対応で「説明可能 AI」の根拠として採用されはじめています。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の落とし穴が、<strong>「入力どうしが相関している場合の S_i・S_Ti の解釈」</strong>です。本ツールも標準 Sobol も「入力は互いに独立」を前提にしています。実務では「降水量と気温」のように相関する入力が普通で、独立を仮定したまま Sobol を回すと、相関する入力どうしで寄与を奪い合って解釈不能な順位になります。対策としては相関込みの拡張版（Kucherenko の方法、Mara &amp; Tarantola の Shapley 効果）を使うか、PCA で無相関な主成分に変換してから感度解析するのが定石です。「とりあえず Sobol を回した」結果を、入力の独立性を確認せずに信じてはいけません。</p>
+    <p>次に、<strong>「サンプリングのコンバージェンスを見ない」</strong>こと。Saltelli 推定は N→∞ で真値に収束しますが、有限 N では推定誤差があり、特に S_T はバイアスが残りやすい。N=128 で出した S_T₁=0.3 が、N=4096 に増やすと S_T₁=0.6 だった、というのは普通に起きます。実務では N を 2 倍ずつ増やして S_i・S_Ti が安定するまで監視する、ブートストラップで信頼区間を出す、という当たり前のチェックが必要です。学会発表のスライドで S_T の数字だけ並んでいて、収束プロットと信頼区間がない論文は、まず信用しないこと。</p>
+    <p>最後に、<strong>「Sobol だけで設計を決める」</strong>こと。Sobol は分散ベースなので、出力分布の「形」全体ではなく「広がり」しか見ません。例えば「大半は安全だが、ごく稀に壊滅的に大きな値が出る」分布（ヘビーテール）では、Sobol で順位の低い入力が実はテールリスクの主因、ということが起こります。重要度の評価軸は分散だけでなく、平均、テール確率（VaR/CVaR）、特定閾値超過確率など複数あり、それぞれ別の感度指標（モーメント独立指標 δ_i、PAWN、Borgonovo の δ）を併用するのが UQ の現代的なお作法です。Sobol を「全能の感度ツール」と思い込まないこと。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>左側のパネルで f = a₁X₁ + a₂X₂ + a₃X₁X₂ の各係数（a₁、a₂、a₃）を入力します。例えば鋼製フレーム解析では a₁=150、a₂=80、a₃=5 のように設定します。</li>
+<li>X₁とX₂の入力分散（varX1、varX2）を指定します。Var[X₁]=0.25、Var[X₂]=0.16 など均一分布の範囲から決定します。</li>
+<li>シミュレータが ANOVA 分解に基づき全分散 Var[Y]、1次感度指標 S₁・S₂、全感度指標 S_T₁・S_T₂、相互作用項 S₁₂ をリアルタイム計算し、各寄与率（%）を表示します。</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>熱伝導パネルの熱流束 Y = 120X₁ + 95X₂ + 3X₁X₂ を想定（X₁:温度差、X₂:面積）。Var[X₁]=0.04、Var[X₂]=0.09 のとき、全分散 Var[Y]=576（W²）、S₁≈83.3%（X₁単独寄与）、S₂≈15.6%（X₂単独寄与）、S₁₂≈1.1%（相互作用）となります。S_T₁≈84.4% と S₁ の差異は高次相互作用を示唆しています。</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>相互作用係数 a₃ が大きい場合（機械的クリアランスとはめあい公差など），S_T₁ と S₁ の乖離が顕著になります。単独効果だけでなく全感度で制御対象を選定してください。</li>
+<li>入力分散の非対称性（例：Var[X₁]=0.01、Var[X₂]=0.49）は感度ランキングを大きく変化させます。実験計画時に設計領域の不確実性を正確に反映させることが重要です。</li>
+<li>S_Tᵢ &lt; 0.05 の入力パラメータは低感度として固定値化することで計算コストを削減できます。航空機構造設計の Monte Carlo サンプリング削減に有効です。</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// shared state for the canvas animation
+const SOB = {S1:0, S2:0, S12:0, Vtotal:0, a1:3, a2:2, a3:1, v1:1, v2:1};
+
+// ===== Chart.js setup =====
+const contribChart = new Chart(document.getElementById('contribChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['V1','V2','V12'],datasets:[
+    {label:'Variance contribution', data:[0,0,0], backgroundColor:['rgba(0,123,255,0.78)','rgba(0,184,148,0.78)','rgba(225,112,85,0.85)'], borderColor:['#007BFF','#00b894','#e17055'], borderWidth:1}
+  ]},
+  options:{
+    animation:false, responsive:true, maintainAspectRatio:false,resizeDelay:100, aspectRatio:2,
+    // Keep a numeric y-axis open even when there is one stacked category.
+    scales:{
+      x:{title:{display:true, text:'Variance term', font:{size:11}}, ticks:{font:{size:11}}},
+      y:{title:{display:true, text:'Variance contribution V_i', font:{size:11}}, beginAtZero:true, suggestedMin:0, suggestedMax:1, ticks:{font:{size:11}}}
+    },
+    plugins:{legend:{display:true, labels:{font:{size:10}, boxWidth:14, color:'#6c757d'}}}
+  }
+});
+
+const sweepChart = new Chart(document.getElementById('sweepChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'S_T₁(a₃)', data:[], borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,.13)', fill:true, borderWidth:2, pointRadius:0, tension:0.2},
+    {label:'S₁(a₃) — 主効果のみ', data:[], borderColor:'#00b894', borderDash:[6,4], borderWidth:2, pointRadius:0, fill:false},
+    {label:'現在の a₃', data:[], borderColor:'#e17055', backgroundColor:'#e17055', showLine:false, pointRadius:6, pointHoverRadius:7}
+  ]},
+  options:{
+    animation:false, responsive:true, maintainAspectRatio:false,resizeDelay:100, aspectRatio:2,
+    scales:{
+      x:{title:{display:true, text:'相互作用係数 a₃', font:{size:11}}, ticks:{maxTicksLimit:8}},
+      y:{title:{display:true, text:'感度指標 (0〜1)', font:{size:11}}, beginAtZero:true, max:1}
+    },
+    plugins:{legend:{display:true, labels:{font:{size:10}, boxWidth:18, color:'#6c757d'}}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const a1Coeff = parseFloat(document.getElementById('a1Coeff').value);
+  const a2Coeff = parseFloat(document.getElementById('a2Coeff').value);
+  const a3Coeff = parseFloat(document.getElementById('a3Coeff').value);
+  const varX1   = parseFloat(document.getElementById('varX1').value);
+  const varX2   = parseFloat(document.getElementById('varX2').value);
+
+  // ---- analytic Sobol for f = a1*X1 + a2*X2 + a3*X1*X2, X1⊥X2, mean 0 ----
+  const V1  = a1Coeff*a1Coeff*varX1;
+  const V2  = a2Coeff*a2Coeff*varX2;
+  const V12 = a3Coeff*a3Coeff*varX1*varX2;
+  const Vtotal = V1 + V2 + V12;
+
+  const S1  = Vtotal>0 ? V1/Vtotal  : 0;
+  const S2  = Vtotal>0 ? V2/Vtotal  : 0;
+  const S12 = Vtotal>0 ? V12/Vtotal : 0;
+  const ST1 = S1 + S12;
+  const ST2 = S2 + S12;
+  const interactionStrength = S12*100;     // %
+
+  // ---- stat cards ----
+  document.getElementById('statVar').textContent  = Vtotal.toFixed(3);
+  document.getElementById('statS1').textContent   = S1.toFixed(3);
+  document.getElementById('statS2').textContent   = S2.toFixed(3);
+  document.getElementById('statST1').textContent  = ST1.toFixed(3);
+  document.getElementById('statST2').textContent  = ST2.toFixed(3);
+  document.getElementById('statS12').textContent  = interactionStrength.toFixed(1);
+
+  // ---- verdict ----
+  const v = document.getElementById('verdict');
+  v.className = 'verdict ok';
+  let dominant = '';
+  if(ST1 > ST2 + 0.05)      dominant = 'X₁ が支配的（S_T₁ '+ST1.toFixed(3)+' > S_T₂ '+ST2.toFixed(3)+'）';
+  else if(ST2 > ST1 + 0.05) dominant = 'X₂ が支配的（S_T₂ '+ST2.toFixed(3)+' > S_T₁ '+ST1.toFixed(3)+'）';
+  else                      dominant = 'X₁ と X₂ がほぼ同等の寄与';
+  let inter = '';
+  if(interactionStrength < 1)       inter = '加法モデル（相互作用なし）';
+  else if(interactionStrength < 15) inter = '弱い相互作用';
+  else if(interactionStrength < 40) inter = '中程度の相互作用';
+  else                              inter = '強い相互作用（非加法）';
+  v.innerHTML = '<i class="fas fa-check-circle"></i> '+dominant+'。'+inter+'（S₁₂ = '+interactionStrength.toFixed(1)+'%）。';
+
+  // ---- contribution bar chart ----
+  contribChart.data.datasets[0].data = [V1, V2, V12];
+  contribChart.options.scales.y.suggestedMax = Math.max(1, Vtotal * 1.1);
+  contribChart.update('none');
+
+  // ---- sweep chart: S_T1 vs a3 ----
+  const sLabels=[], sST1=[], sS1=[], sMarker=[];
+  const a3min=-10, a3max=10, N=41;
+  let nearest=0, best=1e9;
+  for(let i=0;i<N;i++){
+    const a3 = a3min + (a3max-a3min)*i/(N-1);
+    const v12 = a3*a3*varX1*varX2;
+    const v1  = a1Coeff*a1Coeff*varX1;
+    const v2  = a2Coeff*a2Coeff*varX2;
+    const vt  = v1 + v2 + v12;
+    const s1  = vt>0 ? v1/vt  : 0;
+    const s12 = vt>0 ? v12/vt : 0;
+    sLabels.push(a3.toFixed(1));
+    sST1.push(s1 + s12);
+    sS1.push(s1);
+    sMarker.push(null);
+    const d = Math.abs(a3 - a3Coeff);
+    if(d < best){ best = d; nearest = i; }
+  }
+  sMarker[nearest] = ST1;
+  sweepChart.data.labels = sLabels;
+  sweepChart.data.datasets[0].data = sST1;
+  sweepChart.data.datasets[1].data = sS1;
+  sweepChart.data.datasets[2].data = sMarker;
+  sweepChart.update('none');
+
+  // ---- update shared state for canvas animation ----
+  SOB.S1 = S1; SOB.S2 = S2; SOB.S12 = S12;
+  SOB.Vtotal = Vtotal;
+  SOB.a1 = a1Coeff; SOB.a2 = a2Coeff; SOB.a3 = a3Coeff;
+  SOB.v1 = varX1; SOB.v2 = varX2;
+}
+
+// ===== ANOVA-decomposition canvas animation =====
+(function(){
+  const cv  = document.getElementById('sobolCanvas');
+  const ctx = cv.getContext('2d');
+  let t = 0;
+  // pseudo-samples for the flowing dots
+  const NSAMP = 32;
+  const samples = [];
+  for(let i=0;i<NSAMP;i++) samples.push({phase: i/NSAMP, kind: i%3});
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function bell(x, mu, sig){
+    return Math.exp(-((x-mu)*(x-mu))/(2*sig*sig));
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    // ----- left: input distributions X1, X2 -----
+    const padL = 16, padR = 16;
+    const colW = (W - padL - padR) / 3;
+    const colCx = [padL + colW*0.5, padL + colW*1.5, padL + colW*2.5];
+    const headY = 22;
+    const baseY = H - 30;
+
+    ctx.font = '11px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(200,225,245,.85)';
+    ctx.fillText('入力分布', colCx[0], headY);
+    ctx.fillText('モデル f(X₁,X₂)', colCx[1], headY);
+    ctx.fillText('出力分散の分解', colCx[2], headY);
+
+    // X1 / X2 normal density curves stacked
+    const distH = 70;
+    const distTop1 = 42;
+    const distTop2 = 42 + distH + 14;
+    function drawDist(cx, top, sigma, color, label){
+      const w = colW*0.78;
+      const x0 = cx - w/2;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color + '33';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for(let i=0;i<=40;i++){
+        const xx = -3 + 6*i/40;
+        const px = x0 + (xx+3)/6 * w;
+        const py = top + distH - bell(xx,0,sigma)*distH*0.92;
+        i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+      }
+      ctx.lineTo(x0+w, top+distH);
+      ctx.lineTo(x0, top+distH);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = 'bold 10px Roboto Mono, monospace';
+      ctx.textAlign='left';
+      ctx.fillText(label, x0+2, top-2);
+    }
+    const s1 = Math.max(0.45, Math.min(2.6, Math.sqrt(SOB.v1)));
+    const s2 = Math.max(0.45, Math.min(2.6, Math.sqrt(SOB.v2)));
+    drawDist(colCx[0], distTop1, s1, '#007BFF', 'X₁ ~ N(0,σ₁²)');
+    drawDist(colCx[0], distTop2, s2, '#00b894', 'X₂ ~ N(0,σ₂²)');
+
+    // ----- middle: model node -----
+    const mx = colCx[1], my = (distTop1 + distTop2 + distH)/2 + 6;
+    ctx.strokeStyle = 'rgba(255,255,255,.45)';
+    ctx.fillStyle  = 'rgba(0,180,216,.15)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(mx, my, 30, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px Roboto Mono, monospace';
+    ctx.textAlign='center';
+    ctx.fillText('f(X)', mx, my+4);
+
+    // ----- flowing sample dots from inputs -> model -> output -----
+    t += 0.008;
+    for(let i=0;i<NSAMP;i++){
+      const sp = samples[i];
+      const ph = (sp.phase + t) % 1;
+      const src = sp.kind===0 ? {x:colCx[0], y:distTop1+distH/2, col:'#007BFF'}
+                : sp.kind===1 ? {x:colCx[0], y:distTop2+distH/2, col:'#00b894'}
+                              : {x:colCx[0], y:(distTop1+distTop2+distH)/2, col:'#e17055'};
+      let x, y;
+      if(ph<0.5){
+        const u = ph/0.5;
+        x = src.x + (mx-src.x)*u;
+        y = src.y + (my-src.y)*u;
+      }else{
+        const u = (ph-0.5)/0.5;
+        x = mx + (colCx[2]-mx)*u;
+        y = my + ((H/2)-my)*u + Math.sin(u*Math.PI)*8;
+      }
+      ctx.fillStyle = src.col;
+      ctx.globalAlpha = 0.65;
+      ctx.beginPath(); ctx.arc(x,y,2.2,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // ----- right: stacked variance bar (V1 / V2 / V12) -----
+    const barX = colCx[2] - colW*0.30;
+    const barW = colW*0.6;
+    const barTop = 50;
+    const barBot = baseY - 10;
+    const barH = barBot - barTop;
+    // outer frame
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.strokeRect(barX, barTop, barW, barH);
+    // fractions
+    const f1  = SOB.S1, f2 = SOB.S2, f12 = SOB.S12;
+    const h1  = barH * f1;
+    const h2  = barH * f2;
+    const h12 = barH * f12;
+    let yCur = barBot;
+    // V1
+    ctx.fillStyle = '#007BFF';
+    ctx.fillRect(barX, yCur-h1, barW, h1);
+    yCur -= h1;
+    // V2
+    ctx.fillStyle = '#00b894';
+    ctx.fillRect(barX, yCur-h2, barW, h2);
+    yCur -= h2;
+    // V12
+    ctx.fillStyle = '#e17055';
+    ctx.fillRect(barX, yCur-h12, barW, h12);
+
+    // labels on the right of the bar
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#007BFF';
+    ctx.fillText('S₁='+f1.toFixed(2), barX+barW+6, barBot - h1/2 + 3);
+    ctx.fillStyle = '#00b894';
+    ctx.fillText('S₂='+f2.toFixed(2), barX+barW+6, barBot - h1 - h2/2 + 3);
+    ctx.fillStyle = '#e17055';
+    ctx.fillText('S₁₂='+f12.toFixed(2), barX+barW+6, barBot - h1 - h2 - h12/2 + 3);
+
+    // total variance value at top
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.textAlign='center';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.fillText('Var[Y]='+SOB.Vtotal.toFixed(2), barX+barW/2, barTop-6);
+
+    // arrows from model to bar
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.setLineDash([4,3]);
+    ctx.beginPath();
+    ctx.moveTo(mx+30, my);
+    ctx.lineTo(barX-4, my);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['a1Coeff','a2Coeff','a3Coeff','varX1','varX2'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>

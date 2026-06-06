@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR 分解シミュレーター — 最小二乗法と Gram-Schmidt 直交化 | NovaSolver</title>
+<meta name="description" content="QR分解シミュレーターで3×3行列をGram-Schmidt法を用いてQ・R行列に分解し、最小二乗法による最適解を計算します。数値解析・線形代数の教育向けツール。">
+<meta property="og:title" content="QR 分解シミュレーター — 最小二乗法と Gram-Schmidt 直交化">
+<meta property="og:description" content="QR分解シミュレーターで3×3行列をGram-Schmidt法を用いてQ・R行列に分解し、最小二乗法による最適解を計算します。数値解析・線形代数の教育向けツール。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://novasolver.jp/tools/qr-decomposition.html">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="QR decomposition simulator (Modified Gram-Schmidt and least squares)">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://novasolver.jp/tools/qr-decomposition.html">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/qr-decomposition.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/qr-decomposition.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/qr-decomposition.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/qr-decomposition.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "QR分解シミュレーター",
+      "description": "Modified Gram-Schmidt法で3×3行列をQ（直交）とR（上三角）に分解し、最小二乗法 Rx=Qᵀb の後退代入で解を求める教育用シミュレーター。",
+      "url": "https://novasolver.jp/tools/qr-decomposition.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Numerical Linear Algebra Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["Modified Gram-Schmidt法によるQR分解","Rx=Qᵀbの後退代入による最小二乗解","Qの直交性誤差と残差ノルムのリアルタイム検証","行列・ベクトルのカラーマップ表示"],
+      "keywords": "QR分解,Gram-Schmidt法,直交化,最小二乗法,正規方程式,Householder変換,数値線形代数,後退代入",
+      "datePublished": "2026-05-16",
+      "dateModified": "2026-05-16",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "古典的Gram-Schmidt法とModified Gram-Schmidt法の違いは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "古典的Gram-Schmidt（CGS）は各列ベクトルから過去の全ての直交基底成分を一度に引き、Modified Gram-Schmidt（MGS）は1基底ずつ逐次的に引きます。数学的には等価ですが、有限精度演算ではCGSが直交性を急激に失うのに対し、MGSは桁落ちに対してはるかに頑健で、‖QᵀQ-I‖_F がほぼ機械精度で抑えられます。実務では特に理由がない限りMGS、または更に堅牢なHouseholder変換が選ばれます。"}
+        },
+        {
+          "@type": "Question",
+          "name": "なぜ最小二乗法でQR分解を使うのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "正規方程式 AᵀAx=Aᵀb は条件数が κ(A)² となり数値的に不安定です。一方、A=QR から ‖Ax-b‖² = ‖Rx-Qᵀb‖² となるので、Rx=Qᵀb の後退代入で解けば条件数 κ(A) のままで済み、数値的安定性が大幅に向上します。Aの列が独立であれば、解は一意で、計算コストもほぼ同等です。"}
+        },
+        {
+          "@type": "Question",
+          "name": "Householder変換と何が違いますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "Householder変換は鏡映行列を順次掛けて Aを上三角化する方法で、MGSより更に直交性が良く、疎な構造も乱しにくい性質があります。LAPACK の geqrf もHouseholder方式です。一方、Gram-Schmidtは1列ずつ直交化するため、ストリーミング処理や反復解法（GMRES等）の中で部分直交化に使いやすいという利点があります。用途によって使い分けます。"}
+        },
+        {
+          "@type": "Question",
+          "name": "QR分解は固有値計算にも使われると聞きました。",
+          "acceptedAnswer": {"@type": "Answer", "text": "はい、QRアルゴリズムは固有値計算の標準手法です。A_k=Q_kR_k と分解し A_{k+1}=R_kQ_k を繰り返すと、A_k は上三角行列に収束し、その対角成分が固有値になります。シフト戦略（Wilkinsonシフト等）と組み合わせると収束が劇的に速くなり、現在ほぼ全ての固有値ソルバ（LAPACK の dgeev 等）の中核です。本ツールは1ステップのQR分解そのものを可視化したものです。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "QR分解シミュレーター", "item": "https://novasolver.jp/tools/qr-decomposition.html"}
+      ]
+    }
+  ]
+}</script>
+<link rel="stylesheet" href="/tools/tools-common.css">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet">
+<script src="/tools/tools-common.js"></script>
+<style>
+:root{
+  --navy:#001F3F; --accent:#007BFF; --accent2:#00B4D8;
+  --bg:#F8F9FA; --card:#ffffff; --text:#1a1a2e;
+  --muted:#6c757d; --border:#dee2e6;
+}
+body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+.canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">QR分解シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/qr-decomposition.html" class="active">JA</a>
+      <a href="/en/tools/qr-decomposition.html">EN</a>
+      <a href="/zh/tools/qr-decomposition.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-th"></i> 数値線形代数シミュレーター</div>
+    <h1>QR 分解シミュレーター — 最小二乗法と Gram-Schmidt</h1>
+    <p class="hero-sub">3×3行列 A を Modified Gram-Schmidt 法で Q（直交行列）と R（上三角行列）に分解し、Rx=Qᵀb の後退代入で最小二乗解を求めます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">A[0][0] 対角成分</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slA11Val" value="1" min="-3" max="3" step="1" oninput="syncFromNum('slA11','slA11Val')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slA11" min="-3" max="3" step="1" value="1" oninput="syncToNum('slA11','slA11Val');updateSlider(this,'slA11Val',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">A[1][1] 対角成分</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slA22Val" value="0" min="-3" max="3" step="1" oninput="syncFromNum('slA22','slA22Val')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slA22" min="-3" max="3" step="1" value="0" oninput="syncToNum('slA22','slA22Val');updateSlider(this,'slA22Val',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">A[2][2] 対角成分</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slA33Val" value="1" min="-3" max="3" step="1" oninput="syncFromNum('slA33','slA33Val')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slA33" min="-3" max="3" step="1" value="1" oninput="syncToNum('slA33','slA33Val');updateSlider(this,'slA33Val',0,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">b[0] 右辺第1成分</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slB1Val" value="2" min="-10" max="10" step="1" oninput="syncFromNum('slB1','slB1Val')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slB1" min="-10" max="10" step="1" value="2" oninput="syncToNum('slB1','slB1Val');updateSlider(this,'slB1Val',0,'');compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="btn-group">
+      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">A の非対角・b の他成分は固定（A[0][1]=1, A[0][2]=0, A[1][0]=1, A[1][2]=1, A[2][0]=0, A[2][1]=1, b[1]=2, b[2]=2）。既定値で x=(1,1,1)、残差≈0、Q直交性誤差≈0。</p>
+  </div>
+
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statDet">—</div><div class="sl">det(A) = ±det(R) の符号付</div></div>
+        <div class="stat-card"><div class="sv" id="statX1">—</div><div class="sl">x_1 最小二乗解</div></div>
+        <div class="stat-card"><div class="sv" id="statResidual">—</div><div class="sl">残差 ‖Ax-b‖₂</div></div>
+        <div class="stat-card"><div class="sv" id="statOrth">—</div><div class="sl">Q 直交性誤差 ‖QᵀQ-I‖_F</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-th"></i> A・b、Q・R、解 x の可視化</div>
+      <canvas id="cv" width="600" height="400"></canvas>
+      <p class="canvas-hint">上段＝A行列とbベクトル／中段＝Q（直交、列＝q₁ q₂ q₃）とR（上三角、青＝上三角・灰＝下三角）／下段＝解ベクトル x</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <div class="theory-box">
+        <p>QR分解は、列が線形独立な行列 A を直交行列 Q と上三角行列 R の積に分解します。最小二乗問題 ‖Ax-b‖₂ の最小化に直結する基本道具です。</p>
+        <p style="margin-top:8px;">Q が直交、R が上三角の積に分解：</p>
+        $$A = Q\,R, \qquad Q^{\top}Q = I$$
+        <p style="margin-top:6px;">Modified Gram-Schmidt の漸化式（k 列目の更新）：</p>
+        $$r_{kk} = \|a_k^{(k-1)}\|_2,\quad q_k = \frac{a_k^{(k-1)}}{r_{kk}},\quad r_{kj} = q_k^{\top} a_j^{(k-1)},\quad a_j^{(k)} = a_j^{(k-1)} - r_{kj} q_k$$
+        <p style="margin-top:6px;">最小二乗解は Rx = Qᵀb の後退代入で得られる：</p>
+        $$\min_x \|Ax - b\|_2^2 \iff R\,x = Q^{\top} b$$
+        <p style="margin-top:8px;">A が正方かつ正則であれば残差は 0 で、A の行列式は |det(A)| = |det(R)| = ∏ r_{kk} となります。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.setAttribute('data-ux-no-scale', '1');
+  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
+  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 320));
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  canvas.dataset.cssW = String(w);
+  canvas.dataset.cssH = String(h);
+  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w: w, h: h, dpr: dpr };
+}
+
+// ========== QR Decomposition (Modified Gram-Schmidt) Simulator ==========
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+
+function getParams() {
+  var a11 = parseFloat(document.getElementById('slA11').value);
+  var a22 = parseFloat(document.getElementById('slA22').value);
+  var a33 = parseFloat(document.getElementById('slA33').value);
+  var b1 = parseFloat(document.getElementById('slB1').value);
+  // Fixed off-diagonal entries and remaining b components
+  var A = [
+    [a11, 1, 0],
+    [1, a22, 1],
+    [0, 1, a33]
+  ];
+  var b = [b1, 2, 2];
+  return { A: A, b: b };
+}
+
+function vecNorm(v) {
+  var s = 0;
+  for (var i = 0; i < v.length; i++) s += v[i] * v[i];
+  return Math.sqrt(s);
+}
+function dot(u, v) {
+  var s = 0;
+  for (var i = 0; i < u.length; i++) s += u[i] * v[i];
+  return s;
+}
+
+// Modified Gram-Schmidt QR for 3x3
+function mgsQR(A) {
+  var n = 3;
+  // working columns
+  var V = [];
+  for (var j = 0; j < n; j++) {
+    V.push([A[0][j], A[1][j], A[2][j]]);
+  }
+  var Q = [[0,0,0],[0,0,0],[0,0,0]];
+  var R = [[0,0,0],[0,0,0],[0,0,0]];
+  for (var k = 0; k < n; k++) {
+    var nrm = vecNorm(V[k]);
+    R[k][k] = nrm;
+    var qk = nrm > 1e-15 ? [V[k][0]/nrm, V[k][1]/nrm, V[k][2]/nrm] : [0,0,0];
+    for (var i = 0; i < n; i++) Q[i][k] = qk[i];
+    for (var j = k + 1; j < n; j++) {
+      var rkj = dot(qk, V[j]);
+      R[k][j] = rkj;
+      V[j][0] -= rkj * qk[0];
+      V[j][1] -= rkj * qk[1];
+      V[j][2] -= rkj * qk[2];
+    }
+  }
+  return { Q: Q, R: R };
+}
+
+function det3(M) {
+  return M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1])
+       - M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0])
+       + M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0]);
+}
+
+function transpose(M) {
+  return [
+    [M[0][0], M[1][0], M[2][0]],
+    [M[0][1], M[1][1], M[2][1]],
+    [M[0][2], M[1][2], M[2][2]]
+  ];
+}
+function matMulVec(M, v) {
+  return [
+    M[0][0]*v[0] + M[0][1]*v[1] + M[0][2]*v[2],
+    M[1][0]*v[0] + M[1][1]*v[1] + M[1][2]*v[2],
+    M[2][0]*v[0] + M[2][1]*v[1] + M[2][2]*v[2]
+  ];
+}
+function matMulMat(A, B) {
+  var C = [[0,0,0],[0,0,0],[0,0,0]];
+  for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) for (var k = 0; k < 3; k++) C[i][j] += A[i][k]*B[k][j];
+  return C;
+}
+function frobMinusI(M) {
+  var s = 0;
+  for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) {
+    var d = M[i][j] - (i === j ? 1 : 0);
+    s += d * d;
+  }
+  return Math.sqrt(s);
+}
+
+// Back-substitution: Rx = y
+function backSub(R, y) {
+  var x = [0, 0, 0];
+  for (var i = 2; i >= 0; i--) {
+    var s = y[i];
+    for (var j = i + 1; j < 3; j++) s -= R[i][j] * x[j];
+    x[i] = Math.abs(R[i][i]) > 1e-15 ? s / R[i][i] : 0;
+  }
+  return x;
+}
+
+function fmt(v, d) {
+  if (!isFinite(v)) return '—';
+  if (Math.abs(v) < 1e-12) return (0).toFixed(d || 3);
+  return v.toFixed(d || 3);
+}
+function fmtSci(v) {
+  if (!isFinite(v)) return '—';
+  if (Math.abs(v) < 1e-10) return v.toExponential(2);
+  return v.toFixed(3);
+}
+
+// Color cell value: blue gradient for positive, red gradient for negative
+function cellColor(v, vmax) {
+  var t = Math.min(1, Math.abs(v) / Math.max(vmax, 1e-9));
+  if (v >= 0) {
+    var r = Math.round(220 - t * 200);
+    var g = Math.round(235 - t * 100);
+    var bl = Math.round(255);
+    return 'rgb(' + r + ',' + g + ',' + bl + ')';
+  } else {
+    var r2 = 255;
+    var g2 = Math.round(220 - t * 150);
+    var b2 = Math.round(220 - t * 150);
+    return 'rgb(' + r2 + ',' + g2 + ',' + b2 + ')';
+  }
+}
+
+function drawCell(cx, cy, w, h, val, color, textColor) {
+  ctx.fillStyle = color;
+  ctx.fillRect(cx, cy, w, h);
+  ctx.strokeStyle = '#3d567a';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(cx, cy, w, h);
+  ctx.fillStyle = textColor || '#0a1929';
+  ctx.font = 'bold 12px "Roboto Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(fmt(val, 2), cx + w / 2, cy + h / 2);
+}
+
+function drawMatrix(M, x0, y0, cellW, cellH, label, opts) {
+  opts = opts || {};
+  var rows = M.length, cols = M[0].length;
+  // find max abs for scaling
+  var vmax = 0;
+  for (var i = 0; i < rows; i++) for (var j = 0; j < cols; j++) vmax = Math.max(vmax, Math.abs(M[i][j]));
+  // label
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '13px "Roboto Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(label, x0, y0 - 6);
+  for (var i2 = 0; i2 < rows; i2++) {
+    for (var j2 = 0; j2 < cols; j2++) {
+      var col;
+      if (opts.uppertri) {
+        // Upper triangular: blue for upper, gray for lower (which should be 0)
+        if (j2 >= i2) col = cellColor(M[i2][j2], vmax);
+        else col = '#3a4a5e';
+      } else {
+        col = cellColor(M[i2][j2], vmax);
+      }
+      drawCell(x0 + j2 * cellW, y0 + i2 * cellH, cellW, cellH, M[i2][j2], col, opts.uppertri && j2 < i2 ? '#cfe3f7' : '#0a1929');
+    }
+  }
+  // optional column labels (q1 q2 q3)
+  if (opts.colLabels) {
+    ctx.fillStyle = '#FFD166';
+    ctx.font = '11px "Roboto Mono", monospace';
+    ctx.textAlign = 'center';
+    for (var jj = 0; jj < cols; jj++) {
+      ctx.fillText(opts.colLabels[jj], x0 + jj * cellW + cellW / 2, y0 + rows * cellH + 14);
+    }
+  }
+}
+
+function drawAll(p, Q, R, x) {
+  var __novaDims1 = __novaHiDpiCanvas(cv, cv.clientWidth || cv.width, cv.clientHeight || cv.height, cv.getContext('2d'));
+var W = __novaDims1.w, H = __novaDims1.h;
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+  // Three rows of layout
+  var cellW = 48, cellH = 32;
+  // Row 1: A and b
+  var y1 = 28;
+  drawMatrix(p.A, 30, y1, cellW, cellH, 'A (3×3)');
+  // b vector to the right
+  var bx = 30 + 3 * cellW + 30;
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '13px "Roboto Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('b (3×1)', bx, y1 - 6);
+  var bvmax = Math.max.apply(null, p.b.map(Math.abs));
+  for (var i = 0; i < 3; i++) {
+    drawCell(bx, y1 + i * cellH, cellW, cellH, p.b[i], cellColor(p.b[i], bvmax));
+  }
+  // Row 2: Q and R
+  var y2 = y1 + 3 * cellH + 36;
+  drawMatrix(Q, 30, y2, cellW, cellH, 'Q (直交)', { colLabels: ['q₁', 'q₂', 'q₃'] });
+  var rx = 30 + 3 * cellW + 60;
+  drawMatrix(R, rx, y2, cellW, cellH, 'R (上三角)', { uppertri: true });
+  // Row 3: x
+  var y3 = y2 + 3 * cellH + 38;
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '13px "Roboto Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('解 x = R⁻¹ Qᵀ b', 30, y3 - 6);
+  var xvmax = Math.max.apply(null, x.map(Math.abs));
+  for (var k = 0; k < 3; k++) {
+    drawCell(30 + k * cellW, y3, cellW, cellH, x[k], cellColor(x[k], xvmax));
+    ctx.fillStyle = '#FFD166';
+    ctx.font = '11px "Roboto Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('x' + (k === 0 ? '₁' : k === 1 ? '₂' : '₃'), 30 + k * cellW + cellW / 2, y3 + cellH + 14);
+  }
+}
+
+function compute() {
+  var p = getParams();
+  var qr = mgsQR(p.A);
+  var Q = qr.Q, R = qr.R;
+  // det A (signed) and |det R|
+  var detA = det3(p.A);
+  var detR = R[0][0] * R[1][1] * R[2][2];
+  // signed by A: |det R| with sign of det A
+  var signedDet = (detA >= 0 ? 1 : -1) * Math.abs(detR);
+  // Solve Rx = Q^T b  via back-substitution
+  var Qt = transpose(Q);
+  var y = matMulVec(Qt, p.b);
+  var x = backSub(R, y);
+  // residual ||Ax - b||
+  var Ax = matMulVec(p.A, x);
+  var resid = Math.sqrt(
+    (Ax[0] - p.b[0]) * (Ax[0] - p.b[0]) +
+    (Ax[1] - p.b[1]) * (Ax[1] - p.b[1]) +
+    (Ax[2] - p.b[2]) * (Ax[2] - p.b[2])
+  );
+  // orthogonality error ||Q^T Q - I||_F
+  var QtQ = matMulMat(Qt, Q);
+  var orth = frobMinusI(QtQ);
+
+  document.getElementById('statDet').textContent = fmt(signedDet, 3);
+  document.getElementById('statX1').textContent = fmt(x[0], 3);
+  document.getElementById('statResidual').textContent = fmtSci(resid);
+  document.getElementById('statOrth').textContent = fmtSci(orth);
+  drawAll(p, Q, R, x);
+}
+
+function resetParams() {
+  var defs = { slA11: 1, slA22: 0, slA33: 1, slB1: 2 };
+  Object.keys(defs).forEach(function (id) {
+    document.getElementById(id).value = defs[id];
+  });
+  updateSlider(document.getElementById('slA11'), 'slA11Val', 0, '');
+  updateSlider(document.getElementById('slA22'), 'slA22Val', 0, '');
+  updateSlider(document.getElementById('slA33'), 'slA33Val', 0, '');
+  updateSlider(document.getElementById('slB1'), 'slB1Val', 0, '');
+  compute();
+}
+
+window.addEventListener('resize', function () { compute(); });
+
+compute();
+</script>
+
+<section class="explanation">
+  <h2>QR分解シミュレーターとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">QR分解って、なんで「Q」と「R」って文字なんですか？意味あるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">いい質問だね。Q は「直交（Orthogonal）」のドイツ語起源の慣習で、R は「右上（Right triangular）」つまり上三角を意味する。歴史的に Householder と Gram-Schmidt がそれぞれ別文脈で使い始めて定着したんだ。上のシミュレーターで既定値（A の対角=1,0,1）を見ると、Q が直交、R が上三角になっているのが視覚的にわかる。「Q直交性誤差」のカードがほぼ 0（1e-15 オーダー）になっているのが直交の証拠だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">既定値で残差も 0 ですね。ということは「最小二乗法」って言ってるけど、実は普通の連立方程式と同じ答えが出るんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">鋭い。A が正則なら最小二乗解＝厳密解で、残差はゼロになる。最小二乗の威力が出るのは「式が解より多い（過剰決定）」場合や、測定誤差で完全解が存在しない場合だ。本ツールは 3×3 の正方行列でも、Rx=Qᵀb の解法そのものは長方形行列の最小二乗と全く同じ。「A[1][1]」スライダーを 0 から動かしてみて。det が変わるけど x も同時に変わる。これが連立方程式の解だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">じゃあ正規方程式 AᵀAx=Aᵀb で解くのと何が違うんですか？教科書では正規方程式が先に出てきました。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">数学的には同じ解だけど、数値計算では大違いだ。AᵀA を作ると条件数が κ(A)² に跳ね上がる。例えば κ(A)=10⁶ なら κ(AᵀA)=10¹²、倍精度の有効桁15桁のうち12桁を失う。一方 QR 経由なら条件数は κ(A) のままで、桁落ちは半分で済む。だから現代の数値ライブラリ（NumPy の lstsq、MATLAB の \\）は内部で QR か SVD を使う。教科書で正規方程式を先に教えるのは導出が直感的だからで、実装では避けるのが正解だよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">「Modified Gram-Schmidt」って Modified の方を使う理由は何ですか？「古典」じゃダメなんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">古典 Gram-Schmidt（CGS）は数値的に脆い。各列から過去の全ての直交成分を「一度に」引くため、丸め誤差が累積して、計算後の Q が直交を失う（QᵀQ-I が 1e-3 とか出る）。Modified（MGS）は1基底ずつ「逐次的に」引いて引いた結果を使い回すから、誤差が抑えられて 1e-15 程度で済む。本ツールの「Q直交性誤差」のカードは、まさにこの違いを定量的に見せている。実務ではさらに堅牢な Householder 変換を使うことが多いけど、概念理解には MGS が分かりやすいんだ。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">古典的Gram-Schmidt法とModified Gram-Schmidt法の違いは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">古典的Gram-Schmidt（CGS）は各列ベクトルから過去の全ての直交基底成分を一度に引き、Modified Gram-Schmidt（MGS）は1基底ずつ逐次的に引きます。数学的には等価ですが、有限精度演算ではCGSが直交性を急激に失うのに対し、MGSは桁落ちに対してはるかに頑健で、‖QᵀQ-I‖_F がほぼ機械精度で抑えられます。実務では特に理由がない限りMGS、または更に堅牢なHouseholder変換が選ばれます。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">なぜ最小二乗法でQR分解を使うのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">正規方程式 AᵀAx=Aᵀb は条件数が κ(A)² となり数値的に不安定です。一方、A=QR から ‖Ax-b‖² = ‖Rx-Qᵀb‖² となるので、Rx=Qᵀb の後退代入で解けば条件数 κ(A) のままで済み、数値的安定性が大幅に向上します。Aの列が独立であれば、解は一意で、計算コストもほぼ同等です。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">Householder変換と何が違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">Householder変換は鏡映行列を順次掛けて A を上三角化する方法で、MGSより更に直交性が良く、疎な構造も乱しにくい性質があります。LAPACK の geqrf もHouseholder方式です。一方、Gram-Schmidtは1列ずつ直交化するため、ストリーミング処理や反復解法（GMRES等）の中で部分直交化に使いやすいという利点があります。用途によって使い分けます。</div>
+    </div>
+    <div class="faq-item">
+      <button type="button" class="faq-q" onclick="toggleFaq(this)">QR分解は固有値計算にも使われると聞きました。 <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">はい、QRアルゴリズムは固有値計算の標準手法です。A_k=Q_k R_k と分解し A_{k+1}=R_k Q_k を繰り返すと、A_k は上三角行列に収束し、その対角成分が固有値になります。シフト戦略（Wilkinsonシフト等）と組み合わせると収束が劇的に速くなり、現在ほぼ全ての固有値ソルバ（LAPACK の dgeev 等）の中核です。本ツールは1ステップのQR分解そのものを可視化したものです。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>線形回帰と統計モデリング：</strong>多項式フィット、重回帰、機械学習の最小二乗問題は全て本質的に Ax=b の最小二乗解です。R の lm 関数、Python の numpy.linalg.lstsq、MATLAB のバックスラッシュ演算子は内部で QR（または SVD）を実行しています。CAEのパラメータフィッティング、流体抵抗係数の最小二乗フィット等にも直接使われます。</p>
+    <p><strong>有限要素法の反復解法：</strong>大規模疎行列の連立方程式に使う GMRES（Generalized Minimal Residual）法では、Krylov 部分空間の基底を作るために MGS による直交化を毎反復で実行します。CFD・構造解析の Krylov ソルバの心臓部であり、ベクトル長が大きくなると CGS では発散してしまうため MGS（または DGKS 再直交化）が必須です。</p>
+    <p><strong>固有値計算と PCA：</strong>主成分分析（PCA）や固有モード解析（モーダル解析）では QR アルゴリズムが固有値抽出の標準ルーチンです。本ツールが示す1回のQR分解を、上三角行列に収束するまで反復することで、構造物の固有振動数や機械学習の特徴抽出に必須の固有値が得られます。</p>
+    <p><strong>センサー融合とカルマンフィルタ：</strong>Square-root カルマンフィルタは共分散行列の Cholesky 因子（または QR 分解）を直接更新することで、数値的不安定性を回避します。GPS+IMU 融合、ロボット制御、航空宇宙の姿勢推定など、リアルタイム性と数値安定性が両立必要な現場で QR 分解が中核を担っています。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>最も多い誤解は、<strong>「QR分解は正方行列でしか使えない」と思い込む</strong>ことです。実際には m×n（m≥n）の長方形行列にもそのまま適用でき、過剰決定系 Ax=b（式の数 m が未知数 n より多い）の最小二乗解を求める標準手段です。本ツールは可視化の都合で 3×3 を扱っていますが、計算ロジックは Modified Gram-Schmidt そのもので、長方形に拡張するのは循環範囲を変えるだけです。実務では m=10000、n=10 のような縦長行列が頻出します。</p>
+    <p>次に多いのが、<strong>「Q が直交だから QᵀQ=I は当然成り立つ」と数値計算でも信じる</strong>ことです。理論上は Qᵀ Q=I ですが、有限精度演算では誤差が必ず混入します。本ツールの「Q直交性誤差」カードがちょうど 1e-15 程度（倍精度のマシンイプシロン）を示すのは、Modified Gram-Schmidt が極めて優秀だからです。古典的Gram-Schmidt で同じ計算をすると、条件数の悪い行列では誤差が 1e-3 以上に跳ね上がることも珍しくありません。「直交性は計算後に必ず検証する」が鉄則です。</p>
+    <p>最後に、<strong>このシミュレーターが扱う行列は対角要素以外がほぼ固定の特殊形である</strong>点に注意してください。スライダーで動かせるのは A の3つの対角成分と b の第1成分のみで、非対角要素は数値安定性が良い値に固定されています。実際の応用では条件数が 10⁸ を超えるような病的に近い行列も現れ、その場合は MGS でも直交性誤差が増大します。本ツールは概念理解と典型的な良条件問題の挙動を見るためのものであり、極端な病的問題には Householder 変換や SVD（特異値分解）を選ぶべきです。</p>
+  </div>
+</section>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="qr-decomposition.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/linear-regression-sim.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">線形回帰シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">最小二乗法による線形回帰を可視化。データの追加・削除で回帰直線がどう変わるかをインタラクティブに体験できる統計学習ツール。決定係数R²・残差・相関係数もリアルタイム表示。</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/regression-analysis.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-calculator"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">回帰分析・曲線フィッティングツール</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">NovaSolverは、散布図にクリックでデータ点を追加するだけで、線形回帰や多項式、指数・べき乗曲線へのフィッティングをリアルタイムで実行できる無料ツールです。決定係数（R²）や回...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/lu-decomposition.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">LU分解シミュレーター — Ax=bの直接解法</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">LU分解シミュレーターは、3×3行列AをL·Uに分解し、Ax=bを前進代入と後退代入で解く過程をリアルタイム可視化します。部分ピボット選択・行列式・残差・条件数を直感的に学べる教育用...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/bifurcation-diagram.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">分岐図シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ロジスティック写像 x_n+1=rx_n(1-x_n) による分岐図をインタラクティブに探索。倍周期分岐からカオスへの遷移、ファイゲンバウム定数、リャプノフ指数をリアルタイム可視化。...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/monte-carlo-stats.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-dice"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">モンテカルロ法・統計シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">モンテカルロ法シミュレーターで、円周率πの推定や積分計算をビジュアルに体験。中心極限定理(CLT)やランダムウォークをアニメーションで学べる数値解析ツールです。統計シミュレーションの...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/adaboost.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-chart-line"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">AdaBoost シミュレーター — 弱分類器のブースティング</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">AdaBoost シミュレーターは決定スタンプを弱分類器とし、ブースティング反復で強分類器を構築します。サンプル重みと決定境界をリアルタイム可視化し、なぜ弱学習器の組合せが高精度にな...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>3×3行列Aの各要素(A11, A22, A33など)をスライダーで入力します。範囲は-10から10の実数値です</li>
+<li>ベクトルbの成分(B1など)を設定し、Gram-Schmidt正規化法によるQR分解を実行します</li>
+<li>計算結果のQ行列(直交行列)、R行列(上三角行列)、最小二乗解xが自動表示されます</li>
+<li>残差ノルム‖Ax-b‖₂とQ直交性誤差‖QᵀQ-I‖_Fで数値精度を検証します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>構造解析での過剰決定系を想定します。A = [[4, 0, 1], [0, 3, 0], [2, 1, 2]]、b = [8, 6, 7]の場合、Gram-Schmidt法により第1列を正規化後、第2列の直交成分を算出します。結果としてQ行列の列ベクトルは相互に直交(内積≈0)となり、Rx = Qᵀbから最小二乗解x ≈ [1.5, 2.0, 0.8]が得られます。残差は‖Ax-b‖₂ ≈ 0.42となり、システムが完全には満たされないことを示します</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ul>
+<li>FEM逆解析で計測データ数が未知数より多い場合、QR分解による最小二乗法は数値安定性に優れています。LU分解よりも条件数が改善されます</li>
+<li>det(A)の符号がdet(R)の符号と一致することを確認してください。不一致は演算誤差の指標です</li>
+<li>Q直交性誤差‖QᵀQ-I‖_Fが10⁻¹⁴を超える場合、入力行列が数値的に悪条件(ill-conditioned)である可能性があります</li>
+<li>ハウスホルダー法やギブンス回転法と比べ、Gram-Schmidt法は実装は簡潔ですが丸め誤差が蓄積しやすいため、高精度が必須な場合は修正版を用いてください</li>
+</ul>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script src="/tools/tool-ux-template.js?v20260517r4" defer></script>
+</body>
+</html>

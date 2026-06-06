@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8270840061039680" crossorigin="anonymous"></script>
+<meta charset="UTF-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RSYX6L0L61"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMS SOC 推定 — クーロン計数・拡張カルマン | NovaSolver</title>
+<meta name="description" content="BMS（バッテリーマネジメントシステム）の SOC（残量）推定をクーロン計数法・OCV 法・拡張カルマンフィルタ（EKF）・ハイブリッドで比較。公称容量、初期 SOC、負荷電流、センサ誤差、劣化年数、セル温度、経過時間からドリフト誤差と新 SOC をリアルタイム計算する無料シミュレーターです。">
+<link rel="canonical" href="https://novasolver.jp/tools/battery-management-soc-coulomb-count.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://novasolver.jp/tools/battery-management-soc-coulomb-count.html">
+<meta property="og:title" content="BMS SOC 推定シミュレーター — クーロン計数 + EKF 拡張カルマン | NovaSolver Project">
+<meta property="og:description" content="クーロン計数のドリフト誤差を EKF（拡張カルマン）・OCV 法・ハイブリッドでどこまで抑えられるかを実時間で比較できます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="BMS SOC estimation simulator">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@novasolver_jp">
+<meta name="twitter:image" content="https://novasolver.jp/assets/images/general/blueprint.jpg">
+<meta name="robots" content="index,follow">
+<link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/battery-management-soc-coulomb-count.html">
+<link rel="alternate" hreflang="en" href="https://novasolver.jp/en/tools/battery-management-soc-coulomb-count.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://novasolver.jp/zh/tools/battery-management-soc-coulomb-count.html">
+<link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/battery-management-soc-coulomb-count.html">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="256x256" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/tools/tools-common.js?v20260511r13"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','pre']}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
+<link href="/tools/tool-ux-template.css?v20260529r1" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#bmsCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+.canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
+.verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
+.verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
+.verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+</style>
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "BMS SOC 推定シミュレーター",
+      "description": "BMS（バッテリーマネジメントシステム）の SOC 推定をクーロン計数法・OCV 法・拡張カルマンフィルタ（EKF）・ハイブリッドで比較し、ドリフト誤差と新 SOC をリアルタイムで可視化する無料シミュレーターです。",
+      "url": "https://novasolver.jp/tools/battery-management-soc-coulomb-count.html",
+      "applicationCategory": "EngineeringApplication",
+      "applicationSubCategory": "Battery / BMS Simulator",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires JavaScript",
+      "isAccessibleForFree": true,
+      "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "featureList": ["クーロン計数によるSOC推定","拡張カルマンフィルタ（EKF）によるドリフト補正","OCV 法・ハイブリッド法との比較","電流センサ誤差から積算ドリフト誤差を算出","劣化年数・セル温度による実効容量の補正"],
+      "keywords": "BMS,バッテリーマネジメント,SOC推定,クーロン計数,拡張カルマンフィルタ,EKF,OCV法,リチウムイオン",
+      "inLanguage": "ja"
+    },{
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "クーロン計数法とは何ですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "クーロン計数（Coulomb Counting）法は、電池に流れ込む／流れ出す電流 I を時間で積分し、その電荷量 Q=∫I dt を公称容量で割って SOC を推定する方法です。SOC(t)=SOC0 − ∫I dt / C × 100 で計算します。実装が単純で軽量ですが、電流センサのオフセット誤差が時間とともに積み上がり、長時間運用するほどドリフトが大きくなる弱点があります。実機の BMS では一定間隔で OCV 法や EKF とリセット・補正することが前提です。"}
+        },{
+          "@type": "Question",
+          "name": "拡張カルマンフィルタ（EKF）はなぜ SOC 推定に強いのですか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "EKF は、クーロン計数による予測値と、端子電圧 V から逆算した OCV-SOC 観測値の両方を、各々の不確かさで重み付けして融合します。電流センサのドリフトは「予測モデルの誤差」として時間とともに学習・補正されるため、純粋なクーロン計数より誤差を一桁以上小さくできます。本ツールではアルゴリズム係数として coulomb=1.0、EKF=0.1、OCV=0.3、ハイブリッド=0.05 をかけてドリフト抑制の実用差を可視化しています。"}
+        },{
+          "@type": "Question",
+          "name": "セル温度や劣化年数で実効容量はどれくらい変わりますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "本ツールでは劣化補正を「新品=1.0、2年=0.95、5年=0.85、8年=0.70」、温度補正を「0°C未満=0.7、40°C超=0.95、それ以外=1.0」と簡易モデル化しています。例えば75Ah公称のセルでも、5年使用で実効63.75Ah、低温下ではさらに44.6Ah相当まで落ちます。SOC 推定がいくら正確でも、容量側の補正を入れないと「残り電池量（kWh）」を大きく見誤り、航続距離や運転時間の表示が現実とずれます。"}
+        },{
+          "@type": "Question",
+          "name": "電流センサ誤差 50mA は SOC 誤差にどう効きますか？",
+          "acceptedAnswer": {"@type": "Answer", "text": "電流誤差 ΔI が時間 Δt だけ続くと、積算電荷の誤差は ΔI·Δt になります。容量 75Ah のセルで ΔI=50mA、Δt=4hr のとき、誤差は 0.2Ah ≒ SOC で 0.27% です。本ツールではこれに「アルゴリズム係数」（EKF なら 0.1）と現実的な係数 5 を掛け、純粋クーロン計数のドリフト 1.3% を EKF で 0.13% まで抑えられる差を強調表示しています。実機ではセンサ精度が SOC 表示精度を直接決めるため、ホール素子なら 0.5% F.S.、シャント抵抗なら 0.1% F.S. クラスを選びます。"}
+        }
+      ]
+    },{
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "NovaSolver", "item": "https://novasolver.jp/"},
+        {"@type": "ListItem", "position": 2, "name": "シミュレーター", "item": "https://novasolver.jp/tools/"},
+        {"@type": "ListItem", "position": 3, "name": "BMS SOC 推定シミュレーター", "item": "https://novasolver.jp/tools/battery-management-soc-coulomb-count.html"}
+      ]
+    }
+  ]
+}</script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <a href="/tools/index.html" class="header-logo">NovaSolver</a>
+    <span class="header-sep">›</span>
+    <span class="header-title">BMS SOC 推定シミュレーター</span>
+    <nav class="lang-nav">
+      <a href="/tools/battery-management-soc-coulomb-count.html" class="active">JA</a>
+      <a href="/en/tools/battery-management-soc-coulomb-count.html">EN</a>
+      <a href="/zh/tools/battery-management-soc-coulomb-count.html">ZH</a>
+    </nav>
+    <a href="/tools/index.html" class="header-back"><i class="fas fa-arrow-left"></i> 戻る</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge"><i class="fas fa-battery-half"></i> BMS・SOC 推定</div>
+    <h1>BMS SOC 推定 — クーロン計数・拡張カルマン</h1>
+    <p class="hero-sub">電動車や蓄電池のバッテリーマネジメント（BMS）が、なぜ「クーロン計数だけでは残量がズレる」のかを実時間で体験できるツールです。電流センサ誤差・劣化年数・セル温度を変えながら、EKF（拡張カルマンフィルタ）や OCV 法を切り替えて、ドリフトをどこまで抑えられるかを確かめられます。</p>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Left: parameters -->
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">アルゴリズム</span></div>
+      <div class="param-desc">SOC 推定の方法。係数 1.0 / 0.1 / 0.3 / 0.05 でドリフトを補正</div>
+      <select id="bmsAlgorithm" onchange="compute()">
+        <option value="coulomb-count">クーロン計数 (純)</option>
+        <option value="ekf" selected>EKF 拡張カルマン</option>
+        <option value="ocv-based">OCV 法</option>
+        <option value="hybrid">ハイブリッド</option>
+      </select>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">公称容量</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="nominalCapacityAhNum" value="75" min="10" max="200" step="5" oninput="syncFromNum('nominalCapacityAhRange','nominalCapacityAhNum')"><span class="num-unit">Ah</span></div>
+      </div>
+      <input type="range" id="nominalCapacityAhRange" min="10" max="200" step="5" value="75" oninput="syncToNum('nominalCapacityAhRange','nominalCapacityAhNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">初期 SOC</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="initialSOCNum" value="80" min="0" max="100" step="5" oninput="syncFromNum('initialSOCRange','initialSOCNum')"><span class="num-unit">%</span></div>
+      </div>
+      <input type="range" id="initialSOCRange" min="0" max="100" step="5" value="80" oninput="syncToNum('initialSOCRange','initialSOCNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">負荷電流</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="currentLoadANum" value="25" min="-100" max="100" step="5" oninput="syncFromNum('currentLoadARange','currentLoadANum')"><span class="num-unit">A</span></div>
+      </div>
+      <div class="param-desc">正=放電、負=充電</div>
+      <input type="range" id="currentLoadARange" min="-100" max="100" step="5" value="25" oninput="syncToNum('currentLoadARange','currentLoadANum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">電流センサ誤差</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="sensingErrorMaNum" value="50" min="1" max="200" step="5" oninput="syncFromNum('sensingErrorMaRange','sensingErrorMaNum')"><span class="num-unit">mA</span></div>
+      </div>
+      <input type="range" id="sensingErrorMaRange" min="1" max="200" step="5" value="50" oninput="syncToNum('sensingErrorMaRange','sensingErrorMaNum');pct(this);compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">劣化年数</span></div>
+      <div class="param-desc">使用年数による容量保持率（新品=100%／8年=70%）</div>
+      <select id="batteryAgeYr" onchange="compute()">
+        <option value="0-new" selected>新品</option>
+        <option value="2-mid">2 年</option>
+        <option value="5-aged">5 年</option>
+        <option value="8-replace">8 年</option>
+      </select>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">セル温度</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="tempCellBmsCNum" value="25" min="-20" max="50" step="1" oninput="syncFromNum('tempCellBmsCRange','tempCellBmsCNum')"><span class="num-unit">°C</span></div>
+      </div>
+      <input type="range" id="tempCellBmsCRange" min="-20" max="50" step="1" value="25" oninput="syncToNum('tempCellBmsCRange','tempCellBmsCNum');pct(this);compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">経過時間</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="timeIntervalHrNum" value="4" min="0.1" max="24" step="0.1" oninput="syncFromNum('timeIntervalHrRange','timeIntervalHrNum')"><span class="num-unit">hr</span></div>
+      </div>
+      <input type="range" id="timeIntervalHrRange" min="0.1" max="24" step="0.1" value="4" oninput="syncToNum('timeIntervalHrRange','timeIntervalHrNum');pct(this);compute()">
+    </div>
+  </div>
+
+  <!-- Right: visualization -->
+  <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statEffCap">—</div><div class="sl">実効容量 (Ah)</div></div>
+        <div class="stat-card"><div class="sv" id="statIntegrated">—</div><div class="sl">積算電荷 (Ah)</div></div>
+        <div class="stat-card"><div class="sv" id="statSocChange">—</div><div class="sl">SOC 変化 (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statNewSoc">—</div><div class="sl">新 SOC (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statError">—</div><div class="sl">推定誤差 (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statRemaining">—</div><div class="sl">残容量 (Ah)</div></div>
+      </div>
+      <div class="verdict ok" id="verdict">—</div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-car-battery"></i> 電池パック模式図 — SOC ゲージ・電流方向</div>
+      <canvas id="bmsCanvas"></canvas>
+      <p class="canvas-hint">セル群と SOC ゲージ、電流の向き、端子電圧の測定ポイントを可視化します。色は SOC の高さ（緑→橙→赤）です。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> SOC 推定誤差 vs 時間（アルゴリズム別）</div>
+      <canvas class="ux-chartjs-canvas" id="errorChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-bar"></i> アルゴリズム別ドリフト比較（現在条件）</div>
+      <canvas class="ux-chartjs-canvas" id="algoChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$\mathrm{SOC}(t)=\mathrm{SOC}_0-\frac{\int_0^{t} I(\tau)\,d\tau}{C_\text{eff}}\times 100$$</p>
+      <p style="margin-top:6px;">クーロン計数法。I：電流 (A)、C_eff：実効容量 (Ah)、SOC_0：初期 SOC (%)。</p>
+      <p style="margin-top:10px;">$$C_\text{eff}=C_\text{nom}\cdot \eta_\text{age}\cdot \eta_\text{temp}$$</p>
+      <p style="margin-top:6px;">実効容量。年数係数 η_age（新品=1.0、5年=0.85、8年=0.70）と温度係数 η_temp（&lt;0°C=0.7、&gt;40°C=0.95、それ以外=1.0）を掛ける。</p>
+      <p style="margin-top:10px;">$$\varepsilon_\text{drift}=\frac{\Delta I\cdot \Delta t}{C_\text{eff}}\times 100\times 5\cdot k_\text{algo}$$</p>
+      <p style="margin-top:6px;">推定誤差。ΔI：電流センサ誤差 (A)、Δt：経過時間 (hr)、k_algo：アルゴリズム係数（coulomb=1.0、EKF=0.1、OCV=0.3、ハイブリッド=0.05）。</p>
+    </div>
+  </div>
+</div>
+
+<section class="explanation">
+  <h2>BMS SOC 推定シミュレーターとは</h2>
+  <div class="chat">
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">EVのメーター、「あと残り○○km」ってどうやって出してるんですか？電池に「残量センサ」とか入ってるイメージなんですが。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">残念ながら「残量センサ」は存在しないんだ。直接測れるのは端子電圧と、流れ込む／流れ出る電流の2つだけ。一番素直な方法は「出ていった電流を時間で積分して、その分だけ残量を減らす」というもので、これをクーロン計数（Coulomb Counting）と言うよ。式で書くと SOC(t) = SOC0 − ∫I dt / C × 100。シンプルでしょ？</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">それで十分じゃないですか？電流計を高精度にすれば良さそう。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう思うよね。でも積分っていうのが曲者で、たとえセンサ誤差が 50mA という超優秀な値でも、4時間積分すれば 0.2Ah の電荷誤差が積み上がる。75Ah のセルなら SOC で 0.27% ズレるだけだけど、これが1日、1週間、と続くと「メーターでは20%残ってるのに突然シャットダウン」みたいな事故が起きる。だから実機の BMS は OCV（開回路電圧）や EKF（拡張カルマンフィルタ）で定期的に補正をかけるのが大前提なんだ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">左の「アルゴリズム」を EKF に切り替えると、推定誤差がガクッと小さくなりますね。EKFって何をやってるんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">超ざっくり言うと「クーロン計数の予測」と「端子電圧から OCV-SOC テーブルで逆算した観測」を、それぞれの不確かさで重み付けして融合してるんだ。クーロン計数が信用できないときは観測を重視し、観測ノイズが大きいときは予測を重視する。電流センサのバイアス誤差自体も状態変数として学習するので、時間が経つほどドリフトが押さえ込まれる。本ツールではこの効果を「アルゴリズム係数 0.1」と簡略化して、純クーロン計数の 1/10 まで誤差が落ちる様子を見せているよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">劣化年数を「8年」にすると実効容量が 52.5Ah まで落ちました。これも BMS で見ているんですか？</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、SOH（State of Health）と呼ばれる別の指標として常時推定してる。SOH が落ちると、たとえ SOC が 100% を指していても、実際に取り出せる kWh は新品の 70% しかない。だから EV のレンジ表示は SOC × SOH × 公称エネルギーで計算する必要があるんだ。低温時の容量も同じで、本ツールでは 0°C 未満で実効容量が 0.7 倍に落ちる簡易モデルにしている。冬の EV が「100% 充電したのに航続が 60% しか出ない」のはこのためだよ。</div>
+    </div>
+    <div class="cmsg st"><span class="ico">🙋</span>
+      <div class="bub">なるほど！じゃあ実機の BMS は、SOC・SOH・温度補正を全部同時に走らせてるんですね。</div>
+    </div>
+    <div class="cmsg pr"><span class="ico">🎓</span>
+      <div class="bub">そう、しかも 100ms くらいの周期で。EKF・OCV テーブル・温度補償・セル間バランシング・過電圧／過電流／過温度保護まで含めて、車載 BMS は実は「リアルタイム制御の塊」なんだ。本ツールはその中の「SOC 推定の核」だけを切り出した教育用モデルだと思ってね。</div>
+    </div>
+  </div>
+
+  <h2>よくある質問</h2>
+  <div class="faq-section">
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">クーロン計数法とは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">クーロン計数（Coulomb Counting）法は、電池に流れ込む／流れ出す電流 I を時間で積分し、その電荷量 Q=∫I dt を公称容量で割って SOC を推定する方法です。SOC(t)=SOC0 − ∫I dt / C × 100 で計算します。実装が単純で軽量ですが、電流センサのオフセット誤差が時間とともに積み上がり、長時間運用するほどドリフトが大きくなる弱点があります。実機の BMS では一定間隔で OCV 法や EKF とリセット・補正することが前提です。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">拡張カルマンフィルタ（EKF）はなぜ SOC 推定に強いのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">EKF は、クーロン計数による予測値と、端子電圧 V から逆算した OCV-SOC 観測値の両方を、各々の不確かさで重み付けして融合します。電流センサのドリフトは「予測モデルの誤差」として時間とともに学習・補正されるため、純粋なクーロン計数より誤差を一桁以上小さくできます。本ツールではアルゴリズム係数として coulomb=1.0、EKF=0.1、OCV=0.3、ハイブリッド=0.05 をかけてドリフト抑制の実用差を可視化しています。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">セル温度や劣化年数で実効容量はどれくらい変わりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">本ツールでは劣化補正を「新品=1.0、2年=0.95、5年=0.85、8年=0.70」、温度補正を「0°C未満=0.7、40°C超=0.95、それ以外=1.0」と簡易モデル化しています。例えば75Ah公称のセルでも、5年使用で実効63.75Ah、低温下ではさらに44.6Ah相当まで落ちます。SOC 推定がいくら正確でも、容量側の補正を入れないと「残り電池量（kWh）」を大きく見誤り、航続距離や運転時間の表示が現実とずれます。</div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">電流センサ誤差 50mA は SOC 誤差にどう効きますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+      <div class="faq-a">電流誤差 ΔI が時間 Δt だけ続くと、積算電荷の誤差は ΔI·Δt になります。容量 75Ah のセルで ΔI=50mA、Δt=4hr のとき、誤差は 0.2Ah ≒ SOC で 0.27% です。本ツールではこれに「アルゴリズム係数」（EKF なら 0.1）と現実的な係数 5 を掛け、純粋クーロン計数のドリフト 1.3% を EKF で 0.13% まで抑えられる差を強調表示しています。実機ではセンサ精度が SOC 表示精度を直接決めるため、ホール素子なら 0.5% F.S.、シャント抵抗なら 0.1% F.S. クラスを選びます。</div>
+    </div>
+  </div>
+
+  <h2>実世界での応用</h2>
+  <div class="fblock">
+    <p><strong>EV（電気自動車）の航続距離表示：</strong>市販 EV の BMS は、毎秒数回のサンプリングでクーロン計数を走らせ、駐車時の安静電圧で OCV 法による絶対値補正を行い、走行中は EKF で連続的にドリフトを補正します。航続距離は SOC × SOH × 1km あたり消費エネルギー（過去履歴）で計算されるため、SOC 推定誤差 1% は数 km の航続予測誤差として直接ユーザー体験に響きます。</p>
+    <p><strong>定置型蓄電池（家庭用・系統連系）：</strong>家庭用蓄電池や系統連系の大型 ESS では、放電深度（DoD）の浪費を避けるため SOC 推定の精度がそのまま電池寿命に直結します。SOC 5% を見誤って毎日深放電させてしまうと、劣化が 1.5〜2 倍速くなる試算もあります。本ツールの「劣化年数」スライダーで実効容量が落ちる感覚をつかんでください。</p>
+    <p><strong>ドローン・産業用ロボット：</strong>飛行中／作業中に「あと何分動けるか」を表示する用途では、軽量化のためにシャント抵抗ではなくホール素子電流センサ（精度 1〜2% F.S.）が多用されます。センサ誤差が大きい分、EKF やパーティクルフィルタによる補正が必須で、誤推定は墜落・停止という重大事故に直結します。</p>
+    <p><strong>携帯機器・モバイルバッテリー：</strong>スマホやノート PC のバッテリーゲージも内部は同じ理屈です。長期間使うと「90% から急に 0% になる」現象は、クーロン計数の積算ドリフトが OCV 補正のタイミングと噛み合っていない症状。「満充電 → 完全放電」を一度行うと自動学習が走り、表示が改善するのはこのためです。</p>
+  </div>
+
+  <h2>よくある誤解と注意点</h2>
+  <div class="fblock">
+    <p>まず最大の落とし穴が、<strong>「SOC = 端子電圧から一意に決まる」と思い込むこと</strong>です。リチウムイオン電池の OCV-SOC カーブは中央域（SOC 20〜80%）で平坦で、わずか数 mV の電圧差で SOC が数 % 変わります。さらに電流が流れている動的状態では IR ドロップ・分極で端子電圧は OCV から数十〜数百 mV ずれるため、走行中の「電圧→SOC」直読は誤差 10〜20% にもなります。BMS が必ずクーロン計数を併用するのはこの理由です。</p>
+    <p>次に、<strong>「アルゴリズムさえ高度なら誤差はゼロにできる」という幻想</strong>。EKF は素晴らしいフィルタですが、内部の電池モデル（RC 等価回路や OCV テーブル）が間違っていたら、いくら高次の数学を回しても出力は正しくなりません。実機開発では電池メーカーから提供される OCV テーブル・内部抵抗マップ・温度依存特性を厳密にキャリブレーションする工程が、アルゴリズム本体より時間を食います。本ツールの「アルゴリズム係数 0.1」はあくまで理想 EKF のベストケースです。</p>
+    <p>最後に、<strong>「SOC と SOH を混同する」</strong>こと。SOC（State of Charge）は「いま残っている電荷量／実効容量 × 100%」、SOH（State of Health）は「実効容量／公称容量 × 100%」と全く別物です。SOC 100% でも SOH 70% なら、実際に使えるエネルギーは新品の 70% しかありません。本ツールの「劣化年数」スライダーは SOH を簡易に表現したもの。実機 BMS はインピーダンス測定や容量フェード履歴から SOH を別途推定し、SOC × SOH で「真の残量」を出力します。両者を分けて理解することが、BMS 設計の第一歩です。</p>
+  </div>
+</section>
+
+
+<div class="howto-card howto-guide">
+<h3>使い方ガイド</h3>
+<ol>
+<li>公称容量（60～200 Ah）と初期SOC（0～100%）を入力します。リチウムイオン電池の場合、公称容量は製造元仕様書から確認してください</li>
+<li>負荷電流（-100～+100 A、放電負、充電正）とセンサ誤差範囲（±5～20 mA）を設定します。実装するBMSの電流センサ精度に合わせて調整してください</li>
+<li>クーロン計数・OCV曲線法・拡張カルマンフィルタの3手法を自動計算し、ドリフト誤差の蓄積と修正後のSOC値をリアルタイム表示します</li>
+</ol>
+</div>
+<div class="howto-card howto-example">
+<h3>具体的な計算例</h3>
+<p>LiFePO4電池（公称容量100 Ah、初期SOC 80%）に対して、放電電流25 A が1時間続く場合：クーロン計数法では積算電荷25 Ah減少で新SOC 75%となりますが、電流センサ誤差±10 mAが累積すると±3.6%のドリフトが発生します。拡張カルマンフィルタを適用すると、OCVセンサ値（3.2 V）から推定状態を補正し、ドリフト誤差を±0.8%以下に低減します</p>
+</div>
+<div class="howto-card howto-notes">
+<h3>実務での注意点</h3>
+<ol>
+<li>電流センサの零点ドリフトはバイアス誤差として毎月キャリブレーションが必須です。特に高温環境（50℃以上）では±20 mAの誤差が生じやすくなります</li>
+<li>25℃基準のOCV曲線は温度補正が必要です。セル温度が10℃低下すると実効容量は3～5%減少するため、温度センサと併用してください</li>
+<li>劣化電池（サイクル数2000回以上）ではOCV勾配が鈍化するため、ハイブリッド手法（EKF＋インピーダンス補正）への移行を検討してください</li>
+</ol>
+</div>
+<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div style="max-width:1200px;margin:0 auto">
+  <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">
+    <a href="/tools/" style="color:rgba(255,255,255,.7);text-decoration:none">ライブラリ</a>
+    <a href="/index.html" style="color:rgba(255,255,255,.7);text-decoration:none">トップ</a>
+    <a href="/sitemap.html" style="color:rgba(255,255,255,.7);text-decoration:none">サイトマップ</a>
+    <a href="/about/author.html" style="color:rgba(255,255,255,.7);text-decoration:none">著者情報</a>
+  </div>
+  <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// ===== Constant tables =====
+const ageCapacityLoss = { "0-new": 1.0, "2-mid": 0.95, "5-aged": 0.85, "8-replace": 0.70 };
+const algorithmCorrection = { "coulomb-count": 1.0, "ekf": 0.1, "ocv-based": 0.3, "hybrid": 0.05 };
+
+// shared state for the animation
+const BMS = {
+  soc: 80, socChange: 0, effCap: 75, integrated: 0,
+  current: 25, error: 0, ratio: 0.8
+};
+
+// ===== Chart.js setup =====
+const errorChart = new Chart(document.getElementById('errorChart').getContext('2d'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'クーロン計数 (純)',data:[],borderColor:'#d63031',backgroundColor:'rgba(214,48,49,.13)',fill:false,borderWidth:2,pointRadius:0,tension:0.25},
+    {label:'OCV 法',data:[],borderColor:'#e1a055',backgroundColor:'rgba(225,160,85,.13)',fill:false,borderWidth:2,pointRadius:0,tension:0.25},
+    {label:'EKF 拡張カルマン',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.13)',fill:false,borderWidth:2,pointRadius:0,tension:0.25},
+    {label:'ハイブリッド',data:[],borderColor:'#00b894',backgroundColor:'rgba(0,184,148,.13)',fill:false,borderWidth:2,pointRadius:0,tension:0.25}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'経過時間 t (hr)',font:{size:11}},ticks:{maxTicksLimit:8}},
+      y:{title:{display:true,text:'SOC 推定誤差 (%)',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:18,color:'#6c757d'}}}
+  }
+});
+
+const algoChart = new Chart(document.getElementById('algoChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['クーロン計数','OCV 法','EKF','ハイブリッド'],datasets:[
+    {label:'SOC 推定誤差 (%)',data:[0,0,0,0],backgroundColor:['#d63031','#e1a055','#007BFF','#00b894'],borderWidth:0}
+  ]},
+  options:{
+    animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,aspectRatio:2,
+    scales:{
+      x:{title:{display:true,text:'アルゴリズム',font:{size:11}}},
+      y:{title:{display:true,text:'SOC 推定誤差 (%)',font:{size:11}},beginAtZero:true}
+    },
+    plugins:{legend:{display:false}}
+  }
+});
+
+// ===== Main compute =====
+function compute(){
+  const bmsAlgorithm    = document.getElementById('bmsAlgorithm');
+  const batteryAgeYr    = document.getElementById('batteryAgeYr');
+  const nominalCapacityAh = parseFloat(document.getElementById('nominalCapacityAhRange').value);
+  const initialSOC      = parseFloat(document.getElementById('initialSOCRange').value);
+  const currentLoadA    = parseFloat(document.getElementById('currentLoadARange').value);
+  const sensingErrorMa  = parseFloat(document.getElementById('sensingErrorMaRange').value);
+  const tempCellBmsC    = parseFloat(document.getElementById('tempCellBmsCRange').value);
+  const timeIntervalHr  = parseFloat(document.getElementById('timeIntervalHrRange').value);
+
+  // ----- physics -----
+  const ageFactor = ageCapacityLoss[batteryAgeYr.value || "0-new"];
+  const usableCapacity = nominalCapacityAh * ageFactor;
+  const tempFactor = tempCellBmsC < 0 ? 0.7 : tempCellBmsC > 40 ? 0.95 : 1.0;
+  const effectiveCapacity = usableCapacity * tempFactor;
+  const integratedCharge = currentLoadA * timeIntervalHr;
+  const soc_change = (integratedCharge / effectiveCapacity) * 100;
+  const newSOC_CoulombCount = initialSOC - soc_change;
+  const driftError = sensingErrorMa/1000 * timeIntervalHr / effectiveCapacity * 100 * 5;
+  const aF = algorithmCorrection[bmsAlgorithm.value || "ekf"];
+  const finalSOCError = driftError * aF;
+  const finalSOC = Math.max(0, Math.min(100, newSOC_CoulombCount));
+  const isSOCAccurate = finalSOCError < 2;
+  const remainingCapacity = effectiveCapacity * finalSOC/100;
+  const cycleCountEquivalent = nominalCapacityAh * (1-ageFactor) * 100;
+
+  // ----- stat cards -----
+  document.getElementById('statEffCap').textContent     = effectiveCapacity.toFixed(1);
+  document.getElementById('statIntegrated').textContent = integratedCharge.toFixed(1);
+  document.getElementById('statSocChange').textContent  = soc_change.toFixed(1);
+  document.getElementById('statNewSoc').textContent     = finalSOC.toFixed(1);
+  document.getElementById('statError').textContent      = finalSOCError.toFixed(2);
+  document.getElementById('statRemaining').textContent  = remainingCapacity.toFixed(1);
+
+  // colour the error stat
+  const eEl = document.getElementById('statError');
+  eEl.style.color = finalSOCError>5 ? '#c0392b' : (finalSOCError>=2 ? '#c0563a' : '#0a8a6a');
+
+  // ----- verdict -----
+  const v = document.getElementById('verdict');
+  if(finalSOCError > 5){
+    v.className = 'verdict ng';
+    v.innerHTML = '<i class="fas fa-times-circle"></i> SOC 推定誤差が大きすぎます（'+finalSOCError.toFixed(2)+'% &gt; 5%）— アルゴリズム見直し、または OCV 補正の頻度を上げる必要があります。';
+  }else if(!isSOCAccurate){
+    v.className = 'verdict warn';
+    v.innerHTML = '<i class="fas fa-exclamation-triangle"></i> SOC 推定誤差がやや大きめ（'+finalSOCError.toFixed(2)+'%）。EKF/ハイブリッドに切り替えるか、電流センサ精度を向上させてください。';
+  }else{
+    v.className = 'verdict ok';
+    v.innerHTML = '<i class="fas fa-check-circle"></i> SOC 推定は許容範囲内（誤差 '+finalSOCError.toFixed(2)+'%、新 SOC '+finalSOC.toFixed(1)+'%、残容量 '+remainingCapacity.toFixed(1)+' Ah／劣化サイクル相当 '+cycleCountEquivalent.toFixed(0)+'）。';
+  }
+
+  // ----- error vs time chart (per algorithm) -----
+  const labels=[], dCoulomb=[], dOcv=[], dEkf=[], dHybrid=[];
+  const STEPS=24;
+  for(let i=0;i<=STEPS;i++){
+    const t = timeIntervalHr*i/STEPS;
+    const drift = sensingErrorMa/1000 * t / effectiveCapacity * 100 * 5;
+    labels.push(t.toFixed(1));
+    dCoulomb.push(drift*algorithmCorrection["coulomb-count"]);
+    dOcv.push(drift*algorithmCorrection["ocv-based"]);
+    dEkf.push(drift*algorithmCorrection["ekf"]);
+    dHybrid.push(drift*algorithmCorrection["hybrid"]);
+  }
+  errorChart.data.labels = labels;
+  errorChart.data.datasets[0].data = dCoulomb;
+  errorChart.data.datasets[1].data = dOcv;
+  errorChart.data.datasets[2].data = dEkf;
+  errorChart.data.datasets[3].data = dHybrid;
+  errorChart.update('none');
+
+  // ----- algorithm comparison bar chart (current conditions) -----
+  algoChart.data.datasets[0].data = [
+    driftError*algorithmCorrection["coulomb-count"],
+    driftError*algorithmCorrection["ocv-based"],
+    driftError*algorithmCorrection["ekf"],
+    driftError*algorithmCorrection["hybrid"]
+  ];
+  algoChart.update('none');
+
+  // ----- update shared state for animation -----
+  BMS.soc = finalSOC;
+  BMS.socChange = soc_change;
+  BMS.effCap = effectiveCapacity;
+  BMS.integrated = integratedCharge;
+  BMS.current = currentLoadA;
+  BMS.error = finalSOCError;
+  BMS.ratio = finalSOC/100;
+}
+
+// ===== Battery pack animation =====
+(function(){
+  const cv = document.getElementById('bmsCanvas');
+  const ctx = cv.getContext('2d');
+  let phase = 0;
+
+  function resize(){
+    const dpr = window.devicePixelRatio||1;
+    const w = cv.parentElement.getBoundingClientRect().width;
+    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
+      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // SOC colour: low=red, mid=orange, high=green
+  function socColor(r){
+    if(r<0.15) return '#d63031';
+    if(r<0.35) return '#e17055';
+    if(r<0.60) return '#e1a055';
+    return '#00b894';
+  }
+
+  function frame(){
+    resize();
+    const W = cv.width/(window.devicePixelRatio||1);
+    const H = 270;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a';
+    ctx.fillRect(0,0,W,H);
+
+    // ----- battery pack rectangle (left side) -----
+    const packX = 50, packY = 50, packW = 180, packH = 160;
+    // outer shell
+    ctx.strokeStyle = 'rgba(150,200,235,.85)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(packX, packY, packW, packH);
+    // positive terminal nub (top right)
+    ctx.fillStyle = 'rgba(150,200,235,.85)';
+    ctx.fillRect(packX+packW-14, packY-8, 28, 8);
+
+    // ----- cells inside (4x3 grid) -----
+    const cellRows = 3, cellCols = 4;
+    const cellGap = 6;
+    const cellW = (packW - cellGap*(cellCols+1)) / cellCols;
+    const cellH = (packH - cellGap*(cellRows+1)) / cellRows;
+    for(let r=0;r<cellRows;r++){
+      for(let c=0;c<cellCols;c++){
+        const cx = packX + cellGap + c*(cellW+cellGap);
+        const cy = packY + cellGap + r*(cellH+cellGap);
+        // empty cell
+        ctx.fillStyle = 'rgba(120,170,210,.18)';
+        ctx.fillRect(cx, cy, cellW, cellH);
+        // SOC fill (rises from bottom)
+        const fillH = cellH * BMS.ratio;
+        ctx.fillStyle = socColor(BMS.ratio);
+        ctx.fillRect(cx, cy+cellH-fillH, cellW, fillH);
+        // cell outline
+        ctx.strokeStyle = 'rgba(200,225,245,.55)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx, cy, cellW, cellH);
+      }
+    }
+
+    // ----- SOC gauge (right of pack) -----
+    const gaugeX = packX + packW + 60;
+    const gaugeY = packY;
+    const gaugeW = 40;
+    const gaugeH = packH;
+    ctx.strokeStyle = 'rgba(150,200,235,.65)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(gaugeX, gaugeY, gaugeW, gaugeH);
+    // tick marks
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.font = '9px Roboto Mono, monospace';
+    ctx.textAlign = 'right';
+    for(let p=0;p<=100;p+=25){
+      const ty = gaugeY+gaugeH*(1-p/100);
+      ctx.beginPath(); ctx.moveTo(gaugeX-4,ty); ctx.lineTo(gaugeX,ty); ctx.stroke();
+      ctx.fillText(p+'%', gaugeX-6, ty+3);
+    }
+    // SOC fill
+    const fillSoc = gaugeH * BMS.ratio;
+    ctx.fillStyle = socColor(BMS.ratio);
+    ctx.fillRect(gaugeX, gaugeY+gaugeH-fillSoc, gaugeW, fillSoc);
+    // label
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('SOC', gaugeX+gaugeW/2, gaugeY-8);
+    ctx.font = 'bold 13px Roboto Mono, monospace';
+    ctx.fillStyle = socColor(BMS.ratio);
+    ctx.fillText(BMS.soc.toFixed(0)+'%', gaugeX+gaugeW/2, gaugeY+gaugeH+18);
+
+    // ----- current arrow (top, animated) -----
+    const arrowY = 28;
+    const arrowDir = BMS.current >= 0 ? 1 : -1;  // +=discharge(out), -=charge(in)
+    const arrowOffset = (phase*60) % 60;
+    ctx.strokeStyle = arrowDir>0 ? 'rgba(225,112,85,.9)' : 'rgba(0,180,216,.9)';
+    ctx.fillStyle  = arrowDir>0 ? 'rgba(225,112,85,.95)' : 'rgba(0,180,216,.95)';
+    ctx.lineWidth = 2;
+    // arrow line
+    const arrX0 = packX, arrX1 = packX + packW;
+    ctx.beginPath();
+    ctx.moveTo(arrX0, arrowY);
+    ctx.lineTo(arrX1, arrowY);
+    ctx.stroke();
+    // moving chevrons
+    for(let cx=arrX0; cx<arrX1; cx+=20){
+      const x = arrX0 + ((cx-arrX0 + arrowOffset*arrowDir + (arrX1-arrX0)) % (arrX1-arrX0));
+      ctx.beginPath();
+      ctx.moveTo(x, arrowY);
+      ctx.lineTo(x-6*arrowDir, arrowY-4);
+      ctx.moveTo(x, arrowY);
+      ctx.lineTo(x-6*arrowDir, arrowY+4);
+      ctx.stroke();
+    }
+    // label
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    const dirText = arrowDir>0 ? '放電 →' : '← 充電';
+    ctx.fillText('I = '+Math.abs(BMS.current).toFixed(0)+' A  '+dirText, packX+packW/2, arrowY-10);
+
+    // ----- voltage measurement (bottom of pack) -----
+    const vY = packY+packH+30;
+    // voltmeter symbol
+    ctx.strokeStyle = 'rgba(150,200,235,.8)';
+    ctx.fillStyle = 'rgba(120,170,210,.2)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(packX+packW/2, vY+10, 14, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(200,225,245,.9)';
+    ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('V', packX+packW/2, vY+14);
+    // wires
+    ctx.strokeStyle = 'rgba(150,200,235,.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(packX+20, packY+packH); ctx.lineTo(packX+20, vY+10); ctx.lineTo(packX+packW/2-14, vY+10);
+    ctx.moveTo(packX+packW-20, packY+packH); ctx.lineTo(packX+packW-20, vY+10); ctx.lineTo(packX+packW/2+14, vY+10);
+    ctx.stroke();
+    // V label
+    ctx.fillStyle = 'rgba(255,255,255,.65)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'left';
+    const vEst = (3.3 + 0.7*BMS.ratio).toFixed(2);
+    ctx.fillText('端子電圧 ≈ '+vEst+' V/cell', packX+packW+10, vY+14);
+
+    // ----- live status (top-left) -----
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 12px Roboto Mono, monospace';
+    ctx.textAlign='left';
+    ctx.fillText('実効 '+BMS.effCap.toFixed(1)+' Ah  ΔQ='+BMS.integrated.toFixed(1)+' Ah', 16, 16);
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText('推定誤差 '+BMS.error.toFixed(2)+'%', 16, H-12);
+
+    phase += 0.012;
+    if(phase>=1) phase = 0;
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ===== init =====
+['nominalCapacityAhRange','initialSOCRange','currentLoadARange','sensingErrorMaRange','tempCellBmsCRange','timeIntervalHrRange'].forEach(function(id){
+  pct(document.getElementById(id));
+});
+compute();
+</script>
+
+<script src="/assets/sidebar-inject.v9.js" defer></script>
+<script src="/tools/related-tools.js" defer></script>
+<script src="/tools/tool-objectives.js" defer></script>
+<script src="/tools/tool-embed-share.js" defer></script>
+<script src="/tools/param-edit.js" defer></script>
+<script src="/tools/share-state.js?v20260510r6" defer></script>
+<script src="/tools/collapsible-cards.js" defer></script>
+<script src="/tools/tooltips.js" defer></script>
+<script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
+</body>
+</html>
