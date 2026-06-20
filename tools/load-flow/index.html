@@ -124,14 +124,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "電力潮流計算（ガウス・ザイデル法）",
       "description": "ガウス・ザイデル反復法による3母線電力系統の潮流計算シミュレーター。母線アドミタンス行列から電圧を更新し、各母線電圧 V・位相角 δ・線路有効/無効電力 P・Q・系統損失を pu 単位で算出する電力工学ツール。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/load-flow.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -261,7 +261,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="btn" onclick="runFlow()"><i class="fas fa-play"></i> 計算実行</button>
       <button class="btn secondary" onclick="resetDefaults()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4764906821?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4764906821.09._SCMZZZZZZ_.jpg" alt="有限要素法の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">有限要素法 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -301,9 +309,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 液体</div><canvas id="sldCanvas" height="260" data-ux-no-scale="1"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-project-diagram"></i> 単線結線図（3母線系統）</div><canvas id="sldCanvas" height="260" data-ux-no-scale="1"></canvas></div>
 
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 対流</div><canvas class="ux-chartjs-canvas" id="convChart" height="120"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 収束履歴（|ΔV| vs 反復回数・半対数）</div><canvas class="ux-chartjs-canvas" id="convChart" height="120"></canvas></div>
       <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> バス電圧分布</div><canvas class="ux-chartjs-canvas" id="voltChart" height="120"></canvas></div>
     
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
@@ -318,19 +326,40 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 
 <script>
+(function(){
+'use strict';
 let convChartObj = null, voltChartObj = null;
+
+/* ===== complex helpers ===== */
+function complex(re, im){ return { re, im }; }
+function cadd(a, b){ return { re: a.re + b.re, im: a.im + b.im }; }
+function csub(a, b){ return { re: a.re - b.re, im: a.im - b.im }; }
+function cmul(a, b){ return { re: a.re*b.re - a.im*b.im, im: a.re*b.im + a.im*b.re }; }
+function cdiv(a, b){ const d = b.re*b.re + b.im*b.im; return { re: (a.re*b.re + a.im*b.im)/d, im: (a.im*b.re - a.re*b.im)/d }; }
+function cconj(a){ return { re: a.re, im: -a.im }; }
+function cabs(a){ return Math.sqrt(a.re*a.re + a.im*a.im); }
+function cang(a){ return Math.atan2(a.im, a.re) * 180 / Math.PI; }
+function cpolar(mag, angDeg){ const r = angDeg * Math.PI/180; return { re: mag*Math.cos(r), im: mag*Math.sin(r) }; }
+function cinv(a){ const d = a.re*a.re + a.im*a.im; return { re: a.re/d, im: -a.im/d }; }
+function getVal(id){ return parseFloat(document.getElementById(id).value) || 0; }
+
+const VMIN = 0.95, VMAX = 1.05; // pu voltage limits for color coding
 
 function updateTol(){
   const val = parseFloat(document.getElementById('tol').value);
   const tol = Math.pow(10, val);
-  document.getElementById('tolNum').textContent = tol.toExponential(0) + ' pu';
+  const numEl = document.getElementById('tolNum');
+  if (numEl && numEl.tagName === 'INPUT') numEl.value = val; else if (numEl) numEl.textContent = tol.toExponential(0) + ' pu';
   const el = document.getElementById('tol');
   const pct = ((val - (-4)) / ((-2) - (-4)) * 100).toFixed(1);
   el.style.setProperty('--pct', pct + '%');
-}function getVal(id){ return parseFloat(document.getElementById(id).value) || 0; }function complex(re, im){ return { re, im }; }function cadd(a, b){ return { re: a.re + b.re, im: a.im + b.im }; }function csub(a, b){ return { re: a.re - b.re, im: a.im - b.im }; }function cmul(a, b){ return { re: a.re*b.re - a.im*b.im, im: a.re*b.im + a.im*b.re }; }function cdiv(a, b){
-  const d = b.re*b.re + b.im*b.im;
-  return { re: (a.re*b.re + a.im*b.im)/d, im: (a.im*b.re - a.re*b.im)/d };
-}function cconj(a){ return { re: a.re, im: -a.im }; }function cabs(a){ return Math.sqrt(a.re*a.re + a.im*a.im); }function cang(a){ return Math.atan2(a.im, a.re) * 180 / Math.PI; }function cpolar(mag, angDeg){ const r = angDeg * Math.PI/180; return { re: mag*Math.cos(r), im: mag*Math.sin(r) }; }function cinv(a){ const d = a.re*a.re + a.im*a.im; return { re: a.re/d, im: -a.im/d }; }function runFlow(){
+}
+
+/* ===== Gauss-Seidel load flow solver (3-bus) ===== */
+// returns { V[], flows{12,13,23}, totalLoss(MW), totalGen(MW), totalLoad(MW),
+//           minV(pu), iters, converged, convHistory[], sbase }
+let SOL = null;
+function solveFlow(){
   const sbase = getVal('sbase');
   const tolExp = parseFloat(document.getElementById('tol').value);
   const tol = Math.pow(10, tolExp);
@@ -339,62 +368,61 @@ function updateTol(){
   const r13 = getVal('r13'), x13 = getVal('x13');
   const r23 = getVal('r23'), x23 = getVal('x23');
 
-  // admittances
-  function yadm(r,x) { return cinv(complex(r,x)); }const y12 = yadm(r12, x12);
+  function yadm(r,x){ return cinv(complex(r,x)); }
+  const y12 = yadm(r12, x12);
   const y13 = yadm(r13, x13);
   const y23 = yadm(r23, x23);
 
   // Y_bus
   const Y = [
-    [cadd(cadd(y12,y13), complex(0,0)),{ re:-y12.re, im:-y12.im },{ re:-y13.re, im:-y13.im }],
-    [{ re:-y12.re, im:-y12.im }, cadd(y12,y23),{ re:-y23.re, im:-y23.im }],
-    [{ re:-y13.re, im:-y13.im },{ re:-y23.re, im:-y23.im }, cadd(y13,y23)]
+    [cadd(y12,y13), { re:-y12.re, im:-y12.im }, { re:-y13.re, im:-y13.im }],
+    [{ re:-y12.re, im:-y12.im }, cadd(y12,y23), { re:-y23.re, im:-y23.im }],
+    [{ re:-y13.re, im:-y13.im }, { re:-y23.re, im:-y23.im }, cadd(y13,y23)]
   ];
 
-  // Bus data
   const V1 = cpolar(1.05, 0); // slack
-  const P2 = getVal('pg2'); // PV bus gen
+  const P2 = getVal('pg2');   // PV bus gen (pu)
   const V2mag = getVal('v2set');
-  const PL3 = getVal('pl3'); // PQ bus load
+  const PL3 = getVal('pl3');   // PQ load (pu)
   const QL3 = getVal('ql3');
 
-  // Initial voltages
   let V = [V1, cpolar(V2mag, 0), cpolar(1.0, 0)];
-
-  const maxIter = 20;
+  const maxIter = 50;
   const convHistory = [];
-  let converged = false;
-  let iters = 0;
+  let converged = false, iters = 0;
 
   for (let k = 0; k < maxIter; k++){
     const Vold = V.map(v => ({...v}));
-
-    // Bus 2 (PV): update angle, keep |V|
+    // Bus 2 (PV): hold |V|, update angle
     {
       const i = 1;
       const sum = cadd(cmul(Y[i][0], V[0]), cmul(Y[i][2], V[2]));
-      // Q2 from previous iteration
-      const S2_prev = cmul(V[i], cconj(cadd(cmul(Y[i][0],V[0]), cmul(Y[i][1],V[i]), cmul(Y[i][2],V[2]))));
-      const Q2 = -S2_prev.im; // reactive injection = -Q_absorbed; for PV keep Q floating
-      const PQ2 = complex(P2, -Q2);
-      const Vcalc = cdiv(csub(cdiv(PQ2, cconj(V[i])), sum), Y[i][i]);
+      const S2_prev = cmul(V[i], cconj(cadd(cadd(cmul(Y[i][0],V[0]), cmul(Y[i][1],V[i])), cmul(Y[i][2],V[2]))));
+      const Q2 = S2_prev.im; // injected reactive (estimated)
+      const PQ2 = complex(P2, Q2);
+      const Vcalc = cdiv(csub(cdiv(cconj(PQ2), cconj(V[i])), sum), Y[i][i]);
       const newAng = Math.atan2(Vcalc.im, Vcalc.re);
       V[i] = cpolar(V2mag, newAng * 180 / Math.PI);
-    }// Bus 3 (PQ)
+    }
+    // Bus 3 (PQ load): negative injection
     {
       const i = 2;
       const sum = cadd(cmul(Y[i][0], V[0]), cmul(Y[i][1], V[1]));
-      const PQ3 = complex(-PL3, QL3); // load: negative injection
-      V[i] = cdiv(csub(cdiv(PQ3, cconj(V[i])), sum), Y[i][i]);
-    }iters = k + 1;
+      const PQ3 = complex(-PL3, -QL3);
+      V[i] = cdiv(csub(cdiv(cconj(PQ3), cconj(V[i])), sum), Y[i][i]);
+    }
+    iters = k + 1;
     const maxDV = Math.max(
       Math.abs(cabs(V[1]) - cabs(Vold[1])),
-      Math.abs(cabs(V[2]) - cabs(Vold[2]))
+      Math.abs(cabs(V[2]) - cabs(Vold[2])),
+      Math.abs(cang(V[1]) - cang(Vold[1]))*Math.PI/180,
+      Math.abs(cang(V[2]) - cang(Vold[2]))*Math.PI/180
     );
     convHistory.push(maxDV || 1e-10);
-
     if (maxDV < tol){ converged = true; break; }
-  }// Line flows
+  }
+
+  // Line flows (sending end, MW/MVar)
   function lineFlow(Vi, Vj, yij){
     const Iij = cmul(csub(Vi, Vj), yij);
     const Sij = cmul(Vi, cconj(Iij));
@@ -407,85 +435,205 @@ function updateTol(){
   const f31 = lineFlow(V[2], V[0], y13);
   const f32 = lineFlow(V[2], V[1], y23);
 
-  const loss12 = f12.P + f21.P;
-  const loss13 = f13.P + f31.P;
-  const loss23 = f23.P + f32.P;
-  const totalLoss = loss12 + loss13 + loss23;
+  const totalLoss = (f12.P+f21.P) + (f13.P+f31.P) + (f23.P+f32.P);
+  // Slack injection from Y-bus: S1 = V1 * conj(Σ Y1j Vj)
+  const I1 = cadd(cadd(cmul(Y[0][0],V[0]), cmul(Y[0][1],V[1])), cmul(Y[0][2],V[2]));
+  const S1 = cmul(V[0], cconj(I1));
+  const Pslack = S1.re * sbase;
+  const Pg2 = P2 * sbase;
+  const totalGen = Math.max(0, Pslack) + Math.max(0, Pg2);
+  const totalLoad = PL3 * sbase;
+  const minV = Math.min(cabs(V[0]), cabs(V[1]), cabs(V[2]));
 
-  // Update stats
-  document.getElementById('sv1').textContent = cabs(V[0]).toFixed(3) + '∠' + cang(V[0]).toFixed(1) + '°';
-  document.getElementById('sv2').textContent = cabs(V[1]).toFixed(3) + '∠' + cang(V[1]).toFixed(1) + '°';
-  document.getElementById('sv3').textContent = cabs(V[2]).toFixed(3) + '∠' + cang(V[2]).toFixed(1) + '°';
-  document.getElementById('sloss').textContent = (totalLoss).toFixed(2);
-  document.getElementById('siter').textContent = iters;
+  SOL = {
+    V, sbase, iters, converged, convHistory, tol,
+    flows: { f12, f13, f23, f21, f31, f32 },
+    totalLoss, totalGen, totalLoad, Pslack, Pg2, PL3: PL3*sbase, QL3: QL3*sbase, minV
+  };
+  return SOL;
+}
+
+/* ===== runFlow: solve, push stats, refresh charts, (re)start animation ===== */
+function runFlow(){
+  const s = solveFlow();
+  document.getElementById('sv1').textContent = cabs(s.V[0]).toFixed(3) + '∠' + cang(s.V[0]).toFixed(1) + '°';
+  document.getElementById('sv2').textContent = cabs(s.V[1]).toFixed(3) + '∠' + cang(s.V[1]).toFixed(1) + '°';
+  document.getElementById('sv3').textContent = cabs(s.V[2]).toFixed(3) + '∠' + cang(s.V[2]).toFixed(1) + '°';
+  document.getElementById('sloss').textContent = s.totalLoss.toFixed(2);
+  document.getElementById('siter').textContent = s.iters;
   const convEl = document.getElementById('sconv');
-  convEl.innerHTML = converged ? '<span class="conv-ok">収束</span>' : '<span class="conv-fail">未収束</span>';
-  document.getElementById('sp12').textContent = f12.P.toFixed(1);
-  document.getElementById('sp13').textContent = f13.P.toFixed(1);
+  convEl.innerHTML = s.converged ? '<span class="conv-ok">収束</span>' : '<span class="conv-fail">未収束</span>';
+  document.getElementById('sp12').textContent = s.flows.f12.P.toFixed(1);
+  document.getElementById('sp13').textContent = s.flows.f13.P.toFixed(1);
 
-  drawSLD(V, f12, f13, f23);
-  drawConvChart(convHistory, tol);
-  drawVoltChart(V);
-}function drawSLD(V, f12, f13, f23){
-  const canvas = document.getElementById('sldCanvas');
-  const W = canvas.width = canvas.offsetWidth * (window.devicePixelRatio||1);
-  const H = canvas.height = 260 * (window.devicePixelRatio||1);
-  const ctx = canvas.getContext('2d');
-  ctx.scale(window.devicePixelRatio||1, window.devicePixelRatio||1);
-  const w = canvas.offsetWidth, h = 260;
+  drawConvChart(s.convHistory, s.tol);
+  drawVoltChart(s.V);
+  startAnim();
+}
+
+/* ===== V2 HERO: live animated power-flow network on sldCanvas ===== */
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sldCanvas = document.getElementById('sldCanvas');
+const sldCtx = sldCanvas ? sldCanvas.getContext('2d') : null;
+let animId = null, animPhase = 0, lastTs = 0;
+let cssW = 0, cssH = 260;
+
+function vColor(vpu){
+  if (vpu < VMIN) return '#e74c3c';      // under-voltage (sag)
+  if (vpu > VMAX) return '#f39c12';      // over-voltage
+  return '#2ecc71';                       // within limits
+}
+
+function busPositions(w, h){
+  return [
+    { x: w*0.16, y: h*0.50, kind:'gen',  label:'母線1', sub:'Slack' },
+    { x: w*0.50, y: h*0.22, kind:'gen',  label:'母線2', sub:'PV' },
+    { x: w*0.84, y: h*0.50, kind:'load', label:'母線3', sub:'PQ' }
+  ];
+}
+
+function resizeSld(){
+  if (!sldCanvas) return;
+  const rect = sldCanvas.parentElement.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width - 24));
+  cssH = 260;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  sldCanvas.style.width = cssW + 'px';
+  sldCanvas.style.height = cssH + 'px';
+  sldCanvas.width = Math.round(cssW * dpr);
+  sldCanvas.height = Math.round(cssH * dpr);
+  sldCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function drawSldFrame(){
+  if (!SOL || !sldCtx) return;
+  resizeSld();
+  const w = cssW, h = cssH, ctx = sldCtx;
   ctx.clearRect(0,0,w,h);
-  ctx.fillStyle = '#0a1628';
-  ctx.fillRect(0,0,w,h);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,w,h);
+  const fs = Math.max(0.78, Math.min(1.15, w/560));
 
-  const buses = [
-    { x: w*0.15, y: h*0.5, label: 'Bus 1\nSlack', v: V[0], color: '#00b894' },{ x: w*0.5,  y: h*0.2, label: 'Bus 2\nPV',    v: V[1], color: '#007BFF' },{ x: w*0.85, y: h*0.5, label: 'Bus 3\nPQ',    v: V[2], color: '#e17055' }];
+  const B = busPositions(w, h);
+  const V = SOL.V;
+  // line definitions: from-bus, to-bus, sending flow (MW), reverse flow (MW)
+  const lines = [
+    { a:0, b:1, f:SOL.flows.f12.P, q:SOL.flows.f12.Q, loss:Math.abs(SOL.flows.f12.P+SOL.flows.f21.P) },
+    { a:0, b:2, f:SOL.flows.f13.P, q:SOL.flows.f13.Q, loss:Math.abs(SOL.flows.f13.P+SOL.flows.f31.P) },
+    { a:1, b:2, f:SOL.flows.f23.P, q:SOL.flows.f23.Q, loss:Math.abs(SOL.flows.f23.P+SOL.flows.f32.P) }
+  ];
+  let maxAbs = 1;
+  lines.forEach(l => { if (Math.abs(l.f) > maxAbs) maxAbs = Math.abs(l.f); });
 
-  function drawLine(b1, b2, flow){
-    ctx.beginPath();
-    ctx.moveTo(b1.x, b1.y);
-    ctx.lineTo(b2.x, b2.y);
-    ctx.strokeStyle = '#334466';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    const mx = (b1.x+b2.x)/2, my = (b1.y+b2.y)/2;
-    ctx.fillStyle = '#00B4D8';
-    ctx.font = `bold ${Math.round(11*(w/600))}px Roboto Mono, monospace`;
+  // draw lines (thickness ∝ |flow|), then animated power particles
+  lines.forEach(l => {
+    const p1 = B[l.a], p2 = B[l.b];
+    const load = Math.abs(l.f) / maxAbs;             // 0..1 relative loading
+    const lw = 2 + load * 7;
+    ctx.strokeStyle = '#27405f';
+    ctx.lineWidth = lw + 3;
+    ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
+    // colored conductor by loading
+    ctx.strokeStyle = load > 0.85 ? 'rgba(231,76,60,0.55)' : 'rgba(0,180,216,0.35)';
+    ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
+
+    // flow direction: positive f means power flows a->b
+    const dir = l.f >= 0 ? 1 : -1;
+    const sx = dir>0 ? p1.x : p2.x, sy = dir>0 ? p1.y : p2.y;
+    const ex = dir>0 ? p2.x : p1.x, ey = dir>0 ? p2.y : p1.y;
+    const dx = ex - sx, dy = ey - sy, len = Math.hypot(dx,dy);
+    const ux = dx/len, uy = dy/len;
+    // particle count & speed scale with magnitude
+    const mag = Math.abs(l.f);
+    const nP = Math.max(2, Math.round(load * 7) + 2);
+    const speed = 0.10 + load * 0.55;
+    for (let i = 0; i < nP; i++){
+      let t = ((animPhase * speed) + i/nP) % 1;
+      const margin = 26;
+      const x = sx + ux*margin + (dx - ux*margin*2)*t;
+      const y = sy + uy*margin + (dy - uy*margin*2)*t;
+      const r = 1.6 + load*2.4;
+      const g = ctx.createRadialGradient(x,y,0,x,y,r*2.4);
+      g.addColorStop(0,'rgba(255,238,140,0.95)');
+      g.addColorStop(1,'rgba(255,200,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x,y,r*2.4,0,7); ctx.fill();
+      ctx.fillStyle = '#fff3b0';
+      ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
+    }
+    // labels: P (MW), Q (MVar), loss
+    const mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2;
+    ctx.font = `bold ${Math.round(11*fs)}px Roboto Mono, monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(flow.P.toFixed(0)+'MW', mx, my-8);
-    ctx.fillStyle = 'rgba(0,180,216,0.6)';
-    ctx.fillText(flow.Q.toFixed(0)+'MVar', mx, my+10);
-  }drawLine(buses[0], buses[1], f12);
-  drawLine(buses[0], buses[2], f13);
-  drawLine(buses[1], buses[2], f23);
-
-  buses.forEach(b =>{
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, 22, 0, 2*Math.PI);
-    ctx.fillStyle = b.color + '33';
-    ctx.fill();
-    ctx.strokeStyle = b.color;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(10*(w/600))}px Noto Sans JP, sans-serif`;
-    ctx.textAlign = 'center';
-    const lines = b.label.split('\n');
-    ctx.fillText(lines[0], b.x, b.y - 4);
-    ctx.fillStyle = b.color;
-    ctx.fillText(lines[1], b.x, b.y + 12);
-
-    ctx.fillStyle = '#aaccff';
-    ctx.font = `${Math.round(9*(w/600))}px Roboto Mono, monospace`;
-    ctx.fillText(cabs(b.v).toFixed(3)+' pu', b.x, b.y + 38);
-    ctx.fillText(cang(b.v).toFixed(1)+'°', b.x, b.y + 52);
+    ctx.fillStyle = '#7fe3ff';
+    ctx.fillText(Math.abs(l.f).toFixed(0)+' MW', mx, my-7);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = `${Math.round(9.5*fs)}px Roboto Mono, monospace`;
+    ctx.fillText('損失 '+l.loss.toFixed(1)+' MW', mx, my+12);
   });
 
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.font = `${Math.round(10*(w/600))}px Noto Sans JP`;
+  // draw buses
+  B.forEach((b, idx) => {
+    const vpu = cabs(V[idx]);
+    const col = vColor(vpu);
+    // pulse halo for slack/gen feeding power
+    ctx.beginPath(); ctx.arc(b.x, b.y, 24, 0, 7);
+    ctx.fillStyle = col + '22'; ctx.fill();
+    ctx.lineWidth = 2.6; ctx.strokeStyle = col; ctx.stroke();
+    // icon: gen = small ~, load = arrow down
+    ctx.fillStyle = col;
+    if (b.kind === 'gen'){
+      ctx.beginPath(); ctx.arc(b.x, b.y-1, 9, 0, 7); ctx.strokeStyle=col; ctx.lineWidth=1.6; ctx.stroke();
+      ctx.font = `bold ${Math.round(11*fs)}px serif`; ctx.textAlign='center';
+      ctx.fillText('G', b.x, b.y+3);
+    } else {
+      ctx.font = `bold ${Math.round(13*fs)}px sans-serif`; ctx.textAlign='center';
+      ctx.fillText('▼', b.x, b.y+4);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(10*fs)}px Noto Sans JP, sans-serif`;
+    ctx.fillText(b.label+' ('+b.sub+')', b.x, b.y - 31);
+    ctx.fillStyle = col;
+    ctx.font = `bold ${Math.round(10.5*fs)}px Roboto Mono, monospace`;
+    ctx.fillText(vpu.toFixed(3)+' pu', b.x, b.y + 38);
+    ctx.fillStyle = 'rgba(170,200,255,0.85)';
+    ctx.font = `${Math.round(9*fs)}px Roboto Mono, monospace`;
+    ctx.fillText(cang(V[idx]).toFixed(1)+'°', b.x, b.y + 51);
+  });
+
+  // header + legend
   ctx.textAlign = 'left';
-  ctx.fillText('3母線系統 一線図', 10, 18);
-}function drawConvChart(history, tol){
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = `${Math.round(10*fs)}px Noto Sans JP`;
+  ctx.fillText('発電 → 負荷 へ流れる電力（粒子=潮流, 太さ=線路負荷, 色=電圧）', 10, 16);
+  // under-voltage warning
+  if (SOL.minV < VMIN){
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = `bold ${Math.round(10*fs)}px Noto Sans JP`;
+    ctx.fillText('⚠ 電圧低下: 母線電圧が下限 '+VMIN.toFixed(2)+'pu を下回りました', 10, h-10);
+  }
+
+  // live numbers to stat cards every frame (never '—')
+  document.getElementById('sloss').textContent = SOL.totalLoss.toFixed(2);
+}
+
+function animLoop(ts){
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min(0.05, (ts - lastTs)/1000);
+  lastTs = ts;
+  animPhase += dt;
+  drawSldFrame();
+  animId = requestAnimationFrame(animLoop);
+}
+function startAnim(){
+  if (!sldCtx){ return; }
+  if (reduceMotion){ drawSldFrame(); return; } // single static frame
+  if (animId) return;
+  lastTs = 0;
+  animId = requestAnimationFrame(animLoop);
+}
+
+function drawConvChart(history, tol){
   const ctx2 = document.getElementById('convChart').getContext('2d');
   if (convChartObj) convChartObj.destroy();
   const labels = history.map((_,i) => i+1);
@@ -554,13 +702,23 @@ function updateTol(){
   document.getElementById('v2set').value = 1.02;
   document.getElementById('pl3').value = 1.0;
   document.getElementById('ql3').value = 0.5;
+  document.getElementById('sbaseNum').value = 100;
   document.getElementById('sbase').value = 100;
   document.getElementById('tol').value = -3;
-  updateSlider(document.getElementById('sbase'));
+  document.getElementById('tolNum').value = -3;
+  if (typeof updateSlider === 'function') updateSlider(document.getElementById('sbase'));
   updateTol();
   runFlow();
-}function cabs(a){ return Math.sqrt(a.re*a.re + a.im*a.im); }function cang(a){ return Math.atan2(a.im, a.re) * 180 / Math.PI; }window.addEventListener('load', () =>{ updateTol(); runFlow(); });
-window.addEventListener('resize', runFlow);
+}
+
+// expose handlers referenced from inline HTML attributes
+window.runFlow = runFlow;
+window.resetDefaults = resetDefaults;
+window.updateTol = updateTol;
+
+window.addEventListener('load', function(){ updateTol(); runFlow(); });
+window.addEventListener('resize', function(){ if (SOL) drawSldFrame(); });
+})();
 </script>
 
 <section class="explanation">
@@ -621,6 +779,9 @@ window.addEventListener('resize', runFlow);
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="load-flow.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -695,6 +856,16 @@ window.addEventListener('resize', runFlow);
 <li>需要の季節変動（冬季最大50MW、夏季最小20MW）を複数回実行して、年間の電圧変動幅を把握することが重要です</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4764906821?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4764906821.09._SCMZZZZZZ_.jpg" alt="有限要素法の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">有限要素法 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -43,7 +43,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "切削加工シミュレーター",
       "description": "直交切削の切削力・背分力をMerchantの理論で計算。Merchant円で力関係を可視化。",
       "url": "https://novasolver.jp/tools/metal-cutting.html",
@@ -52,7 +52,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
       "operatingSystem": "Web Browser",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Merchantの直交切削理論","Merchant円の可視化","Taylor工具寿命式"],
       "keywords": "切削加工,Merchant円,切削力,背分力,工具寿命,Taylor式,CAE",
       "datePublished": "2026-04-08",
@@ -156,16 +156,35 @@ canvas.merchant{width:100%;border-radius:10px;border:1px solid var(--border)}/* 
       <label>比切削抵抗 kc <div class="num-wrap"><input type="number" class="num-input" id="kcNum" value="2000" min="500" max="4000" step="100" oninput="syncFromNum('kc','kcNum')"><span class="num-unit">MPa</span></div> N/mm²</label>
       <input type="range" id="kc" min="500" max="4000" value="2000" step="100" oninput="syncToNum('kc','kcNum')">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4820759353?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4820759353.09._SCMZZZZZZ_.jpg" alt="機械加工の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">機械加工 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（ライブ）</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="s_phi">—</div><div class="sl">せん断角 φ (°)</div></div>
       <div class="stat-card"><div class="sv" id="s_Fc">—</div><div class="sl">切削力 Fc (N)</div></div>
       <div class="stat-card"><div class="sv" id="s_Ft">—</div><div class="sl">背分力 Ft (N)</div></div>
       <div class="stat-card"><div class="sv" id="s_Pw">—</div><div class="sl">切削動力 (W)</div></div>
+      <div class="stat-card"><div class="sv" id="s_r">—</div><div class="sl">切りくず厚さ比 r = t₀/tc</div></div>
+      <div class="stat-card"><div class="sv" id="s_gam">—</div><div class="sl">せん断ひずみ γ</div></div>
+    </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 直交切削アニメーション（せん断面・切りくず生成）</div><canvas id="cutAnim" width="600" height="360" class="merchant"></canvas>
+    <div class="legend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:8px">
+      <span><i style="display:inline-block;width:16px;height:3px;background:#e85d04;border-radius:2px"></i> せん断面（角φ）</span>
+      <span><i style="display:inline-block;width:16px;height:3px;background:#007BFF;border-radius:2px"></i> 切削力 Fc</span>
+      <span><i style="display:inline-block;width:16px;height:3px;background:#2ecc71;border-radius:2px"></i> 背分力 Ft</span>
+      <span><i style="display:inline-block;width:16px;height:3px;background:#9b59b6;border-radius:2px"></i> 合力 R</span>
     </div>
     </div>
 
@@ -177,172 +196,263 @@ canvas.merchant{width:100%;border-radius:10px;border:1px solid var(--border)}/* 
 <p style="margin-top:6px;font-size:.82rem">主分力（Merchant則）：\(k_s\) 比切削抵抗 [N/mm²]、\(b\) 切削幅、\(h\) 切り込み深さ [mm]</p>
 <p style="margin-top:8px">$$v_c = \frac{C}{T^m f^a d^b}$$</p>
 <p style="margin-top:6px;font-size:.82rem">テイラーの工具寿命式：\(T\) 工具寿命 [min]、\(v_c\) 切削速度 [m/min]</p>
-<p style="margin-top:8px">$$P = F_c \cdot v_c$$</p>
-<p style="margin-top:6px;font-size:.82rem">切削動力 [W]：\(F_c\) 主分力 [N]、\(v_c\) 切削速度 [m/s]</p>
+<p style="margin-top:8px">$$P = \frac{F_c \cdot v_c}{60}$$</p>
+<p style="margin-top:6px;font-size:.82rem">切削動力 [W]：\(F_c\) 主分力 [N]、\(v_c\) 切削速度 [m/min]（本ツールはこの単位系で計算）</p>
 </div>
   </div>
 </div>
 
 <script>
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
+(function(){
+"use strict";
+var L = {
+  cutTitle:'直交切削（せん断面・切りくず生成）', chipLbl:'切りくず', toolLbl:'工具', workLbl:'被削材',
+  shearLbl:'せん断面 φ', rakeLbl:'すくい角 α', t0Lbl:'切込 t₀', tcLbl:'切りくず厚 tc',
+  merchantTitle:'Merchant 円', toolLife:'工具寿命 T (min)', vcAxis:'切削速度 Vc (m/min)', tAxis:'工具寿命 T (min)',
+  font:'Noto Sans JP, sans-serif'
+};
+function d2r(d){ return d*Math.PI/180; }
+function hidpi(canvas, ctx, cssW, cssH){
+  var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  canvas.setAttribute('data-ux-no-scale','1');
+  var w = Math.max(1, Math.round(cssW)), h = Math.max(1, Math.round(cssH));
+  canvas.style.width = w+'px'; canvas.style.height = h+'px';
+  var bw = Math.round(w*dpr), bh = Math.round(h*dpr);
+  if(canvas.width!==bw||canvas.height!==bh){ canvas.width=bw; canvas.height=bh; }
+  canvas.dataset.cssW=String(w); canvas.dataset.cssH=String(h);
+  if(ctx&&ctx.setTransform) ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { w:w, h:h };
 }
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
+
+var ids = ['alpha','beta','vc','f_val','ap','kc'];
+var animCanvas = document.getElementById('cutAnim');
+var actx = animCanvas ? animCanvas.getContext('2d') : null;
+var mc = document.getElementById('merchant');
+var mctx = mc ? mc.getContext('2d') : null;
+var chart = null;
+var state = {};        // current computed physics
+var phase = 0;         // animation phase 0..1 (tool advance into stock)
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function readParams(){
+  var alpha = +document.getElementById('alpha').value;
+  var beta  = +document.getElementById('beta').value;
+  var vc    = +document.getElementById('vc').value;
+  var f     = +document.getElementById('f_val').value;
+  var ap    = +document.getElementById('ap').value;
+  var kc    = +document.getElementById('kc').value;
+  // Merchant orthogonal cutting relations
+  var phi = 45 + alpha/2 - beta/2;                 // shear angle (deg)
+  var phiR = d2r(phi), aR = d2r(alpha);
+  var r = Math.sin(phiR)/Math.cos(phiR - aR);      // chip thickness ratio t0/tc
+  var gamma = 1/Math.tan(phiR) + Math.tan(phiR - aR); // shear strain
+  var Fc = kc * ap * f;                             // cutting force (N)
+  var Ft = Fc * Math.tan(d2r(beta - alpha));        // thrust force (N)
+  var Pw = Fc * vc / 60;                            // cutting power (W)
+  return { alpha:alpha, beta:beta, vc:vc, f:f, ap:ap, kc:kc,
+           phi:phi, r:r, gamma:gamma, Fc:Fc, Ft:Math.abs(Ft), R:Math.hypot(Fc,Ft) };
 }
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var attrW = parseFloat(canvas.getAttribute("width")) || 0;
-  var attrH = parseFloat(canvas.getAttribute("height")) || 0;
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || attrW || canvas.width / dpr || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || attrH || canvas.height / dpr || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  var bw = Math.round(w * dpr);
-  var bh = Math.round(h * dpr);
-  if (canvas.width !== bw || canvas.height !== bh) {
-    canvas.width = bw;
-    canvas.height = bh;
+
+function setText(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+
+function updateStats(s){
+  setText('s_phi', s.phi.toFixed(1));
+  setText('s_Fc', s.Fc.toFixed(0));
+  setText('s_Ft', s.Ft.toFixed(0));
+  setText('s_Pw', s.Pw.toFixed(0));
+  setText('s_r', s.r.toFixed(3));
+  setText('s_gam', s.gamma.toFixed(2));
+}
+
+/* ===== Orthogonal cutting animation ===== */
+function arrow(ctx, x1,y1,x2,y2,color,label,lw){
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+  ctx.strokeStyle=color; ctx.lineWidth=lw||2.5; ctx.stroke();
+  var ang=Math.atan2(y2-y1,x2-x1), h=9;
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-h*Math.cos(ang-0.4), y2-h*Math.sin(ang-0.4));
+  ctx.lineTo(x2-h*Math.cos(ang+0.4), y2-h*Math.sin(ang+0.4));
+  ctx.closePath(); ctx.fillStyle=color; ctx.fill();
+  if(label){ ctx.fillStyle=color; ctx.font='bold 12px Roboto Mono, monospace'; ctx.fillText(label, x2+5, y2-5); }
+}
+
+function drawCut(s, ph){
+  if(!actx) return;
+  var cw = animCanvas.clientWidth || parseFloat(animCanvas.getAttribute('width')) || 600;
+  var dims = hidpi(animCanvas, actx, cw, 360);
+  var W=dims.w, H=dims.h, ctx=actx;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+
+  var phi = s.phi, aR = d2r(s.alpha), phiR = d2r(phi);
+  var ground = H*0.66;                 // top surface of the workpiece (machined line)
+  var t0 = Math.max(14, Math.min(48, s.f*120 + s.ap*4)); // depth of cut in px (visual)
+  var tc = t0 / Math.max(0.18, s.r);   // chip thickness (thicker than t0)
+  var toolBaseX = W*0.62;              // tool tip x at full engagement
+  var adv = ph;                        // 0..1 progress of cut along surface
+  var tipX = W*0.20 + adv*(toolBaseX - W*0.20);
+
+  // ---- Workpiece (uncut stock to the right of tool tip) ----
+  ctx.fillStyle='#33414f';
+  ctx.fillRect(tipX, ground, W - tipX, H-ground);
+  // machined surface to the left (already cut, lower by t0)
+  ctx.fillStyle='#3d4a59';
+  ctx.fillRect(0, ground + t0, tipX, H-ground-t0);
+  // hatch on machined surface
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  for(var gx=0; gx<tipX; gx+=14){ ctx.beginPath(); ctx.moveTo(gx, ground+t0); ctx.lineTo(gx+10, H); ctx.stroke(); }
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='11px '+L.font; ctx.textAlign='left';
+  ctx.fillText(L.workLbl, 10, ground+t0+18);
+
+  // uncut chip thickness line t0 (top of stock to shear start)
+  // shear plane: from tool tip (tipX, ground+t0) up to free surface at angle phi
+  var tipY = ground + t0;
+  var spLen = t0 / Math.sin(phiR);     // length of shear plane
+  var spx = tipX + spLen*Math.cos(phiR);
+  var spy = tipY - spLen*Math.sin(phiR);  // up to the original surface (ground)
+
+  // ---- Chip (sheared material flowing up the rake face) ----
+  // rake face direction (up-left), tool rake angle alpha measured from vertical
+  var rake = -Math.PI/2 + aR;          // direction of rake face going up
+  var rdx = Math.cos(rake), rdy = Math.sin(rake);
+  var chipLen = 90 + 60*Math.min(1, s.r); // chip length up the face
+  // chip is a parallelogram from shear plane along rake face, thickness tc
+  var nrx = -rdy, nry = rdx;            // normal to rake face (toward chip outside)
+  var p1x = tipX, p1y = tipY;          // tool tip
+  var p2x = spx, p2y = spy;            // top of shear plane (free surface)
+  var p3x = p2x + rdx*chipLen, p3y = p2y + rdy*chipLen;
+  var p4x = p1x + rdx*chipLen, p4y = p1y + rdy*chipLen;
+  // curl the chip outward at the top
+  ctx.fillStyle='#c0651e';
+  ctx.beginPath();
+  ctx.moveTo(p1x,p1y); ctx.lineTo(p2x,p2y);
+  ctx.lineTo(p3x,p3y);
+  // curl: quadratic toward outside
+  var curlx = p3x + nrx*tc*1.4 - rdx*18, curly = p3y + nry*tc*1.4 - rdy*18;
+  ctx.quadraticCurveTo(p3x+nrx*tc*0.7, p3y+nry*tc*0.7, curlx, curly);
+  ctx.lineTo(p4x,p4y);
+  ctx.closePath(); ctx.fill();
+  // chip shear lamellae (lines showing shear strain)
+  ctx.strokeStyle='rgba(0,0,0,0.22)'; ctx.lineWidth=1;
+  for(var i=1;i<7;i++){
+    var fx=i/7;
+    var ax=p1x+(p2x-p1x)*fx, ay=p1y+(p2y-p1y)*fx;
+    var bx=p4x+(p3x-p4x)*fx, by=p4y+(p3y-p4y)*fx;
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
   }
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
+
+  // ---- Shear plane (highlighted) ----
+  ctx.strokeStyle='#e85d04'; ctx.lineWidth=2.6;
+  ctx.beginPath(); ctx.moveTo(tipX,tipY); ctx.lineTo(spx,spy); ctx.stroke();
+  ctx.fillStyle='#ffb37a'; ctx.font='bold 12px '+L.font; ctx.textAlign='left';
+  ctx.fillText('φ='+phi.toFixed(1)+'°', (tipX+spx)/2+6, (tipY+spy)/2-4);
+
+  // depth of cut t0 bracket
+  ctx.strokeStyle='rgba(120,200,120,0.8)'; ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.moveTo(spx, ground); ctx.lineTo(spx+22, ground); ctx.moveTo(spx, ground+t0); ctx.lineTo(spx+22, ground+t0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(spx+16, ground); ctx.lineTo(spx+16, ground+t0); ctx.stroke();
+  ctx.fillStyle='rgba(150,230,150,0.95)'; ctx.font='10px '+L.font; ctx.textAlign='left';
+  ctx.fillText('t₀='+t0.toFixed(0), spx+26, ground+t0/2+3);
+
+  // ---- Tool ----
+  ctx.fillStyle='#9aa6b4';
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);                          // tool tip
+  ctx.lineTo(tipX + rdx*chipLen*1.4, tipY + rdy*chipLen*1.4); // up rake face
+  ctx.lineTo(tipX + rdx*chipLen*1.4 + 70, tipY + rdy*chipLen*1.4 + 12);
+  ctx.lineTo(tipX + 70, tipY + 22);                // flank/clearance side
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#5a6675'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle='#001F3F'; ctx.font='bold 11px '+L.font;
+  ctx.fillText(L.toolLbl, tipX+40, tipY+40);
+  // rake angle arc
+  ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(tipX, tipY-30); ctx.lineTo(tipX, tipY); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='10px '+L.font;
+  ctx.fillText('α='+s.alpha+'°', tipX+4, tipY-22);
+
+  // ---- Force vectors at the tool tip ----
+  var Fmax = Math.max(s.Fc, s.Ft, 1);
+  var fscale = 70 / Fmax;
+  arrow(ctx, tipX, tipY, tipX - s.Fc*fscale, tipY, '#3aa0ff', 'Fc', 2.6); // cutting force (on tool, opposite to motion)
+  arrow(ctx, tipX, tipY, tipX, tipY + s.Ft*fscale, '#2ecc71', 'Ft', 2.6); // thrust force (pushing tool away)
+  arrow(ctx, tipX, tipY, tipX - s.Fc*fscale, tipY + s.Ft*fscale, '#b07cff', 'R', 2.2); // resultant
+
+  // chip label
+  ctx.fillStyle='#ffd9b0'; ctx.font='bold 11px '+L.font; ctx.textAlign='left';
+  ctx.fillText(L.chipLbl+' (tc='+tc.toFixed(0)+', r='+s.r.toFixed(2)+')', p3x+6, p3y+4);
+
+  // title + cutting direction
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 12px '+L.font; ctx.textAlign='left';
+  ctx.fillText(L.cutTitle, 10, 20);
+  arrow(ctx, W*0.40, 26, W*0.40+46, 26, '#00B4D8', 'Vc', 2);
+  ctx.textAlign='left';
 }
 
-const ids = ['alpha','beta','vc','f_val','ap','kc'];
-const disps = {alpha:'v_alpha',beta:'v_beta',vc:'v_vc',f_val:'v_f',ap:'v_ap',kc:'v_kc'};
-const mc = document.getElementById('merchant');
-const mctx = mc.getContext('2d');
-let chart = null;
+/* ===== Merchant circle ===== */
+function drawMerchant(s){
+  if(!mctx) return;
+  var dims = hidpi(mc, mctx, mc.clientWidth||400, mc.clientHeight||300);
+  var W=dims.w, H=dims.h, ctx=mctx;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#F8F9FA'; ctx.fillRect(0,0,W,H);
+  var cx=W*0.5, cy=H*0.5, R=Math.min(W,H)*0.36;
+  var F=Math.max(s.R,1), scale=R/F;
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,2*Math.PI); ctx.strokeStyle='#cdd6df'; ctx.lineWidth=1; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-R-10,cy); ctx.lineTo(cx+R+10,cy);
+  ctx.strokeStyle='#bbb'; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+  arrow(ctx, cx,cy, cx + s.Fc*scale, cy, '#007BFF', 'Fc', 2.5);
+  arrow(ctx, cx + s.Fc*scale, cy, cx + s.Fc*scale, cy - s.Ft*scale, '#2ecc71', 'Ft', 2.5);
+  arrow(ctx, cx,cy, cx + s.Fc*scale, cy - s.Ft*scale, '#9b59b6', 'R', 2.5);
+  ctx.fillStyle='#666'; ctx.font='11px '+L.font; ctx.textAlign='left';
+  ctx.fillText('α='+s.alpha+'° β='+s.beta+'° φ='+s.phi.toFixed(1)+'°', 8, H-8);
+  ctx.fillStyle='#001F3F'; ctx.font='bold 13px '+L.font; ctx.fillText(L.merchantTitle, 8, 18);
+}
 
-function deg2rad(d){ return d * Math.PI / 180; }function drawMerchant(alpha_deg, beta_deg, phi_deg, Fc, Ft){
-  const __novaDims = __novaHiDpiCanvas(mc, mc.clientWidth || parseFloat(mc.getAttribute('width')) || 400, mc.clientHeight || parseFloat(mc.getAttribute('height')) || 300, mctx);
-  const W = __novaDims.w, H = __novaDims.h;
-  mctx.clearRect(0, 0, W, H);
-  mctx.fillStyle = '#F8F9FA';
-  mctx.fillRect(0, 0, W, H);
-
-  const cx = W * 0.45, cy = H * 0.55;
-  const R = Math.min(W, H) * 0.35;
-  const F = Math.sqrt(Fc * Fc + Ft * Ft);
-  const scale = R / F;
-
-  // Draw circle
-  mctx.beginPath();
-  mctx.arc(cx, cy, R, 0, 2 * Math.PI);
-  mctx.strokeStyle = '#dee2e6';
-  mctx.lineWidth = 1;
-  mctx.stroke();
-
-  // Workpiece direction (horizontal)
-  mctx.beginPath();
-  mctx.moveTo(cx - R - 10, cy);
-  mctx.lineTo(cx + R + 10, cy);
-  mctx.strokeStyle = '#aaa';
-  mctx.lineWidth = 1;
-  mctx.setLineDash([4, 4]);
-  mctx.stroke();
-  mctx.setLineDash([]);
-
-  function arrow(x1, y1, x2, y2, color, label) {
-    mctx.beginPath();
-    mctx.moveTo(x1, y1);
-    mctx.lineTo(x2, y2);
-    mctx.strokeStyle = color;
-    mctx.lineWidth = 2.5;
-    mctx.stroke();
-    const angle = Math.atan2(y2 - y1, x2 - x1);
-    mctx.beginPath();
-    mctx.moveTo(x2, y2);
-    mctx.lineTo(x2 - 10 * Math.cos(angle - 0.35), y2 - 10 * Math.sin(angle - 0.35));
-    mctx.lineTo(x2 - 10 * Math.cos(angle + 0.35), y2 - 10 * Math.sin(angle + 0.35));
-    mctx.closePath();
-    mctx.fillStyle = color;
-    mctx.fill();
-    if (label) {
-      mctx.fillStyle = color;
-      mctx.font = 'bold 12px Roboto Mono, monospace';
-      mctx.fillText(label, x2 + 6, y2 - 6);
-    }
-  }// Resultant F (from bottom of circle upward)
-  const Fx_dir = Math.cos(deg2rad(-beta_deg + 90));
-  const Fy_dir = -Math.sin(deg2rad(-beta_deg + 90));
-  const Fx2 = cx + 2 * R * Fx_dir;
-  const Fy2 = cy + 2 * R * Fy_dir;
-  arrow(cx, cy, Fx2, Fy2, '#e85d04', 'F');
-
-  // Fc (horizontal = cutting direction)
-  const Fc_x = cx + Fc * scale;
-  const Fc_y = cy;
-  arrow(cx, cy, Fc_x, Fc_y, '#007BFF', 'Fc');
-
-  // Ft (vertical = thrust direction)
-  const Ft_x = Fc_x;
-  const Ft_y = cy - Ft * scale;
-  arrow(Fc_x, cy, Ft_x, Ft_y, '#2ecc71', 'Ft');
-
-  // Labels
-  mctx.fillStyle = '#666';
-  mctx.font = '11px Noto Sans JP, sans-serif';
-  mctx.fillText(`α=${alpha_deg}° β=${beta_deg}° φ=${phi_deg.toFixed(1)}°`, 10, H - 10);
-
-  // Title
-  mctx.fillStyle = '#001F3F';
-  mctx.font = 'bold 13px Noto Sans JP, sans-serif';
-  mctx.fillText('Merchant 円', 10, 22);
-}function compute(){
-  const alpha = +document.getElementById('alpha').value;
-  const beta = +document.getElementById('beta').value;
-  const vc = +document.getElementById('vc').value;
-  const f = +document.getElementById('f_val').value;
-  const ap = +document.getElementById('ap').value;
-  const kc = +document.getElementById('kc').value;
-
-  for (const id of ids) {
-    var _mc=document.getElementById(disps[id]);if(_mc)_mc.textContent=document.getElementById(id).value;
-  }const phi = 45 + alpha / 2 - beta / 2;
-  const Fc = kc * ap * f;
-  const Ft = Fc * Math.tan(deg2rad(beta - alpha));
-  const Pw = Fc * vc / 60;
-
-  document.getElementById('s_phi').textContent = phi.toFixed(1);
-  document.getElementById('s_Fc').textContent = Fc.toFixed(0);
-  document.getElementById('s_Ft').textContent = Math.abs(Ft).toFixed(0);
-  document.getElementById('s_Pw').textContent = Pw.toFixed(0);
-
-  drawMerchant(alpha, beta, phi, Fc, Math.abs(Ft));
-
-  // Taylor tool life: Vc*T^0.25 = C (n=0.25, C based on current vc giving T=60min)
-  const C = vc * Math.pow(60, 0.25);
-  const vcs = [], Ts = [];
-  for (let v = 20; v <= 500; v += 10){
-    vcs.push(v);
-    const T = Math.pow(C / v, 4);
-    Ts.push(Math.min(T, 1000));
-  }if (chart){
-    chart.data.labels = vcs;
-    chart.data.datasets[0].data = Ts;
-    chart.update('none');
-  }else{
-    chart = new Chart(document.getElementById('chart').getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: vcs,
-        datasets: [{label: '工具寿命 T (min)', data: Ts, borderColor: '#e85d04', backgroundColor: 'rgba(232,93,4,0.1)', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true}]
-      },
-      options:{
-        responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,plugins: {legend: {position: 'top'}},
-        scales:{
-          x: { title: {display: true, text: '切削速度 Vc (m/min)'}},
-          y:{title: {display: true, text: '工具寿命 T (min)'}, min: 0, max: 500}
-        }
-      }
+/* ===== Taylor tool-life chart ===== */
+function drawChart(s){
+  if(typeof Chart==='undefined') return;
+  var C = s.vc * Math.pow(60, 0.25);
+  var vcs=[], Ts=[];
+  for(var v=20; v<=500; v+=10){ vcs.push(v); Ts.push(Math.min(Math.pow(C/v,4),1000)); }
+  if(chart){ chart.data.labels=vcs; chart.data.datasets[0].data=Ts; chart.update('none'); }
+  else{
+    var cv=document.getElementById('chart'); if(!cv) return;
+    chart=new Chart(cv.getContext('2d'),{
+      type:'line',
+      data:{ labels:vcs, datasets:[{label:L.toolLife, data:Ts, borderColor:'#e85d04', backgroundColor:'rgba(232,93,4,0.1)', borderWidth:2, pointRadius:0, tension:0.3, fill:true}]},
+      options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:100, plugins:{legend:{position:'top'}},
+        scales:{ x:{title:{display:true,text:L.vcAxis}}, y:{title:{display:true,text:L.tAxis}, min:0, max:500}}}
     });
   }
-}ids.forEach(id => document.getElementById(id).addEventListener('input', compute));
+}
+
+function compute(){
+  state = readParams();
+  state.Pw = state.Fc * state.vc / 60;
+  updateStats(state);
+  drawMerchant(state);
+  drawChart(state);
+  if(reduceMotion){ drawCut(state, 1); }
+}
+
+/* ===== rAF loop: tool repeatedly advances through the stock ===== */
+var lastTs=0;
+function loop(ts){
+  if(reduceMotion) return;
+  if(!lastTs) lastTs=ts;
+  var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+  // speed of advance scaled by Vc (visual only)
+  phase += dt * (0.18 + state.vc/900);
+  if(phase>1) phase=0;
+  drawCut(state, phase);
+  requestAnimationFrame(loop);
+}
+
+ids.forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('input', compute); });
 compute();
+if(!reduceMotion) requestAnimationFrame(loop);
+window.addEventListener('resize', function(){ drawMerchant(state); if(reduceMotion) drawCut(state,1); });
+})();
 </script>
 
 <section class="explanation">
@@ -404,6 +514,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="metal-cutting.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -457,7 +570,7 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>工具前角αと逃げ角βを入力します。一般的なハイス工具は前角15°、逃げ角8°が標準値です</li>
+<li>すくい角α（rake angle）と摩擦角β（friction angle）を入力します。一般的なすくい角は0〜15°、摩擦角は鋼で20〜35°程度が目安です</li>
 <li>切削速度vcと送り量f_valを設定します。アルミニウム合金の場合vc=200m/min、鋼ではvc=80m/minが目安です</li>
 <li>シミュレータがMerchant理論に基づいてせん断角φを算出し、切削力Fc、背分力Ft、切削動力を自動計算します</li>
 <li>Merchant円を確認して、工具の応力分布と工具寿命への影響を視覚化します</li>
@@ -465,17 +578,27 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>炭素鋼(S45C)を超硬工具で乾式加工する場合：前角α=10°、逃げ角β=6°、切削速度vc=120m/min、送り量f_val=0.2mm/revで計算すると、せん断角φ≈32°、切削力Fc≈800N、背分力Ft≈320N、切削動力≈1.6kWが得られます。同じ条件でvc=180m/minに上げるとFcは低下して約650Nになり、動力は2.0kWに増加します。前角を15°に変更するとφが約38°になり、Fcは更に低下して550Nになりますが、工具の欠損リスクが高まります。</p>
+<p>炭素鋼を超硬工具で加工する場合：すくい角α=10°、摩擦角β=25°、切削速度vc=100m/min、送り量f=0.2mm/rev、切り込みap=2.0mm、比切削抵抗kc=2000N/mm²で計算すると、せん断角φ=45+α/2−β/2=37.5°、切削力Fc=kc·ap·f=800N、背分力Ft=Fc·tan(β−α)≈214N、切削動力Pw=Fc·vc/60≈1333W（約1.33kW）が得られます。本モデルではFcはkc・ap・fのみで決まり、すくい角αや切削速度vcを変えてもFc自体は変化しません（αはφとFtに、vcはPwに影響します）。送り量fを0.4mm/revへ倍にするとFcも倍の1600N・動力も2667Wに増加し、摩擦角βを35°へ上げるとφ=32.5°・Ft≈373Nに増えます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
-<li>Merchant円上で最大剪断応力点(τmax)が工具逃げ面で発生する場合、工具寿命は著しく短くなります。背分力が切削力の40%を超えるような条件は避けてください</li>
+<li>背分力Ftが切削力Fcの40%（Ft/Fc>0.4）を超える条件では工具のたわみ・びびり・摩耗が増えやすいため避けてください。Ft/Fcは摩擦角βとすくい角αの差で決まります（Ft=Fc·tan(β−α)）。</li>
 <li>送り量を2倍にするとFcはほぼ2倍になるため、古い工作機械では主軸動力不足で加工不可になる可能性があります。事前に動力計算を確認してください</li>
 <li>冷却液使用時は前角を2～3°増やしても工具寿命が延びることがあります。ただしステンレス鋼(SUS304)では前角が高すぎると逃げ面摩耗が急加速するため、最大12°に制限してください</li>
 <li>アルミニウムで前角を25°以上にすると、せん断角が不安定になり、Merchant理論の適用範囲外となるため注意が必要です</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4820759353?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4820759353.09._SCMZZZZZZ_.jpg" alt="機械加工の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">機械加工 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

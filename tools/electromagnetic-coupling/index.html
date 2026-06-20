@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "電磁結合シミュレーター",
       "description": "相互インダクタンスM=k√(L1·L2)による電磁結合をリアルタイムシミュレーション。結合係数k、1次/2次電流・電圧波形、ワイヤレス給電・誘導加熱の動作原理を可視化。",
       "url": "https://novasolver.jp/tools/electromagnetic-coupling.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["相互インダクタンスと結合係数のリアルタイム計算","1次・2次電流電圧波形アニメーション","トランスフォーマー・ワイヤレス給電・誘導加熱モード"],
       "keywords": "電磁結合,相互インダクタンス,結合係数,トランスフォーマー,ワイヤレス給電,誘導加熱,CAEシミュレーター",
       "datePublished": "2026-04-08",
@@ -203,20 +203,30 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
-      <div class="stat-card"><div class="sv" id="statM">0.90 mH</div><div class="sl">相互インダクタンス M</div></div>
-      <div class="stat-card"><div class="sv" id="statEff">81.0%</div><div class="sl">伝達効率 η</div></div>
+      <div class="stat-card"><div class="sv" id="statM">—</div><div class="sl">相互インダクタンス M</div></div>
+      <div class="stat-card"><div class="sv" id="statEmf">—</div><div class="sl">2次誘起電圧 V₂ (ωM·I₁)</div></div>
+      <div class="stat-card"><div class="sv" id="statEff">—</div><div class="sl">伝達効率 η</div></div>
+      <div class="stat-card"><div class="sv" id="statZr">—</div><div class="sl">反射インピーダンス |Z_r|</div></div>
       <div class="stat-card"><div class="sv" id="statP">—</div><div class="sl">2次側電力 P₂</div></div>
       <div class="stat-card"><div class="sv" id="statFres">—</div><div class="sl">共振周波数 f_res</div></div>
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 連成</div><canvas id="couplingCanvas" height="220"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-wave-square"></i> 磁束結合ライブビュー — 一次の交流が磁束を生み、k に比例した本数が二次へ鎖交し電圧を誘起</div><canvas id="couplingCanvas" height="300"></canvas></div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 波形</div><canvas class="ux-chartjs-canvas" id="waveChart"></canvas></div>
   
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
@@ -230,179 +240,262 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-
+(function(){
+"use strict";
+const T = {
+  primary:'1次コイル L₁', secondary:'2次コイル L₂',
+  linked:'鎖交磁束', leak:'漏れ磁束', emfLabel:'誘起 V₂'
+};
 const canvas = document.getElementById('couplingCanvas');
 const ctx = canvas.getContext('2d');
-let chart;
-let animT = 0;
-let animId;
+let chart = null;
 let currentMode = 'transformer';
+let phase = 0;          // AC phase (rad)
+let lastTs = 0;
+let rafId = null;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function setMode(m) {
+// physics state (recomputed on update)
+let P = { k:0.95, L1:5e-3, L2:5e-3, R1:0.5, R2:0.5, V0:10, freq:50,
+          omega:0, M:0, I1amp:0, I2amp:0, V2emf:0, Zr:0, eff:0, P2:0, fres:0 };
+
+function el(id){ return document.getElementById(id); }
+function getNum(id){ return parseFloat(el(id).value); }
+
+function updateSlider(id){
+  const e = el(id); if(!e) return;
+  const min = parseFloat(e.min), max = parseFloat(e.max);
+  const pct = ((parseFloat(e.value) - min) / (max - min)) * 100;
+  e.style.setProperty('--pct', pct + '%');
+}
+
+window.setMode = function(m){
   currentMode = m;
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  // Preset values
-  if (m === 'transformer') {
-    document.getElementById('sk').value = 0.95;
-    document.getElementById('sL1').value = 5;
-    document.getElementById('sL2').value = 5;
-    document.getElementById('sR1').value = 0.5;
-    document.getElementById('sR2').value = 0.5;
-    document.getElementById('sFreq').value = 50;
-  }else if (m === 'wireless'){
-    document.getElementById('sk').value = 0.2;
-    document.getElementById('sL1').value = 3;
-    document.getElementById('sL2').value = 3;
-    document.getElementById('sR1').value = 0.3;
-    document.getElementById('sR2').value = 2;
-    document.getElementById('sFreq').value = 100;
-  }else{
-    document.getElementById('sk').value = 0.6;
-    document.getElementById('sL1').value = 2;
-    document.getElementById('sL2').value = 0.5;
-    document.getElementById('sR1').value = 1;
-    document.getElementById('sR2').value = 0.2;
-    document.getElementById('sFreq').value = 500;
-  }
+  if (window.event && window.event.target) window.event.target.classList.add('active');
+  const set = (id,v)=>{ el(id).value = v; };
+  if (m === 'transformer'){ set('sk',0.95); set('sL1',5); set('sL2',5); set('sR1',0.5); set('sR2',0.5); set('sFreq',50); }
+  else if (m === 'wireless'){ set('sk',0.2); set('sL1',3); set('sL2',3); set('sR1',0.3); set('sR2',2); set('sFreq',100); }
+  else { set('sk',0.6); set('sL1',2); set('sL2',0.5); set('sR1',1); set('sR2',0.2); set('sFreq',500); }
+  ['sL1','sL2','sk','sR1','sR2','sV0','sFreq'].forEach(id=>{ const n=el(id.replace('s','n')); if(n) n.value=el(id).value; });
   update();
-}function update(){
-  const L1 = parseFloat(document.getElementById('sL1').value) * 1e-3;
-  const L2 = parseFloat(document.getElementById('sL2').value) * 1e-3;
-  const k  = parseFloat(document.getElementById('sk').value);
-  const R1 = parseFloat(document.getElementById('sR1').value);
-  const R2 = parseFloat(document.getElementById('sR2').value);
-  const V0 = parseFloat(document.getElementById('sV0').value);
-  const freq = parseFloat(document.getElementById('sFreq').value);
+};
+
+window.update = function(){
+  const L1 = getNum('sL1') * 1e-3;
+  const L2 = getNum('sL2') * 1e-3;
+  const k  = getNum('sk');
+  const R1 = getNum('sR1');
+  const R2 = getNum('sR2');
+  const V0 = getNum('sV0');
+  const freq = getNum('sFreq');
   const omega = 2 * Math.PI * freq;
 
   ['sL1','sL2','sk','sR1','sR2','sV0','sFreq'].forEach(updateSlider);
 
+  // M = k*sqrt(L1*L2)
   const M = k * Math.sqrt(L1 * L2);
-  const Z1 = Math.sqrt(R1*R1 + (omega*L1)*(omega*L1));
-  const Z2 = Math.sqrt(R2*R2 + (omega*L2)*(omega*L2));
-  const Zm = omega * M;
-  // Simplified coupled circuit: I1 ≈ V0/Z1_eff
-  const Z1eff = Math.sqrt(R1*R1 + (omega*L1 - Zm*Zm/Z2)*(omega*L1 - Zm*Zm/Z2));
-  const I1amp = V0 / (Z1eff || 0.001);
-  const I2amp = (Zm * I1amp) / (Z2 || 0.001);
-  const V2amp = I2amp * R2;
+  const Z2 = Math.sqrt(R2*R2 + (omega*L2)*(omega*L2));   // secondary impedance magnitude
+  const Zm = omega * M;                                   // ωM
+  const Zr = (Zm*Zm) / (Z2 || 1e-9);                      // reflected impedance magnitude (ω²M²/Z2)
+  // primary current with reflected impedance subtracted from primary reactance
+  const Xeff = omega*L1 - Zm*Zm/(Z2 || 1e-9);
+  const Z1eff = Math.sqrt(R1*R1 + Xeff*Xeff);
+  const I1amp = V0 / (Z1eff || 1e-3);
+  const I2amp = (Zm * I1amp) / (Z2 || 1e-3);
+  const V2emf = Zm * I1amp;                               // induced EMF = ωM·I1 (sinusoid)
+  const V2load = I2amp * R2;
   const P2 = 0.5 * I2amp * I2amp * R2;
-  const fres = 1 / (2 * Math.PI * Math.sqrt(L1 * L2)) / 1000; // kHz
-  const eff = (k * k * omega * omega * L1 * L2) / ((R1 * Z2 + k * k * omega * omega * L1 * L2) || 0.001) * 100;
+  const fres = 1 / (2 * Math.PI * Math.sqrt(L1 * L2)) / 1000; // kHz (characteristic)
+  const eff = (k*k * omega*omega * L1*L2) / ((R1*Z2 + k*k*omega*omega*L1*L2) || 1e-9) * 100;
 
-  document.getElementById('statM').textContent = (M*1e6).toFixed(2) + ' µH';
-  document.getElementById('statEff').textContent = Math.min(eff, 99.9).toFixed(1) + '%';
-  document.getElementById('statP').textContent = P2 < 1000 ? P2.toFixed(2) + ' W' : (P2/1000).toFixed(2) + ' kW';
-  document.getElementById('statFres').textContent = fres.toFixed(3) + ' kHz';
+  P = { k, L1, L2, R1, R2, V0, freq, omega, M, I1amp, I2amp, V2emf, Zr, eff, P2, fres, V2load };
 
-  // Update chart
+  el('statM').textContent = (M*1e6).toFixed(2) + ' µH';
+  el('statEmf').textContent = V2emf < 1000 ? V2emf.toFixed(2) + ' V' : (V2emf/1000).toFixed(2) + ' kV';
+  el('statEff').textContent = Math.min(eff, 99.9).toFixed(1) + '%';
+  el('statZr').textContent = Zr < 1000 ? Zr.toFixed(2) + ' Ω' : (Zr/1000).toFixed(2) + ' kΩ';
+  el('statP').textContent = P2 < 1000 ? P2.toFixed(2) + ' W' : (P2/1000).toFixed(2) + ' kW';
+  el('statFres').textContent = fres.toFixed(3) + ' kHz';
+
+  // waveform chart
   const N = 200;
-  const T = 1 / freq;
-  const labels = [];
-  const d1 = [], d2 = [], dv2 = [];
-  for (let i = 0; i < N; i++) {
-    const t = (i / N) * 3 * T;
+  const Tp = 1 / freq;
+  const labels = [], d1 = [], d2 = [], dv2 = [];
+  for (let i = 0; i < N; i++){
+    const t = (i / N) * 3 * Tp;
     labels.push((t * 1e3).toFixed(2));
     d1.push(I1amp * Math.sin(omega * t));
     d2.push(I2amp * Math.sin(omega * t - Math.PI));
-    dv2.push(V2amp * Math.sin(omega * t - Math.PI));
-  }if (chart){
+    dv2.push(P.V2load * Math.sin(omega * t - Math.PI/2));
+  }
+  if (chart){
     chart.data.labels = labels;
     chart.data.datasets[0].data = d1;
     chart.data.datasets[1].data = d2;
     chart.data.datasets[2].data = dv2;
     chart.update('none');
   }
+  if (reduceMotion) drawScene(0);
+};
 
-  animT = 0;
-  drawCoils(k, I1amp, I2amp, freq);
-}function drawCoils(k, I1, I2, freq){
-  const W = canvas.offsetWidth, H = 220;
-  var __novaW = W;
-  var __novaH = H;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  const c = ctx;
-  c.clearRect(0, 0, W, H);
-  c.fillStyle = '#020d1a';
-  c.fillRect(0, 0, W, H);
+/* ===== HiDPI sizing ===== */
+let cssW = 0, cssH = 300;
+function sizeCanvas(){
+  cssW = Math.max(260, canvas.offsetWidth || (canvas.parentElement.clientWidth - 0));
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
 
-  const cx = W / 2, cy = H / 2;
-  const gap = W * 0.18;
+function drawCoil(x, y, color, glow){
+  const turns = 6, ry = 96, rx = 22;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 6 + glow*10;
+  ctx.beginPath();
+  for (let i = 0; i <= turns*40; i++){
+    const t = i/40;
+    const angle = t * 2*Math.PI;
+    const xp = x + rx * Math.cos(angle);
+    const yp = y + (t - turns/2) * (ry/turns) + Math.sin(angle)*3;
+    if (i===0) ctx.moveTo(xp, yp); else ctx.lineTo(xp, yp);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
 
-  // Draw coupling field lines
-  const fieldIntensity = k;
-  for (let i = 0; i < 8; i++) {
-    const t = i / 7;
-    const alpha = fieldIntensity * (0.3 + 0.7 * Math.sin(Math.PI * t));
-    c.strokeStyle = `rgba(0,180,216,${alpha * 0.6})`;
-    c.lineWidth = 1;
-    c.beginPath();
-    const x1 = cx - gap + 20;
-    const x2 = cx + gap - 20;
-    const y = cy - 60 + t * 120;
-    c.moveTo(x1, y);
-    c.bezierCurveTo(cx - gap * 0.3, y - 20 + t * 40, cx + gap * 0.3, y - 20 + t * 40, x2, y);
-    c.stroke();
-  }// Draw coil 1 (left)
-  drawCoil(c, cx - gap - 10, cy, 30, 60, '#007BFF', I1, '1次コイル L₁');
-  // Draw coil 2 (right)
-  drawCoil(c, cx + gap + 10, cy, 30, 60, '#00B4D8', I2, '2次コイル L₂');
+// one closed flux line looping around both coils (for linked) or one coil (leak)
+function fluxPath(cx, cy, halfW, halfH){
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, halfW, halfH, 0, 0, Math.PI*2);
+}
 
-  // k label
-  c.fillStyle = 'rgba(255,255,255,0.8)';
-  c.font = '13px Roboto Mono, monospace';
-  c.textAlign = 'center';
-  c.fillText(`k = ${k.toFixed(2)}`, cx, cy - 75);
+function drawScene(p){
+  sizeCanvas();
+  const W = cssW, H = cssH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#020d1a';
+  ctx.fillRect(0,0,W,H);
 
-  // M label
-  const M = k * Math.sqrt(parseFloat(document.getElementById('sL1').value) * parseFloat(document.getElementById('sL2').value));
-  c.fillStyle = 'rgba(0,180,216,0.9)';
-  c.font = '11px Noto Sans JP, sans-serif';
-  c.fillText(`M = ${M.toFixed(3)} mH`, cx, cy + 80);
-}function drawCoil(c, x, y, rx, ry, color, current, label){
-  const turns = 5;
-  c.strokeStyle = color;
-  c.lineWidth = 2.5;
-  c.beginPath();
-  for (let i = 0; i <= turns * 40; i++) {
-    const t = i / 40;
-    const angle = t * 2 * Math.PI;
-    const xp = x + rx * Math.cos(angle) * 0.5;
-    const yp = y + (t - turns / 2) * (ry / turns) + Math.sin(angle) * 8;
-    if (i === 0) c.moveTo(xp, yp);
-    else c.lineTo(xp, yp);
-  }c.stroke();
+  const cyc = Math.sin(p);                 // AC drive value -1..1
+  const cx1 = W*0.27, cx2 = W*0.73, cy = H*0.5;
+  const k = P.k;
 
-  // Current arrow
-  const Inorm = Math.min(Math.abs(current) / 10, 1);
-  c.fillStyle = color;
-  c.font = 'bold 11px Noto Sans JP, sans-serif';
-  c.textAlign = 'center';
-  c.fillText(label, x, y + ry / 2 + 18);
-  c.fillStyle = `rgba(255,200,0,${0.4 + Inorm * 0.6})`;
-  c.font = '10px monospace';
-  c.fillText(`I = ${current.toFixed(2)} A`, x, y - ry / 2 - 8);
-}function initChart(){
-  const ctx2 = document.getElementById('waveChart').getContext('2d');
-  chart = new Chart(ctx2, {
+  // ---- flux lines ----
+  // total lines fixed; fraction linking = k, rest leak around primary only
+  const TOTAL = 10;
+  const linked = Math.max(1, Math.round(TOTAL * k));
+  const leak = TOTAL - linked;
+  const dir = cyc >= 0 ? 1 : -1;           // flux direction reverses with AC
+  const intensity = Math.abs(cyc);
+
+  // linked flux: large loops enclosing both coils
+  for (let i = 0; i < linked; i++){
+    const f = (i+0.5)/linked;
+    const halfW = (cx2 - cx1)/2 * (0.55 + 0.55*f) + 30;
+    const halfH = (24 + f*104);
+    const mx = (cx1+cx2)/2;
+    const a = (0.18 + 0.55*intensity) * (0.5 + 0.5*Math.sin(Math.PI*f));
+    ctx.strokeStyle = 'rgba(0,200,255,'+a.toFixed(3)+')';
+    ctx.lineWidth = 1.4;
+    fluxPath(mx, cy, halfW, halfH);
+    ctx.stroke();
+    // moving arrowhead showing flux circulation direction
+    const ph = p*1.2 + i*0.6;
+    const ang = ph;
+    const ax = mx + halfW*Math.cos(ang)*dir;
+    const ay = cy + halfH*Math.sin(ang);
+    ctx.fillStyle = 'rgba(120,230,255,'+(0.5*intensity+0.2).toFixed(3)+')';
+    ctx.beginPath(); ctx.arc(ax, ay, 2.4, 0, 7); ctx.fill();
+  }
+  // leak flux: small loops around the primary only (does NOT reach secondary)
+  for (let i = 0; i < leak; i++){
+    const f = (i+0.5)/Math.max(leak,1);
+    const halfW = 30 + f*26;
+    const halfH = 30 + f*70;
+    const a = (0.12 + 0.4*intensity) * (0.5 + 0.5*Math.sin(Math.PI*f));
+    ctx.strokeStyle = 'rgba(255,140,60,'+a.toFixed(3)+')';
+    ctx.lineWidth = 1.1;
+    ctx.setLineDash([4,4]);
+    fluxPath(cx1, cy, halfW, halfH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ---- coils ----
+  const i1 = Math.sin(p);
+  const i2 = -Math.sin(p);                  // secondary opposes (Lenz)
+  drawCoil(cx1, cy, '#3aa0ff', Math.abs(i1)*intensity);
+  drawCoil(cx2, cy, '#00d0a0', Math.abs(i2)*k*intensity);
+
+  // current direction dots on coils
+  function curDot(x, val, color){
+    const yy = cy - 116;
+    ctx.fillStyle = color;
+    ctx.font = 'bold 13px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(val>=0 ? '⊙' : '⊗', x, yy);
+  }
+  curDot(cx1, i1, '#7cc4ff');
+  curDot(cx2, i2*k, '#5fe6c4');
+
+  // ---- labels ----
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#7cc4ff';
+  ctx.font = 'bold 12px Noto Sans JP, sans-serif';
+  ctx.fillText(T.primary, cx1, H-14);
+  ctx.fillStyle = '#5fe6c4';
+  ctx.fillText(T.secondary, cx2, H-14);
+
+  // induced voltage readout near secondary (live)
+  const v2 = P.V2emf * Math.cos(p);         // EMF leads/relates to dI/dt
+  ctx.fillStyle = 'rgba(255,213,74,'+(0.55+0.45*Math.abs(Math.cos(p))).toFixed(3)+')';
+  ctx.font = 'bold 12px Roboto Mono, monospace';
+  ctx.fillText(T.emfLabel+' = '+v2.toFixed(1)+' V', cx2, cy+128);
+
+  // k / linkage legend
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(0,200,255,0.95)';
+  ctx.font = '12px Roboto Mono, monospace';
+  ctx.fillText('k = '+k.toFixed(2)+'   '+T.linked+' '+linked+'/'+TOTAL, 12, 22);
+  ctx.fillStyle = 'rgba(255,140,60,0.9)';
+  ctx.fillText(T.leak+' '+leak+'/'+TOTAL, 12, 40);
+  ctx.fillStyle = 'rgba(0,180,216,0.9)';
+  ctx.font = '12px Noto Sans JP, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('M = '+(P.M*1e6).toFixed(1)+' µH', W-12, 22);
+  ctx.textAlign = 'left';
+}
+
+function frame(ts){
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min(0.05, (ts - lastTs)/1000);
+  lastTs = ts;
+  // animate at a fixed visual rate (decoupled from real freq for clarity)
+  phase += dt * 2 * Math.PI * 0.6;
+  if (phase > 1e6) phase = phase % (2*Math.PI);
+  drawScene(phase);
+  rafId = requestAnimationFrame(frame);
+}
+
+function initChart(){
+  const cv = document.getElementById('waveChart');
+  if (!cv || typeof Chart === 'undefined') return;
+  chart = new Chart(cv.getContext('2d'), {
     type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        { label: 'I₁ (1次電流)', data: [], borderColor: '#007BFF', borderWidth: 2, pointRadius: 0, tension: 0.4 },{ label: 'I₂ (2次電流)', data: [], borderColor: '#00B4D8', borderWidth: 2, pointRadius: 0, tension: 0.4 },{ label: 'V₂ (2次電圧)', data: [], borderColor: '#f39c12', borderWidth: 1.5, pointRadius: 0, tension: 0.4, borderDash: [4,3] }
-      ]
-    },
+    data: { labels: [], datasets: [
+      { label: 'I₁ (1次電流)', data: [], borderColor: '#3aa0ff', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+      { label: 'I₂ (2次電流)', data: [], borderColor: '#00d0a0', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+      { label: 'V₂ (2次電圧)', data: [], borderColor: '#f39c12', borderWidth: 1.5, pointRadius: 0, tension: 0.4, borderDash: [4,3] }
+    ]},
     options:{
-      responsive: true, maintainAspectRatio: false,resizeDelay:100, animation: false,
+      responsive: true, maintainAspectRatio: false, resizeDelay: 100, animation: false,
       plugins: { legend: { labels: { color: '#6c757d', font: { size: 11 } } } },
       scales:{
         x: { ticks: { color: '#6c757d', maxTicksLimit: 8, font:{size:10} }, grid:{ color: 'rgba(0,0,0,.05)' }, title:{ display: true, text: '時間 (ms)', color: '#6c757d', font:{size:11} } },
@@ -410,8 +503,14 @@ function setMode(m) {
       }
     }
   });
-}initChart();
+}
+
+initChart();
 update();
+if (reduceMotion){ drawScene(Math.PI/2); }
+else { rafId = requestAnimationFrame(frame); }
+window.addEventListener('resize', function(){ if (reduceMotion) drawScene(Math.PI/2); });
+})();
 </script>
 
 <section class="explanation">
@@ -473,6 +572,9 @@ update();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="electromagnetic-coupling.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -519,14 +621,14 @@ update();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>1次側コイルのインダクタンスL1（例：50μH）と直列抵抗R1（例：2Ω）を入力フィールドnL1、sL1に設定します</li>
-<li>2次側コイルのインダクタンスL2（例：50μH）と負荷抵抗R2（例：10Ω）をnL2、sL2に入力し、結合係数k（0～1の範囲、例：0.85）をnkで指定します</li>
-<li>シミュレーション実行ボタンを押すと、相互インダクタンスM、伝達効率η、2次側電力P₂、共振周波数f_resがリアルタイムで計算・表示されます</li>
+<li>1次側コイルのインダクタンスL₁（スライダー範囲0.1～10mH）を nL1／sL1 に、1次抵抗R₁（0.1～20Ω）を nR1／sR1 に設定します</li>
+<li>2次側コイルのインダクタンスL₂（0.1～10mH）を nL2／sL2 に、2次抵抗R₂（0.1～20Ω）を nR2／sR2 に、結合係数k（0.01～1.0、例：0.90）を nk／sk に設定します</li>
+<li>入力を変えると、相互インダクタンスM、伝達効率η、2次側電力P₂、特性周波数f_resとコイル・波形図がリアルタイムに再計算されます（実行ボタンはありません）</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>ワイヤレス給電コイルの場合：L1=100μH、R1=0.5Ω、L2=100μH、R2=50Ω、k=0.92、1次側入力電流1Aで動作させると、相互インダクタンスM≈92μH、伝達効率η≈78%、2次側電力P₂≈1.6W、共振周波数f_res≈159kHzが得られます。産業用誘導加熱では、L1=200μH、k=0.80の場合、M≈160μH、伝達効率が65～70%程度となり、加熱効率の評価に活用できます。</p>
+<p>ワイヤレス給電モード（プリセット）の例：L₁=L₂=3mH、R₁=0.3Ω、R₂=2Ω、k=0.2、周波数100Hz では、相互インダクタンスM=k√(L₁L₂)=0.6mH（=600µH）が得られ、疎結合のため伝達効率は低めになります（kを上げる／周波数を上げると効率が改善）。変圧器モード（k=0.95、L₁=L₂=5mH、R=0.5Ω、50Hz）では M=4.75mH と密結合になり、効率が大きく向上します。各スライダー範囲はL:0.1～10mH、R:0.1～20Ω、k:0.01～1.0、周波数:10～1000Hz です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -537,6 +639,16 @@ update();
 <li>トランス設計では相互インダクタンスMの値がシステム全体のQ値と周波数応答特性に直結するため、複数のk値で比較検討を推奨します</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

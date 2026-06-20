@@ -112,7 +112,7 @@ canvas{max-width:100%}/* mobile-compact */
 <link rel="alternate" hreflang="x-default" href="https://novasolver.jp/tools/beam-deflection.html">
 <script type="application/ld+json">[{
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
+    "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
     "name": "梁のたわみ・応力 シミュレーター｜片持ち・単純・両端固定",
     "description": "梁の撓みシミュレーター。単純支持梁・片持梁の集中荷重・分布荷重から撓み・曲げモーメント・せん断力を理論式で計算し、リアルタイム可視化・解析できます。",
     "url": "https://novasolver.jp/tools/beam-deflection.html",
@@ -149,7 +149,7 @@ canvas{max-width:100%}/* mobile-compact */
         "name": "単純支持梁に等分布荷重がかかるときの最大撓みの公式は？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "単純支持梁（スパン L）に等分布荷重 q が作用するとき、最大撓みは梁の中央に生じ、δ_max = 5qL⁴ / (384EI) で求められます。ここで E はヤング率、I は断面二次モーメントです。例えば L=2 m、q=10 kN/m、E=200 GPa、I=1×10⁻⁵ m⁴ の場合、δ_max = 5×10000×2⁴ / (384×200×10⁹×10⁻⁵) ≈ 0.26 mm となります。"
+          "text": "単純支持梁（スパン L）に等分布荷重 q が作用するとき、最大撓みは梁の中央に生じ、δ_max = 5qL⁴ / (384EI) で求められます。ここで E はヤング率、I は断面二次モーメントです。例えば L=2 m、q=10 kN/m、E=200 GPa、I=1×10⁻⁵ m⁴ の場合、δ_max = 5×10000×2⁴ / (384×200×10⁹×10⁻⁵) ≈ 1.04 mm となります。"
         }
       },{
         "@type": "Question",
@@ -263,6 +263,8 @@ canvas{max-width:100%}/* mobile-compact */
         <option value="ss_point">単純支持 + 集中荷重</option>
         <option value="cant_udl">片持梁 + 等分布荷重</option>
         <option value="cant_point">片持梁 + 集中荷重</option>
+        <option value="fix_udl">両端固定 + 等分布荷重</option>
+        <option value="fix_point">両端固定 + 集中荷重</option>
       </select>
     </div>
 
@@ -325,6 +327,15 @@ canvas{max-width:100%}/* mobile-compact */
   
 
   <!-- Right: Charts -->
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
     <div class="chart-card">
@@ -346,6 +357,11 @@ canvas{max-width:100%}/* mobile-compact */
           <div class="stat-unit">kN</div>
         </div>
         <div class="stat-card">
+          <div class="stat-label">最大たわみ角 θ_max</div>
+          <div class="stat-value" id="statSlope">—</div>
+          <div class="stat-unit">°</div>
+        </div>
+        <div class="stat-card">
           <div class="stat-label">曲げ剛性 EI</div>
           <div class="stat-value" id="statEI">—</div>
           <div class="stat-unit">N·m²</div>
@@ -361,15 +377,54 @@ canvas{max-width:100%}/* mobile-compact */
       <div class="beam-hint" id="beamHint">クリック: 荷重位置を設定 ｜ 上下ドラッグ: 荷重大きさを変更</div>
     </div>
 
-    <!-- Beam deformation animation card -->
+    <!-- Beam deformation animation card (v2 showcase) -->
     <div class="chart-card">
-      <div class="chart-title"><i class="fa-solid fa-wave-square" style="color:var(--accent)"></i> 変形アニメーション — たわみ振動の可視化</div>
-      <canvas id="beamAnimCanvas" style="display:block;width:100%;height:160px;border-radius:6px;background:#F8F9FA"></canvas>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:0.72rem;color:var(--muted)">
-        <span><i class="fa-solid fa-circle-info"></i> 変形量は視覚的に誇張して表示</span>
+      <div class="chart-title"><i class="fa-solid fa-wave-square" style="color:var(--accent)"></i> 梁が曲がる — 荷重で実際にたわむ様子</div>
+      <div class="beamv2-readouts" id="beamAnimReadouts">
+        <div class="beamv2-ro accent"><div class="rv" id="roLoad">—</div><div class="rl" id="roLoadLbl">荷重 P</div></div>
+        <div class="beamv2-ro"><div class="rv" id="roDefl">—</div><div class="rl">最大たわみ δ [mm]</div></div>
+        <div class="beamv2-ro"><div class="rv" id="roMom">—</div><div class="rl">最大モーメント [kN·m]</div></div>
+        <div class="beamv2-ro"><div class="rv" id="roStress">—</div><div class="rl">最大応力 σ [MPa]</div></div>
+        <div class="beamv2-ro"><div class="rv" id="roEI">—</div><div class="rl">曲げ剛性 EI [N·m²]</div></div>
+        <div class="beamv2-ro"><div class="rv" id="roPos">—</div><div class="rl">最大たわみ位置 [m]</div></div>
+      </div>
+      <canvas id="beamAnimCanvas" style="display:block;width:100%;height:220px;border-radius:6px;background:#F8F9FA" tabindex="0" role="img" aria-label="梁が荷重を受けてたわむアニメーション。支持点・荷重矢印・たわみ曲線・最大たわみ点を表示します。"></canvas>
+      <div class="beamv2-play">
+        <button class="beamv2-btn" type="button" id="beamPlayBtn" aria-label="再生 / 一時停止"><i class="fa-solid fa-pause"></i> 一時停止</button>
+        <button class="beamv2-btn sec" type="button" id="beamResetBtn" aria-label="最初から"><i class="fa-solid fa-rotate-left"></i> 最初から</button>
+        <div class="beamv2-speed" role="group" aria-label="再生速度">
+          <button class="beamv2-sbtn" type="button" data-bspeed="0.5">0.5×</button>
+          <button class="beamv2-sbtn active" type="button" data-bspeed="1">1×</button>
+          <button class="beamv2-sbtn" type="button" data-bspeed="2">2×</button>
+        </div>
+      </div>
+      <div class="beamv2-presets">
+        <button class="beamv2-pbtn" type="button" data-bpreset="ss_center">単純支持・中央集中</button>
+        <button class="beamv2-pbtn" type="button" data-bpreset="cant_end">片持・先端集中</button>
+        <button class="beamv2-pbtn" type="button" data-bpreset="udl">単純支持・等分布</button>
+        <button class="beamv2-pbtn" type="button" data-bpreset="stiff">剛 vs 柔の比較</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:0.72rem;color:var(--muted);flex-wrap:wrap;gap:6px">
+        <span><i class="fa-solid fa-circle-info"></i> たわみ形状は視覚的に誇張表示。荷重が周期的に増減し、変形が見えます</span>
         <span id="beamAnimInfo" style="font-family:'Roboto Mono',monospace;color:var(--accent)">—</span>
       </div>
     </div>
+    <style>
+    .beamv2-readouts{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px}
+    .beamv2-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:8px;padding:7px 4px;text-align:center}
+    .beamv2-ro .rv{font-family:'Roboto Mono',monospace;font-size:.92rem;font-weight:700;color:#fff;line-height:1.1}
+    .beamv2-ro .rl{font-size:.56rem;color:rgba(255,255,255,.62);margin-top:3px;letter-spacing:.02em}
+    .beamv2-ro.accent .rv{color:#ffd54a}
+    @media(max-width:640px){.beamv2-readouts{grid-template-columns:repeat(3,1fr)}}
+    .beamv2-play{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+    .beamv2-btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:.8rem;font-family:inherit;font-weight:600}
+    .beamv2-btn.sec{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+    .beamv2-speed{display:flex;gap:4px;margin-left:auto}
+    .beamv2-sbtn,.beamv2-pbtn{padding:4px 9px;font-size:.72rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;color:var(--text)}
+    .beamv2-sbtn.active,.beamv2-pbtn:hover{border-color:var(--accent);color:var(--accent)}
+    .beamv2-presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    canvas#beamAnimCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+    </style>
 
     <div class="chart-card">
       <div class="chart-title"><i class="fa-solid fa-chart-area"></i> 撓み曲線 w(x)</div>
@@ -423,11 +478,63 @@ canvas{max-width:100%}/* mobile-compact */
       <div class="bub">実務では、材料でEが決まり、梁の断面形状でIが決まるんだ。例えば自動車のフレーム（鋼材、E=210 GPa）と机の天板（木材、E=10 GPa）では、同じ荷重でもたわみが大きく異なる。このツールで「ヤング率E」の値を1/10にしてみると、たわみが10倍になるのがすぐわかる。材料選びの重要性が体感できるね。</div>
     </div>
   </div>
-  <h2>よくある質問</h2>
+  <h2>たわみ・たわみ角の公式一覧（最大値）</h2>
+<div class="fblock">
+<p>代表的な支持条件と荷重に対する<strong>最大たわみ δ<sub>max</sub></strong>・<strong>たわみ角 θ</strong>・<strong>最大曲げモーメント M<sub>max</sub></strong>の公式をまとめます。ここで $E$ はヤング率、$I$ は断面二次モーメント、$EI$ は曲げ剛性、$L$ はスパン、$P$ は集中荷重、$w$ は等分布荷重強度です。</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">支持条件・荷重</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">最大たわみ δ<sub>max</sub></th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">たわみ角 θ</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">最大モーメント M<sub>max</sub></th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">片持ち梁・先端集中荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL^3/3EI$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL^2/2EI$（先端）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL$（固定端）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">片持ち梁・等分布荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL^4/8EI$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL^3/6EI$（先端）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL^2/2$（固定端）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">単純梁・中央集中荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL^3/48EI$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL^2/16EI$（支点）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL/4$（中央）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">単純梁・等分布荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$5wL^4/384EI$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL^3/24EI$（支点）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL^2/8$（中央）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">両端固定梁・中央集中荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL^3/192EI$</td><td style="border:1px solid #d0d7de;padding:6px 8px">支点で0（径間内が最大）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL/8$（支点・中央）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">両端固定梁・等分布荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL^4/384EI$</td><td style="border:1px solid #d0d7de;padding:6px 8px">支点で0（径間内が最大）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL^2/12$（支点）, $wL^2/24$（中央）</td></tr>
+</tbody>
+</table>
+</div>
+<p>拘束が強いほど（自由端＜単純支持＜両端固定）同じ荷重でもたわみ・モーメントは小さくなります。たとえば中央集中荷重では、両端固定梁のたわみ $PL^3/192EI$ は単純梁 $PL^3/48EI$ の<strong>1/4</strong>です。上のシミュレーターで「梁の種類」を切り替え、この関係を数値で確認できます。</p>
+</div>
+
+<h2>許容たわみの目安（用途別）</h2>
+<div class="fblock">
+<p>たわみは強度とは別に、<strong>使用性（仕上げのひび割れ・建具の不具合・振動・心理的不安）</strong>を満たすために制限されます。スパン $L$ に対する代表的な許容値の目安は次の通りです（設計では適用規格・条件を必ず確認してください）。</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">用途</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">許容たわみの目安</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">一般の床梁（活荷重時）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$L/250 \sim L/300$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">仕上げ・天井のある梁</td><td style="border:1px solid #d0d7de;padding:6px 8px">$L/360$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">片持ち梁（先端）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$L/180 \sim L/250$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">クレーンガーダー</td><td style="border:1px solid #d0d7de;padding:6px 8px">$L/500 \sim L/1000$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">精密機械・工作機械フレーム</td><td style="border:1px solid #d0d7de;padding:6px 8px">$L/1000$ 以上</td></tr>
+</tbody>
+</table>
+</div>
+<p>許容たわみを満たさない場合は、<strong>断面（$I$）を大きくする・ヤング率の高い材料に変える・スパンを短くする・支持を増やす・荷重を減らす</strong>のいずれかで対応します。$I$ はたわみに対し $L$ は3〜4乗で効くため、スパン短縮が最も効果的です。</p>
+</div>
+
+<h2>断面係数・曲げ応力と支持条件の使い分け</h2>
+<div class="fblock">
+<p>たわみが基準内でも<strong>曲げ応力</strong>が許容値を超えてはいけません。曲げ応力は断面係数 $Z$ を用いて $\sigma = M_{max}/Z$、$Z = I/c$（$c$ は中立軸から縁までの距離）で評価し、材料の許容応力 $\sigma_a$ と比較します。たわみ照査（剛性 $EI$）と応力照査（断面係数 $Z$）は別物で、<strong>両方</strong>を満たす必要があります。</p>
+<p><strong>支持条件の使い分け：</strong>片持ち梁はたわみ・モーメントが最も大きく、看板・棚・機械アームなど一端しか固定できない場合に用います。単純梁は最も基本的で施工が容易、両端固定梁は端部に大きな負（ホギング）モーメントが生じる代わりにたわみが小さく、剛結された門形ラーメンや連続構造で現れます。実際の継手は完全固定と単純支持の中間（半剛接）になることが多く、安全側の評価では両者で挟んで検討します。</p>
+<p><strong>自重の扱い：</strong>梁自身の重量も等分布荷重として作用します。長スパンや軽量設計では自重によるたわみが無視できないため、活荷重に自重を加えて（重ね合わせて）検討してください。本シミュレーターでは荷重に自重相当分を含めて入力すれば近似的に評価できます。</p>
+</div>
+
+<h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">シミュレーション結果の単位は何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
     <div class="faq-a">撓みの単位はmm、曲げモーメントはN･mm、せん断力はN、応力はMPaです。入力値の単位（長さmm、荷重N、ヤング率MPa）に依存しますので、統一した単位系で入力してください。</div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggleFaq(this)">梁の自重はたわみ計算に含めるべきですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+    <div class="faq-a">はい。梁自身の重量も等分布荷重として作用し、特に長スパンや軽量材料では自重によるたわみが無視できません。実務では活荷重に自重を加えた合計荷重で検討します。本ツールでは荷重強度に自重相当分を上乗せして入力することで近似的に評価できます。</div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggleFaq(this)">片持ち梁・単純梁・両端固定梁はどう使い分けますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+    <div class="faq-a">一端のみ固定できる場合は片持ち梁（たわみ・モーメント最大）、両端を支える基本形が単純梁、端部を剛結できる場合は両端固定梁（たわみが単純梁の約1/4、ただし端部に大きな負モーメント）です。実際の継手は半剛接が多く、単純支持と固定支持の両者で挟んで安全側に検討するのが実務的です。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">集中荷重と分布荷重は同時に設定できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -461,6 +568,9 @@ canvas{max-width:100%}/* mobile-compact */
 
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="beam-deflection.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -517,13 +627,13 @@ canvas{max-width:100%}/* mobile-compact */
 <ol>
 <li>材料のヤング係数(E)を入力。鋼：200GPa、アルミ：70GPa、木材：10GPaを目安に設定</li>
 <li>断面二次モーメント(I)をスライダーで調整。I字型鋼材H-200×100で約2140cm⁴</li>
-<li>梁の長さ(L)と集中荷重(P)を指定後、「計算実行」で撓み量δ、最大曲げモーメント、せん断力分布を算出</li>
-<li>単純支持梁と片持梁をタブ切り替えで選択。支持条件により応力分布が異なる</li>
+<li>梁の長さ(L)と集中荷重(P)を指定すると、撓み量δ、最大曲げモーメント、せん断力分布が自動算出されます</li>
+<li>「梁の種類」プルダウンで単純支持梁・片持梁・荷重種別を選択。支持条件により応力分布が異なる</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>SS400鋼材H-200×100梁(E=200GPa、I=2140cm⁴)、支間長3.0m、中央集中荷重50kNの場合：最大撓みδ=48mm、中央最大曲げモーメント=75kN·m、支点反力=25kN。片持梁同仕様で荷重50kN先端加力時、先端撓み=180mm、固定端曲げモーメント=150kN·mとなり、支持条件で撓みが3.75倍増加。</p>
+<p>SS400鋼材H-200×100梁(E=200GPa、I=2140cm⁴=2.14×10⁻⁵m⁴)、支間長3.0m、中央集中荷重50kNの場合：最大撓みδ=PL³/(48EI)=6.57mm、中央最大曲げモーメント=PL/4=37.5kN·m、支点反力=25kN。片持梁同仕様で荷重50kN先端加力時、先端撓み=PL³/(3EI)=105mm、固定端曲げモーメント=PL=150kN·mとなり、支持条件で撓みが16倍増加。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -533,6 +643,22 @@ canvas{max-width:100%}/* mobile-compact */
 <li>温度変化時ヤング係数が低下(50℃上昇で約1%)するため、高温環境では補正が必要</li>
 <li>動的荷重はシミュレーターの静的計算には含まれないため、振動解析ソフト併用推奨</li>
 </ul>
+</div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
+<div class="howto-card">
+<h3>準拠規格・前提条件</h3>
+<p><strong>準拠/参考：</strong> オイラー・ベルヌーイ梁理論。単純支持・中央集中：\( \delta_{\max}=PL^3/(48EI) \)、単純支持・等分布：\( \delta_{\max}=5qL^4/(384EI) \)、片持・先端集中：\( \delta_{\max}=PL^3/(3EI) \)、片持・等分布：\( \delta_{\max}=qL^4/(8EI) \)。せん断力と曲げモーメントは \( dM/dx=V \)。出典：Gere &amp; Goodno「材料力学」、Roark「応力・ひずみ公式集」。</p>
+<p><strong>モデルの前提：</strong> 線形弾性・等方均質材料、微小変形（小たわみ）、平面保持の細長梁（せん断変形を無視＝Bernoulli仮定）、荷重は理想化された集中／等分布。既定値 E=200 GPa, I=1×10⁻⁶ m⁴, L=2 m, P/q=10 で δ・M・V は上式と完全一致を確認済み。</p>
+<p><strong>適用範囲・限界：</strong> スパン／せい比が大きい細長梁に有効。太く短い梁ではせん断たわみが無視できず本ツールは過小評価（その場合はティモシェンコ梁理論を用いる）。座屈・大変形・塑性・動的応答は対象外の教育用静的線形モデル。</p>
 </div>
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
@@ -645,19 +771,23 @@ function resizeBeamCanvas(){
   bctx.strokeStyle = 'rgba(255,255,255,.4)';
   bctx.lineWidth = 1.5;
 
-  if(isCant){
-    // Fixed support at left
-    bctx.beginPath();
-    bctx.moveTo(pad, beamY - 16);
-    bctx.lineTo(pad, beamY + 16);
-    bctx.stroke();
-    for(let i=0;i<4;i++){
-      const yy = beamY - 14 + i*8;
+  const isFixed = type.startsWith('fix_');
+  if(isCant || isFixed){
+    // Fixed wall at left (and right end too for 両端固定)
+    const ends = isFixed ? [{x:pad,dir:-1},{x:pad+beamL,dir:1}] : [{x:pad,dir:-1}];
+    ends.forEach(function(en){
       bctx.beginPath();
-      bctx.moveTo(pad, yy);
-      bctx.lineTo(pad - 8, yy + 6);
+      bctx.moveTo(en.x, beamY - 16);
+      bctx.lineTo(en.x, beamY + 16);
       bctx.stroke();
-    }
+      for(let i=0;i<4;i++){
+        const yy = beamY - 14 + i*8;
+        bctx.beginPath();
+        bctx.moveTo(en.x, yy);
+        bctx.lineTo(en.x + en.dir*8, yy + 6);
+        bctx.stroke();
+      }
+    });
   }else{
     // Pin at left
     bctx.beginPath();
@@ -904,6 +1034,28 @@ function compute(){
       w = P*x*x*(6*L*L - 4*L*x + x*x)/(24*EI)*1000;
       m = P*(L-x)*(L-x)/2/1000;
       v = P*(L-x)/1000;
+    }else if(type==='fix_udl'){
+      // 両端固定 + 等分布荷重 q (=P, N/m): δmax=qL⁴/384EI, M端=qL²/12(hogging), M中央=qL²/24
+      w = P*x*x*(L-x)*(L-x)/(24*EI)*1000;
+      m = (P*(L*x - x*x)/2 - P*L*L/12)/1000;
+      v = P*(L/2 - x)/1000;
+    }else if(type==='fix_point'){
+      // 両端固定 + 集中荷重 P at a (b=L-a): 中央でδ=PL³/192EI, M=±PL/8
+      const bb = L - a;
+      const RA = P*bb*bb*(L+2*a)/(L*L*L);
+      const MA = -P*a*bb*bb/(L*L);
+      if(x <= a){
+        w = P*bb*bb*x*x*(3*a*L - 3*a*x - bb*x)/(6*EI*L*L*L)*1000;
+        m = (RA*x + MA)/1000;
+        v = RA/1000;
+      }else{
+        const xr = L - x;
+        const RB = P*a*a*(L+2*bb)/(L*L*L);
+        const MB = -P*a*a*bb/(L*L);
+        w = P*a*a*xr*xr*(3*bb*L - 3*bb*xr - a*xr)/(6*EI*L*L*L)*1000;
+        m = (RB*xr + MB)/1000;
+        v = -RB/1000;
+      }
     }else{ // cant_point at position a
       if(x <= a){
         w = P*x*x*(3*a - x)/(6*EI)*1000;
@@ -930,6 +1082,15 @@ function compute(){
   document.getElementById('statMoment').textContent = maxMom.toFixed(3);
   document.getElementById('statShear').textContent  = maxShe.toFixed(2);
 
+  // 最大たわみ角 θ_max (数値微分: dw/dx → rad → deg)
+  let maxSlope=0;
+  for(let i=0;i<xs.length-1;i++){
+    const dwdx=(ws[i+1]-ws[i])/(xs[i+1]-xs[i]); // mm/m
+    const sr=Math.abs(dwdx/1000);               // rad
+    if(sr>maxSlope) maxSlope=sr;
+  }
+  (function(){var e=document.getElementById('statSlope'); if(e) e.textContent=(maxSlope*180/Math.PI).toFixed(3);})();
+
   drawBeamDiagram();
 }
 ['eSlider','iSlider','lSlider','pSlider','aSlider'].forEach(id=>{
@@ -938,145 +1099,215 @@ function compute(){
 document.getElementById('beamType').addEventListener('change', compute);
 compute();
 
-// ── Beam Deformation Animation ──
+// ── Beam Bending Animation (v2 showcase) ──
 (function() {
+  "use strict";
+  const T = {
+    info: function(d, m, s){ return 'δ=' + d.toFixed(2) + ' mm ｜ M=' + m.toFixed(2) + ' kN·m ｜ σ=' + s.toFixed(1) + ' MPa'; },
+    loadPoint: '荷重 P [kN]', loadUDL: '荷重 q [kN/m]',
+    pausedHint: '荷重 0%（無負荷）', play: '<i class="fa-solid fa-pause"></i> 一時停止', paused: '<i class="fa-solid fa-play"></i> 再生'
+  };
   const el = document.getElementById('beamAnimCanvas');
+  if (!el) return;
   const ctx = el.getContext('2d');
+  const H = 220;
   let phase = 0;
+  let playing = true;
+  let speed = 1;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) playing = false;
 
   function resize() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     const w = el.parentElement.getBoundingClientRect().width;
-    if (Math.abs(el.width - w * dpr) > 2 || el.height !== 160 * dpr) {
-      el.width = w * dpr;
-      el.height = 160 * dpr;
-      el.style.height = '160px';
+    if (Math.abs(el.width - w * dpr) > 2 || el.height !== H * dpr) {
+      el.width = Math.round(w * dpr);
+      el.height = Math.round(H * dpr);
+      el.style.height = H + 'px';
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function supports(W, beamY, padL, bw, isCant) {
+  // section height (square assumption) from I: I=h^4/12 -> h=(12I)^(1/4); c=h/2
+  function stressMPa(MmaxKNm, I) {
+    if (!(I > 0) || !(MmaxKNm > 0)) return 0;
+    const h = Math.pow(12 * I, 0.25);
+    const c = h / 2;
+    return (MmaxKNm * 1e3 * c / I) / 1e6; // Pa -> MPa
+  }
+
+  function drawSupports(beamY, padL, bw, isCant) {
     ctx.lineWidth = 1.5;
     if (isCant) {
       ctx.fillStyle = 'rgba(0,31,63,0.1)';
-      ctx.fillRect(padL - 12, beamY - 20, 12, 40);
-      ctx.strokeStyle = '#1a1a2e';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(padL, beamY - 20); ctx.lineTo(padL, beamY + 20); ctx.stroke();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(0,31,63,0.45)';
-      for (let y = beamY - 16; y <= beamY + 16; y += 7) {
+      ctx.fillRect(padL - 12, beamY - 24, 12, 48);
+      ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(padL, beamY - 24); ctx.lineTo(padL, beamY + 24); ctx.stroke();
+      ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,31,63,0.45)';
+      for (let y = beamY - 20; y <= beamY + 20; y += 8) {
         ctx.beginPath(); ctx.moveTo(padL - 12, y); ctx.lineTo(padL, y + 6); ctx.stroke();
       }
     } else {
-      ctx.strokeStyle = '#1a1a2e';
-      // pin left
+      ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(padL, beamY); ctx.lineTo(padL - 8, beamY + 14); ctx.lineTo(padL + 8, beamY + 14);
+      ctx.moveTo(padL, beamY); ctx.lineTo(padL - 9, beamY + 16); ctx.lineTo(padL + 9, beamY + 16);
       ctx.closePath(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(padL - 10, beamY + 16); ctx.lineTo(padL + 10, beamY + 16); ctx.stroke();
-      // roller right
-      ctx.beginPath(); ctx.arc(padL + bw, beamY + 8, 5, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(padL + bw, beamY); ctx.lineTo(padL + bw, beamY + 3); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(padL + bw - 10, beamY + 16); ctx.lineTo(padL + bw + 10, beamY + 16); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(padL - 12, beamY + 18); ctx.lineTo(padL + 12, beamY + 18); ctx.stroke();
+      ctx.beginPath(); ctx.arc(padL + bw, beamY + 9, 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(padL + bw, beamY); ctx.lineTo(padL + bw, beamY + 4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(padL + bw - 12, beamY + 18); ctx.lineTo(padL + bw + 12, beamY + 18); ctx.stroke();
+    }
+  }
+
+  function drawLoad(beamY, padL, bw, xs, ws, amp, vScale, type, L, loadFrac) {
+    const isUDL = type.endsWith('udl');
+    const isCant = type.startsWith('cant_');
+    ctx.strokeStyle = '#ff5252'; ctx.fillStyle = '#ff5252';
+    function defY(xr) {
+      // deflected y at ratio xr along beam
+      const idx = Math.min(xs.length - 1, Math.max(0, Math.round(xr * (xs.length - 1))));
+      return beamY + ws[idx] * amp * vScale;
+    }
+    if (isUDL) {
+      ctx.lineWidth = 1.4;
+      const n = Math.max(6, Math.floor(bw / 26));
+      const top = beamY - 34;
+      for (let i = 0; i <= n; i++) {
+        const xr = i / n; const ax = padL + xr * bw; const by = defY(xr) - 4;
+        ctx.beginPath(); ctx.moveTo(ax, top); ctx.lineTo(ax, by); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ax, by); ctx.lineTo(ax - 3, by - 6); ctx.lineTo(ax + 3, by - 6); ctx.closePath(); ctx.fill();
+      }
+      ctx.beginPath(); ctx.moveTo(padL, top); ctx.lineTo(padL + bw, top); ctx.stroke();
+    } else {
+      // point load at a (a = L/2 for ss center default, or aSlider)
+      const aSl = document.getElementById('aSlider');
+      const a = aSl ? parseFloat(aSl.value) : L / 2;
+      const xr = isCant ? 1 : Math.min(0.999, a / L);
+      const ax = padL + xr * bw;
+      const by = defY(xr) - 4;
+      const top = by - (28 + 26 * loadFrac);
+      ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(ax, top); ctx.lineTo(ax, by); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax, by); ctx.lineTo(ax - 5, by - 10); ctx.lineTo(ax + 5, by - 10); ctx.closePath(); ctx.fill();
     }
   }
 
   function frame() {
     resize();
-    const W = el.width / (window.devicePixelRatio || 1);
-    const H = 160;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const W = el.width / dpr;
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#F8F9FA';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#F8F9FA'; ctx.fillRect(0, 0, W, H);
 
     const labels = deflChart.data.labels;
-    const ws = deflChart.data.datasets[0].data;
-    if (!labels || !labels.length) { requestAnimationFrame(frame); return; }
+    const wsFull = deflChart.data.datasets[0].data;
+    if (!labels || !labels.length) { if (playing && !reduce) phase += 0.03 * speed; requestAnimationFrame(frame); return; }
 
     const xs = labels.map(Number);
     const L = xs[xs.length - 1] || 1;
-    const maxDefl = Math.max(...ws.map(Math.abs));
-    const amp = Math.sin(phase);
+    const type = document.getElementById('beamType').value;
+    const isUDL = type.endsWith('udl');
 
-    const padL = 38, padR = 18;
-    const beamY = H * 0.44;
+    // Load factor oscillates 0..1 (load applied gradually) so the beam visibly bends
+    const loadFrac = reduce ? 1 : (0.5 - 0.5 * Math.cos(phase));
+    const ws = wsFull.map(v => v * loadFrac);
+    const maxDeflFull = Math.max(1e-9, ...wsFull.map(Math.abs));
+    const maxDefl = maxDeflFull * loadFrac;
+
+    const padL = 44, padR = 22;
+    const beamY = H * 0.5;
     const bw = W - padL - padR;
+    const vScale = Math.min(70, 24 + 56 * Math.tanh(maxDeflFull / 14)) / maxDeflFull;
 
-    // Visual scale: fit maxDefl into 60px, capped
-    const vScale = maxDefl > 0 ? Math.min(60, 20 + 50 * Math.tanh(maxDefl / 15)) / maxDefl : 1;
+    // grid
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)'; ctx.lineWidth = 1;
+    [-60, -30, 30, 60].forEach(dy => { ctx.beginPath(); ctx.moveTo(padL, beamY + dy); ctx.lineTo(padL + bw, beamY + dy); ctx.stroke(); });
 
-    // Light grid
-    ctx.strokeStyle = 'rgba(0,0,0,0.05)';
-    ctx.lineWidth = 1;
-    [-40, -20, 20, 40].forEach(dy => {
-      ctx.beginPath(); ctx.moveTo(padL, beamY + dy); ctx.lineTo(padL + bw, beamY + dy); ctx.stroke();
-    });
+    // undeformed neutral axis
+    ctx.strokeStyle = 'rgba(0,123,255,0.20)'; ctx.lineWidth = 1.4; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(padL, beamY); ctx.lineTo(padL + bw, beamY); ctx.stroke(); ctx.setLineDash([]);
 
-    // Neutral axis
-    ctx.strokeStyle = 'rgba(0,123,255,0.22)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath(); ctx.moveTo(padL, beamY); ctx.lineTo(padL + bw, beamY); ctx.stroke();
-    ctx.setLineDash([]);
+    // filled deformed area
+    ctx.beginPath(); ctx.moveTo(padL, beamY);
+    for (let i = 0; i < xs.length; i++) ctx.lineTo(padL + (xs[i] / L) * bw, beamY + ws[i] * vScale);
+    ctx.lineTo(padL + bw, beamY); ctx.closePath();
+    ctx.fillStyle = 'rgba(0,123,255,0.07)'; ctx.fill();
 
-    // Filled deformed area
-    if (maxDefl > 0) {
-      ctx.beginPath();
-      ctx.moveTo(padL, beamY);
-      for (let i = 0; i < xs.length; i++) {
-        ctx.lineTo(padL + (xs[i] / L) * bw, beamY + ws[i] * amp * vScale);
-      }
-      ctx.lineTo(padL + bw, beamY);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(0,123,255,0.07)';
-      ctx.fill();
-
-      // Deformed beam line
-      const deflColor = maxDefl > 50 ? '#d63031' : maxDefl > 10 ? '#e17055' : '#007BFF';
-      ctx.beginPath();
-      for (let i = 0; i < xs.length; i++) {
-        const px = padL + (xs[i] / L) * bw;
-        const py = beamY + ws[i] * amp * vScale;
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-      }
-      ctx.strokeStyle = deflColor;
-      ctx.lineWidth = 2.5;
-      ctx.lineJoin = 'round';
-      ctx.stroke();
-
-      // Max deflection marker & label
-      const mi = ws.reduce((best, v, i) => Math.abs(v) > Math.abs(ws[best]) ? i : best, 0);
-      const mxPx = padL + (xs[mi] / L) * bw;
-      const myPy = beamY + ws[mi] * amp * vScale;
-      ctx.beginPath(); ctx.arc(mxPx, myPy, 4, 0, Math.PI * 2);
-      ctx.fillStyle = deflColor; ctx.fill();
-
-      const curDefl = Math.abs(ws[mi] * amp);
-      if (curDefl > 0.01) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath(); ctx.moveTo(mxPx, beamY); ctx.lineTo(mxPx, myPy); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = deflColor;
-        ctx.font = '10px Roboto Mono, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(curDefl.toFixed(2) + ' mm', mxPx, ws[mi] > 0 ? myPy + 14 : myPy - 6);
-      }
+    // deformed beam line (thick = the bending beam)
+    const deflColor = maxDeflFull > 50 ? '#d63031' : maxDeflFull > 10 ? '#e17055' : '#007BFF';
+    ctx.beginPath();
+    for (let i = 0; i < xs.length; i++) {
+      const px = padL + (xs[i] / L) * bw, py = beamY + ws[i] * vScale;
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     }
+    ctx.strokeStyle = deflColor; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.lineWidth = 1;
 
-    // Supports
-    const beamType = document.getElementById('beamType').value;
-    supports(W, beamY, padL, bw, beamType.startsWith('cant_'));
+    // max deflection marker
+    const mi = ws.reduce((b, v, i) => Math.abs(wsFull[i]) > Math.abs(wsFull[b]) ? i : b, 0);
+    const mxPx = padL + (xs[mi] / L) * bw, myPy = beamY + ws[mi] * vScale;
+    ctx.beginPath(); ctx.arc(mxPx, myPy, 4.5, 0, Math.PI * 2); ctx.fillStyle = deflColor; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(mxPx, beamY); ctx.lineTo(mxPx, myPy); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = deflColor; ctx.font = '11px Roboto Mono, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(maxDefl.toFixed(2) + ' mm', mxPx, ws[mi] >= 0 ? myPy + 15 : myPy - 7);
 
-    // Info label
+    // load arrows (follow deflected shape)
+    drawLoad(beamY, padL, bw, xs, wsFull, 1, vScale, type, L, loadFrac);
+
+    // supports
+    drawSupports(beamY, padL, bw, type.startsWith('cant_'));
+
+    // ── readouts ──
+    const msFull = momentChart.data.datasets[0].data;
+    const maxMomFull = Math.max(0, ...msFull.map(Math.abs));
+    const Eg = parseFloat(document.getElementById('eSlider').value) * 1e9;
+    const Ival = getI(parseFloat(document.getElementById('iSlider').value));
+    const sigFull = stressMPa(maxMomFull, Ival);
+    const loadInput = parseFloat(document.getElementById('pSlider').value);
+    set('roLoad', (loadInput * loadFrac).toFixed(1));
+    set('roLoadLbl', isUDL ? T.loadUDL : T.loadPoint);
+    set('roDefl', maxDefl.toFixed(2));
+    set('roMom', (maxMomFull * loadFrac).toFixed(2));
+    set('roStress', (sigFull * loadFrac).toFixed(1));
+    set('roEI', (Eg * Ival).toExponential(2));
+    set('roPos', xs[mi].toFixed(2));
     const infoEl = document.getElementById('beamAnimInfo');
-    if (infoEl) infoEl.textContent = 'δ_max = ' + maxDefl.toFixed(2) + ' mm';
+    if (infoEl) infoEl.textContent = (reduce ? '' : (playing ? '' : T.pausedHint + ' ｜ ')) + T.info(maxDefl, maxMomFull * loadFrac, sigFull * loadFrac);
 
-    phase += 0.04;
+    if (playing && !reduce) phase += 0.03 * speed;
     requestAnimationFrame(frame);
   }
+  function set(id, v){ const e = document.getElementById(id); if (e) (e.tagName === 'DIV' ? e.textContent = v : e.textContent = v); }
+
+  // ── controls ──
+  const playBtn = document.getElementById('beamPlayBtn');
+  const resetBtn = document.getElementById('beamResetBtn');
+  if (playBtn) playBtn.addEventListener('click', function(){ playing = !playing; playBtn.innerHTML = playing ? T.play : T.paused; });
+  if (reduce && playBtn) playBtn.innerHTML = T.paused;
+  if (resetBtn) resetBtn.addEventListener('click', function(){ phase = 0; });
+  document.querySelectorAll('.beamv2-sbtn').forEach(function(b){
+    b.addEventListener('click', function(){
+      speed = parseFloat(b.getAttribute('data-bspeed'));
+      document.querySelectorAll('.beamv2-sbtn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  function setSlider(id, val){ const s = document.getElementById(id); if (s){ s.value = val; pct(s); } }
+  document.querySelectorAll('.beamv2-pbtn').forEach(function(b){
+    b.addEventListener('click', function(){
+      const p = b.getAttribute('data-bpreset');
+      const bt = document.getElementById('beamType');
+      if (p === 'ss_center'){ bt.value = 'ss_point'; setSlider('lSlider', 2); setSlider('aSlider', 1); setSlider('eSlider', 200); setSlider('iSlider', 50); setSlider('pSlider', 10); }
+      else if (p === 'cant_end'){ bt.value = 'cant_point'; setSlider('lSlider', 2); setSlider('aSlider', 2); setSlider('eSlider', 200); setSlider('iSlider', 50); setSlider('pSlider', 10); }
+      else if (p === 'udl'){ bt.value = 'ss_udl'; setSlider('lSlider', 2); setSlider('eSlider', 200); setSlider('iSlider', 50); setSlider('pSlider', 10); }
+      else if (p === 'stiff'){ bt.value = 'ss_point'; setSlider('lSlider', 3); setSlider('aSlider', 1.5); setSlider('eSlider', 200); setSlider('iSlider', 80); setSlider('pSlider', 30); }
+      bt.dispatchEvent(new Event('change'));
+      compute();
+      phase = 0;
+    });
+  });
 
   frame();
 })();

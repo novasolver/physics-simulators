@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "マリュスの法則 シミュレーター",
       "description": "マリュスの法則 I = I0 cos²θ を用いて、3 枚の偏光板（基準 P1、中間 P2 角度 θa、最終 P3 角度 θb）の構成から各段の透過強度・全透過率・中間板による寄与を実時間に計算する 3 偏光板パラドックスのシミュレーター。",
       "url": "https://novasolver.jp/tools/malus-law.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["マリュスの法則 I = I0 cos²θ の実時間計算","3 偏光板（P1=0°、P2=θa、P3=θb）の縦列透過解析","入射強度 I0・中間角 θa・最終角 θb・消光比 ext を独立調整","中間板を取り除いた場合との比較で 3 偏光板パラドックスを定量化","P1→P2→P3 の偏光方向と強度を矢印で可視化、θa 依存の I3 曲線を表示"],
       "keywords": "マリュスの法則,Malus law,3偏光板パラドックス,偏光子,cos²則,消光比,偏光,光学,直交偏光,線偏光",
       "datePublished": "2026-05-15",
@@ -102,6 +102,19 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #polarCanvas,#angleCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.preset-row{ display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+.preset-btn{ padding:5px 10px; font-size:0.74rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); cursor:pointer; font-family:inherit; transition:all .15s; }
+.preset-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.toggle-btn{ display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:0.82rem; font-family:inherit; cursor:pointer; transition:all .15s; }
+.toggle-btn.active{ background:rgba(0,123,255,.1); border-color:var(--accent); color:var(--accent); font-weight:600; }
+.live-readouts{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:14px; }
+.live-ro{ background:linear-gradient(135deg,#0a1628,#102a4c); border:1px solid rgba(0,180,216,.25); border-radius:10px; padding:10px 6px; text-align:center; }
+.live-ro .rv{ font-family:'Roboto Mono',monospace; font-size:1.05rem; font-weight:700; color:#fff; line-height:1.1; }
+.live-ro .rl{ font-size:0.6rem; color:rgba(255,255,255,.6); margin-top:4px; letter-spacing:.02em; }
+.live-ro.accent .rv{ color:#ffd54a; }
+@media(max-width:600px){ .live-readouts{ grid-template-columns:repeat(3,1fr); } }
+canvas:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce){ .toggle-btn,.preset-btn{ transition:none; } }
 </style>
 </head>
 <body>
@@ -165,14 +178,49 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
+    <div style="font-size:0.72rem;color:var(--muted);margin-bottom:4px;font-weight:600;">プリセット・シナリオ</div>
+    <div class="preset-row">
+      <button type="button" class="preset-btn" onclick="preset('parallel')">平行（全透過）</button>
+      <button type="button" class="preset-btn" onclick="preset('crossed')">直交 → 暗黒</button>
+      <button type="button" class="preset-btn" onclick="preset('middle')">直交＋45°中間 → I0/8</button>
+      <button type="button" class="preset-btn" onclick="preset('rotate')">連続回転</button>
+    </div>
+
+    <div class="param-group" style="margin-top:10px;">
+      <button type="button" class="toggle-btn active" id="midToggle" onclick="toggleMid()" aria-pressed="true"><i class="fas fa-check-square"></i> 中間板 P2 あり</button>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">中間板 P2 を出し入れして、3 偏光板パラドックスで光が復活する様子を確認できます。</div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> θa をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()" aria-pressed="false"><i class="fas fa-play"></i> 再生</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は I0=100、θa=45°、θb=90°、ext=0。P1 は 0° に固定された基準軸で、自然光が通ると半分が透過して垂直偏光化されます。θb=90° で P1 と P3 が直交し、中間 P2 がない場合は光が遮断されますが、θa=45° で挿入すると I3=12.5（全透過率 12.5%）が観測されます。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は I0=100、θa=45°、θb=90°、ext=0。P1 は 0° に固定された基準軸で、自然光が通ると半分が透過して垂直偏光化されます。θb=90° で P1 と P3 が直交し、中間 P2 がない場合は光が遮断されますが、θa=45° で挿入すると I3=12.5（全透過率 12.5%）が観測されます。再生で E 場の振動がアニメーションします。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> 各段ライブ強度</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roI0">100.0</div><div class="rl">入射 I0</div></div>
+        <div class="live-ro"><div class="rv" id="roI1">50.0</div><div class="rl">P1 後 I1</div></div>
+        <div class="live-ro"><div class="rv" id="roI2">25.0</div><div class="rl">P2 後 I2</div></div>
+        <div class="live-ro"><div class="rv" id="roI3">12.5</div><div class="rl">P3 後 I3</div></div>
+        <div class="live-ro"><div class="rv" id="roTrans">12.5%</div><div class="rl">全透過率</div></div>
+      </div>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -184,8 +232,8 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-grip-lines"></i> 3 偏光板の縦列配置</div>
-      <canvas id="polarCanvas"></canvas>
+      <div class="chart-title"><i class="fas fa-grip-lines"></i> 3 偏光板の縦列配置（E 場アニメーション）</div>
+      <canvas id="polarCanvas" tabindex="0" role="img" aria-label="3 枚の偏光板を通る光の E 場振動アニメーション。各段の偏光方向と強度を表示します。"></canvas>
       <p class="canvas-hint">左＝自然光（無偏光）入射 I0／P1（青、0°）後＝垂直偏光化された I1=I0/2／P2（緑、θa）後＝マリュスの法則による I2／P3（赤、θb）後＝最終出力 I3。矢印長で強度を、向きで透過軸方向を表現。</p>
     </div>
 
@@ -207,78 +255,91 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Malus Law Simulator (Three-Polarizer Paradox) ==========
+var L = {
+  "unpol": "自然光（無偏光）",
+  "removed": "なし",
+  "annZero": "直交ペア → 完全消光 I3=0",
+  "annEighth": "直交＋45°中間 → I3 = I0/8",
+  "noMid": "P2 なしの I3",
+  "pause": "一時停止",
+  "play": "再生",
+  "midOn": "中間板 P2 あり",
+  "midOff": "中間板 P2 なし"
+};
+// ========== Malus Law Simulator v2 (Three-Polarizer Paradox) ==========
+"use strict";
 var polarCanvas = document.getElementById('polarCanvas');
 var polarCtx = polarCanvas.getContext('2d');
 var angleCanvas = document.getElementById('angleCanvas');
 var angleCtx = angleCanvas.getContext('2d');
 var playing = false;
-var animId = null;
+var rafId = null;
+var phase = 0;
+var lastTs = 0;
+var midOn = true;
+var sweepMode = false;
 var sweepDir = 1;
+var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function $(id){ return document.getElementById(id); }
 
 function getParams() {
-  var I0 = parseFloat(document.getElementById('slI0').value);
-  var ta = parseFloat(document.getElementById('slTheta_a').value);
-  var tb = parseFloat(document.getElementById('slTheta_b').value);
-  var ext = parseFloat(document.getElementById('slExt').value);
+  var I0 = parseFloat($('slI0').value);
+  var ta = parseFloat($('slTheta_a').value);
+  var tb = parseFloat($('slTheta_b').value);
+  var ext = parseFloat($('slExt').value);
   return { I0: I0, ta: ta, tb: tb, ext: ext };
 }
 
-// Transmission function with extinction-ratio leakage
+// Ideal/real transmission factor (relative angle in degrees) with extinction leakage
 function T(thetaDeg, ext) {
   var r = thetaDeg * Math.PI / 180;
-  return Math.cos(r) * Math.cos(r) + ext;
+  var c = Math.cos(r);
+  return c * c + ext;
 }
 
-// Stage intensities for the three-polarizer stack (P1=0, P2=ta, P3=tb)
+// Stage intensities. When midOn is false, P2 is removed (P1 -> P3 directly).
 function stack(p) {
-  var I1 = 0.5 * p.I0;                      // unpolarised → P1 (vertical baseline)
-  var I2 = I1 * T(p.ta, p.ext);             // through P2 (rel angle ta - 0)
-  var I3 = I2 * T(p.tb - p.ta, p.ext);      // through P3 (rel angle tb - ta)
-  // Compare without P2 (P1 → P3 directly)
+  var I1 = 0.5 * p.I0;
+  var f2 = T(p.ta, p.ext);
+  var f3, I2, I3;
+  if (midOn) {
+    I2 = I1 * f2;
+    f3 = T(p.tb - p.ta, p.ext);
+    I3 = I2 * f3;
+  } else {
+    I2 = I1;
+    f2 = 1;
+    f3 = T(p.tb, p.ext);
+    I3 = I1 * f3;
+  }
   var I3_noMid = I1 * T(p.tb, p.ext);
-  return { I1: I1, I2: I2, I3: I3, I3_noMid: I3_noMid };
+  return { I1: I1, I2: I2, I3: I3, I3_noMid: I3_noMid, f2: f2, f3: f3 };
 }
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
+function __cssW(c){ return parseFloat(c.dataset.cssW) || c.width / Math.min(window.devicePixelRatio || 1, 2.5); }
+function __cssH(c){ return parseFloat(c.dataset.cssH) || c.height / Math.min(window.devicePixelRatio || 1, 2.5); }
 
 function resizeCanvases() {
-  [polarCanvas, angleCanvas].forEach(function(cv){
+  [[polarCanvas,0.52],[angleCanvas,0.5]].forEach(function(pair){
+    var cv = pair[0];
     var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+    var H = Math.round(w * pair[1]);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = w + 'px';
+    cv.style.height = H + 'px';
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(H * dpr);
+    cv.dataset.cssW = String(w);
+    cv.dataset.cssH = String(H);
+    var c = cv.getContext('2d');
+    if (c) c.setTransform(dpr, 0, 0, dpr, 0, 0);
   });
 }
 
-function drawArrow(ctx, x1, y1, x2, y2, color, headSize) {
-  if (typeof headSize !== 'number') headSize = 9;
-  var ang = Math.atan2(y2 - y1, x2 - x1);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - headSize * Math.cos(ang - 0.35), y2 - headSize * Math.sin(ang - 0.35));
-  ctx.lineTo(x2 - headSize * Math.cos(ang + 0.35), y2 - headSize * Math.sin(ang + 0.35));
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawPolarizerPlate(ctx, cx, cy, angleDeg, color, label) {
-  // Disc representing the polarizer with a slit (transmission axis) drawn at angleDeg
-  var R = 36;
+function drawPolarizerPlate(ctx, cx, cy, angleDeg, color, label, faded) {
+  var R = 34;
+  ctx.globalAlpha = faded ? 0.28 : 1;
   ctx.fillStyle = 'rgba(255,255,255,0.06)';
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
@@ -286,139 +347,150 @@ function drawPolarizerPlate(ctx, cx, cy, angleDeg, color, label) {
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  // Transmission axis line (the slit)
   var r = angleDeg * Math.PI / 180;
-  // We treat 0deg as vertical (y-axis up), so rotate accordingly.
-  var dx = Math.sin(r), dy = -Math.cos(r);
+  var ax = Math.sin(r), ay = -Math.cos(r);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+  ctx.strokeStyle = color; ctx.globalAlpha = (faded ? 0.28 : 1) * 0.35; ctx.lineWidth = 1;
+  for (var o = -R; o <= R; o += 6) {
+    ctx.beginPath();
+    ctx.moveTo(cx + ax * o - ay * R, cy + ay * o + ax * R);
+    ctx.lineTo(cx + ax * o + ay * R, cy + ay * o - ax * R);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.globalAlpha = faded ? 0.4 : 1;
   ctx.strokeStyle = color;
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(cx - dx * R, cy - dy * R);
-  ctx.lineTo(cx + dx * R, cy + dy * R);
+  ctx.moveTo(cx - ax * R, cy - ay * R);
+  ctx.lineTo(cx + ax * R, cy + ay * R);
   ctx.stroke();
-  // Label below
+  ctx.globalAlpha = 1;
   ctx.fillStyle = '#cfe3f7';
   ctx.font = 'bold 12px "Roboto Mono", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(label, cx, cy + R + 16);
-  // Angle label
+  ctx.fillText(label, cx, cy + R + 15);
   ctx.font = '11px "Roboto Mono", monospace';
   ctx.fillStyle = color;
-  ctx.fillText(angleDeg.toFixed(0) + '°', cx, cy + R + 30);
+  ctx.fillText(angleDeg.toFixed(0) + '°', cx, cy + R + 29);
+}
+
+// Animated transverse E-field wave; amplitude proportional to sqrt(I)
+function drawWaveSegment(ctx, xa, xb, cy, angleDeg, I, Imax, color, ph) {
+  var amp = 30 * Math.sqrt(Math.max(0, Math.min(1, I / Imax)));
+  if (amp < 0.6) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xa, cy); ctx.lineTo(xb, cy); ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
+  var r = angleDeg * Math.PI / 180;
+  var ux = Math.sin(r), uy = -Math.cos(r);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  var k = 0.16;
+  for (var x = xa; x <= xb; x += 2) {
+    var sv = amp * Math.sin(k * (x - xa) - ph);
+    var dx = ux * sv, dy = uy * sv;
+    if (x === xa) ctx.moveTo(x + dx, cy + dy);
+    else ctx.lineTo(x + dx, cy + dy);
+  }
+  ctx.stroke();
 }
 
 function drawPolar(p) {
-  var ctx = polarCtx, W = __novaCanvasCssW(polarCanvas), H = __novaCanvasCssH(polarCanvas);
+  var ctx = polarCtx, W = __cssW(polarCanvas), H = __cssH(polarCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
-
   var s = stack(p);
+  var Imax = Math.max(p.I0, 1e-6);
 
-  // Layout: four x-positions for: (a) source/unpolarized arrows, (b) P1, (c) P2, (d) P3, plus output
-  var xs = [W * 0.10, W * 0.30, W * 0.52, W * 0.74, W * 0.92];
+  var xs = [W * 0.09, W * 0.29, W * 0.51, W * 0.73, W * 0.95];
   var cy = H * 0.50;
 
-  // Beam axis baseline
-  ctx.strokeStyle = 'rgba(143,184,224,0.30)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 4]);
-  ctx.beginPath(); ctx.moveTo(W * 0.04, cy); ctx.lineTo(W * 0.96, cy); ctx.stroke();
+  ctx.strokeStyle = 'rgba(143,184,224,0.25)';
+  ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.moveTo(W * 0.03, cy); ctx.lineTo(W * 0.97, cy); ctx.stroke();
   ctx.setLineDash([]);
 
-  // (a) Unpolarized incoming arrows at xs[0] showing random orientations
   var unpolColor = 'rgba(255,209,102,0.85)';
-  var stageLen = function(I){
-    // Map intensity (0..max possible) to arrow length in px
-    var Imax = Math.max(p.I0, 1e-6);
-    return 22 + 36 * Math.min(1, I / Imax);
-  };
-  var inLen = stageLen(p.I0);
+  var inAmp = 26 * Math.sqrt(Math.min(1, p.I0 / Imax));
   for (var a = 0; a < 6; a++) {
-    var ang = (a / 6) * Math.PI;
-    var dx = Math.cos(ang), dy = Math.sin(ang);
-    ctx.strokeStyle = unpolColor;
-    ctx.lineWidth = 1.6;
+    var oa = (a / 6) * Math.PI;
+    var dux = Math.cos(oa), duy = Math.sin(oa);
+    var sN = inAmp * Math.sin(phase + a);
+    ctx.strokeStyle = unpolColor; ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(xs[0] - dx * inLen / 2, cy - dy * inLen / 2);
-    ctx.lineTo(xs[0] + dx * inLen / 2, cy + dy * inLen / 2);
+    ctx.moveTo(xs[0] - dux * sN, cy - duy * sN);
+    ctx.lineTo(xs[0] + dux * sN, cy + duy * sN);
     ctx.stroke();
   }
   ctx.fillStyle = '#FFD166';
   ctx.font = 'bold 11px "Roboto Mono", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('I0 = ' + p.I0.toFixed(1), xs[0], cy - 56);
+  ctx.fillText('I0 = ' + p.I0.toFixed(1), xs[0], cy - 58);
   ctx.font = '10px "Noto Sans JP", sans-serif';
   ctx.fillStyle = '#cfe3f7';
-  ctx.fillText('自然光（無偏光）', xs[0], cy + 56);
+  ctx.fillText(L.unpol, xs[0], cy + 60);
 
-  // (b) Plate P1 at 0° (vertical axis)
-  drawPolarizerPlate(ctx, xs[1], cy, 0, '#7fdcff', 'P1');
-  // After P1: vertical polarization arrow with length proportional to I1
-  var arrColors = ['#7fdcff', '#9be7a3', '#ff6b6b'];
-  var arrows = [
-    { x: (xs[1] + xs[2]) / 2, angDeg: 0,    I: s.I1, color: arrColors[0], label: 'I1' },
-    { x: (xs[2] + xs[3]) / 2, angDeg: p.ta, I: s.I2, color: arrColors[1], label: 'I2' },
-    { x: (xs[3] + xs[4]) / 2, angDeg: p.tb, I: s.I3, color: arrColors[2], label: 'I3' }
-  ];
+  drawPolarizerPlate(ctx, xs[1], cy, 0, '#7fdcff', 'P1', false);
+  drawPolarizerPlate(ctx, xs[2], cy, p.ta, '#9be7a3', 'P2', !midOn);
+  drawPolarizerPlate(ctx, xs[3], cy, p.tb, '#ff6b6b', 'P3', false);
 
-  // (c) Plate P2 at θa
-  drawPolarizerPlate(ctx, xs[2], cy, p.ta, '#9be7a3', 'P2');
-  // (d) Plate P3 at θb
-  drawPolarizerPlate(ctx, xs[3], cy, p.tb, '#ff6b6b', 'P3');
+  drawWaveSegment(ctx, xs[1] + 36, xs[2] - 36, cy, 0, s.I1, Imax, '#7fdcff', phase);
+  drawWaveSegment(ctx, xs[2] + 36, xs[3] - 36, cy, (midOn ? p.ta : 0), s.I2, Imax, '#9be7a3', phase);
+  drawWaveSegment(ctx, xs[3] + 36, xs[4], cy, p.tb, s.I3, Imax, '#ff6b6b', phase);
 
-  // Draw polarisation arrows after each plate
-  for (var i = 0; i < arrows.length; i++) {
-    var ar = arrows[i];
-    var len = stageLen(ar.I);
-    var r = ar.angDeg * Math.PI / 180;
-    var dx = Math.sin(r), dy = -Math.cos(r);
-    var x1 = ar.x - dx * len / 2;
-    var y1 = cy - dy * len / 2;
-    var x2 = ar.x + dx * len / 2;
-    var y2 = cy + dy * len / 2;
-    ctx.strokeStyle = ar.color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-    drawArrow(ctx, x1, y1, x2, y2, ar.color, 8);
-    drawArrow(ctx, x2, y2, x1, y1, ar.color, 8);
-    ctx.fillStyle = ar.color;
-    ctx.font = 'bold 11px "Roboto Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(ar.label + ' = ' + ar.I.toFixed(2), ar.x, cy - 56);
-  }
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 11px "Roboto Mono", monospace';
+  ctx.fillStyle = '#7fdcff'; ctx.fillText('I1 = ' + s.I1.toFixed(2), (xs[1] + xs[2]) / 2, cy - 58);
+  ctx.fillStyle = '#9be7a3'; ctx.fillText('I2 = ' + s.I2.toFixed(2), (xs[2] + xs[3]) / 2, cy - 58);
+  ctx.fillStyle = '#ff6b6b'; ctx.fillText('I3 = ' + s.I3.toFixed(2), (xs[3] + xs[4]) / 2, cy - 58);
+  ctx.font = '10px "Roboto Mono", monospace';
+  ctx.fillStyle = 'rgba(155,231,163,0.85)';
+  ctx.fillText('×cos²=' + s.f2.toFixed(3), (xs[2] + xs[3]) / 2, cy + 64);
+  ctx.fillStyle = 'rgba(255,107,107,0.85)';
+  ctx.fillText('×cos²=' + s.f3.toFixed(3), (xs[3] + xs[4]) / 2, cy + 64);
 
-  // Title and summary
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '11px "Noto Sans JP", sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText('P1 (0°基準) → P2 (θa=' + p.ta.toFixed(0) + '°) → P3 (θb=' + p.tb.toFixed(0) + '°)', 14, 18);
-  ctx.fillText('中間 P2 を除いた場合の I3 = ' + s.I3_noMid.toFixed(2) + ' （比較）', 14, H - 12);
+  ctx.fillText('P1 (0°) → P2 (' + (midOn ? p.ta.toFixed(0) + '°' : L.removed) + ') → P3 (' + p.tb.toFixed(0) + '°)', 12, 17);
+
+  var crossed = Math.abs(((p.tb % 180) + 180) % 180 - 90) < 1.0;
+  ctx.textAlign = 'right'; ctx.font = 'bold 11px "Noto Sans JP", sans-serif';
+  if (!midOn && crossed) {
+    ctx.fillStyle = '#ff6b6b';
+    ctx.fillText(L.annZero, W - 12, H - 12);
+  } else if (midOn && crossed && Math.abs(p.ta - 45) < 1.0) {
+    ctx.fillStyle = '#ffd54a';
+    ctx.fillText(L.annEighth, W - 12, H - 12);
+  } else {
+    ctx.fillStyle = '#8fb8e0'; ctx.font = '10px "Roboto Mono", monospace';
+    ctx.fillText(L.noMid + ' = ' + s.I3_noMid.toFixed(2), W - 12, H - 12);
+  }
 }
 
 function drawAngle(p) {
-  var ctx = angleCtx, W = __novaCanvasCssW(angleCanvas), H = __novaCanvasCssH(angleCanvas);
+  var ctx = angleCtx, W = __cssW(angleCanvas), H = __cssH(angleCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
 
-  var mx = 56, my = 30;
+  var mx = 52, my = 28;
   var x0 = mx, x1 = W - 14, y0 = H - my, y1 = my + 4;
   var gw = x1 - x0, gh = y0 - y1;
-
-  // Y range: 0 .. I0/2 (max possible after P1)
   var yMax = Math.max(p.I0 / 2 + p.ext * p.I0, 1e-6);
 
   function px(deg) { return x0 + deg / 180 * gw; }
   function py(v)   { return y0 - Math.max(0, Math.min(1, v / yMax)) * gh; }
 
-  // Gridlines x-axis
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
+  ctx.strokeStyle = 'rgba(143,184,224,0.16)';
   ctx.fillStyle = '#8fb8e0';
   ctx.font = '10px "Roboto Mono", monospace';
-  ctx.lineWidth = 1;
-  ctx.textAlign = 'center';
+  ctx.lineWidth = 1; ctx.textAlign = 'center';
   for (var d = 0; d <= 180; d += 30) {
     var xx = px(d);
     ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
@@ -426,131 +498,157 @@ function drawAngle(p) {
   }
   ctx.textAlign = 'right';
   var ticks = [0, 0.25, 0.5, 0.75, 1.0];
-  for (var k = 0; k < ticks.length; k++) {
-    var v = ticks[k] * yMax;
-    var yy = py(v);
+  for (var ti = 0; ti < ticks.length; ti++) {
+    var v = ticks[ti] * yMax; var yy = py(v);
     ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
     ctx.fillText(v.toFixed(1), x0 - 4, yy + 3);
   }
-  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(143,184,224,0.55)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
 
-  // Reference line: I3 without midplate (constant at this θb)
   var I1 = 0.5 * p.I0;
   var I3_noMid = I1 * T(p.tb, p.ext);
-  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = 'rgba(143,184,224,0.55)'; ctx.lineWidth = 1.2;
   ctx.setLineDash([5, 4]);
-  ctx.beginPath();
-  ctx.moveTo(x0, py(I3_noMid));
-  ctx.lineTo(x1, py(I3_noMid));
-  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0, py(I3_noMid)); ctx.lineTo(x1, py(I3_noMid)); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono", monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('P2 なしの I3 = ' + I3_noMid.toFixed(2), x0 + 8, py(I3_noMid) - 6);
+  ctx.fillStyle = '#8fb8e0'; ctx.font = '10px "Roboto Mono", monospace'; ctx.textAlign = 'left';
+  ctx.fillText(L.noMid + ' = ' + I3_noMid.toFixed(2), x0 + 8, py(I3_noMid) - 6);
 
-  // I3(θa) curve at fixed θb
-  ctx.strokeStyle = '#7fdcff';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#7fdcff'; ctx.lineWidth = 2;
   ctx.beginPath();
   var first = true;
   for (var d2 = 0; d2 <= 180; d2 += 1) {
     var I2 = I1 * T(d2, p.ext);
-    var I3 = I2 * T(p.tb - d2, p.ext);
-    var X = px(d2), Y = py(I3);
-    if (first) { ctx.moveTo(X, Y); first = false; }
-    else       { ctx.lineTo(X, Y); }
+    var I3c = I2 * T(p.tb - d2, p.ext);
+    var X = px(d2), Y = py(I3c);
+    if (first) { ctx.moveTo(X, Y); first = false; } else ctx.lineTo(X, Y);
   }
   ctx.stroke();
 
-  // Current θa marker
   var s = stack(p);
-  var mX = px(p.ta), mY = py(s.I3);
+  var markI3 = midOn ? s.I3 : I3_noMid;
+  var mX = px(p.ta), mY = py(markI3);
   ctx.fillStyle = '#FFD166';
   ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
   ctx.beginPath(); ctx.arc(mX, mY, 6, 0, Math.PI * 2); ctx.fill();
   ctx.shadowBlur = 0;
   ctx.fillStyle = '#FFD166';
-  ctx.font = 'bold 11px "Roboto Mono", monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('θa=' + p.ta.toFixed(0) + '°  I3=' + s.I3.toFixed(2), mX + 8, Math.max(mY - 8, y1 + 12));
+  ctx.font = 'bold 11px "Roboto Mono", monospace'; ctx.textAlign = 'left';
+  ctx.fillText('θa=' + p.ta.toFixed(0) + '°  I3=' + markI3.toFixed(2), mX + 8, Math.max(mY - 8, y1 + 12));
 
-  // Axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('θa (°)  (θb=' + p.tb.toFixed(0) + '°  固定)', (x0 + x1) / 2, H - 6);
-  ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('I3', 0, 0);
-  ctx.restore();
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '12px "Roboto Mono", monospace'; ctx.textAlign = 'center';
+  ctx.fillText('θa (°)  θb=' + p.tb.toFixed(0) + '°', (x0 + x1) / 2, H - 6);
+  ctx.save(); ctx.translate(13, (y0 + y1) / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText('I3', 0, 0); ctx.restore();
+}
+
+function updateReadouts(p, s) {
+  var trans = p.I0 > 1e-9 ? (s.I3 / p.I0) * 100 : 0;
+  var contrib = s.I3 - s.I3_noMid;
+  var sign = contrib >= 0 ? '+' : '';
+  $('statI_final').textContent    = s.I3.toFixed(1);
+  $('statTrans').textContent      = trans.toFixed(1) + ' %';
+  $('statI_mid').textContent      = s.I2.toFixed(1);
+  $('statMidContrib').textContent = sign + contrib.toFixed(1);
+  if ($('roI0'))    $('roI0').textContent    = p.I0.toFixed(1);
+  if ($('roI1'))    $('roI1').textContent    = s.I1.toFixed(1);
+  if ($('roI2'))    $('roI2').textContent    = s.I2.toFixed(1);
+  if ($('roI3'))    $('roI3').textContent    = s.I3.toFixed(1);
+  if ($('roTrans')) $('roTrans').textContent = trans.toFixed(1) + '%';
 }
 
 function compute() {
   var p = getParams();
   if (!isFinite(p.I0) || !isFinite(p.ta) || !isFinite(p.tb) || !isFinite(p.ext)) return;
   var s = stack(p);
-  var trans = p.I0 > 1e-9 ? (s.I3 / p.I0) * 100 : 0;
-  var contrib = s.I3 - s.I3_noMid;
-  var sign = contrib >= 0 ? '+' : '';
-  document.getElementById('statI_final').textContent     = s.I3.toFixed(1);
-  document.getElementById('statTrans').textContent       = trans.toFixed(1) + ' %';
-  document.getElementById('statI_mid').textContent       = s.I2.toFixed(1);
-  document.getElementById('statMidContrib').textContent  = sign + contrib.toFixed(1);
+  updateReadouts(p, s);
   drawPolar(p);
   drawAngle(p);
 }
 
-function animationStep() {
+function frame(ts) {
   if (!playing) return;
-  var sl = document.getElementById('slTheta_a');
-  var cur = parseFloat(sl.value);
-  if (!isFinite(cur)) cur = 45;
-  cur += sweepDir * 2;
-  if (cur >= 180) { cur = 180; sweepDir = -1; }
-  if (cur <= 0)   { cur = 0;   sweepDir = 1; }
-  sl.value = cur.toFixed(0);
-  updateSlider(sl, 'slTheta_aVal', 0, '');
+  if (!lastTs) lastTs = ts;
+  var dt = (ts - lastTs) / 1000; lastTs = ts;
+  if (dt > 0.1) dt = 0.1;
+  phase += dt * 6.0;
+  if (sweepMode) {
+    var sl = $('slTheta_a');
+    var cur = parseFloat(sl.value); if (!isFinite(cur)) cur = 45;
+    cur += sweepDir * dt * 40;
+    if (cur >= 180) { cur = 180; sweepDir = -1; }
+    if (cur <= 0)   { cur = 0;   sweepDir = 1; }
+    sl.value = cur.toFixed(0);
+    if (typeof updateSlider === 'function') updateSlider(sl, 'slTheta_aVal', 0, '');
+    else { $('slTheta_aVal').value = cur.toFixed(0); }
+  }
   compute();
-  setTimeout(function(){ animId = requestAnimationFrame(animationStep); }, 80);
+  rafId = requestAnimationFrame(frame);
 }
 
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
+function setPlay(on) {
+  playing = on;
+  var btn = $('playBtn');
   if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
+    btn.innerHTML = '<i class="fas fa-pause"></i> ' + L.pause;
+    btn.setAttribute('aria-pressed', 'true');
+    lastTs = 0;
+    rafId = requestAnimationFrame(frame);
   } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> θa をスイープ';
-    if (animId) cancelAnimationFrame(animId);
+    btn.innerHTML = '<i class="fas fa-play"></i> ' + L.play;
+    btn.setAttribute('aria-pressed', 'false');
+    if (rafId) cancelAnimationFrame(rafId);
   }
+}
+function togglePlay() { setPlay(!playing); }
+
+function setMid(on) {
+  midOn = on;
+  var b = $('midToggle');
+  if (b) {
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.innerHTML = '<i class="fas fa-' + (on ? 'check-square' : 'square') + '"></i> ' + (on ? L.midOn : L.midOff);
+  }
+  compute();
+}
+function toggleMid() { setMid(!midOn); }
+
+function setSlider(id, valId, value, dec) {
+  $(id).value = value;
+  $(valId).value = (typeof value === 'number') ? value.toFixed(dec || 0) : value;
+  if (typeof updateSlider === 'function') updateSlider($(id), valId, dec || 0, '');
+}
+
+function preset(name) {
+  sweepMode = false;
+  if (name === 'parallel')      { setMid(true);  setSlider('slI0', 'slI0Val', 100, 0); setSlider('slTheta_a', 'slTheta_aVal', 0, 0);  setSlider('slTheta_b', 'slTheta_bVal', 0, 0); }
+  else if (name === 'crossed')  { setMid(false); setSlider('slI0', 'slI0Val', 100, 0); setSlider('slTheta_a', 'slTheta_aVal', 45, 0); setSlider('slTheta_b', 'slTheta_bVal', 90, 0); }
+  else if (name === 'middle')   { setMid(true);  setSlider('slI0', 'slI0Val', 100, 0); setSlider('slTheta_a', 'slTheta_aVal', 45, 0); setSlider('slTheta_b', 'slTheta_bVal', 90, 0); }
+  else if (name === 'rotate')   { setMid(true);  setSlider('slTheta_b', 'slTheta_bVal', 90, 0); sweepMode = true; if (!playing) setPlay(true); }
+  compute();
 }
 
 function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> θa をスイープ';
-  var defs = { slI0: 100, slTheta_a: 45, slTheta_b: 90, slExt: 0.000 };
-  Object.keys(defs).forEach(function(id){
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slI0'),      'slI0Val',      0, '');
-  updateSlider(document.getElementById('slTheta_a'), 'slTheta_aVal', 0, '');
-  updateSlider(document.getElementById('slTheta_b'), 'slTheta_bVal', 0, '');
-  updateSlider(document.getElementById('slExt'),     'slExtVal',     3, '');
+  sweepMode = false;
+  setPlay(false);
+  setMid(true);
+  setSlider('slI0', 'slI0Val', 100, 0);
+  setSlider('slTheta_a', 'slTheta_aVal', 45, 0);
+  setSlider('slTheta_b', 'slTheta_bVal', 90, 0);
+  setSlider('slExt', 'slExtVal', 0, 3);
+  $('slExtVal').value = '0.000';
   compute();
 }
 
 window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
 
 resizeCanvases();
+setMid(true);
 compute();
+if (!REDUCED) setPlay(true);
 </script>
 
 <section class="explanation">
@@ -618,6 +716,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="malus-law.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -671,15 +772,15 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>初期強度 I0（mW/cm²）をスライダーで設定します。典型値は 100～1000 mW/cm²です。</li>
+<li>入射強度 I0（無次元、0〜200）をスライダーで設定します。既定値は 100 です。</li>
 <li>3 枚の偏光板の相対角度を設定します。基準板 P1 に対して中間板 P2 の角度 θ_a、P2 に対して最終板 P3 の角度 θ_b をそれぞれ 0°～90° の範囲で入力します。</li>
-<li>各偏光板の消光比（extinction ratio）を設定します。理想板は 1：∞ ですが、実際の光学素子は 1：100～1000 程度です。</li>
-<li>シミュレーターはマリュスの法則 I = I₀cos²θ を段階的に適用し、P1 出力 I1、P2 出力 I2、最終出力 I3 をリアルタイム計算します。</li>
+<li>偏光子漏れ係数 ext（0〜0.1）を設定します。ext = 0 が理想板、市販品は ext ≈ 0.001（消光比 1000:1）、安価品で ext ≈ 0.01（100:1）が目安です。</li>
+<li>スライダーを動かすと、自然光半減（I1 = I0/2）の後にマリュスの法則 cos²θ を P2・P3 に段階適用し、P1 出力 I1、中間 P2 出力 I2、最終出力 I3 をリアルタイム計算します（「計算」ボタンはなく即時更新）。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>初期強度 I0 = 500 mW/cm²、θ_a = 30°、θ_b = 30°、消光比 1：1000 の場合：I1 = 500×cos²(30°) = 375 mW/cm²、I2 = 375×cos²(30°) = 281.3 mW/cm²、I3 = 281.3×cos²(30°) = 210.9 mW/cm²。全透過率は 210.9/500 = 42.2%。一方、θ_a = 90°（直交）に設定すると、理想板では完全遮光（I2 = 0）ですが、消光比が有限のため、漏れ光により I2 ≈ 0.5 mW/cm² が観測されます。これが 3 偏光板パラドックスです。</p>
+<p>既定値 I0 = 100、θa = 45°、θb = 90°、ext = 0 の場合：自然光は P1 で半減し I1 = I0/2 = 50.0、次に I2 = I1·cos²(45°) = 25.0、最後に I3 = I2·cos²(90°−45°) = 12.5 となり、全透過率は 12.5/100 = 12.5% です。中間 P2 を外すと P1→P3 が直交（cos²(90°)=0）で I3 = 0 になるため、中間板による寄与は +12.5 ポイント。これが 3 偏光板パラドックスです。消光比を ext = 0.001 に上げ θa = 0°・θb = 90°（直交）にすると、本来 0 の中間出力に漏れ光 I2 = I0/2·ext = 0.25 が現れ、有限の消光比が黒浮きを生むことが確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -689,6 +790,16 @@ compute();
 <li>紫外線（UV）または赤外線（IR）領域では消光比が可視光より悪化するため、用途に応じた偏光板選定が必須です。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

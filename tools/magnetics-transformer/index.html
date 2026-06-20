@@ -43,7 +43,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "変圧器設計計算ツール",
       "description": "変圧器の巻数比・効率・電圧調整率をリアルタイムに計算・可視化。銅損・鉄損の分析と負荷率vs効率カーブを表示。",
       "url": "https://novasolver.jp/tools/magnetics-transformer.html",
@@ -53,7 +53,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["巻数比と1次/2次電流の計算","銅損・鉄損・最大効率の解析","負荷率vs効率カーブの可視化","電圧調整率の計算と特性グラフ"],
       "keywords": "変圧器,巻数比,電圧調整率,銅損,鉄損,効率,CAE,電磁気解析",
       "datePublished": "2026-04-09",
@@ -132,6 +132,20 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 transformer live animation ===== */
+#xfCanvas{border-radius:8px;background:#0a1628;display:block;width:100%;max-width:100%}
+#xfCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.xf-live{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
+.xf-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.xf-ro .rv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.1}
+.xf-ro .rl{font-size:0.58rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.xf-ro.accent .rv{color:#ffd54a}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px;align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.xf-note{background:rgba(0,123,255,.04);border-left:3px solid var(--accent);padding:10px 12px;border-radius:0 8px 8px 0;font-size:0.8rem;line-height:1.7;color:var(--text);margin-top:12px}
+@media(max-width:600px){.xf-live{grid-template-columns:repeat(3,1fr)}}
+@media (prefers-reduced-motion: reduce){.preset-btn{transition:none}}
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/magnetics-transformer.html">
@@ -220,7 +234,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -245,13 +267,33 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 負荷率 <span style="text-transform:none">β</span> vs 効率 <span style="text-transform:none">η</span></div><canvas class="ux-chartjs-canvas" id="chartEta"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 鉄心の交番磁束と1次→2次の電圧変換（ライブ）</div>
+      <div class="xf-live">
+        <div class="xf-ro"><div class="rv" id="roVp">0</div><div class="rl">1次電圧 Vp [V]</div></div>
+        <div class="xf-ro accent"><div class="rv" id="roVs">0</div><div class="rl">2次電圧 Vs [V]</div></div>
+        <div class="xf-ro"><div class="rv" id="roIp">0</div><div class="rl">1次電流 Ip [A]</div></div>
+        <div class="xf-ro"><div class="rv" id="roIs">0</div><div class="rl">2次電流 Is [A]</div></div>
+        <div class="xf-ro"><div class="rv" id="roFlux">0</div><div class="rl">磁束 Φ [mWb]</div></div>
+        <div class="xf-ro"><div class="rv" id="roP">0</div><div class="rl">伝達電力 [kW]</div></div>
+      </div>
+      <canvas id="xfCanvas" height="360" tabindex="0" role="img" aria-label="変圧器の鉄心を流れる交番磁束が1次巻線から2次巻線へ電圧を誘導する様子のアニメーション"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#ff5252"></i>1次（励磁）</span>
+        <span><i class="swatch" style="background:#00d4a0"></i>2次（負荷）</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>交番磁束 Φ</span>
+        <span id="xfMode" style="margin-left:auto;font-weight:700;color:var(--accent)"></span>
+      </div>
+      <div class="play-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+        <button class="btn" type="button" id="xfPlay"><i class="fas fa-pause"></i> 一時停止</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn xf-load" type="button" data-load="0.25">軽負荷</button>
+          <button class="preset-btn xf-load active" type="button" data-load="0.8" style="border-color:var(--accent);color:var(--accent)">定格80%</button>
+          <button class="preset-btn xf-load" type="button" data-load="1">全負荷</button>
+        </div>
+      </div>
+      <div class="xf-note" id="xfNote">$V_p/V_s = N_p/N_s$、電力一定で $I_p/I_s = N_s/N_p$。鉄心の交番磁束が両巻線を鎖交し、2次に電圧を誘導します。</div>
     </div>
-    <div class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 負荷電流 vs 2次端子電圧</div><canvas class="ux-chartjs-canvas" id="chartReg"></canvas></div>
-    </div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
       巻数比：$a = N_1/N_2 = V_1/V_2$<br>
@@ -264,104 +306,251 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-const ids = ['v1','v2','s','f','eta','pf','vk'];
-const displays = {v1:'v1Val',v2:'v2Val',s:'sVal',f:'fVal',eta:'etaVal',pf:'pfVal',vk:'vkVal'};
+(function(){
+"use strict";
+var L = {"prim":"1次巻線","sec":"2次巻線","stepup":"昇圧 (Step-up)","stepdown":"降圧 (Step-down)","iso":"絶縁 (1:1)","play":"再生","pause":"一時停止"};
+var cv = document.getElementById('xfCanvas');
+if(!cv) return;
+var ctx = cv.getContext('2d');
+function el(id){ return document.getElementById(id); }
+function num(id){ var e=el(id); return e?parseFloat(e.value):NaN; }
 
-function setSliderGradient(el){
-  const min=parseFloat(el.min),max=parseFloat(el.max),val=parseFloat(el.value);
-  const pct=((val-min)/(max-min)*100).toFixed(1)+'%';
-  el.style.setProperty('--pct',pct);
-}ids.forEach(id=>{
-  const el=document.getElementById(id);
-  setSliderGradient(el);
-  el.addEventListener('input',()=>{
-    let v=parseFloat(el.value);
-    const disp=displays[id];
-    var _mt=document.getElementById(disp);if(_mt)_mt.textContent=v.toFixed(id==='eta'?1:id==='pf'?2:id==='vk'?1:0);
-    setSliderGradient(el);
-    update();
+var loadFactor = 0.8;     // fraction of rated load
+var playing = true;
+var animId = null;
+var phase = 0;            // electrical phase (radians)
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- physics state from inputs (RMS amplitudes) ----
+function model(){
+  var V1 = num('v1'), V2 = num('v2'), Skva = num('s'), pf = num('pf');
+  if(!(V1>0)) V1=6600; if(!(V2>0)) V2=210; if(!(Skva>0)) Skva=100; if(!(pf>0)) pf=0.85;
+  var a = V1/V2;                       // turns ratio Np/Ns = Vp/Vs
+  var S = Skva*1000;                   // VA
+  var I1r = S/V1, I2r = S/V2;          // rated currents
+  var I1 = I1r*loadFactor, I2 = I2r*loadFactor;
+  var Pkw = (V2*I2*pf)/1000;           // transferred real power
+  return {V1:V1,V2:V2,a:a,I1:I1,I2:I2,I1r:I1r,I2r:I2r,Pkw:Pkw,pf:pf};
+}
+
+// ---- HiDPI ----
+var cssW=0, cssH=360;
+function resize(){
+  var rect = cv.parentElement.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width - 44));
+  cssH = (cssW < 460) ? 300 : 360;
+  var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  cv.style.width = cssW+'px'; cv.style.height = cssH+'px';
+  cv.width = Math.round(cssW*dpr); cv.height = Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function fmt(v){
+  if(!isFinite(v)) return '0';
+  var av=Math.abs(v);
+  if(av>=100) return v.toFixed(0);
+  if(av>=10) return v.toFixed(1);
+  return v.toFixed(2);
+}
+
+// winding helper: draw a coil as a vertical stack of loops on a limb
+function drawCoil(x, yTop, yBot, turns, color, glow){
+  var h = yBot-yTop, step = h/turns, r = Math.min(step*0.46, 13);
+  ctx.lineWidth = 3; ctx.strokeStyle = color;
+  if(glow>0){ ctx.shadowColor=color; ctx.shadowBlur=glow; } else { ctx.shadowBlur=0; }
+  for(var i=0;i<turns;i++){
+    var cy = yTop + step*(i+0.5);
+    ctx.beginPath();
+    ctx.ellipse(x, cy, 16, r, 0, -Math.PI/2, Math.PI/2, false);
+    ctx.stroke();
+  }
+  ctx.shadowBlur=0;
+}
+
+function drawWaveBadge(x, y, w, amp, ph, color, label){
+  // mini oscillating waveform with moving dot
+  ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+w, y); ctx.stroke();
+  ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath();
+  for(var i=0;i<=w;i+=2){
+    var yy = y - amp*Math.sin(ph - i/w*Math.PI*2);
+    if(i===0) ctx.moveTo(x+i,yy); else ctx.lineTo(x+i,yy);
+  }
+  ctx.stroke();
+  var dotY = y - amp*Math.sin(ph);
+  ctx.fillStyle=color; ctx.beginPath(); ctx.arc(x, dotY, 3.2, 0, 7); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.75)'; ctx.font='11px Roboto Mono'; ctx.textAlign='left';
+  ctx.fillText(label, x+w+8, y+4);
+}
+
+var M = model();
+
+function render(){
+  M = model();
+  var W=cssW, H=cssH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+
+  var s = Math.sin(phase);          // instantaneous AC value (primary drive)
+  var stepUp = M.a < 0.999;         // Np<Ns => step-up
+
+  // ----- core geometry (rectangular window) -----
+  var coreX = W*0.30, coreW = W*0.40;
+  var coreY = H*0.16, coreH = H*0.62;
+  var limb = Math.max(22, coreW*0.14);
+
+  // core body
+  ctx.fillStyle='#1b3a5c'; ctx.strokeStyle='#2d5a86'; ctx.lineWidth=2;
+  ctx.fillRect(coreX, coreY, coreW, coreH);
+  ctx.strokeRect(coreX, coreY, coreW, coreH);
+  // window (cut-out)
+  ctx.fillStyle='#0a1628';
+  ctx.fillRect(coreX+limb, coreY+limb, coreW-2*limb, coreH-2*limb);
+
+  // ----- alternating flux flowing around the core loop -----
+  var fluxMag = Math.cos(phase);     // Phi ~ integral of V => 90deg lag
+  var midX1 = coreX+limb/2, midX2 = coreX+coreW-limb/2;
+  var midY1 = coreY+limb/2, midY2 = coreY+coreH-limb/2;
+  var path=[[midX1,midY2],[midX1,midY1],[midX2,midY1],[midX2,midY2]];
+  var fcol = fluxMag>=0 ? '255,213,74' : '255,138,74';
+  var alpha = 0.25 + 0.6*Math.abs(fluxMag);
+  ctx.strokeStyle='rgba('+fcol+','+alpha.toFixed(3)+')';
+  ctx.lineWidth = 4 + 6*Math.abs(fluxMag);
+  ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(path[0][0],path[0][1]);
+  for(var i=1;i<path.length;i++) ctx.lineTo(path[i][0],path[i][1]);
+  ctx.closePath(); ctx.stroke();
+  ctx.lineCap='butt';
+  // moving flux markers (direction reverses with sign)
+  var dir = fluxMag>=0 ? 1 : -1;
+  var perim=[];
+  var pts=path.concat([path[0]]);
+  for(var k=0;k<pts.length-1;k++){
+    var ax=pts[k][0],ay=pts[k][1],bx=pts[k+1][0],by=pts[k+1][1];
+    perim.push({ax:ax,ay:ay,bx:bx,by:by,len:Math.hypot(bx-ax,by-ay)});
+  }
+  var total=0; perim.forEach(function(p){total+=p.len;});
+  var nDots=10;
+  for(var d=0; d<nDots; d++){
+    var fr = ((d/nDots) + dir*(phase/(2*Math.PI)))%1; if(fr<0) fr+=1;
+    var dist = fr*total, seg=0;
+    for(var q=0;q<perim.length;q++){
+      if(dist <= seg+perim[q].len){
+        var t=(dist-seg)/perim[q].len;
+        var x=perim[q].ax+(perim[q].bx-perim[q].ax)*t;
+        var y=perim[q].ay+(perim[q].by-perim[q].ay)*t;
+        ctx.fillStyle='rgba('+fcol+','+(0.4+0.5*Math.abs(fluxMag)).toFixed(3)+')';
+        ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill();
+        break;
+      }
+      seg+=perim[q].len;
+    }
+  }
+  ctx.fillStyle='rgba(255,213,74,.9)'; ctx.font='bold 11px Roboto Mono'; ctx.textAlign='center';
+  ctx.fillText('Φ', (midX1+midX2)/2, (midY1+midY2)/2+4);
+
+  // ----- windings -----
+  var wYt = coreY+limb+10, wYb = coreY+coreH-limb-10;
+  var pTurns = 7, sTurns = stepUp ? 11 : (M.a>=2?4:6);
+  var pGlow = 6 + 14*Math.abs(s);
+  var sGlow = 6 + 14*Math.abs(s);
+  drawCoil(coreX+limb/2, wYt, wYb, pTurns, '#ff5252', pGlow);
+  drawCoil(coreX+coreW-limb/2, wYt, wYb, sTurns, '#00d4a0', sGlow);
+
+  // labels
+  ctx.fillStyle='#ff8a8a'; ctx.font='bold 12px Noto Sans JP'; ctx.textAlign='center';
+  ctx.fillText(L.prim, coreX+limb/2, coreY-6);
+  ctx.fillStyle='#5ef2c4';
+  ctx.fillText(L.sec, coreX+coreW-limb/2, coreY-6);
+
+  // ----- source (left) and load (right) with AC waveforms -----
+  var ampW = 26;
+  drawWaveBadge(W*0.045, H*0.30, W*0.16, ampW, phase, '#ff5252', 'Vp');
+  drawWaveBadge(W*0.045, H*0.62, W*0.16, ampW*(0.25+0.75*loadFactor), phase, '#ff8a8a', 'Ip');
+  drawWaveBadge(W*0.795, H*0.30, W*0.16, ampW, phase, '#00d4a0', 'Vs');
+  drawWaveBadge(W*0.795, H*0.62, W*0.16, ampW*(0.25+0.75*loadFactor), phase, '#5ef2c4', 'Is');
+
+  // connecting leads
+  ctx.strokeStyle='rgba(255,82,82,.5)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(W*0.205, H*0.30); ctx.lineTo(coreX+limb/2-16, wYt); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W*0.205, H*0.62); ctx.lineTo(coreX+limb/2-16, wYb); ctx.stroke();
+  ctx.strokeStyle='rgba(0,212,160,.5)';
+  ctx.beginPath(); ctx.moveTo(coreX+coreW-limb/2+16, wYt); ctx.lineTo(W*0.795, H*0.30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(coreX+coreW-limb/2+16, wYb); ctx.lineTo(W*0.795, H*0.62); ctx.stroke();
+
+  // turns ratio + mode banner
+  var modeTxt = stepUp ? L.stepup : (M.a>1.001 ? L.stepdown : L.iso);
+  el('xfMode').textContent = modeTxt + '  (Np:Ns ≈ ' + (M.a>=1? M.a.toFixed(1)+':1' : '1:'+(1/M.a).toFixed(1)) + ')';
+  ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 13px Roboto Mono'; ctx.textAlign='center';
+  ctx.fillText('Vp/Vs = Np/Ns = '+M.a.toFixed(M.a>=10?0:2), W/2, H-14);
+
+  // ----- live readouts -----
+  el('roVp').textContent = fmt(M.V1);
+  el('roVs').textContent = fmt(M.V2);
+  el('roIp').textContent = fmt(M.I1);
+  el('roIs').textContent = fmt(M.I2);
+  // flux from EMF=4.44 f N Phi (illustrative reference turns), pulsing magnitude
+  var f = num('f')||50;
+  var phiMax = M.V1/(4.44*f*Math.max(pTurns*60,1));
+  el('roFlux').textContent = (phiMax*1000*Math.abs(fluxMag)).toFixed(1);
+  el('roP').textContent = fmt(M.Pkw);
+  // populate result stat-cards (turns ratio / design efficiency / rated I2 / voltage regulation)
+  var _setSC=function(id,v){var e=el(id); if(e) e.textContent=v;};
+  _setSC('sc_a', M.a.toFixed(M.a>=10?1:2));
+  var _eta=num('eta'); if(!(_eta>0)) _eta=97; _setSC('sc_eta_max', _eta.toFixed(1));
+  _setSC('sc_i2', fmt(M.I2r));
+  var _vk=num('vk'); if(!(_vk>0)) _vk=4; var _sf=Math.sqrt(Math.max(0,1-M.pf*M.pf));
+  _setSC('sc_reg', (_vk*(0.4*M.pf+0.9*_sf)).toFixed(2));
+}
+
+function loop(){
+  if(!playing){ animId=null; return; }
+  phase += 0.06;
+  if(phase>1e6) phase=0;
+  render();
+  animId = requestAnimationFrame(loop);
+}
+
+function start(){ if(reduce){ render(); return; } if(!animId){ playing=true; animId=requestAnimationFrame(loop); } }
+function stop(){ playing=false; if(animId){ cancelAnimationFrame(animId); animId=null; } }
+function refresh(){ resize(); render(); }
+
+// input listeners (sliders + number boxes)
+['v1','v2','s','f','pf','vk','eta'].forEach(function(id){
+  var sl=el(id), nu=el(id+'Num');
+  if(sl) sl.addEventListener('input', function(){ render(); });
+  if(nu) nu.addEventListener('input', function(){ render(); });
+});
+
+// load preset buttons
+Array.prototype.forEach.call(document.querySelectorAll('.xf-load'), function(b){
+  b.addEventListener('click', function(){
+    loadFactor = parseFloat(b.dataset.load)||0.8;
+    Array.prototype.forEach.call(document.querySelectorAll('.xf-load'), function(o){
+      o.classList.remove('active'); o.style.borderColor=''; o.style.color='';
+    });
+    b.classList.add('active'); b.style.borderColor='var(--accent)'; b.style.color='var(--accent)';
+    render();
   });
 });
 
-const ctxEta=document.getElementById('chartEta').getContext('2d');
-const ctxReg=document.getElementById('chartReg').getContext('2d');
-
-const chartEta=new Chart(ctxEta,{
-  type:'line',
-  data:{labels:[],datasets:[{label:'効率 η (%)',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,0.08)',borderWidth:2.5,pointRadius:0,fill:true,tension:0.4}]},
-  options:{responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,animation:{duration:300},plugins:{legend:{labels:{font:{size:12}}}},scales:{x:{ title:{display:true,text:'負荷率 β'}},y:{title:{display:true,text:'効率 (%)'},min:85,max:100}}}
+// play/pause
+var pb = el('xfPlay');
+if(pb) pb.addEventListener('click', function(){
+  if(playing){ stop(); pb.innerHTML='<i class="fas fa-play"></i> '+L.play; }
+  else { pb.innerHTML='<i class="fas fa-pause"></i> '+L.pause; start(); }
 });
 
-const chartReg=new Chart(ctxReg,{
-  type:'line',
-  data:{labels:[],datasets:[{label:'2次端子電圧 (V)',data:[],borderColor:'#00B4D8',backgroundColor:'rgba(0,180,216,0.08)',borderWidth:2.5,pointRadius:0,fill:true,tension:0.3}]},
-  options:{responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,animation:{duration:300},plugins:{legend:{labels:{font:{size:12}}}},scales:{x:{ title:{display:true,text:'負荷電流 I₂ (A)'}},y:{title:{display:true,text:'V₂端子電圧 (V)'}}}}
+cv.addEventListener('keydown', function(e){
+  if(e.key===' '||e.key==='Enter'){ e.preventDefault(); if(pb) pb.click(); }
 });
 
-function update(){
-  const V1=parseFloat(document.getElementById('v1').value);
-  const V2=parseFloat(document.getElementById('v2').value);
-  const S=parseFloat(document.getElementById('s').value);
-  const eta_r=parseFloat(document.getElementById('eta').value)/100;
-  const freq=parseFloat(document.getElementById('f').value);
-  const pf=parseFloat(document.getElementById('pf').value);
-  const Vk=parseFloat(document.getElementById('vk').value)/100;
-
-  const a=V1/V2;
-  const I2_rated=S*1000/V2;
-  const P_rated=S*1000*eta_r; // approx output
-
-  // Total loss at rated
-  const P_loss_rated=S*1000*(1-eta_r);
-  // Split 50/50 copper/iron at rated
-  const Pcu_rated=P_loss_rated*0.5;
-  const PfeBase=P_loss_rated*0.5;
-  const Pfe=PfeBase*Math.pow(freq/50,1.5);
-
-  // Max efficiency load factor
-  const beta_opt=Math.sqrt(Pfe/Pcu_rated);
-
-  // Max efficiency
-  const P_out_opt=S*1000*beta_opt*pf;
-  const eta_max=P_out_opt/(P_out_opt+Pfe+beta_opt*beta_opt*Pcu_rated)*100;
-
-  // Voltage regulation estimate: εr = Vk*cosφ, εx = Vk*sinφ
-  const phi=Math.acos(pf);
-  const eps_r=Vk*pf;
-  const eps_x=Vk*Math.sin(phi);
-  const eps_pct=(eps_r*pf+eps_x*Math.sin(phi))*100;
-
-  document.getElementById('sc_a').textContent=a.toFixed(2);
-  document.getElementById('sc_eta_max').textContent=eta_max.toFixed(2)+'% @ '+freq.toFixed(0)+'Hz';
-  document.getElementById('sc_i2').textContent=I2_rated.toFixed(1)+'A';
-  document.getElementById('sc_reg').textContent=eps_pct.toFixed(2)+'%';
-
-  // Efficiency curve
-  const betas=[];
-  const etas=[];
-  for(let b=0.05;b<=1.5;b+=0.025){
-    betas.push(b.toFixed(2));
-    const Pout=S*1000*b*pf;
-    const eff=Pout/(Pout+Pfe+b*b*Pcu_rated)*100;
-    etas.push(Math.min(eff,100));
-  }chartEta.data.labels=betas;
-  chartEta.data.datasets[0].data=etas;
-  chartEta.options.scales.y.min=Math.max(80,Math.floor(Math.min(...etas)-2));
-  chartEta.update('none');
-
-  // Voltage regulation curve
-  const iArr=[];
-  const vArr=[];
-  for(let i=0;i<=I2_rated*1.5;i+=I2_rated*1.5/40){
-    iArr.push(i.toFixed(1));
-    // Simplified regulation: V2_term = V2*(1 - eps*(i/I2_rated))
-    const v2term=V2*(1-(eps_r*pf+eps_x*Math.sin(phi))*(i/I2_rated));
-    vArr.push(Math.max(v2term,0));
-  }
-  chartReg.data.labels=iArr;
-  chartReg.data.datasets[0].data=vArr;
-  chartReg.update('none');
-}update();
+window.addEventListener('resize', refresh);
+resize();
+if(reduce){ render(); if(pb){ pb.innerHTML='<i class="fas fa-play"></i> '+L.play; playing=false; } }
+else { render(); start(); }
+})();
 </script>
 
 <section class="explanation">
@@ -423,6 +612,9 @@ function update(){
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="magnetics-transformer.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -478,13 +670,13 @@ function update(){
 <ol>
 <li>1次電圧V1（例：6,600V）と2次電圧V2（例：210V）を入力します</li>
 <li>変圧器容量S（例：500kVA）と周波数f（50Hz または 60Hz）を指定します</li>
-<li>「計算」ボタンを押すと、巻数比 a=V1/V2、定格2次電流I₂=S×1000/V2、電圧調整率が自動算出されます</li>
+<li>入力すると即座に、巻数比 a=V1/V2、定格2次電流I₂=S×1000/V2、電圧調整率が自動算出されます</li>
 <li>負荷率0～100%での効率曲線が表示され、最大効率点（通常60～80%負荷）を確認できます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>高圧配電用油入変圧器：V1=6,600V、V2=210V、S=500kVA、f=50Hz の場合、巻数比 a≒31.4、定格2次電流I₂≒2,381A、無負荷損Pc≒2.5kW、負荷損Pcu≒6.8kWとして、100%負荷時の効率は約97.8%、電圧調整率は負荷力率0.85遅れで約4.2%となります。負荷率70%時に最大効率98.1%に達し、軽負荷時の効率低下を把握できます。</p>
+<p>高圧配電用油入変圧器：V1=6,600V、V2=210V、S=500kVA、f=50Hz、定格効率97%、力率0.85遅れ、短絡インピーダンス5% の場合、巻数比 a≒31.4、定格2次電流I₂≒2,381A と算出されます。本ツールは総損失を銅損・鉄損で50:50に分割する簡略モデルのため、最大効率は負荷率β≒1.0で約96.6%、電圧調整率は約3.8%となります。スライダーで効率・力率・短絡インピーダンスを変えると、最大効率点と調整率が連動して動くことを確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -495,6 +687,16 @@ function update(){
 <li>三相変圧器の場合、単相に換算するため容量S/3で計算し、3倍して総損失を求めてください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

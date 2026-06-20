@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "複合材料破壊基準シミュレーター",
       "description": "CFRP・GFRPの破壊指数をリアルタイム計算。Tsai-Wu・Tsai-Hill・最大応力・Hashin基準で繊維/マトリクス破壊モードを判定。",
       "url": "https://novasolver.jp/tools/composite-failure.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Tsai-Wu / Tsai-Hill / 最大応力 / Hashin破壊基準","繊維/マトリクス/せん断破壊モード判定","破壊包絡線プロット（Nx-Ny平面）","繊維角スイープによる破壊指数分布"],
       "keywords": "複合材料,CFRP,GFRP,Tsai-Wu,Hashin,破壊基準,積層板,破壊指数",
       "datePublished": "2026-04-08",
@@ -71,7 +71,7 @@
         },{
           "@type": "Question",
           "name": "破壊指数FIとは何ですか？",
-          "acceptedAnswer": {"@type": "Answer", "text": "破壊指数（Failure Index, FI）は現在の応力状態が破壊基準をどの程度満たすかを表す無次元数です。FI < 1 なら安全、FI = 1 が破壊の境界、FI > 1 なら破壊しています。強度余裕は R = 1/√FI（Tsai-Wu）などで表現され、設計では一般に R ≥ 1.5 以上を目標にします。"}
+          "acceptedAnswer": {"@type": "Answer", "text": "The Failure Index (FI) is a dimensionless measure of proximity to failure: FI < 1 is safe, FI = 1 is the boundary, and FI > 1 indicates failure. The strength ratio R is computed from the selected criterion: max-stress uses 1/FI, Tsai-Hill uses 1/sqrt(FI), and Tsai-Wu uses the positive quadratic root."}
         },{
           "@type": "Question",
           "name": "T300/Epoxyとはどんな材料ですか？",
@@ -206,7 +206,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="ctrl-label"><span>プライ数</span><div class="num-wrap"><input type="number" class="num-input" id="nply-val" value="4" min="2" max="8" step="2" oninput="syncFromNum('nply','nply-val')"><span class="num-unit"></span></div></div>
       <input type="range" id="nply" oninput="syncToNum('nply','nply-val')" min="2" max="8" step="2" value="4">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -218,7 +226,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <div class="stat-card">
         <div class="stat-val" id="s-R">—</div>
-        <div class="stat-lbl">強度余裕 R = 1/√FI</div>
+        <div class="stat-lbl">Strength ratio R</div>
       </div>
       <div class="stat-card">
         <div class="stat-val" id="s-sig1">—</div>
@@ -275,34 +283,20 @@ const MATS = {
 let chartEnv=null, chartSweep=null, activeTab='envelope';
 
 function getStresses(Nx,Ny,Nxy,theta,mat,nply){
-  const m=MATS[mat];
-  const t = 0.25 * nply; // approx total thickness mm (0.25mm per ply)
-  const c=Math.cos(theta*Math.PI/180), s=Math.sin(theta*Math.PI/180);
-  // Laminate stiffness (single-ply approximation)
-  const Q11=m.E1/(1-m.nu12*m.nu12*m.E2/m.E1);
-  const Q22=m.E2/(1-m.nu12*m.nu12*m.E2/m.E1);
-  const Q12=m.nu12*m.E2/(1-m.nu12*m.nu12*m.E2/m.E1);
-  const Q66=m.G12;
-  // Transformed compliance
-  const c2=c*c,s2=s*s,cs=c*s;
-  const S11=c2*c2/m.E1 + s2*s2/m.E2 - 2*c2*s2*m.nu12/m.E1 + c2*s2/m.G12;
-  const S22=s2*s2/m.E1 + c2*c2/m.E2 - 2*c2*s2*m.nu12/m.E1 + c2*s2/m.G12;
-  const S12=-(c2*s2)*(1/m.E1+1/m.E2) + (c2*s2-0.25*Math.pow(c2-s2,2))/m.G12 - m.nu12/m.E1*(c2*c2+s2*s2-c2*s2);
-  const S16=(2*c2*s2-2*s2*s2)*(-m.nu12/m.E1-1/m.E2) + 2*c*s*(c2-s2)*(0.5/m.G12) + 2*c*s*(c2-s2)*(1/m.E1-m.nu12/m.E1);
-  // Global strains from force resultants
+  const t = 0.25 * nply; // total laminate thickness, mm
   const hh = t || 1;
-  const ex=(S11*Nx/hh + S12*Ny/hh);
-  const ey=(S12*Nx/hh + S22*Ny/hh);
-  const gxy=(Nxy/hh)/m.G12;
-  // Ply stresses in principal (1-2) system via strain transformation
-  const sig_x = (Q11*ex + Q12*ey);
-  const sig_y = (Q12*ex + Q22*ey);
-  const tau_xy = m.G12*gxy;
+  const sig_x = Nx / hh;
+  const sig_y = Ny / hh;
+  const tau_xy = Nxy / hh;
+  const c=Math.cos(theta*Math.PI/180), s=Math.sin(theta*Math.PI/180);
+  const c2=c*c,s2=s*s,cs=c*s;
   const sig1 =  c2*sig_x + s2*sig_y + 2*cs*tau_xy;
   const sig2 =  s2*sig_x + c2*sig_y - 2*cs*tau_xy;
   const tau12= -cs*sig_x + cs*sig_y + (c2-s2)*tau_xy;
   return {sig1,sig2,tau12};
-}function failureIndex(sig1,sig2,tau12,mat,criterion){
+}
+
+function failureIndex(sig1,sig2,tau12,mat,criterion){
   const m=MATS[mat];
   let FI=0, mode='—';
   if (criterion==='maxstress') {
@@ -324,14 +318,31 @@ function getStresses(Nx,Ny,Nxy,theta,mat,nply){
     mode=FI>=1?'Tsai-Wu破壊':'安全';
   }else if (criterion==='hashin'){
     const fft=(sig1>=0)?(sig1/m.Xt)**2+(tau12/m.S12)**2:0;
-    const ffc=(sig1<0)?(Math.abs(sig1)/m.Xc):0;
+    const ffc=(sig1<0)?(sig1/m.Xc)**2:0;
     const fmt=(sig2>=0)?(sig2/m.Yt)**2+(tau12/m.S12)**2:0;
     const fmc=(sig2<0)?((sig2/(2*m.S12))**2+((m.Yc/(2*m.S12))**2-1)*sig2/m.Yc+(tau12/m.S12)**2):0;
     const candidates={繊維引張:fft,繊維圧縮:ffc,マトリクス引張:fmt,マトリクス圧縮:fmc};
     FI=Math.max(fft,ffc,fmt,fmc);
     mode=Object.entries(candidates).sort((a,b)=>b[1]-a[1])[0][0];
   }return{FI, mode};
-}function compute(){
+}function strengthRatio(sig1,sig2,tau12,mat,criterion,FI){
+  const m=MATS[mat];
+  if(!isFinite(FI)||FI<=0)return 999;
+  if(criterion==='maxstress')return 1/FI;
+  if(criterion==='tsaiwu'){
+    const F1=1/m.Xt-1/m.Xc, F2=1/m.Yt-1/m.Yc;
+    const F11=1/(m.Xt*m.Xc), F22=1/(m.Yt*m.Yc), F66=1/(m.S12*m.S12);
+    const F12=-0.5*Math.sqrt(F11*F22);
+    const a=F11*sig1**2+F22*sig2**2+F66*tau12**2+2*F12*sig1*sig2;
+    const b=F1*sig1+F2*sig2;
+    if(Math.abs(a)<1e-15)return b>0?1/b:999;
+    const disc=b*b+4*a;
+    return disc>=0?(-b+Math.sqrt(disc))/(2*a):999;
+  }
+  return 1/Math.sqrt(Math.abs(FI));
+}
+
+function compute(){
   const theta=parseFloat(document.getElementById('theta').value);
   const Nx=parseFloat(document.getElementById('nx').value);
   const Ny=parseFloat(document.getElementById('ny').value);
@@ -348,7 +359,7 @@ function getStresses(Nx,Ny,Nxy,theta,mat,nply){
 
   const {sig1,sig2,tau12}=getStresses(Nx,Ny,Nxy,theta,mat,nply);
   const{FI,mode}=failureIndex(sig1,sig2,tau12,mat,crit);
-  const R=FI>0?1/Math.sqrt(Math.abs(FI)):999;
+  const R=strengthRatio(sig1,sig2,tau12,mat,crit,FI);
 
   document.getElementById('s-sig1').textContent=sig1.toFixed(1);
   document.getElementById('s-sig2').textContent=sig2.toFixed(1);
@@ -372,7 +383,7 @@ function getStresses(Nx,Ny,Nxy,theta,mat,nply){
   const envelope=[];
   for(let a=0;a<=360;a+=5){
     const rad=a*Math.PI/180;
-    let lo=0,hi=1000;
+    let lo=0,hi=20000;
     for(let iter=0;iter<40;iter++){
       const mid=(lo+hi)/2;
       const Nx=mid*Math.cos(rad), Ny=mid*Math.sin(rad);
@@ -439,7 +450,7 @@ function getStresses(Nx,Ny,Nxy,theta,mat,nply){
 }['theta','nx','ny','nxy','nply'].forEach(id=>document.getElementById(id).addEventListener('input',compute));
 document.getElementById('material').addEventListener('change',compute);
 document.getElementById('criterion').addEventListener('change',compute);
-compute();
+switchTab('envelope');
 </script>
 
 <section class="explanation">
@@ -472,15 +483,15 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">破壊包絡線の見方を教えてください。 <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">包絡線の内側が安全領域、外側が破壊領域です。σ1-σ2平面上に楕円や多角形で表示され、引張と圧縮で強度が異なるため非対称になります。マウスで応力点を動かすと、その位置での破壊余裕が数値で確認できます。</div>
+    <div class="faq-a">The envelope is an Nx-Ny limit plot for the selected material, angle, ply count, and criterion. Inside the curve is safe and outside is failed. It is not a draggable sigma1-sigma2 plane; move the Nx and Ny sliders to change the plotted point.</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">入力する材料強度はどのように入手すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">一般的なCFRP/GFRPの値は材料データベースやメーカーの技術資料に記載されています。実験値がない場合は、繊維体積含有率から推定するか、本ツールのデフォルト値（例：T300/5208）を参考にしてください。</div>
+    <div class="faq-a">This page uses built-in material presets such as T300/Epoxy, E-glass/Epoxy, and Kevlar/Epoxy. Strengths are not user-entered in the current UI.</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">プライ応力の計算に使用する応力はどのように指定しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">積層板全体に作用する面内応力（Nx, Ny, Nxy）または各プライのひずみを入力します。本ツールは直交異方性弾性則に基づき、各プライの材料主軸方向に応力を変換して破壊判定を行います。</div>
+    <div class="faq-a">Enter laminate in-plane loads Nx, Ny, and Nxy. The tool estimates sigma_x=Nx/t, sigma_y=Ny/t, and tau_xy=Nxy/t, then transforms those stresses to the ply material axes for the failure check.</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -500,6 +511,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="composite-failure.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -552,28 +566,35 @@ compute();
 <!-- codex-static-related-tools:end -->
 
 <div class="howto-card howto-guide">
-<h3>使い方ガイド</h3>
+<h3>How to use</h3>
 <ol>
-<li>プライ角度(theta)をCFRP積層板の繊維方向に合わせて入力。0°～90°の範囲で設定</li>
-<li>面内応力成分(Nx、Ny、Nxy)を単位面積あたりの力(N/mm)で入力。例：Nx=800N/mm、Ny=50N/mm</li>
-<li>シミュレーター実行でプライ座標系の応力(σ1、σ2、τ12)を自動計算</li>
-<li>Tsai-Wu基準とHashin基準の破壊指数(FI)をリアルタイム表示。FI≧1.0で破壊判定</li>
-<li>繊維破壊・マトリクス破壊・層間破壊のモード判別を確認</li>
+<li>Select a material preset, fiber angle theta, ply count, and in-plane loads Nx, Ny, Nxy.</li>
+<li>Use load cases within the UI range, -500 to 500 N/mm.</li>
+<li>The displayed stresses use a single-laminate approximation: sigma_x=Nx/t, sigma_y=Ny/t, tau_xy=Nxy/t, transformed to material axes.</li>
+<li>The envelope is an Nx-Ny limit plot for the selected criterion; there is no drag editing or sigma1-sigma2 input plane.</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
-<h3>具体的な計算例</h3>
-<p>45°積層CFRP(T800H/3900-2)にNx=1200N/mm、Ny=200N/mm、Nxy=300N/mmを負荷した場合：プライ座標系応力はσ1≈849MPa、σ2≈157MPa、τ12≈501MPa。Hashin繊維引張基準FI=0.68、マトリクス剪断基準FI=0.82と判定。一方、±45°積層でNxy=600N/mm時はτ12が増加し、マトリクス破壊FI=1.15で破壊判定となり、層間剪断補強が必要と判定可能。</p>
+<h3>Measured example</h3>
+<p>With T300/Epoxy, theta=45 deg, Nx=100 N/mm, Ny=0, Nxy=0, and n=4 (t=1 mm), sigma1=50.0 MPa, sigma2=50.0 MPa, and tau12=-50.0 MPa. Tsai-Wu FI=1.24, so the state is FAILED.</p>
 </div>
 <div class="howto-card howto-notes">
-<h3>実務での注意点</h3>
+<h3>Notes</h3>
 <ol>
-<li>GFRPはCFRPより横弾性率Gが低いため、同一剪断応力でもマトリクス破壊指数が上昇。GFRPサンドイッチパネルのコア材選定時は要注意</li>
-<li>45°プライは繊維方向強度より剪断強度支配になるため、τxyが500MPa超えるとHashin基準で危険域に急速に遷移</li>
-<li>温度上昇時は樹脂Tgの低下により横圧縮強度が15～20%低下。真夏運用の航空機主翼ではTsai-Wu基準のマトリクス係数を補正必須</li>
-<li>含水率上昇でマトリクス強度が変動。積層板は1%含水で横強度が5～10%低下するため、湿度環境での検証試験推奨</li>
+<li>Only material presets are available; strengths and strains are not user-entered.</li>
+<li>Interlaminar failure and detailed stacking sequence are not implemented.</li>
+<li>Tsai-Wu margin is computed from the positive quadratic root, not from 1/sqrt(FI).</li>
 </ol>
 </div>
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

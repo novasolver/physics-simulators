@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ホイートストンブリッジシミュレーター",
       "description": "ホイートストンブリッジシミュレーターで R1〜R4 と励起電圧から開放出力電圧 Vout と平衡条件をリアルタイム計算。回路図・感度曲線でひずみゲージ原理を可視化する電気解析ツール。",
       "url": "https://novasolver.jp/tools/wheatstone-bridge.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["4抵抗の分圧と出力電圧Voutの計算","平衡条件 R1·R4 = R2·R3 の可視化","感度 Vout/Vin (mV/V) の表示","ひずみゲージ計測の原理に対応"],
       "keywords": "ホイートストンブリッジ,平衡条件,ひずみゲージ,分圧,精密計測,ブリッジ回路,Vout,感度",
       "datePublished": "2026-05-16",
@@ -102,6 +102,19 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.preset-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.preset-btn{ padding:4px 10px; font-size:0.76rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); cursor:pointer; font-family:inherit; transition:all .2s; }
+.preset-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.preset-btn.active{ background:rgba(0,123,255,.1); border-color:var(--accent); color:var(--accent); font-weight:600; }
+.live-readouts{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+.live-ro{ background:linear-gradient(135deg,#0a1628,#102a4c); border:1px solid rgba(0,180,216,.25); border-radius:10px; padding:10px 8px; text-align:center; }
+.live-ro .rv{ font-family:'Roboto Mono',monospace; font-size:1.05rem; font-weight:700; color:#fff; line-height:1.1; }
+.live-ro .rl{ font-size:0.62rem; color:rgba(255,255,255,.6); margin-top:4px; letter-spacing:.03em; }
+.live-ro.accent .rv{ color:#ffd54a; }
+@media(max-width:600px){ .live-readouts{ grid-template-columns:repeat(2,1fr); } }
+.play-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+canvas:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce){ input[type=range]::-webkit-slider-thumb{ transition:none; } }
 </style>
 </head>
 <body>
@@ -131,6 +144,18 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="wbPreset('balanced')">平衡</button>
+        <button type="button" class="preset-btn" onclick="wbPreset('slight')">わずかに不平衡</button>
+        <button type="button" class="preset-btn" onclick="wbPreset('measure')">未知Rxを測定</button>
+        <button type="button" class="preset-btn" onclick="wbPreset('sensitive')">高感度</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">抵抗 R1</span>
@@ -157,36 +182,72 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">抵抗 R4</span>
+        <span class="param-name">未知抵抗 Rx（=R4）</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slR4Num" value="1010" min="10" max="10000" step="1" oninput="syncFromNum('slR4','slR4Num')"><span class="num-unit">Ω</span></div>
       </div>
       <input type="range" id="slR4" min="10" max="10000" step="1" value="1010" oninput="syncToNum('slR4','slR4Num');updateSlider(this,'slR4Num',0,'');compute()">
     </div>
 
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">電源電圧 V</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slVNum" value="5" min="1" max="24" step="0.1" oninput="syncFromNum('slV','slVNum')"><span class="num-unit">V</span></div>
+      </div>
+      <input type="range" id="slV" min="1" max="24" step="0.1" value="5" oninput="syncToNum('slV','slVNum');updateSlider(this,'slVNum',1,'');compute()">
+    </div>
+
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" onclick="balanceBridge()"><i class="fas fa-balance-scale"></i> R4を平衡値に</button>
+      <button type="button" class="btn" onclick="wbAutoBalance()"><i class="fas fa-balance-scale"></i> 自動平衡（Rxをヌルへ）</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">励起電圧 Vin は 5 V に固定。R1=R2=R3=1000Ω, R4=1010Ω が初期値（ひずみゲージ1個に約1%変化を与えた状態）です。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">ガルバノメーターは R1/R2 = R3/Rx すなわち Rx = R3·R2/R1 のときヌル（針が0）になります。初期値 R1=R2=R3=1000Ω, Rx=1010Ω はひずみゲージに約1%変化を与えた不平衡状態です。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roVg">0.0</div><div class="rl">ブリッジ電圧 Vg [mV]</div></div>
+        <div class="live-ro"><div class="rv" id="roIg">0.0</div><div class="rl">検流計電流 Ig [µA]</div></div>
+        <div class="live-ro"><div class="rv" id="roBal">—</div><div class="rl">平衡？</div></div>
+        <div class="live-ro"><div class="rv" id="roRxnull">—</div><div class="rl">ヌル時の Rx [Ω]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-project-diagram"></i> ブリッジ回路（電流の流れ・検流計の針）</div>
+      <canvas id="cv" width="600" height="400" tabindex="0" role="img" aria-label="ホイートストンブリッジの回路アニメーション。4抵抗の枝を流れる電荷と、不平衡に応じて振れる検流計の針を表示します。"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="wbPlay" onclick="wbTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="wbReset()"><i class="fas fa-rotate-left"></i> リセット</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn" type="button" data-spd="0.5" onclick="wbSpeed(0.5)">0.5×</button>
+          <button class="preset-btn active" type="button" data-spd="1" onclick="wbSpeed(1)">1×</button>
+          <button class="preset-btn" type="button" data-spd="2" onclick="wbSpeed(2)">2×</button>
+        </div>
+      </div>
+      <p class="canvas-hint">枝を流れる点＝電流（速さ∝枝電流）／中央の検流計の針は不平衡で振れ、Rx = R3·R2/R1 のヌルで0に戻ります。</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statVout">—</div><div class="sl">出力電圧 Vout</div></div>
         <div class="stat-card"><div class="sv" id="statSens">—</div><div class="sl">感度 Vout/Vin</div></div>
-        <div class="stat-card"><div class="sv" id="statBalance">—</div><div class="sl">平衡時の R4 (R2·R3/R1)</div></div>
-        <div class="stat-card"><div class="sv" id="statDeltaR">—</div><div class="sl">不平衡量 ΔR4</div></div>
+        <div class="stat-card"><div class="sv" id="statBalance">—</div><div class="sl">平衡時の Rx (R3·R2/R1)</div></div>
+        <div class="stat-card"><div class="sv" id="statDeltaR">—</div><div class="sl">不平衡量 ΔRx</div></div>
       </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-project-diagram"></i> ブリッジ回路図</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">ひし形の4抵抗／左右ノードに励起電圧 Vin、上下ノードに出力電圧 Vout 計／緑=平衡 (|Vout|&lt;1mV)、赤=不平衡</p>
     </div>
 
     <div class="chart-card">
@@ -206,220 +267,297 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Wheatstone Bridge Simulator ==========
-var Vin = 5.0; // 固定励起電圧
-var cv = document.getElementById('cv');
-var ctx = cv.getContext('2d');
-
-function fmtNum(v, digits) {
-  if (!isFinite(v)) return '—';
-  var a = Math.abs(v);
-  if (a !== 0 && (a < 0.001 || a >= 1e6)) return v.toExponential(2);
-  return v.toFixed(digits);
-}
-
-function getParams() {
-  return {
-    R1: parseFloat(document.getElementById('slR1').value),
-    R2: parseFloat(document.getElementById('slR2').value),
-    R3: parseFloat(document.getElementById('slR3').value),
-    R4: parseFloat(document.getElementById('slR4').value)
+// ========== Wheatstone Bridge Simulator v2 (animated) ==========
+(function () {
+  "use strict";
+  var I18N = {
+    bal: '平衡', unbal: '不平衡', yes: 'はい', no: 'いいえ',
+    nullMsg: 'ヌル：針が0 — Rx = R3·R2/R1',
+    deflect: '不平衡：針が振れる', play: '再生', pause: '一時停止',
+    Vin: 'V', GND: 'GND', galv: 'G'
   };
-}
+  var cv = document.getElementById('cv');
+  if (!cv) return;
+  var ctx = cv.getContext('2d');
+  var Rg = 100;            // galvanometer resistance [Ω]
+  var playing = true, speed = 1, phase = 0, lastTs = 0, animId = null;
+  var needle = 0, needleV = 0;   // smoothed needle angle state
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 700));
-  var h = Math.round(w * 0.66);
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
-  cv.width = Math.round(w * dpr);
-  cv.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cv.dataset.cssW = String(w);
-  cv.dataset.cssH = String(h);
-}
+  function el(id) { return document.getElementById(id); }
+  function gv(id) { return parseFloat(el(id).value); }
 
-function drawBridge(p, Vout) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-
-  // diamond layout: 4 nodes
-  var cx = W * 0.5, cy = H * 0.52;
-  var rx = Math.min(W * 0.32, H * 0.36);
-  var ry = Math.min(W * 0.28, H * 0.34);
-  var nL = { x: cx - rx, y: cy };       // 左ノード（Vin+）
-  var nR = { x: cx + rx, y: cy };       // 右ノード（GND）
-  var nT = { x: cx, y: cy - ry };        // 上ノード（Vout+）
-  var nB = { x: cx, y: cy + ry };        // 下ノード（Vout-）
-
-  var balanced = Math.abs(Vout) < 1e-3 * Vin;
-  var lineCol = balanced ? '#00b894' : '#e74c3c';
-
-  // wires
-  ctx.strokeStyle = '#5a89b8';
-  ctx.lineWidth = 2;
-  function wire(a, b) {
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
+  function getParams() {
+    return {
+      R1: gv('slR1'), R2: gv('slR2'), R3: gv('slR3'),
+      Rx: gv('slR4'), V: gv('slV')
+    };
   }
-  wire(nL, nT); wire(nT, nR); wire(nR, nB); wire(nB, nL);
 
-  // resistor boxes (rotated rectangles on each edge)
-  function drawResistor(a, b, label, value) {
+  // Bridge electrical model (Thevenin across detector nodes T-B)
+  function solve(p) {
+    var Vt = p.V * (p.R2 / (p.R1 + p.R2) - p.Rx / (p.R3 + p.Rx)); // open-circuit Vout
+    var Rth = (p.R1 * p.R2) / (p.R1 + p.R2) + (p.R3 * p.Rx) / (p.R3 + p.Rx);
+    var Ig = Vt / (Rth + Rg);     // galvanometer current [A]
+    var Vg = Ig * Rg;             // voltage across galvanometer [V]
+    var Rxbal = p.R3 * p.R2 / p.R1;
+    return { Vout: Vt, Ig: Ig, Vg: Vg, Rxbal: Rxbal, dR: p.Rx - Rxbal,
+             balanced: Math.abs(Vt) < 1e-3 * Math.max(p.V, 1e-9) };
+  }
+
+  // branch currents (for charge-dot speed): two divider legs
+  function branchCurrents(p) {
+    return {
+      top: p.V / (p.R1 + p.R2),   // R1->R2 leg
+      bot: p.V / (p.R3 + p.Rx)    // R3->Rx leg
+    };
+  }
+
+  function resizeCanvas() {
+    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 720));
+    var h = Math.round(w * 0.66);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cv.dataset.cssW = String(w);
+    cv.dataset.cssH = String(h);
+  }
+
+  function resistor(a, b, label, value, hot) {
     var mx = (a.x + b.x) * 0.5, my = (a.y + b.y) * 0.5;
     var dx = b.x - a.x, dy = b.y - a.y;
     var len = Math.sqrt(dx * dx + dy * dy);
     var ang = Math.atan2(dy, dx);
-    var bw = Math.min(len * 0.42, 64);
-    var bh = 22;
+    var bw = Math.min(len * 0.42, 66), bh = 22;
     ctx.save();
-    ctx.translate(mx, my);
-    ctx.rotate(ang);
-    // box
-    ctx.fillStyle = '#1c2f47';
+    ctx.translate(mx, my); ctx.rotate(ang);
+    ctx.fillStyle = hot ? '#2a2140' : '#1c2f47';
     ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
-    ctx.strokeStyle = '#cfe3f7';
+    ctx.strokeStyle = hot ? '#ffd54a' : '#cfe3f7';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);
-    // label inside
-    ctx.fillStyle = '#cfe3f7';
+    if (Math.abs(ang) > Math.PI * 0.5) ctx.rotate(Math.PI);
+    ctx.fillStyle = hot ? '#ffd54a' : '#cfe3f7';
     ctx.font = 'bold 12px "Roboto Mono",monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    // re-orient text upright
-    var textAng = ang;
-    if (Math.abs(ang) > Math.PI * 0.5) {
-      ctx.rotate(Math.PI);
-      textAng = ang + Math.PI;
-    }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(label, 0, -2);
     ctx.font = '10px "Roboto Mono",monospace';
     ctx.fillStyle = '#8fb8e0';
     ctx.fillText(value.toFixed(0) + ' Ω', 0, 9);
     ctx.restore();
   }
-  drawResistor(nL, nT, 'R1', p.R1); // 左上
-  drawResistor(nT, nR, 'R2', p.R2); // 右上
-  drawResistor(nL, nB, 'R3', p.R3); // 左下
-  drawResistor(nB, nR, 'R4', p.R4); // 右下
 
-  // node markers
-  ctx.fillStyle = '#FFD166';
-  [nL, nR, nT, nB].forEach(function (n) {
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // Vin connection (left/right external leads)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(nL.x, nL.y); ctx.lineTo(nL.x - 30, nL.y);
-  ctx.moveTo(nR.x, nR.y); ctx.lineTo(nR.x + 30, nR.y);
-  ctx.stroke();
-  ctx.fillStyle = '#00B4D8';
-  ctx.font = 'bold 13px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Vin = ' + Vin.toFixed(1) + 'V', nL.x - 36, nL.y);
-  ctx.textAlign = 'left';
-  ctx.fillText('GND', nR.x + 36, nR.y);
-
-  // Vout meter (top/bottom external leads + meter circle on side)
-  ctx.strokeStyle = lineCol;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(nT.x, nT.y); ctx.lineTo(nT.x, nT.y - 26);
-  ctx.lineTo(W - 60, nT.y - 26);
-  ctx.moveTo(nB.x, nB.y); ctx.lineTo(nB.x, nB.y + 26);
-  ctx.lineTo(W - 60, nB.y + 26);
-  ctx.stroke();
-  // meter circle
-  var mx = W - 60, my = cy;
-  ctx.beginPath();
-  ctx.moveTo(mx, nT.y - 26); ctx.lineTo(mx, my - 18);
-  ctx.moveTo(mx, my + 18); ctx.lineTo(mx, nB.y + 26);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(mx, my, 18, 0, Math.PI * 2);
-  ctx.fillStyle = '#0a1929';
-  ctx.strokeStyle = lineCol;
-  ctx.lineWidth = 2;
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = lineCol;
-  ctx.font = 'bold 11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('V', mx, my);
-
-  // status badge
-  ctx.font = 'bold 13px "Noto Sans JP",sans-serif';
-  ctx.textAlign = 'center';
-  if (balanced) {
-    ctx.fillStyle = '#00b894';
-    ctx.fillText('BALANCED  Vout ≈ 0', W * 0.5, H - 14);
-  } else {
-    ctx.fillStyle = '#e74c3c';
-    var mv = Vout * 1000;
-    var s = (mv >= 0 ? '+' : '') + mv.toFixed(2) + ' mV';
-    ctx.fillText('不平衡  Vout = ' + s, W * 0.5, H - 14);
+  // moving charge dots along a segment
+  function dots(a, b, current, dir) {
+    var n = 4;
+    var spd = Math.min(1, Math.abs(current) / 0.02); // normalize
+    for (var i = 0; i < n; i++) {
+      var f = ((phase * (0.15 + spd * 0.85) * dir) + i / n) % 1;
+      if (f < 0) f += 1;
+      var x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,212,255,' + (0.35 + spd * 0.55).toFixed(2) + ')';
+      ctx.fill();
+    }
   }
-}
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.R1) || !isFinite(p.R2) || !isFinite(p.R3) || !isFinite(p.R4)) return;
-  var d1 = p.R2 / (p.R1 + p.R2);
-  var d2 = p.R4 / (p.R3 + p.R4);
-  var Vout = Vin * (d1 - d2);
-  var sens = Vout / Vin; // V/V
-  var R4bal = p.R2 * p.R3 / p.R1;
-  var dR = p.R4 - R4bal;
+  function draw(p, s) {
+    var W = parseFloat(cv.dataset.cssW) || 600, H = parseFloat(cv.dataset.cssH) || 400;
+    ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
 
-  // statVout in mV
-  document.getElementById('statVout').textContent = (Vout * 1000).toFixed(2) + ' mV';
-  // statSens in mV/V
-  document.getElementById('statSens').textContent = (sens * 1000).toFixed(2) + ' mV/V';
-  // statBalance R4 ideal
-  document.getElementById('statBalance').textContent = R4bal.toFixed(1) + ' Ω';
-  // statDeltaR
-  document.getElementById('statDeltaR').textContent = (dR >= 0 ? '+' : '') + dR.toFixed(1) + ' Ω';
+    var cx = W * 0.46, cy = H * 0.52;
+    var rx = Math.min(W * 0.30, H * 0.36), ry = Math.min(W * 0.26, H * 0.34);
+    var nL = { x: cx - rx, y: cy }, nR = { x: cx + rx, y: cy };
+    var nT = { x: cx, y: cy - ry }, nB = { x: cx, y: cy + ry };
+    var lineCol = s.balanced ? '#00b894' : '#e74c3c';
 
-  drawBridge(p, Vout);
-}
+    // wires
+    ctx.strokeStyle = '#5a89b8'; ctx.lineWidth = 2;
+    [[nL, nT], [nT, nR], [nR, nB], [nB, nL]].forEach(function (w) {
+      ctx.beginPath(); ctx.moveTo(w[0].x, w[0].y); ctx.lineTo(w[1].x, w[1].y); ctx.stroke();
+    });
 
-function balanceBridge() {
-  var p = getParams();
-  var R4bal = p.R2 * p.R3 / p.R1;
-  R4bal = Math.max(10, Math.min(10000, Math.round(R4bal)));
-  var sl = document.getElementById('slR4');
-  sl.value = R4bal;
-  updateSlider(sl, 'slR4Num', 0, '');
-  compute();
-}
+    // animated current dots (top leg L->T->R, bottom leg L->B->R)
+    var br = branchCurrents(p);
+    dots(nL, nT, br.top, 1); dots(nT, nR, br.top, 1);
+    dots(nL, nB, br.bot, 1); dots(nB, nR, br.bot, 1);
 
-function resetParams() {
-  var defs = { slR1: 1000, slR2: 1000, slR3: 1000, slR4: 1010 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slR1'), 'slR1Num', 0, '');
-  updateSlider(document.getElementById('slR2'), 'slR2Num', 0, '');
-  updateSlider(document.getElementById('slR3'), 'slR3Num', 0, '');
-  updateSlider(document.getElementById('slR4'), 'slR4Num', 0, '');
-  compute();
-}
+    // resistors
+    resistor(nL, nT, 'R1', p.R1, false);
+    resistor(nT, nR, 'R2', p.R2, false);
+    resistor(nL, nB, 'R3', p.R3, false);
+    resistor(nB, nR, 'Rx', p.Rx, true);
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+    // nodes
+    ctx.fillStyle = '#FFD166';
+    [nL, nR, nT, nB].forEach(function (n) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, 4, 0, Math.PI * 2); ctx.fill();
+    });
 
-resizeCanvas();
-compute();
+    // supply leads
+    ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(nL.x, nL.y); ctx.lineTo(nL.x - 28, nL.y);
+    ctx.moveTo(nR.x, nR.y); ctx.lineTo(nR.x + 28, nR.y);
+    ctx.stroke();
+    ctx.fillStyle = '#00B4D8';
+    ctx.font = 'bold 12px "Roboto Mono",monospace';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(I18N.Vin + ' = ' + p.V.toFixed(1) + 'V', nL.x - 32, nL.y);
+    ctx.textAlign = 'left'; ctx.fillText(I18N.GND, nR.x + 32, nR.y);
+
+    // galvanometer leads from T and B to a meter circle on the right
+    var gxC = Math.min(W - 56, nR.x + 70), gyC = cy, gR = Math.min(34, H * 0.12);
+    ctx.strokeStyle = lineCol; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(nT.x, nT.y); ctx.lineTo(nT.x, nT.y - 22); ctx.lineTo(gxC, nT.y - 22); ctx.lineTo(gxC, gyC - gR);
+    ctx.moveTo(nB.x, nB.y); ctx.lineTo(nB.x, nB.y + 22); ctx.lineTo(gxC, nB.y + 22); ctx.lineTo(gxC, gyC + gR);
+    ctx.stroke();
+
+    // meter face
+    ctx.beginPath(); ctx.arc(gxC, gyC, gR, 0, Math.PI * 2);
+    ctx.fillStyle = '#0a1929'; ctx.fill();
+    ctx.strokeStyle = lineCol; ctx.lineWidth = 2; ctx.stroke();
+    // scale arc + center null tick
+    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(gxC, gyC, gR - 5, Math.PI * 1.18, Math.PI * 1.82); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.5)';
+    ctx.beginPath(); ctx.moveTo(gxC, gyC - gR + 4); ctx.lineTo(gxC, gyC - gR + 9); ctx.stroke();
+
+    // needle: angle proportional to Vg, clamped; nulls to vertical (0) at balance
+    var maxV = 0.4; // V full scale for deflection display
+    var defl = Math.max(-1, Math.min(1, s.Vg / maxV));
+    var target = defl * (Math.PI * 0.32); // ±~58° from vertical
+    if (reduce) { needle = target; }
+    var na = -Math.PI / 2 + needle; // 0 deflection -> pointing up
+    ctx.strokeStyle = lineCol; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(gxC, gyC);
+    ctx.lineTo(gxC + Math.cos(na) * (gR - 7), gyC + Math.sin(na) * (gR - 7));
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(gxC, gyC, 3, 0, Math.PI * 2); ctx.fillStyle = lineCol; ctx.fill();
+    ctx.fillStyle = lineCol;
+    ctx.font = 'bold 12px "Roboto Mono",monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(I18N.galv, gxC, gyC + gR + 12);
+
+    // Vg label near meter
+    ctx.font = '10px "Roboto Mono",monospace';
+    ctx.fillStyle = '#cfe3f7';
+    ctx.fillText('Vg=' + (s.Vg * 1000).toFixed(1) + 'mV', gxC, gyC - gR - 8);
+
+    // status badge
+    ctx.font = 'bold 13px "Noto Sans JP","Roboto Mono",sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    if (s.balanced) {
+      ctx.fillStyle = '#00b894'; ctx.fillText(I18N.nullMsg, W * 0.5, H - 12);
+    } else {
+      var mv = s.Vout * 1000;
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillText(I18N.deflect + '  Vg = ' + (mv >= 0 ? '+' : '') + mv.toFixed(2) + ' mV', W * 0.5, H - 12);
+    }
+    return target;
+  }
+
+  function updateReadouts(s) {
+    el('roVg').textContent = (s.Vg * 1000).toFixed(2);
+    el('roIg').textContent = (s.Ig * 1e6).toFixed(1);
+    el('roBal').textContent = s.balanced ? I18N.yes : I18N.no;
+    el('roBal').style.color = s.balanced ? '#00d4a0' : '#ff8a8a';
+    el('roRxnull').textContent = s.Rxbal.toFixed(1);
+    el('statVout').textContent = (s.Vout * 1000).toFixed(2) + ' mV';
+    el('statSens').textContent = (s.Vout / Math.max(getParams().V, 1e-9) * 1000).toFixed(2) + ' mV/V';
+    el('statBalance').textContent = s.Rxbal.toFixed(1) + ' Ω';
+    el('statDeltaR').textContent = (s.dR >= 0 ? '+' : '') + s.dR.toFixed(1) + ' Ω';
+  }
+
+  var targetAngle = 0;
+  function frame(ts) {
+    if (!lastTs) lastTs = ts;
+    var dt = Math.min(0.05, (ts - lastTs) / 1000);
+    lastTs = ts;
+    if (playing && !reduce) phase += dt * speed * 0.9;
+    // critically-damped needle toward target
+    var k = 90, c = 14;
+    var acc = k * (targetAngle - needle) - c * needleV;
+    needleV += acc * dt; needle += needleV * dt;
+    var p = getParams();
+    var s = solve(p);
+    targetAngle = draw(p, s);
+    animId = requestAnimationFrame(frame);
+  }
+
+  window.compute = function () {
+    var p = getParams();
+    if (!isFinite(p.R1) || !isFinite(p.R2) || !isFinite(p.R3) || !isFinite(p.Rx) || !isFinite(p.V)) return;
+    var s = solve(p);
+    updateReadouts(s);
+    if (reduce) { resizeCanvas(); targetAngle = draw(p, s); }
+  };
+
+  window.wbAutoBalance = function () {
+    var p = getParams();
+    var Rxbal = Math.max(10, Math.min(10000, Math.round(p.R3 * p.R2 / p.R1)));
+    var sl = el('slR4'); sl.value = Rxbal;
+    updateSlider(sl, 'slR4Num', 0, '');
+    window.compute();
+  };
+
+  window.resetParams = function () {
+    var defs = { slR1: 1000, slR2: 1000, slR3: 1000, slR4: 1010, slV: 5 };
+    Object.keys(defs).forEach(function (id) { el(id).value = defs[id]; });
+    updateSlider(el('slR1'), 'slR1Num', 0, '');
+    updateSlider(el('slR2'), 'slR2Num', 0, '');
+    updateSlider(el('slR3'), 'slR3Num', 0, '');
+    updateSlider(el('slR4'), 'slR4Num', 0, '');
+    updateSlider(el('slV'), 'slVNum', 1, '');
+    window.compute();
+  };
+
+  window.wbReset = window.resetParams;
+
+  window.wbPreset = function (name) {
+    var P = {
+      balanced:  { R1: 100, R2: 100, R3: 470, Rx: 470, V: 5 },
+      slight:    { R1: 100, R2: 100, R3: 470, Rx: 500, V: 5 },
+      measure:   { R1: 100, R2: 200, R3: 300, Rx: 600, V: 5 },
+      sensitive: { R1: 1000, R2: 1000, R3: 1000, Rx: 1050, V: 12 }
+    }[name];
+    if (!P) return;
+    el('slR1').value = P.R1; el('slR2').value = P.R2;
+    el('slR3').value = P.R3; el('slR4').value = P.Rx; el('slV').value = P.V;
+    updateSlider(el('slR1'), 'slR1Num', 0, '');
+    updateSlider(el('slR2'), 'slR2Num', 0, '');
+    updateSlider(el('slR3'), 'slR3Num', 0, '');
+    updateSlider(el('slR4'), 'slR4Num', 0, '');
+    updateSlider(el('slV'), 'slVNum', 1, '');
+    window.compute();
+  };
+
+  window.wbTogglePlay = function () {
+    playing = !playing;
+    var b = el('wbPlay');
+    b.innerHTML = playing ? '<i class="fas fa-pause"></i> ' + I18N.pause
+                          : '<i class="fas fa-play"></i> ' + I18N.play;
+  };
+
+  window.wbSpeed = function (v) {
+    speed = v;
+    var btns = document.querySelectorAll('[data-spd]');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', parseFloat(btns[i].getAttribute('data-spd')) === v);
+    }
+  };
+
+  window.addEventListener('resize', function () { resizeCanvas(); window.compute(); });
+
+  resizeCanvas();
+  window.compute();
+  if (!reduce) animId = requestAnimationFrame(frame);
+})();
 </script>
 
 <section class="explanation">
@@ -487,6 +625,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="wheatstone-bridge.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -540,7 +681,7 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>R1～R4の4つの抵抗値をスライダーで設定します。初期値は各100Ωから開始できます。</li>
+<li>R1～R4の4つの抵抗値をスライダーで設定します。初期値は R1=R2=R3=1000Ω、R4=1010Ω です。</li>
 <li>入力電圧Vin（例：5V）を固定し、R1とR3の分圧点、R2とR4の分圧点間の電圧差を監視します。</li>
 <li>平衡条件R1·R4＝R2·R3が成立するようR4を調整し、出力電圧Voutが0Vに近づく動作を確認します。</li>
 <li>ひずみゲージセンサ応用時は、R1を基準抵抗、R2を温度補償用、R3～R4をアクティブゲージとして配置し、感度特性を評価します。</li>
@@ -548,7 +689,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>鋼製引張試験片にひずみゲージ（ゲージ係数2.0）を貼付し、R1=R2=120Ω、R3=120.5Ω、Vin=10Vの場合を考えます。平衡時R4=120.5Ωですが、ひずみ100μεで抵抗が120.524Ωに変化すると、不平衡量ΔR4=0.024Ωが生じます。このとき出力電圧Vout≈20.8mV（感度＝2.08mV/V）となり、精密マイクロボルトメータで検出可能な信号が得られます。</p>
+<p>鋼製引張試験片にひずみゲージ（ゲージ係数2.0）を貼付し、R1=R2=120Ω、R3=120.5Ω、Vin=10Vの場合を考えます。平衡時R4=120.5Ωですが、ひずみ100μεで抵抗が120.524Ωに変化すると、不平衡量ΔR4=0.024Ωが生じます。このとき出力電圧Vout≈−0.50mV（感度＝−0.05mV/V）となり、計装アンプで増幅すれば検出可能な信号が得られます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -558,6 +699,16 @@ compute();
 <li>高周波ノイズ環境下では、ブリッジ給電を交流（例：1kHz）に変更し、ロックインアンプでVoutを検出することで、S/N比を100倍以上改善できます。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

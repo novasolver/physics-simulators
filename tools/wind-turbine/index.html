@@ -41,7 +41,7 @@
   "@context":"https://schema.org",
   "@graph":[
     {
-      "@type":"SoftwareApplication",
+      "@type":"SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name":"風力発電シミュレーター",
       "description":"風力タービンのパワーカーブ・Cp-TSR特性・年間発電量をリアルタイム計算。ベッツ限界・ワイブル分布を体験。",
       "url":"https://novasolver.jp/tools/wind-turbine.html",
@@ -51,7 +51,7 @@
       "browserRequirements":"Requires JavaScript",
       "isAccessibleForFree":true,
       "offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},
-      "publisher":{"@type":"Organization","name":"NovaSolver Project","url":"https://novasolver.jp"},
+      "publisher":{"@type":"Organization","name":"NovaSolver Project","url":"https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList":["パワーカーブのリアルタイム表示","Cp-TSR特性曲線","ワイブル分布による年間発電量計算","回転翼アニメーション","設備利用率（CF）算出"],
       "keywords":"風力発電,ベッツ限界,パワーカーブ,Cp-TSR,翼素運動量理論,BEM,ワイブル分布,年間発電量",
       "datePublished":"2026-04-08",
@@ -115,6 +115,27 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 live readouts / controls ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.62);margin-top:3px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+.live-ro.region .rv{font-size:0.82rem}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 4px}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.84rem;font-family:inherit;font-weight:600;transition:background .2s}
+.btn:hover{background:#0056b3}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.preset-btn{padding:5px 11px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+#turbineCanvas{display:block;width:100%;max-width:100%}
+#turbineCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){input[type=range]::-webkit-slider-thumb{transition:none}}
+/* end v2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/wind-turbine.html">
@@ -144,7 +165,19 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 <div class="main">
   <div class="panel">
+    <div class="panel-title">プリセット</div>
+    <div class="preset-row">
+      <button class="preset-btn" type="button" data-preset="breeze" onclick="setPreset('breeze')">そよ風</button>
+      <button class="preset-btn" type="button" data-preset="rated" onclick="setPreset('rated')">定格風</button>
+      <button class="preset-btn" type="button" data-preset="storm" onclick="setPreset('storm')">暴風カットアウト</button>
+      <button class="preset-btn" type="button" data-preset="betz" onclick="setPreset('betz')">ベッツ最適</button>
+    </div>
+    <div class="divider"></div>
     <div class="panel-title">タービン設定</div>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">風速 v (m/s)</span><div class="num-wrap"><input type="number" class="num-input" id="vV" value="12" min="0" max="30" step="0.5" oninput="syncFromNum('sV','vV')"><span class="num-unit">m/s</span></div></div>
+      <input type="range" id="sV" min="0" max="30" step="0.5" value="12" oninput="syncToNum('sV','vV');updateSlider(this,'vV',v=>parseFloat(v).toFixed(1)+' m/s');update()" aria-label="風速 メートル毎秒">
+    </div>
     <div class="param-group">
       <div class="param-label"><span class="param-name">ローター半径 R (m)</span><div class="num-wrap"><input type="number" class="num-input" id="vR" value="50" min="10" max="120" step="5" oninput="syncFromNum('sR','vR')"><span class="num-unit">m</span></div></div>
       <input type="range" id="sR" min="10" max="120" step="5" value="50" oninput="syncToNum('sR','vR');updateSlider(this,'vR',v=>v+' m');update()">
@@ -171,21 +204,53 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">解析結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（現在の風速）</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roP">0.00</div><div class="rl">取得電力 P [MW]</div></div>
+        <div class="live-ro"><div class="rv" id="roPw">0.00</div><div class="rl">風の電力 [MW]</div></div>
+        <div class="live-ro"><div class="rv" id="roCp">0.000</div><div class="rl">パワー係数 Cp</div></div>
+        <div class="live-ro"><div class="rv" id="roLam">0.0</div><div class="rl">先端速度比 λ</div></div>
+        <div class="live-ro"><div class="rv" id="roRPM">0.0</div><div class="rl">回転数 [rpm]</div></div>
+        <div class="live-ro"><div class="rv" id="roA">0</div><div class="rl">受風面積 A [m²]</div></div>
+        <div class="live-ro"><div class="rv" id="roCF">-</div><div class="rl">設備利用率 CF</div></div>
+        <div class="live-ro region"><div class="rv" id="roRegion">-</div><div class="rl">運転領域</div></div>
+      </div>
+    </div>
+
+    <div class="turbine-wrap">
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-fan"></i> タービン（風の流れ・回転翼）</div>
+        <canvas id="turbineCanvas" width="600" height="360" tabindex="0" role="img" aria-label="風力タービンのアニメーション。風が左から流れ、翼が風速に応じて回転し、ベッツ理論に従い後方で風速が低下します。"></canvas>
+        <div class="play-row">
+          <button class="btn" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+          <button class="btn secondary" type="button" onclick="resetSim()"><i class="fas fa-rotate-left"></i> リセット</button>
+          <div style="display:flex;gap:4px;margin-left:auto">
+            <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+            <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+            <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 年間計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="sPrated">-</div><div class="sl">定格出力 (MW)</div></div>
       <div class="stat-card"><div class="sv" id="sAEP">-</div><div class="sl">AEP (GWh/yr)</div></div>
       <div class="stat-card"><div class="sv" id="sCF">-</div><div class="sl">設備利用率 CF</div></div>
       <div class="stat-card"><div class="sv" id="sCpMax">-</div><div class="sl">Cp,max</div></div>
     </div>
-    </div>
-
-    <div class="turbine-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> タービン</div><canvas id="turbineCanvas" width="600" height="360"></canvas></div>
     </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 出力</div><canvas class="ux-chartjs-canvas" id="chartPower"></canvas></div>
     <div class="canvas-wrap">
@@ -203,168 +268,336 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-let chartPower, chartCp, chartWeibull;
-let angle = 0;
-let animId;
+"use strict";
+(function(){
+  // ===== i18n labels (per language) =====
+  const T = {
+    pP:'出力 P (MW)', pRated:'定格出力', cpLbl:'Cp (パワー係数)', betz:'ベッツ限界 16/27',
+    wbl:'ワイブル分布 f(v)', tPower:'パワーカーブ', tCp:'Cp - 先端速度比（TSR）特性',
+    tWbl:'風速頻度分布（ワイブル）', axV:'風速 v (m/s)', axMW:'出力 (MW)', axTSR:'TSR λ = ΩR/v',
+    axCp:'Cp', axPdf:'確率密度 f(v)',
+    rBelow:'カットイン前', rPartial:'部分負荷', rRated:'定格', rCutout:'カットアウト',
+    hintPlay:'<i class="fas fa-play"></i> 再生', hintPause:'<i class="fas fa-pause"></i> 一時停止',
+    cWind:'風', cWake:'後流（減速）', cP:'P = ', cStop:'停止', cBetzNote:'ベッツ限界 0.593'
+  };
+  const RHO=1.225, VCUTIN=3, VCUTOUT=25;
+  let chartPower, chartCp, chartWeibull;
+  let angle=0, animId=null, playing=true, speedMult=1, lastTs=0;
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function getVal(id){return parseFloat(document.getElementById(id).value);}function drawTurbine(ang){
-  const cv=document.getElementById('turbineCanvas');
-  const ctx=cv.getContext('2d');
-  const card=cv.closest('.chart-card');
-  const W=Math.max(420,Math.min(680,(card?card.clientWidth-44:600)||600));
-  const H=Math.round(W*0.56);
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  cv.style.setProperty('width',W+'px','important');
-  cv.style.setProperty('height',H+'px','important');
-  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,W,H);
-  // sky gradient
-  const sky=ctx.createLinearGradient(0,0,0,H*0.6);
-  sky.addColorStop(0,'#001F3F');sky.addColorStop(1,'#003875');
-  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*0.6);
-  // ground
-  ctx.fillStyle='#4a6741';ctx.fillRect(0,H*0.6,W,H*0.4);
-  // tower
-  const cx=W/2,cy=H*0.6,tH=H*0.45;
-  ctx.beginPath();
-  ctx.moveTo(cx-6,cy);ctx.lineTo(cx+6,cy);
-  ctx.lineTo(cx+3,cy-tH);ctx.lineTo(cx-3,cy-tH);
-  ctx.closePath();ctx.fillStyle='#cccccc';ctx.fill();
-  // hub
-  const hx=cx,hy=cy-tH;
-  ctx.beginPath();ctx.arc(hx,hy,7,0,Math.PI*2);
-  ctx.fillStyle='#aaaaaa';ctx.fill();
-  // blades
-  const R=H*0.38,nb=3;
-  ctx.save();ctx.translate(hx,hy);
-  for(let i=0;i<nb;i++){
-    const a=ang+i*(2*Math.PI/nb);
-    ctx.save();ctx.rotate(a);
+  function el(id){return document.getElementById(id);}
+  function getVal(id){return parseFloat(el(id).value);}
+
+  // ===== Physics =====
+  function Cp(tsr, beta){
+    const li=1/(1/(tsr+0.08*beta)-0.035/(Math.pow(beta,3)+1));
+    const cp=0.5176*(116/li-0.4*beta-5)*Math.exp(-21/li)+0.0068*tsr;
+    return Math.max(0,Math.min(cp,0.593));
+  }
+  function cpMaxAt(beta){
+    let cpMax=0,tsrOpt=7;
+    for(let tsr=1;tsr<=15;tsr+=0.25){const c=Cp(tsr,beta);if(c>cpMax){cpMax=c;tsrOpt=tsr;}}
+    return {cpMax,tsrOpt};
+  }
+  // Power actually extracted at a given wind speed (W)
+  function powerAt(v,R,Vrated,beta,Prated,cpMax){
+    const A=Math.PI*R*R;
+    if(v<VCUTIN||v>VCUTOUT) return 0;
+    if(v<=Vrated) return 0.5*RHO*A*v*v*v*cpMax;
+    return Prated;
+  }
+  function regionOf(v,Vrated){
+    if(v<VCUTIN) return T.rBelow;
+    if(v>VCUTOUT) return T.rCutout;
+    if(v<=Vrated) return T.rPartial;
+    return T.rRated;
+  }
+
+  function powerCurveArrays(R,Vrated,beta,Prated,cpMax){
+    const vArr=[],pArr=[];
+    for(let v=0;v<=30;v+=0.5){vArr.push(v);pArr.push(powerAt(v,R,Vrated,beta,Prated,cpMax)/1e6);}
+    return {vArr,pArr};
+  }
+  function weibullDist(){
+    const c=getVal('sWc'),k=getVal('sWk');
+    const vArr=[],fArr=[];
+    for(let v=0;v<=30;v+=0.5){
+      const f=(k/c)*Math.pow(v/c,k-1)*Math.exp(-Math.pow(v/c,k));
+      vArr.push(v);fArr.push(Math.max(0,f));
+    }
+    return {vArr,fArr};
+  }
+  function computeAEP(R,Vrated,beta,Prated,cpMax){
+    const c=getVal('sWc'),k=getVal('sWk');
+    let aep=0; const dv=0.2;
+    for(let v=0;v<=30;v+=dv){
+      const f=(k/c)*Math.pow(v/c,k-1)*Math.exp(-Math.pow(v/c,k));
+      aep+=powerAt(v,R,Vrated,beta,Prated,cpMax)*f*dv*8760;
+    }
+    return aep;
+  }
+
+  // ===== Live turbine state derived from current wind speed =====
+  function liveState(){
+    const v=getVal('sV'), R=getVal('sR'), Vrated=getVal('sVrated'), beta=getVal('sBeta');
+    const A=Math.PI*R*R;
+    const {cpMax,tsrOpt}=cpMaxAt(beta);
+    const Prated=0.5*RHO*A*Math.pow(Vrated,3)*cpMax;
+    const running=(v>=VCUTIN && v<=VCUTOUT);
+    const P=powerAt(v,R,Vrated,beta,Prated,cpMax);
+    const Pwind=0.5*RHO*A*v*v*v;
+    const cpInst=Pwind>0?Math.min(P/Pwind,cpMax):0;
+    // rotor tracks optimal TSR below rated, then de-rates above rated
+    let lam=0, omega=0, rpm=0;
+    if(running){
+      lam = (v<=Vrated)? tsrOpt : tsrOpt*(Vrated/v); // de-rate above rated
+      omega = lam*v/R;                 // rad/s
+      rpm = omega*60/(2*Math.PI);
+    }
+    return {v,R,Vrated,beta,A,cpMax,tsrOpt,Prated,running,P,Pwind,cpInst,lam,omega,rpm};
+  }
+
+  // ===== Canvas =====
+  function drawTurbine(ang){
+    const cv=el('turbineCanvas'); if(!cv) return;
+    const ctx=cv.getContext('2d');
+    const card=cv.closest('.chart-card');
+    const W=Math.max(420,Math.min(680,(card?card.clientWidth-44:600)||600));
+    const H=Math.round(W*0.56);
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    cv.style.setProperty('width',W+'px','important');
+    cv.style.setProperty('height',H+'px','important');
+    cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+
+    const s=liveState();
+    // sky + ground
+    const sky=ctx.createLinearGradient(0,0,0,H*0.62);
+    sky.addColorStop(0,'#001F3F');sky.addColorStop(1,'#0a4a86');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*0.62);
+    ctx.fillStyle='#3f5a37';ctx.fillRect(0,H*0.62,W,H*0.38);
+
+    const cx=W*0.62, cy=H*0.62, tH=H*0.45;
+    const hx=cx, hy=cy-tH;
+    const Rpix=H*0.34;
+
+    // ---- streamtube (Betz): wind flows L->R, expands and slows behind rotor ----
+    const vNorm=Math.min(s.v/15,1);
+    const upY1=hy-Rpix*0.85, upY2=hy+Rpix*0.85;       // upstream tube edges
+    const dnY1=hy-Rpix*1.18, dnY2=hy+Rpix*1.18;       // downstream expanded
+    ctx.fillStyle='rgba(0,180,216,'+(0.06+0.05*vNorm).toFixed(3)+')';
     ctx.beginPath();
-    ctx.moveTo(0,0);
-    ctx.bezierCurveTo(8,-R*0.2,4,-R*0.8,0,-R);
-    ctx.bezierCurveTo(-4,-R*0.8,-8,-R*0.2,0,0);
-    ctx.closePath();
-    ctx.fillStyle='rgba(200,220,255,0.9)';ctx.fill();
-    ctx.strokeStyle='rgba(100,150,200,0.7)';ctx.lineWidth=1;ctx.stroke();
+    ctx.moveTo(0,upY1); ctx.lineTo(hx,upY1);
+    ctx.bezierCurveTo(hx+30,upY1,hx+30,dnY1,hx+70,dnY1); ctx.lineTo(W,dnY1);
+    ctx.lineTo(W,dnY2); ctx.lineTo(hx+70,dnY2);
+    ctx.bezierCurveTo(hx+30,dnY2,hx+30,upY2,hx,upY2); ctx.lineTo(0,upY2);
+    ctx.closePath(); ctx.fill();
+
+    // wind particles: faster & denser upstream, slower downstream (Betz ~1/3 loss)
+    const nLines=7;
+    for(let i=0;i<nLines;i++){
+      const fy=(i+0.5)/nLines;
+      const yUp=upY1+(upY2-upY1)*fy;
+      const yDn=dnY1+(dnY2-dnY1)*fy;
+      const phase=(ang*0.7+i*1.3);
+      for(let seg=0;seg<5;seg++){
+        const isWake = false;
+        let px=((phase* (8+s.v*1.2) + seg*W/5)%W);
+        let py, alpha, len;
+        if(px<hx){ py=yUp; alpha=0.10+0.45*vNorm; len=6+s.v; }
+        else { py=yDn+(yUp-yDn)*0; py=yDn; alpha=0.06+0.22*vNorm; len=4+s.v*0.5; }
+        ctx.strokeStyle='rgba(150,220,255,'+alpha.toFixed(2)+')';
+        ctx.lineWidth=1.4;
+        ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+len,py); ctx.stroke();
+      }
+    }
+    // wind label
+    ctx.fillStyle='rgba(180,230,255,0.85)';ctx.font='11px Noto Sans JP';ctx.textAlign='left';
+    ctx.fillText(T.cWind+' '+s.v.toFixed(1)+' m/s →', 8, upY1-8);
+    ctx.fillStyle='rgba(140,200,230,0.7)';
+    ctx.fillText(T.cWake+' ≈ '+(s.v*2/3).toFixed(1)+' m/s', hx+74, dnY1-6);
+
+    // tower
+    ctx.beginPath();
+    ctx.moveTo(cx-7,cy);ctx.lineTo(cx+7,cy);ctx.lineTo(cx+3.5,hy);ctx.lineTo(cx-3.5,hy);
+    ctx.closePath();ctx.fillStyle='#d4d8dd';ctx.fill();
+    // hub
+    ctx.beginPath();ctx.arc(hx,hy,7,0,Math.PI*2);ctx.fillStyle='#b6bcc4';ctx.fill();
+
+    // blades (motion blur arc when spinning fast)
+    if(s.running && s.rpm>22){
+      ctx.beginPath();ctx.arc(hx,hy,Rpix,0,Math.PI*2);
+      ctx.strokeStyle='rgba(200,220,255,0.18)';ctx.lineWidth=Rpix*0.5;ctx.stroke();
+    }
+    const nb=3;
+    ctx.save();ctx.translate(hx,hy);
+    for(let i=0;i<nb;i++){
+      const a=ang+i*(2*Math.PI/nb);
+      ctx.save();ctx.rotate(a);
+      ctx.beginPath();ctx.moveTo(0,0);
+      ctx.bezierCurveTo(9,-Rpix*0.2,5,-Rpix*0.8,0,-Rpix);
+      ctx.bezierCurveTo(-5,-Rpix*0.8,-9,-Rpix*0.2,0,0);
+      ctx.closePath();
+      ctx.fillStyle='rgba(225,238,255,0.95)';ctx.fill();
+      ctx.strokeStyle='rgba(90,140,190,0.7)';ctx.lineWidth=1;ctx.stroke();
+      ctx.restore();
+    }
     ctx.restore();
+
+    // power overlay box (top-right)
+    const boxW=150, boxX=W-boxW-10, boxY=10;
+    ctx.fillStyle='rgba(10,22,40,0.78)';
+    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(boxX,boxY,boxW,58,8);ctx.fill();}
+    else ctx.fillRect(boxX,boxY,boxW,58);
+    ctx.textAlign='left';
+    ctx.fillStyle='#ffd54a';ctx.font='bold 16px Roboto Mono, monospace';
+    ctx.fillText(T.cP+(s.P/1e6).toFixed(2)+' MW', boxX+10, boxY+24);
+    ctx.fillStyle='rgba(255,255,255,0.7)';ctx.font='10px Noto Sans JP';
+    ctx.fillText('Cp='+s.cpInst.toFixed(3)+'  '+regionOf(s.v,s.Vrated), boxX+10, boxY+42);
+    ctx.fillStyle='rgba(150,220,255,0.65)';
+    ctx.fillText(T.cBetzNote, boxX+10, boxY+53);
+
+    if(!s.running){
+      ctx.fillStyle='rgba(255,90,90,0.92)';ctx.font='bold 13px Noto Sans JP';ctx.textAlign='center';
+      ctx.fillText(T.cStop, hx, hy-Rpix-12);ctx.textAlign='left';
+    }
   }
-  ctx.restore();
-}function Cp(tsr, beta){
-  // Simplified Cp-TSR-beta model
-  const b=beta*Math.PI/180;
-  const li=1/(tsr+0.08*beta)-0.035/(Math.pow(beta,3)+1);
-  const cp=0.5176*(116/li-0.4*beta-5)*Math.exp(-21/li)+0.0068*tsr;
-  return Math.max(0,Math.min(cp,0.59));
-}function powerCurve(){
-  const R=getVal('sR');
-  const Vrated=getVal('sVrated');
-  const beta=getVal('sBeta');
-  const rho=1.225,A=Math.PI*R*R;
-  const Vcutin=3,Vcutout=25;
-  const vArr=[];
-  const pArr=[];
-  // Find Cp at optimal TSR
-  let cpMax=0,tsrOpt=7;
-  for(let tsr=1;tsr<=15;tsr+=0.5){const c=Cp(tsr,beta);if(c>cpMax){cpMax=c;tsrOpt=tsr;}}// Rated power
-  const Prated=0.5*rho*A*Math.pow(Vrated,3)*cpMax;
-  document.getElementById('sPrated').textContent=(Prated/1e6).toFixed(2);
-  document.getElementById('sCpMax').textContent=cpMax.toFixed(3);
 
-  for(let v=0;v<=30;v+=0.5){
-    vArr.push(v);
-    if(v<Vcutin||v>Vcutout){pArr.push(0);}else if(v<=Vrated){pArr.push(0.5*rho*A*v*v*v*cpMax/1e6);}else{pArr.push(Prated/1e6);}
-  }return{vArr,pArr,Prated,cpMax,tsrOpt};
-}function weibullDist(){
-  const c=getVal('sWc'),k=getVal('sWk');
-  const vArr=[],fArr=[];
-  for(let v=0;v<=30;v+=0.5){
-    const f=(k/c)*Math.pow(v/c,k-1)*Math.exp(-Math.pow(v/c,k));
-    vArr.push(v);fArr.push(Math.max(0,f));
-  }return{vArr,fArr,c,k};
-}function computeAEP(Prated,cpMax){
-  const c=getVal('sWc'),k=getVal('sWk');
-  const Vcutin=3,Vrated=getVal('sVrated'),Vcutout=25;
-  const R=getVal('sR');
-  const rho=1.225,A=Math.PI*R*R;
-  let aep=0;
-  const dv=0.2;
-  for(let v=0;v<=30;v+=dv){
-    const f=(k/c)*Math.pow(v/c,k-1)*Math.exp(-Math.pow(v/c,k));
-    let P=0;
-    if(v>=Vcutin&&v<=Vrated) P=0.5*rho*A*v*v*v*cpMax;
-    else if(v>Vrated&&v<=Vcutout) P=Prated;
-    aep+=P*f*dv*8760;
+  // ===== Update charts + readouts =====
+  function update(){
+    const s=liveState();
+    // live readouts
+    el('roP').textContent=(s.P/1e6).toFixed(2);
+    el('roPw').textContent=(s.Pwind/1e6).toFixed(2);
+    el('roCp').textContent=s.cpInst.toFixed(3);
+    el('roLam').textContent=s.lam.toFixed(1);
+    el('roRPM').textContent=s.rpm.toFixed(1);
+    el('roA').textContent=Math.round(s.A);
+    el('roRegion').textContent=regionOf(s.v,s.Vrated);
+
+    // annual stats
+    const aep=computeAEP(s.R,s.Vrated,s.beta,s.Prated,s.cpMax);
+    const cf=s.Prated>0?aep/(s.Prated*8760):0;
+    el('sPrated').textContent=(s.Prated/1e6).toFixed(2);
+    el('sCpMax').textContent=s.cpMax.toFixed(3);
+    el('sAEP').textContent=(aep/1e9).toFixed(3);
+    el('sCF').textContent=(cf*100).toFixed(1)+'%';
+    el('roCF').textContent=(cf*100).toFixed(0)+'%';
+
+    // power curve chart + live marker at current v
+    const {vArr,pArr}=powerCurveArrays(s.R,s.Vrated,s.beta,s.Prated,s.cpMax);
+    chartPower.data.labels=vArr;
+    chartPower.data.datasets[0].data=pArr;
+    chartPower.data.datasets[1].data=vArr.map(v=>v===s.Vrated?s.Prated/1e6:null);
+    chartPower.data.datasets[2].data=vArr.map(v=>(Math.abs(v-s.v)<0.26)?s.P/1e6:null);
+    chartPower.update('none');
+
+    // Cp-TSR chart + live marker
+    const tsrPts=[],cpPts=[];
+    for(let tsr=0;tsr<=15;tsr+=0.2){tsrPts.push(tsr);cpPts.push(Cp(tsr,s.beta));}
+    chartCp.data.labels=tsrPts;
+    chartCp.data.datasets[0].data=cpPts;
+    chartCp.data.datasets[1].data=Array(tsrPts.length).fill(16/27);
+    chartCp.data.datasets[2].data=tsrPts.map(t=>(Math.abs(t-s.lam)<0.11 && s.running)?Cp(t,s.beta):null);
+    chartCp.update('none');
+
+    // Weibull chart + live marker
+    const {vArr:wv,fArr:wf}=weibullDist();
+    chartWeibull.data.labels=wv;
+    chartWeibull.data.datasets[0].data=wf;
+    const c=getVal('sWc'),k=getVal('sWk');
+    chartWeibull.data.datasets[1].data=wv.map(v=>(Math.abs(v-s.v)<0.26)?(k/c)*Math.pow(v/c,k-1)*Math.exp(-Math.pow(v/c,k)):null);
+    chartWeibull.update('none');
+
+    if(reduceMotion) drawTurbine(angle);
   }
-  return aep;
-}function update(){
-  const{vArr,pArr,Prated,cpMax,tsrOpt}=powerCurve();
-  const aep=computeAEP(Prated,cpMax);
-  const cf=aep/(Prated*8760);
-  document.getElementById('sAEP').textContent=(aep/1e9).toFixed(3);
-  document.getElementById('sCF').textContent=(cf*100).toFixed(1)+'%';
+  window.windTurbineUpdate=update; // expose for inline oninput
+  window.update=update;            // inline slider oninput calls update()
 
-  // Power curve chart
-  chartPower.data.labels=vArr;
-  chartPower.data.datasets[0].data=pArr;
-  const Vr=getVal('sVrated');
-  chartPower.data.datasets[1].data=vArr.map(v=>v===Vr?Prated/1e6:null);
-  chartPower.update('none');
+  // ===== Animation =====
+  function animate(ts){
+    if(!lastTs) lastTs=ts;
+    const dt=Math.min((ts-lastTs)/1000,0.05); lastTs=ts;
+    const s=liveState();
+    if(playing && s.running) angle+=s.omega*dt*speedMult*0.6; // scaled for visual clarity
+    drawTurbine(angle);
+    animId=requestAnimationFrame(animate);
+  }
 
-  // Cp-TSR chart
-  const tsrPts=[],cpPts=[];
-  for(let tsr=0;tsr<=15;tsr+=0.2){tsrPts.push(tsr);cpPts.push(Cp(tsr,getVal('sBeta')));}chartCp.data.labels=tsrPts;
-  chartCp.data.datasets[0].data=cpPts;
-  chartCp.data.datasets[1].data=Array(tsrPts.length).fill(16/27);
-  chartCp.update('none');
+  // ===== Controls =====
+  window.togglePlay=function(){
+    playing=!playing;
+    const b=el('btnPlay'); if(b) b.innerHTML = playing? T.hintPause : T.hintPlay;
+  };
+  window.setSpeed=function(m){
+    speedMult=m;
+    document.querySelectorAll('.speed-btn').forEach(b=>b.classList.toggle('active',parseFloat(b.dataset.speed)===m));
+  };
+  window.resetSim=function(){
+    setSlider('sV','vV',12); setSlider('sR','vR',50); setSlider('sVrated','vVrated',12);
+    setSlider('sBeta','vBeta',0); setSlider('sWc','vWc',8); setSlider('sWk','vWk',2.0);
+    angle=0; playing=true; setSpeed(1);
+    const b=el('btnPlay'); if(b) b.innerHTML=T.hintPause;
+    document.querySelectorAll('.preset-btn[data-preset]').forEach(b=>b.classList.remove('active'));
+    update();
+  };
+  function setSlider(sid,nid,val){
+    const sl=el(sid); if(sl){sl.value=val; const min=parseFloat(sl.min),max=parseFloat(sl.max); sl.style.setProperty('--pct',((val-min)/(max-min)*100)+'%');}
+    const nm=el(nid); if(nm) nm.value=val;
+  }
+  window.setPreset=function(name){
+    const P={
+      breeze:{v:5, R:50, Vrated:12, beta:0},
+      rated: {v:12,R:50, Vrated:12, beta:0},
+      storm: {v:27,R:50, Vrated:12, beta:0},
+      betz:  {v:9, R:50, Vrated:12, beta:0}
+    }[name];
+    if(!P) return;
+    setSlider('sV','vV',P.v); setSlider('sR','vR',P.R);
+    setSlider('sVrated','vVrated',P.Vrated); setSlider('sBeta','vBeta',P.beta);
+    document.querySelectorAll('.preset-btn[data-preset]').forEach(b=>b.classList.toggle('active',b.dataset.preset===name));
+    update();
+  };
 
-  // Weibull chart
-  const{vArr:wv,fArr:wf}=weibullDist();
-  chartWeibull.data.labels=wv;
-  chartWeibull.data.datasets[0].data=wf;
-  chartWeibull.update('none');
-}function animate(){
-  const Vrated=getVal('sVrated');
-  const omega=Vrated*getVal('sR')>0? (7*Vrated/getVal('sR'))*0.016 : 0.03;
-  angle+=omega;
-  drawTurbine(angle);
-  animId=requestAnimationFrame(animate);
-}window.addEventListener('DOMContentLoaded',()=>{
-  ['sR','sVrated','sBeta','sWc','sWk'].forEach(id=>{
-    const el=document.getElementById(id);
-    const pct=(el.value-el.min)/(el.max-el.min)*100;
-    el.style.setProperty('--pct',pct+'%');
+  window.addEventListener('DOMContentLoaded',()=>{
+    ['sV','sR','sVrated','sBeta','sWc','sWk'].forEach(id=>{
+      const e=el(id); if(!e) return;
+      const pct=(e.value-e.min)/(e.max-e.min)*100;
+      e.style.setProperty('--pct',pct+'%');
+    });
+    const co={responsive:true,maintainAspectRatio:false,resizeDelay:100,animation:false,plugins:{legend:{labels:{font:{size:11},color:'#1a1a2e',filter:i=>i.text!=='__live'}}}};
+    const liveDS={label:'__live',data:[],borderColor:'#ffd54a',backgroundColor:'#ffd54a',pointRadius:5,pointHoverRadius:6,showLine:false,fill:false};
+
+    chartPower=new Chart(el('chartPower'),{type:'line',
+      data:{labels:[],datasets:[
+        {label:T.pP,data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.1)',pointRadius:0,borderWidth:2,fill:true,tension:0.4},
+        {label:T.pRated,data:[],borderColor:'#FFD700',borderWidth:1.5,pointRadius:0,borderDash:[4,4],fill:false},
+        Object.assign({},liveDS)
+      ]},
+      options:{...co,plugins:{...co.plugins,title:{display:true,text:T.tPower,color:'#1a1a2e',font:{size:13,weight:'700'}}},scales:{x:{title:{display:true,text:T.axV},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:T.axMW},beginAtZero:true}}}
+    });
+    chartCp=new Chart(el('chartCp'),{type:'line',
+      data:{labels:[],datasets:[
+        {label:T.cpLbl,data:[],borderColor:'#00B4D8',backgroundColor:'rgba(0,180,216,.1)',pointRadius:0,borderWidth:2,fill:true,tension:0.4},
+        {label:T.betz,data:[],borderColor:'#FF6B6B',borderWidth:1.5,pointRadius:0,borderDash:[6,3],fill:false},
+        Object.assign({},liveDS)
+      ]},
+      options:{...co,plugins:{...co.plugins,title:{display:true,text:T.tCp,color:'#1a1a2e',font:{size:13,weight:'700'}}},scales:{x:{title:{display:true,text:T.axTSR},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:T.axCp},min:0,max:0.65}}}
+    });
+    chartWeibull=new Chart(el('chartWeibull'),{type:'line',
+      data:{labels:[],datasets:[
+        {label:T.wbl,data:[],borderColor:'#28a745',backgroundColor:'rgba(40,167,69,.15)',pointRadius:0,borderWidth:2,fill:true,tension:0.4},
+        Object.assign({},liveDS)
+      ]},
+      options:{...co,plugins:{...co.plugins,title:{display:true,text:T.tWbl,color:'#1a1a2e',font:{size:13,weight:'700'}}},scales:{x:{title:{display:true,text:T.axV},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:T.axPdf}}}}
+    });
+
+    update();
+    if(reduceMotion){ playing=false; const b=el('btnPlay'); if(b) b.innerHTML=T.hintPlay; drawTurbine(angle); }
+    else animId=requestAnimationFrame(animate);
   });
-  const co={responsive:true,maintainAspectRatio:false,resizeDelay:100,animation:false,plugins:{legend:{labels:{font:{size:11},color:'#1a1a2e'}}}};
-
-  chartPower=new Chart(document.getElementById('chartPower'),{
-    type:'line',
-    data:{labels:[],datasets:[
-      {label:'出力 P (MW)',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,.1)',pointRadius:0,borderWidth:2,fill:true,tension:0.4},{label:'定格出力',data:[],borderColor:'#FFD700',borderWidth:1.5,pointRadius:0,borderDash:[4,4],fill:false}
-    ]},
-    options:{...co,plugins:{...co.plugins,title:{display:true,text:'パワーカーブ',color:'#1a1a2e',font:{size:13,weight:'700'}}},scales:{x:{ title:{display:true,text:'風速 v (m/s)'},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'出力 (MW)'},beginAtZero:true}}}
-  });
-
-  chartCp=new Chart(document.getElementById('chartCp'),{
-    type:'line',
-    data:{labels:[],datasets:[
-      {label:'Cp (パワー係数)',data:[],borderColor:'#00B4D8',backgroundColor:'rgba(0,180,216,.1)',pointRadius:0,borderWidth:2,fill:true,tension:0.4},{label:'ベッツ限界 16/27',data:[],borderColor:'#FF6B6B',borderWidth:1.5,pointRadius:0,borderDash:[6,3],fill:false}
-    ]},
-    options:{...co,plugins:{...co.plugins,title:{display:true,text:'Cp - 先端速度比（TSR）特性',color:'#1a1a2e',font:{size:13,weight:'700'}}},scales:{x:{ title:{display:true,text:'TSR λ = ΩR/v'},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'Cp'},min:0,max:0.65}}}
-  });
-
-  chartWeibull=new Chart(document.getElementById('chartWeibull'),{
-    type:'line',
-    data:{labels:[],datasets:[
-      {label:'ワイブル分布 f(v)',data:[],borderColor:'#28a745',backgroundColor:'rgba(40,167,69,.15)',pointRadius:0,borderWidth:2,fill:true,tension:0.4}
-    ]},
-    options:{...co,plugins:{...co.plugins,title:{display:true,text:'風速頻度分布（ワイブル）',color:'#1a1a2e',font:{size:13,weight:'700'}}},scales:{x:{ title:{display:true,text:'風速 v (m/s)'},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'確率密度 f(v)'}}}}
-  });
-
-  update();
-  animate();
-});
+})();
 </script>
 
 <section class="explanation">
@@ -426,6 +659,9 @@ function getVal(id){return parseFloat(document.getElementById(id).value);}functi
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="wind-turbine.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -465,14 +701,14 @@ function getVal(id){return parseFloat(document.getElementById(id).value);}functi
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>風速入力欄（vR）に実測データまたは設計想定値を入力。定格風速（vVrated）は一般的な水平軸風車で10～13m/sの範囲で設定</li>
-<li>ピッチ角（vBeta）を0～25度の範囲で調整。ベッツ限界59.3%に近づくよう翼素運動量理論（BEM）がCp値をリアルタイム計算</li>
-<li>カットイン風速（vWc）を2～4m/sで指定後、シミュレーション実行ボタンを押すと年間発電量（AEP）と設備利用率（CF）が自動算出される</li>
+<li>ローター半径R（vR、10〜120m）と定格風速（vVrated、8〜20m/s）を設定します。一般的な水平軸風車の定格風速は10〜13m/s程度です</li>
+<li>ピッチ角β（vBeta）を0〜30度で調整。Cp(λ,β)モデルが最適TSR（通常7〜8）でのCp,maxをリアルタイム計算します（ベッツ限界16/27≈59.3%が上限）</li>
+<li>風況（ワイブル）のスケールc（vWc、4〜16m/s）と形状k（vWk、1.2〜3.5）を変えると、年間発電量AEPと設備利用率CFが自動更新されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>2.5MWの海上風車で、年間平均風速8.2m/s、定格風速12m/s、ピッチ角15度の条件下：Cp,max=0.48（ベッツ限界比91%）、年間発電量AEP=6.8GWh/yr、設備利用率CF=31%。同じ風車で平均風速9.5m/sの立地では、AEP=8.2GWh/yr、CF=37%に向上。Rayleighスペクトルに基づく風速分布で自動計算</p>
+<p>既定設定（ローター半径R=50m、定格風速12m/s、ピッチ角0度、ワイブル scale c=8m/s・形状k=2）では：最適TSR≈8でCp,max≈0.48（ベッツ限界16/27≈0.593の約81%）、定格出力≈4.0MW、年間発電量AEP≈10.8GWh/yr、設備利用率CF≈31%。ワイブル scale c を大きく（風況を強く）すると、パワーカーブとの積分でAEP・CFが上昇します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -482,6 +718,16 @@ function getVal(id){return parseFloat(document.getElementById(id).value);}functi
 <li>年間発電量計算は風速頻度分布（Weibull分布）に依存。山岳地形や海面粗度の影響を反映するため、実測風況データ12ヶ月以上の取得を推奨</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

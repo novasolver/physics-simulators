@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ループシェイピング設計シミュレーター",
       "description": "プロセス G_p と PI 補償 C から開ループ L=C·G_p の Bode 線図を生成し、ゲイン交差周波数・位相余裕・ゲイン余裕・帯域幅をリアルタイムに計算する制御工学教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/loop-shaping.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["PI 補償と 2 次プロセスの開ループボード線図","ゲイン交差周波数 ω_c の二分探索","位相余裕 PM・ゲイン余裕 GM の計算","近似帯域幅 ω_BW ≈ 1.5 ω_c の表示"],
       "keywords": "ループシェイピング,ボード線図,PI 補償,位相余裕,ゲイン余裕,帯域幅,周波数応答,古典制御",
       "datePublished": "2026-05-16",
@@ -100,9 +100,11 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#bodeCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#bodeCanvas,#stepCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#bodeCanvas:focus-visible,#stepCanvas:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
 .warn-msg{ color:#ff8c42; font-weight:600; font-size:0.78rem; margin-top:6px; }
+.comp-btn{ font-size:0.74rem; padding:5px 10px; }
 </style>
 </head>
 <body>
@@ -165,29 +167,81 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="divider"></div>
+    <div class="panel-title" style="margin-bottom:10px"><i class="fas fa-wave-square"></i> 追加補償器（ループ整形）</div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">補償タイプ</span>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="toggle-btn comp-btn active" data-comp="lead" onclick="setComp('lead')">リード</button>
+          <button type="button" class="toggle-btn comp-btn" data-comp="lag" onclick="setComp('lag')">ラグ</button>
+          <button type="button" class="toggle-btn comp-btn" data-comp="none" onclick="setComp('none')">なし</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">補償強度 α（ゼロ/極比）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slAlphaVal" value="6.0" min="1" max="20" step="0.1" oninput="syncFromNum('slAlpha','slAlphaVal')"><span class="num-unit">—</span></div>
+      </div>
+      <input type="range" id="slAlpha" min="1" max="20" step="0.1" value="6.0" oninput="syncToNum('slAlpha','slAlphaVal');updateSlider(this,'slAlphaVal',1,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">補償中心周波数 ω_m</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slWmVal" value="3.0" min="0.1" max="30" step="0.1" oninput="syncFromNum('slWm','slWmVal')"><span class="num-unit">rad/s</span></div>
+      </div>
+      <input type="range" id="slWm" min="0.1" max="30" step="0.1" value="3.0" oninput="syncToNum('slWm','slWmVal');updateSlider(this,'slWmVal',1,'');compute()">
+    </div>
+
+    <div class="divider"></div>
 
     <div class="btn-group">
+      <button type="button" class="btn" id="btnAnim" onclick="toggleShape()"><i class="fas fa-play"></i> 整形アニメ</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">第 2 時定数 T_2 = 0.5 s 固定。周波数範囲 ω ∈ [0.01, 100] rad/s 対数。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">第 2 時定数 T_2 = 0.5 s 固定。周波数範囲 ω ∈ [0.01, 100] rad/s 対数。「整形アニメ」で補償器を 0→100% まで挿入し、Bode 曲線が曲がり位相余裕が改善する様子を見られます。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-calculator"></i> ライブ計算結果（毎フレーム更新）</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statOmegaC">—</div><div class="sl">ゲイン交差 ω_c</div></div>
         <div class="stat-card"><div class="sv" id="statPM">—</div><div class="sl">位相余裕 PM</div></div>
         <div class="stat-card"><div class="sv" id="statGM">—</div><div class="sl">ゲイン余裕 GM</div></div>
         <div class="stat-card"><div class="sv" id="statBW">—</div><div class="sl">帯域幅 ω_BW</div></div>
       </div>
+      <div class="stat-cards" style="margin-top:12px">
+        <div class="stat-card"><div class="sv" id="statPhi">—</div><div class="sl">補償付加位相 φ_m</div></div>
+        <div class="stat-card"><div class="sv" id="statOS">—</div><div class="sl">行過ぎ量 OS</div></div>
+        <div class="stat-card"><div class="sv" id="statBlend">—</div><div class="sl">補償挿入率</div></div>
+        <div class="stat-card"><div class="sv" id="statStable">—</div><div class="sl">安定判定</div></div>
+      </div>
       <p id="warnMsg" class="warn-msg" style="display:none"></p>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 開ループ Bode 線図 L(j<span style="text-transform:none">ω</span>)</div>
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 開ループ Bode 線図 L(j<span style="text-transform:none">ω</span>) — 補償で整形</div>
       <canvas id="bodeCanvas"></canvas>
-      <p class="canvas-hint">上＝ゲイン |L| (dB)、下＝位相 ∠L (°)、横軸＝ω (rad/s) 対数／黄縦線＝ω_c、赤縦線＝ω_180</p>
+      <p class="canvas-hint">青＝整形後 |L|・∠L、灰破線＝補償なしの元の L／黄縦線＝ω_c、黄点＝位相余裕 PM、赤縦線＝ω_180（ゲイン余裕）</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-wave-square"></i> 閉ループ ステップ応答 — 位相余裕が形を決める</div>
+      <canvas id="stepCanvas"></canvas>
+      <p class="canvas-hint">PM が大きいほど行過ぎ量が小さく整定が速い。灰破線＝補償なし、緑＝整形後の閉ループ応答。</p>
     </div>
 
     <div class="chart-card">
@@ -206,315 +260,419 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Loop Shaping (Bode plot + stability margins) ==========
-var bodeCanvas = document.getElementById('bodeCanvas');
-var bodeCtx = bodeCanvas.getContext('2d');
-
+/* ===== Loop Shaping V2 — see the loop gain being reshaped ===== */
+(function(){
+"use strict";
 var T2_FIXED = 0.5;
 var W_MIN = 0.01, W_MAX = 100;
+var LOGW0 = Math.log10(W_MIN), LOGW1 = Math.log10(W_MAX);
 
-function getParams() {
-  var Kp = parseFloat(document.getElementById('slKp').value);
-  var T1 = parseFloat(document.getElementById('slT1').value);
-  var Kc = parseFloat(document.getElementById('slKc').value);
-  var Ti = parseFloat(document.getElementById('slTi').value);
-  return { Kp: Kp, T1: T1, T2: T2_FIXED, Kc: Kc, Ti: Ti };
+var bodeCanvas = document.getElementById('bodeCanvas');
+var bodeCtx = bodeCanvas.getContext('2d');
+var stepCanvas = document.getElementById('stepCanvas');
+var stepCtx = stepCanvas.getContext('2d');
+
+var compType = 'lead';   // 'lead' | 'lag' | 'none'
+var blend = 1;           // compensator insertion fraction 0..1 (animated)
+var shaping = false;     // animation running
+var rafId = null, lastTs = 0;
+var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function gv(id){ var e = document.getElementById(id); return e ? parseFloat(e.value) : NaN; }
+
+function getParams(){
+  return {
+    Kp: gv('slKp'), T1: gv('slT1'), T2: T2_FIXED,
+    Kc: gv('slKc'), Ti: gv('slTi'),
+    alpha: gv('slAlpha'), wm: gv('slWm')
+  };
 }
 
-// Complex helpers
-function cMul(a, b) { return { re: a.re*b.re - a.im*b.im, im: a.re*b.im + a.im*b.re }; }
-function cDiv(a, b) {
-  var d = b.re*b.re + b.im*b.im;
-  return { re: (a.re*b.re + a.im*b.im)/d, im: (a.im*b.re - a.re*b.im)/d };
-}
-function cAbs(a) { return Math.sqrt(a.re*a.re + a.im*a.im); }
-function cArg(a) { return Math.atan2(a.im, a.re); }
+/* complex helpers */
+function cMul(a,b){ return { re:a.re*b.re-a.im*b.im, im:a.re*b.im+a.im*b.re }; }
+function cDiv(a,b){ var d=b.re*b.re+b.im*b.im; return { re:(a.re*b.re+a.im*b.im)/d, im:(a.im*b.re-a.re*b.im)/d }; }
+function cAbs(a){ return Math.sqrt(a.re*a.re+a.im*a.im); }
 
-// L(jw) = Kc * (1 + 1/(j Ti w)) * Kp / ((1 + j T1 w)(1 + j T2 w))
-function L(p, w) {
-  // PI part: Kc * (1 + 1/(j Ti w)) = Kc - j*Kc/(Ti w)
-  var pi = { re: p.Kc, im: -p.Kc / (p.Ti * w) };
-  // process denominator: (1 + j T1 w)(1 + j T2 w)
-  var d1 = { re: 1, im: p.T1 * w };
-  var d2 = { re: 1, im: p.T2 * w };
-  var den = cMul(d1, d2);
-  var num = { re: p.Kp, im: 0 };
-  var gp = cDiv(num, den);
+/* Base open loop L0(jw) = Kc(1+1/(jTi w)) * Kp/((1+jT1 w)(1+jT2 w)) */
+function Lbase(p,w){
+  var pi = { re:p.Kc, im:-p.Kc/(p.Ti*w) };
+  var den = cMul({re:1,im:p.T1*w},{re:1,im:p.T2*w});
+  var gp = cDiv({re:p.Kp,im:0}, den);
   return cMul(pi, gp);
 }
 
-function magDb(p, w) { return 20 * Math.log10(cAbs(L(p, w))); }
-// unwrapped phase in degrees (since PI adds ~ -90 at low w and each pole adds another -90)
-function phaseDeg(p, w) {
-  // phase of PI = atan2(-Kc/(Ti w), Kc) -> -90..0 from low to high w
-  var phPI = Math.atan2(-p.Kc / (p.Ti * w), p.Kc) * 180 / Math.PI;
-  var phP1 = -Math.atan(p.T1 * w) * 180 / Math.PI;
-  var phP2 = -Math.atan(p.T2 * w) * 180 / Math.PI;
-  return phPI + phP1 + phP2;
+/* Lead/lag compensator centred at wm with zero/pole ratio alpha.
+   Lead:  C=(1+ s/wz)/(1+ s/wp), wz=wm/sqrt(a), wp=wm*sqrt(a)  -> +phase, DC gain 1
+   Lag:   C=a(1+ s/wz)/(1+ s/wp), wz=wm*sqrt(a), wp=wm/sqrt(a) -> low-freq gain boost a, HF gain 1
+   blend morphs alpha->1 (no compensation) at blend=0, full at blend=1. */
+function comp(p,w){
+  if (compType === 'none') return { re:1, im:0 };
+  var a = 1 + (p.alpha - 1) * blend;     // effective ratio, 1 when blend=0
+  if (a <= 1) return { re:1, im:0 };
+  var sa = Math.sqrt(a);
+  if (compType === 'lead'){
+    var c = cDiv({re:1,im:w/(p.wm/sa)}, {re:1,im:w/(p.wm*sa)});
+    return c;                            // DC gain 1, adds phase near wm
+  }
+  // lag: zero at wm*sqrt(a) (above pole), pole at wm/sqrt(a); times a -> DC gain a, HF gain 1
+  var cl = cDiv({re:1,im:w/(p.wm*sa)}, {re:1,im:w/(p.wm/sa)});
+  return { re:a*cl.re, im:a*cl.im };
 }
 
-// bisection to find w where magDb = 0
-function findOmegaC(p) {
-  // Search across log range; find sign change of magDb
-  var N = 600;
-  var prev = null, prevW = W_MIN;
-  for (var i = 0; i <= N; i++) {
-    var w = W_MIN * Math.pow(W_MAX / W_MIN, i / N);
-    var v = magDb(p, w);
-    if (prev !== null && ((prev > 0 && v <= 0) || (prev < 0 && v >= 0))) {
-      // bisect between prevW and w
-      var lo = prevW, hi = w;
-      for (var k = 0; k < 60; k++) {
-        var mid = Math.sqrt(lo * hi); // log midpoint
-        var vm = magDb(p, mid);
-        if ((prev > 0 && vm > 0) || (prev < 0 && vm < 0)) lo = mid; else hi = mid;
-        if (Math.abs(vm) < 1e-6) return mid;
-      }
-      return Math.sqrt(lo * hi);
+function Lc(p,w){ return cMul(Lbase(p,w), comp(p,w)); }
+function magDb(p,w){ return 20*Math.log10(cAbs(Lc(p,w))); }
+function magDbBase(p,w){ return 20*Math.log10(cAbs(Lbase(p,w))); }
+
+/* continuous unwrapped phase (deg): PI + 2 poles + compensator zero/pole */
+function phaseDeg(p,w){
+  var ph = Math.atan2(-p.Kc/(p.Ti*w), p.Kc)*180/Math.PI;  // PI: -90..0
+  ph += -Math.atan(p.T1*w)*180/Math.PI;
+  ph += -Math.atan(p.T2*w)*180/Math.PI;
+  if (compType !== 'none'){
+    var a = 1 + (p.alpha-1)*blend;
+    if (a > 1){
+      var sa = Math.sqrt(a), wz, wp;
+      if (compType==='lead'){ wz=p.wm/sa; wp=p.wm*sa; } else { wz=p.wm*sa; wp=p.wm/sa; }
+      ph += Math.atan(w/wz)*180/Math.PI;   // zero
+      ph += -Math.atan(w/wp)*180/Math.PI;  // pole
     }
-    prev = v; prevW = w;
+  }
+  return ph;
+}
+function phaseDegBase(p,w){
+  var ph = Math.atan2(-p.Kc/(p.Ti*w), p.Kc)*180/Math.PI;
+  ph += -Math.atan(p.T1*w)*180/Math.PI;
+  ph += -Math.atan(p.T2*w)*180/Math.PI;
+  return ph;
+}
+
+/* phase added by compensator at wm (max lead = asin((a-1)/(a+1))) */
+function compPhaseAtWm(p){
+  if (compType==='none') return 0;
+  var a = 1 + (p.alpha-1)*blend;
+  if (a <= 1) return 0;
+  var phi = Math.asin((a-1)/(a+1))*180/Math.PI;
+  return compType==='lead' ? phi : -phi;
+}
+
+function findOmegaC(magFn,p){
+  var N=600, prev=null, prevW=W_MIN;
+  for (var i=0;i<=N;i++){
+    var w = W_MIN*Math.pow(W_MAX/W_MIN, i/N);
+    var v = magFn(p,w);
+    if (prev!==null && ((prev>0&&v<=0)||(prev<0&&v>=0))){
+      var lo=prevW, hi=w;
+      for (var k=0;k<60;k++){
+        var mid=Math.sqrt(lo*hi), vm=magFn(p,mid);
+        if ((prev>0&&vm>0)||(prev<0&&vm<0)) lo=mid; else hi=mid;
+        if (Math.abs(vm)<1e-6) return mid;
+      }
+      return Math.sqrt(lo*hi);
+    }
+    prev=v; prevW=w;
+  }
+  return NaN;
+}
+function findOmega180(phFn,p){
+  var N=600, prev=null, prevW=W_MIN;
+  for (var i=0;i<=N;i++){
+    var w = W_MIN*Math.pow(W_MAX/W_MIN, i/N);
+    var v = phFn(p,w);
+    if (prev!==null && prev>-180 && v<=-180){
+      var lo=prevW, hi=w;
+      for (var k=0;k<60;k++){
+        var mid=Math.sqrt(lo*hi), vm=phFn(p,mid);
+        if (vm>-180) lo=mid; else hi=mid;
+        if (Math.abs(vm+180)<1e-6) return mid;
+      }
+      return Math.sqrt(lo*hi);
+    }
+    prev=v; prevW=w;
   }
   return NaN;
 }
 
-// find w180 where phase = -180 (search from high w because phase decreases)
-function findOmega180(p) {
-  var N = 600;
-  var prev = null, prevW = W_MIN;
-  for (var i = 0; i <= N; i++) {
-    var w = W_MIN * Math.pow(W_MAX / W_MIN, i / N);
-    var v = phaseDeg(p, w);
-    if (prev !== null && prev > -180 && v <= -180) {
-      var lo = prevW, hi = w;
-      for (var k = 0; k < 60; k++) {
-        var mid = Math.sqrt(lo * hi);
-        var vm = phaseDeg(p, mid);
-        if (vm > -180) lo = mid; else hi = mid;
-        if (Math.abs(vm + 180) < 1e-6) return mid;
-      }
-      return Math.sqrt(lo * hi);
-    }
-    prev = v; prevW = w;
-  }
-  return NaN;
+/* approximate percent overshoot from phase margin (deg) via 2nd-order map:
+   zeta ~= PM/100 (good for PM<=70). OS% = 100*exp(-pi*zeta/sqrt(1-zeta^2)). */
+function overshootFromPM(pm){
+  if (!isFinite(pm)) return NaN;
+  if (pm <= 0) return 100;          // unstable / sustained — clamp display
+  var zeta = Math.min(0.99, Math.max(0.001, pm/100));
+  return 100*Math.exp(-Math.PI*zeta/Math.sqrt(1-zeta*zeta));
 }
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-
-function resizeCanvas() {
-  var cv = bodeCanvas;
+/* HiDPI sizing */
+function sizeCanvas(cv, ratio){
   var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var __novaW = w;
-  var __novaH = Math.round(w * 0.62);
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = __novaW + 'px';
-  cv.style.height = __novaH + 'px';
-  cv.width = Math.round(__novaW * __novaDpr);
-  cv.height = Math.round(__novaH * __novaDpr);
-  cv.dataset.cssW = String(__novaW);
-  cv.dataset.cssH = String(__novaH);
-  var __novaCtx = cv.getContext && cv.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+  var h = Math.round(w * ratio);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.style.width = w+'px'; cv.style.height = h+'px';
+  cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr);
+  cv.dataset.cssW = String(w); cv.dataset.cssH = String(h);
+  var c = cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0);
 }
+function resizeCanvas(){ sizeCanvas(bodeCanvas, 0.62); sizeCanvas(stepCanvas, 0.34); }
+function cw(cv){ return parseFloat(cv.dataset.cssW) || cv.width; }
+function ch(cv){ return parseFloat(cv.dataset.cssH) || cv.height; }
 
-function drawBode(p, oc, o180) {
-  var ctx = bodeCtx, W = __novaCanvasCssW(bodeCanvas), H = __novaCanvasCssH(bodeCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 56, my = 22;
-  var midGap = 28;
-  var x0 = mx, x1 = W - 14;
-  var gw = x1 - x0;
-  var totalH = H - 2 * my - midGap;
-  var gMagH = Math.round(totalH * 0.55);
-  var gPhH = totalH - gMagH;
-  var yMag0 = my, yMag1 = yMag0 + gMagH;
-  var yPh0 = yMag1 + midGap, yPh1 = yPh0 + gPhH;
+function drawBode(p, oc, o180){
+  var ctx=bodeCtx, W=cw(bodeCanvas), H=ch(bodeCanvas);
+  ctx.fillStyle='#0a1929'; ctx.fillRect(0,0,W,H);
+  var mx=56,my=22,midGap=28,x0=mx,x1=W-14,gw=x1-x0;
+  var totalH=H-2*my-midGap, gMagH=Math.round(totalH*0.55), gPhH=totalH-gMagH;
+  var yMag0=my,yMag1=yMag0+gMagH,yPh0=yMag1+midGap,yPh1=yPh0+gPhH;
 
-  // sample
-  var N = 360;
-  var ws = [], mags = [], phs = [];
-  var magMin = Infinity, magMax = -Infinity;
-  for (var i = 0; i <= N; i++) {
-    var w = W_MIN * Math.pow(W_MAX / W_MIN, i / N);
+  var N=360, ws=[],mags=[],phs=[],magsB=[],phsB=[];
+  var magMin=Infinity,magMax=-Infinity;
+  for (var i=0;i<=N;i++){
+    var w=W_MIN*Math.pow(W_MAX/W_MIN,i/N);
     ws.push(w);
-    var m = magDb(p, w);
-    var ph = phaseDeg(p, w);
-    mags.push(m); phs.push(ph);
-    if (m < magMin) magMin = m;
-    if (m > magMax) magMax = m;
+    var m=magDb(p,w), mb=magDbBase(p,w);
+    mags.push(m); magsB.push(mb);
+    phs.push(phaseDeg(p,w)); phsB.push(phaseDegBase(p,w));
+    if (m<magMin) magMin=m; if (m>magMax) magMax=m;
+    if (mb<magMin) magMin=mb; if (mb>magMax) magMax=mb;
   }
-  // axis ranges
-  var magLo = Math.floor(Math.min(magMin, -40) / 20) * 20;
-  var magHi = Math.ceil(Math.max(magMax, 40) / 20) * 20;
-  if (magHi - magLo < 80) magHi = magLo + 80;
-  var phLo = -270, phHi = 0;
+  var magLo=Math.floor(Math.min(magMin,-40)/20)*20;
+  var magHi=Math.ceil(Math.max(magMax,40)/20)*20;
+  if (magHi-magLo<80) magHi=magLo+80;
+  var phLo=-270,phHi=0;
 
-  function px(w) { return x0 + (Math.log10(w) - Math.log10(W_MIN)) / (Math.log10(W_MAX) - Math.log10(W_MIN)) * gw; }
-  function pyMag(m) { return yMag0 + (1 - (m - magLo) / (magHi - magLo)) * gMagH; }
-  function pyPh(ph) { return yPh0 + (1 - (ph - phLo) / (phHi - phLo)) * gPhH; }
+  function px(w){ return x0+(Math.log10(w)-LOGW0)/(LOGW1-LOGW0)*gw; }
+  function pyMag(m){ return yMag0+(1-(m-magLo)/(magHi-magLo))*gMagH; }
+  function pyPh(ph){ return yPh0+(1-(ph-phLo)/(phHi-phLo))*gPhH; }
 
-  // grid lines
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.lineWidth = 1;
-  // vertical decade lines
-  for (var d = -2; d <= 2; d++) {
-    var wg = Math.pow(10, d);
-    var xg = px(wg);
-    ctx.beginPath(); ctx.moveTo(xg, yMag0); ctx.lineTo(xg, yMag1); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(xg, yPh0); ctx.lineTo(xg, yPh1); ctx.stroke();
-    ctx.fillStyle = 'rgba(143,184,224,0.7)';
-    ctx.font = '10px "Roboto Mono",monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('10^' + d, xg, yPh1 + 12);
+  ctx.strokeStyle='rgba(143,184,224,0.18)'; ctx.lineWidth=1;
+  for (var d=-2;d<=2;d++){
+    var xg=px(Math.pow(10,d));
+    ctx.beginPath(); ctx.moveTo(xg,yMag0); ctx.lineTo(xg,yMag1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(xg,yPh0); ctx.lineTo(xg,yPh1); ctx.stroke();
+    ctx.fillStyle='rgba(143,184,224,0.7)'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('10^'+d, xg, yPh1+12);
   }
-  // horizontal grid magnitude
-  for (var mb = magLo; mb <= magHi; mb += 20) {
-    var yg = pyMag(mb);
-    ctx.beginPath(); ctx.moveTo(x0, yg); ctx.lineTo(x1, yg); ctx.stroke();
-    ctx.fillStyle = 'rgba(143,184,224,0.7)';
-    ctx.textAlign = 'right';
-    ctx.fillText(mb + '', x0 - 4, yg + 3);
+  for (var mb2=magLo;mb2<=magHi;mb2+=20){
+    var yg=pyMag(mb2);
+    ctx.beginPath(); ctx.moveTo(x0,yg); ctx.lineTo(x1,yg); ctx.stroke();
+    ctx.fillStyle='rgba(143,184,224,0.7)'; ctx.textAlign='right'; ctx.fillText(mb2+'',x0-4,yg+3);
   }
-  // horizontal grid phase
-  for (var pp = phLo; pp <= phHi; pp += 45) {
-    var yg2 = pyPh(pp);
-    ctx.beginPath(); ctx.moveTo(x0, yg2); ctx.lineTo(x1, yg2); ctx.stroke();
-    ctx.fillStyle = 'rgba(143,184,224,0.7)';
-    ctx.textAlign = 'right';
-    ctx.fillText(pp + '', x0 - 4, yg2 + 3);
+  for (var pp=phLo;pp<=phHi;pp+=45){
+    var yg2=pyPh(pp);
+    ctx.beginPath(); ctx.moveTo(x0,yg2); ctx.lineTo(x1,yg2); ctx.stroke();
+    ctx.fillStyle='rgba(143,184,224,0.7)'; ctx.textAlign='right'; ctx.fillText(pp+'',x0-4,yg2+3);
   }
 
-  // 0 dB line (emphasized)
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 1.2;
-  ctx.setLineDash([4, 3]);
-  var y0db = pyMag(0);
-  ctx.beginPath(); ctx.moveTo(x0, y0db); ctx.lineTo(x1, y0db); ctx.stroke();
-  // -180 deg line
-  var ym180 = pyPh(-180);
-  ctx.beginPath(); ctx.moveTo(x0, ym180); ctx.lineTo(x1, ym180); ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1.2; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(x0,pyMag(0)); ctx.lineTo(x1,pyMag(0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0,pyPh(-180)); ctx.lineTo(x1,pyPh(-180)); ctx.stroke();
   ctx.setLineDash([]);
 
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.7)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, yMag0); ctx.lineTo(x0, yMag1); ctx.lineTo(x1, yMag1); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, yPh0); ctx.lineTo(x0, yPh1); ctx.lineTo(x1, yPh1); ctx.stroke();
+  ctx.strokeStyle='rgba(143,184,224,0.7)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x0,yMag0); ctx.lineTo(x0,yMag1); ctx.lineTo(x1,yMag1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0,yPh0); ctx.lineTo(x0,yPh1); ctx.lineTo(x1,yPh1); ctx.stroke();
 
-  // magnitude curve (blue)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  for (var i = 0; i < ws.length; i++) {
-    var xs = px(ws[i]);
-    var ys = pyMag(mags[i]);
-    if (i === 0) ctx.moveTo(xs, ys); else ctx.lineTo(xs, ys);
-  }
-  ctx.stroke();
-  // phase curve (green)
-  ctx.strokeStyle = '#3ddc97';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  for (var i = 0; i < ws.length; i++) {
-    var xs2 = px(ws[i]);
-    var ys2 = pyPh(phs[i]);
-    if (i === 0) ctx.moveTo(xs2, ys2); else ctx.lineTo(xs2, ys2);
-  }
-  ctx.stroke();
-
-  // ω_c vertical (yellow) on both panels
-  if (isFinite(oc)) {
-    var xc = px(oc);
-    ctx.strokeStyle = 'rgba(255,209,102,0.9)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.moveTo(xc, yMag0); ctx.lineTo(xc, yPh1); ctx.stroke();
-    // PM marker at the phase plot at omega_c
-    var phc = phaseDeg(p, oc);
-    var ypc = pyPh(phc);
-    ctx.fillStyle = '#FFD166';
-    ctx.beginPath(); ctx.arc(xc, ypc, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.font = '11px "Roboto Mono",monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('ω_c=' + oc.toFixed(2), xc + 5, yMag0 + 12);
-    var pm = phc + 180;
-    ctx.fillStyle = '#FFD166';
-    ctx.fillText('PM=' + pm.toFixed(1) + '°', xc + 5, ypc - 6);
-  }
-  // ω_180 vertical (red) on both panels
-  if (isFinite(o180)) {
-    var x180 = px(o180);
-    ctx.strokeStyle = 'rgba(231,76,60,0.85)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.moveTo(x180, yMag0); ctx.lineTo(x180, yPh1); ctx.stroke();
-    var m180 = magDb(p, o180);
-    var ymv = pyMag(m180);
-    ctx.fillStyle = '#e74c3c';
-    ctx.beginPath(); ctx.arc(x180, ymv, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.font = '11px "Roboto Mono",monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText('ω_180=' + o180.toFixed(2), x180 - 5, yMag0 + 12);
-    var gmDb = -m180;
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillText('GM=' + gmDb.toFixed(1) + 'dB', x180 - 5, ymv + 14);
+  function curve(arr, pyFn){
+    ctx.beginPath();
+    for (var i=0;i<ws.length;i++){ var xs=px(ws[i]), yy=pyFn(arr[i]); if (i===0) ctx.moveTo(xs,yy); else ctx.lineTo(xs,yy); }
+    ctx.stroke();
   }
 
-  // legend labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('|L| (dB)', x0 + 4, yMag0 + 12);
-  ctx.fillText('∠L (°)', x0 + 4, yPh0 + 12);
+  // baseline (uncompensated) — grey dashed
+  if (compType!=='none' && blend>0.001){
+    ctx.setLineDash([5,4]); ctx.lineWidth=1.6;
+    ctx.strokeStyle='rgba(170,190,210,0.55)'; curve(magsB,pyMag);
+    ctx.strokeStyle='rgba(170,190,210,0.55)'; curve(phsB,pyPh);
+    ctx.setLineDash([]);
+  }
+  // shaped magnitude (blue) + phase (green)
+  ctx.lineWidth=2.4; ctx.strokeStyle='#00B4D8'; curve(mags,pyMag);
+  ctx.lineWidth=2.4; ctx.strokeStyle='#3ddc97'; curve(phs,pyPh);
+
+  if (isFinite(oc)){
+    var xc=px(oc);
+    ctx.strokeStyle='rgba(255,209,102,0.9)'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(xc,yMag0); ctx.lineTo(xc,yPh1); ctx.stroke();
+    var phc=phaseDeg(p,oc), ypc=pyPh(phc);
+    ctx.fillStyle='#FFD166'; ctx.beginPath(); ctx.arc(xc,ypc,4,0,Math.PI*2); ctx.fill();
+    ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText('ω_c='+oc.toFixed(2), xc+5, yMag0+12);
+    ctx.fillText('PM='+(phc+180).toFixed(1)+'°', xc+5, ypc-6);
+  }
+  if (isFinite(o180)){
+    var x180=px(o180);
+    ctx.strokeStyle='rgba(231,76,60,0.85)'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(x180,yMag0); ctx.lineTo(x180,yPh1); ctx.stroke();
+    var m180=magDb(p,o180), ymv=pyMag(m180);
+    ctx.fillStyle='#e74c3c'; ctx.beginPath(); ctx.arc(x180,ymv,4,0,Math.PI*2); ctx.fill();
+    ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='right';
+    ctx.fillText('ω_180='+o180.toFixed(2), x180-5, yMag0+12);
+    ctx.fillText('GM='+(-m180).toFixed(1)+'dB', x180-5, ymv+14);
+  }
+
+  ctx.fillStyle='#cfe3f7'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='left';
+  ctx.fillText('|L| (dB)', x0+4, yMag0+12);
+  ctx.fillText('∠L (°)', x0+4, yPh0+12);
 }
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.Kp) || !isFinite(p.T1) || !isFinite(p.Kc) || !isFinite(p.Ti)) return;
-  var oc = findOmegaC(p);
-  var o180 = findOmega180(p);
-  var warnEl = document.getElementById('warnMsg');
-  warnEl.style.display = 'none';
+/* Closed-loop step response from a 2nd-order surrogate matched to (omega_c, PM).
+   wn ~= omega_c, zeta ~= PM/100. y(t)=1 - e^{-zeta wn t}( cos wd t + (zeta/sqrt(1-z^2)) sin wd t ). */
+function stepSeries(oc, pm, npts, Tend){
+  var ys = new Array(npts);
+  if (!isFinite(oc) || !isFinite(pm) || pm<=0){
+    for (var i=0;i<npts;i++) ys[i]=NaN;  // unstable -> not drawn
+    return ys;
+  }
+  var wn=oc, z=Math.min(0.999, Math.max(0.02, pm/100));
+  var wd=wn*Math.sqrt(1-z*z);
+  for (var k=0;k<npts;k++){
+    var t=Tend*k/(npts-1);
+    var env=Math.exp(-z*wn*t);
+    ys[k]=1-env*(Math.cos(wd*t)+(z/Math.sqrt(1-z*z))*Math.sin(wd*t));
+  }
+  return ys;
+}
 
-  if (isFinite(oc)) {
-    document.getElementById('statOmegaC').textContent = oc.toFixed(2) + ' rad/s';
-    var pm = phaseDeg(p, oc) + 180;
-    document.getElementById('statPM').textContent = pm.toFixed(1) + ' °';
-    document.getElementById('statBW').textContent = (oc * 1.5).toFixed(2) + ' rad/s';
-  } else {
-    document.getElementById('statOmegaC').textContent = 'no crossover';
-    document.getElementById('statPM').textContent = '—';
-    document.getElementById('statBW').textContent = '—';
-    warnEl.textContent = '注意: ゲイン交差周波数 ω_c が範囲内に存在しません（|L| が 0 dB を切らない）。K_c または K_p を調整してください。';
-    warnEl.style.display = 'block';
+function drawStep(ocS, pmS, ocB, pmB){
+  var ctx=stepCtx, W=cw(stepCanvas), H=ch(stepCanvas);
+  ctx.fillStyle='#0a1929'; ctx.fillRect(0,0,W,H);
+  var padL=42,padR=16,padT=16,padB=26, x0=padL,x1=W-padR,y0=padT,y1=H-padB;
+  var ocRef = isFinite(ocS)?ocS:(isFinite(ocB)?ocB:1);
+  var Tend = Math.max(6, 12/Math.max(ocRef,0.2));   // ~ enough settling time
+  var npts=260;
+  var yMax=2.0, yMin=0;
+  function tx(t){ return x0+(t/Tend)*(x1-x0); }
+  function ty(y){ return y1-(y-yMin)/(yMax-yMin)*(y1-y0); }
+
+  ctx.strokeStyle='rgba(143,184,224,0.18)'; ctx.lineWidth=1;
+  for (var g=0;g<=4;g++){ var yy=y0+(y1-y0)*g/4; ctx.beginPath(); ctx.moveTo(x0,yy); ctx.lineTo(x1,yy); ctx.stroke(); }
+  // reference y=1
+  ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(x0,ty(1)); ctx.lineTo(x1,ty(1)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(143,184,224,0.7)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y1); ctx.lineTo(x1,y1); ctx.stroke();
+  ctx.fillStyle='rgba(143,184,224,0.7)'; ctx.font='10px "Roboto Mono",monospace';
+  ctx.textAlign='right'; ctx.fillText('1.0',x0-4,ty(1)+3); ctx.fillText('0',x0-4,ty(0)+3);
+  ctx.textAlign='center'; ctx.fillText('t [s]', (x0+x1)/2, H-6);
+
+  function plot(ys, color, dash, width){
+    ctx.strokeStyle=color; ctx.lineWidth=width; if (dash) ctx.setLineDash(dash); else ctx.setLineDash([]);
+    ctx.beginPath(); var started=false;
+    for (var i=0;i<ys.length;i++){
+      if (!isFinite(ys[i])) continue;
+      var t=Tend*i/(ys.length-1), X=tx(t), Y=ty(Math.max(yMin,Math.min(yMax,ys[i])));
+      if (!started){ ctx.moveTo(X,Y); started=true; } else ctx.lineTo(X,Y);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
   }
-  if (isFinite(o180)) {
-    var gmDb = -magDb(p, o180);
-    document.getElementById('statGM').textContent = gmDb.toFixed(1) + ' dB';
-  } else {
-    document.getElementById('statGM').textContent = '∞';
+  // baseline (grey dashed) when compensator active
+  if (compType!=='none' && blend>0.001){
+    plot(stepSeries(ocB,pmB,npts,Tend), 'rgba(170,190,210,0.55)', [5,4], 1.6);
   }
+  var shaped = stepSeries(ocS,pmS,npts,Tend);
+  var anyFinite = shaped.some(function(v){return isFinite(v);});
+  if (anyFinite){ plot(shaped, '#3ddc97', null, 2.4); }
+  else {
+    ctx.fillStyle='#e74c3c'; ctx.font='12px "Noto Sans JP",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('PM ≤ 0：閉ループ不安定（発散）', (x0+x1)/2, (y0+y1)/2);
+  }
+}
+
+function setText(id,v){ var e=document.getElementById(id); if (e) e.textContent=v; }
+
+function compute(){
+  var p=getParams();
+  if (!isFinite(p.Kp)||!isFinite(p.T1)||!isFinite(p.Kc)||!isFinite(p.Ti)) return;
+  if (!isFinite(p.alpha)) p.alpha=1; if (!isFinite(p.wm)) p.wm=1;
+
+  var oc=findOmegaC(magDb,p);
+  var o180=findOmega180(phaseDeg,p);
+  var ocB=findOmegaC(magDbBase,p);
+  var o180B=findOmega180(phaseDegBase,p);
+  var warnEl=document.getElementById('warnMsg'); warnEl.style.display='none';
+
+  var pm=NaN, pmB=NaN;
+  if (isFinite(oc)){
+    pm=phaseDeg(p,oc)+180;
+    setText('statOmegaC', oc.toFixed(2)+' rad/s');
+    setText('statPM', pm.toFixed(1)+' °');
+    setText('statBW', (oc*1.5).toFixed(2)+' rad/s');
+  } else {
+    setText('statOmegaC','no crossover'); setText('statPM','—'); setText('statBW','—');
+    warnEl.textContent='注意: ゲイン交差周波数 ω_c が範囲内に存在しません（|L| が 0 dB を切らない）。K_c または K_p を調整してください。';
+    warnEl.style.display='block';
+  }
+  if (isFinite(ocB)) pmB=phaseDegBase(p,ocB)+180;
+
+  if (isFinite(o180)) setText('statGM', (-magDb(p,o180)).toFixed(1)+' dB');
+  else setText('statGM','∞');
+
+  // V2 live stats — never '—' when meaningful
+  setText('statPhi', (compType==='none'?'0.0':(compPhaseAtWm(p)>=0?'+':'')+compPhaseAtWm(p).toFixed(1))+' °');
+  var os=overshootFromPM(pm);
+  setText('statOS', isFinite(os)? os.toFixed(1)+' %' : '—');
+  setText('statBlend', Math.round(blend*100)+' %');
+  setText('statStable', (isFinite(pm)&&pm>0)? '安定 (PM>0)' : '不安定');
+
   drawBode(p, oc, o180);
+  drawStep(oc, pm, ocB, pmB);
 }
 
-function resetParams() {
-  var defs = { slKp: 1.0, slT1: 1.0, slKc: 5.00, slTi: 2.0 };
-  Object.keys(defs).forEach(function (id) { document.getElementById(id).value = defs[id]; });
-  updateSlider(document.getElementById('slKp'), 'slKpVal', 1, '');
-  updateSlider(document.getElementById('slT1'), 'slT1Val', 1, '');
-  updateSlider(document.getElementById('slKc'), 'slKcVal', 2, '');
-  updateSlider(document.getElementById('slTi'), 'slTiVal', 1, '');
+/* ===== shaping animation: morph blend 0 -> 1 so the curve visibly bends ===== */
+function frame(ts){
+  if (!shaping){ rafId=null; return; }
+  if (!lastTs) lastTs=ts;
+  var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+  blend += dt*0.45;                 // ~2.2 s sweep
+  if (blend>=1){ blend=1; shaping=false; setBtn(false); }
   compute();
+  if (shaping) rafId=requestAnimationFrame(frame); else rafId=null;
 }
+function setBtn(on){
+  var b=document.getElementById('btnAnim');
+  if (b) b.innerHTML = on ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 整形アニメ';
+}
+window.toggleShape=function(){
+  if (compType==='none'){ return; }
+  if (prefersReduced){ blend=1; compute(); return; }
+  if (shaping){ shaping=false; setBtn(false); if (rafId) cancelAnimationFrame(rafId); rafId=null; return; }
+  if (blend>=1) blend=0;            // restart from no-compensation
+  shaping=true; lastTs=0; setBtn(true);
+  rafId=requestAnimationFrame(frame);
+};
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+window.setComp=function(type){
+  compType=type;
+  var btns=document.querySelectorAll('.comp-btn');
+  for (var i=0;i<btns.length;i++){ btns[i].classList.toggle('active', btns[i].getAttribute('data-comp')===type); }
+  blend=1; compute();
+};
+
+window.compute=compute;
+window.resizeCanvas=resizeCanvas;
+
+window.resetParams=function(){
+  shaping=false; if (rafId) cancelAnimationFrame(rafId); rafId=null; setBtn(false);
+  var defs={ slKp:1.0, slT1:1.0, slKc:5.00, slTi:2.0, slAlpha:6.0, slWm:3.0 };
+  Object.keys(defs).forEach(function(id){ var e=document.getElementById(id); if (e) e.value=defs[id]; });
+  if (typeof updateSlider==='function'){
+    updateSlider(document.getElementById('slKp'),'slKpVal',1,'');
+    updateSlider(document.getElementById('slT1'),'slT1Val',1,'');
+    updateSlider(document.getElementById('slKc'),'slKcVal',2,'');
+    updateSlider(document.getElementById('slTi'),'slTiVal',1,'');
+    updateSlider(document.getElementById('slAlpha'),'slAlphaVal',1,'');
+    updateSlider(document.getElementById('slWm'),'slWmVal',1,'');
+  }
+  compType='lead'; blend=1;
+  var btns=document.querySelectorAll('.comp-btn');
+  for (var i=0;i<btns.length;i++){ btns[i].classList.toggle('active', btns[i].getAttribute('data-comp')==='lead'); }
+  compute();
+};
+
+window.addEventListener('resize', function(){ resizeCanvas(); compute(); });
 
 resizeCanvas();
+if (prefersReduced) blend=1;
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -582,6 +740,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="loop-shaping.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -642,7 +803,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>プラント G(s)=2.5/(1+0.8s)、PI補償器 C(s)=3.2(1+1/(0.5s)) の場合を考えます。開ループ伝達関数 L(s)=C(s)G(s) の Bode線図から、ゲイン交差周波数は ω_c=1.8rad/s、位相余裕は PM=52°、ゲイン余裕は GM=8.5dB となります。このとき帯域幅 ω_BW≈2.3rad/s で、応答時間は約 t_s=2.2秒（5%整定時間）となり、実装可能な設計値です</p>
+<p>本ツールのプロセス G_p(s)=K_p/((T_1 s+1)(T_2 s+1)) は T_2=0.5 s 固定の2次系です。K_p=2.5、T_1=0.8、PI補償器 K_c=3.2、T_i=0.5 を入力すると、開ループ L(s)=C(s)G_p(s) の Bode線図からゲイン交差周波数は ω_c≈4.39 rad/s、位相余裕は PM≈15.9°（やや低め）となります。本ツールの構造では開ループ位相が −180° に漸近して到達しないため、ゲイン余裕 GM は「∞」と表示されます。帯域幅は近似 ω_BW≈1.5ω_c≈6.6 rad/s。PM を 40〜60° に上げるには K_c を下げて ω_c を低周波側へ戻します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -652,6 +813,16 @@ compute();
 <li>モータ駆動やPLC実装では離散化ピッチ 10ms 以下を確保し、サンプリング周波数がゲイン交差周波数の 10 倍以上になるよう設定します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

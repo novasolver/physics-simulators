@@ -42,7 +42,9 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
+  "@graph": [
+  {
+  "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
   "name": "平面ラーメン構造解析 シミュレーター — 直接剛性法・変形図・BMD・断面力 | NovaSolver Project",
   "description": "平面ラーメン構造の解析をオンラインで無料実行。直接剛性法により、固定・ピン・ローラー支点や、梁分布荷重・節点集中荷重・風や地震を想定した水平荷重に対応。変形図、曲げモーメント図、断面力をリアルタイムで計算・表示する構造解析シミュレーターです。",
   "url": "https://novasolver.jp/tools/frame-analysis.html",
@@ -50,7 +52,7 @@
   "publisher": {
     "@type": "Organization",
     "name": "NovaSolver",
-    "url": "https://novasolver.jp/"
+    "url": "https://novasolver.jp/","sameAs":["https://github.com/novasolver"]
   },
   "applicationCategory": "EngineeringApplication",
   "operatingSystem": "Web Browser",
@@ -60,6 +62,25 @@
     "price": "0",
     "priceCurrency": "JPY"
   }
+  },
+  {
+    "@type": "FAQPage",
+    "mainEntity": [
+      {"@type":"Question","name":"解析できるラーメン形状は矩形門型のみですか？","acceptedAnswer":{"@type":"Answer","text":"はい、本ツールは矩形門型ラーメン専用です。柱と梁が直交する1層1スパンの形状に限定されます。斜め部材や多層・多スパンには対応していません。"}},
+      {"@type":"Question","name":"断面力のリアルタイム計算とは、どのような操作で確認できますか？","acceptedAnswer":{"@type":"Answer","text":"荷重や部材寸法（スパン長、柱高さ、断面剛性EI）をスライダーや数値入力で変更すると、即座に変形図・曲げモーメント図・せん断力図が更新され、数値も連動して変化します。"}},
+      {"@type":"Question","name":"水平荷重下の層間変位アニメーションは、どのような条件で表示されますか？","acceptedAnswer":{"@type":"Answer","text":"水平荷重や分布荷重を入力すると、荷重が徐々に作用して骨組みが変形していく過程がアニメーションで表示され、層間変位（柱頂部の水平変位）が数値とともに動的に変化します。"}},
+      {"@type":"Question","name":"直接剛性法の計算原理を理解していなくても使えますか？","acceptedAnswer":{"@type":"Answer","text":"はい、内部の行列計算は自動で行われますので、原理を知らなくても入力値を変えるだけで結果を得られます。"}}
+    ]
+  },
+  {
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type":"ListItem","position":1,"name":"NovaSolver","item":"https://novasolver.jp/"},
+      {"@type":"ListItem","position":2,"name":"ツール","item":"https://novasolver.jp/tools/index.html"},
+      {"@type":"ListItem","position":3,"name":"平面ラーメン構造解析","item":"https://novasolver.jp/tools/frame-analysis.html"}
+    ]
+  }
+  ]
 }
 </script>
 <link rel="stylesheet" href="/tools/tools-common.css?v20260510r6">
@@ -224,7 +245,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="fH" min="0" max="200" step="5" value="0" oninput="syncToNum('fH','fHNum');updateSlider(this);compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -234,6 +263,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="stat-card"><div class="sv" id="fStatMbeam">—</div><div class="sl">梁最大曲げ M (kN·m)</div></div>
       <div class="stat-card"><div class="sv" id="fStatMcol">—</div><div class="sl">柱最大曲げ M (kN·m)</div></div>
       <div class="stat-card"><div class="sv" id="fStatSway">—</div><div class="sl">層間変形角 δ/h</div></div>
+      <div class="stat-card"><div class="sv" id="fStatReact">—</div><div class="sl">柱脚せん断反力 (kN)</div></div>
     </div>
     </div>
 
@@ -263,319 +293,329 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
+(function(){
+'use strict';
+// ===== Plane (portal) frame — Direct Stiffness / slope-deflection, V2 animated hero =====
+// Nodes: 0=left base, 1=left top, 2=right top, 3=right base
+// Members: left column (0-1), beam (1-2), right column (3-2)
+var LBL = { beam:'梁', lcol:'左柱', rcol:'右柱', top:'頂部', base:'脚部', lend:'左端', rend:'右端',
+            unstable:'不安定（機構）', applied:'荷重を適用中', deformed:'変形図', ghost:'変形前' };
 
-let fCurrentTab = 'frame';
-let fMoments = {};
+var fCurrentTab = 'frame';
+var fMoments = {};
 
-function switchFTab(tab, btn){
+window.switchFTab = function(tab, btn){
   fCurrentTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
   document.getElementById('fResultsWrap').style.display = tab === 'results' ? 'block' : 'none';
   compute();
-}// Direct Stiffness Method for portal frame
-// Nodes: 0=left base, 1=left top, 2=right top, 3=right base
-// Members: 0=left col (0->1), 1=beam (1->2), 2=right col (3->2)
-// DOF per node: [u, v, θ] => 12 DOF total
+};
 
-function beamStiffness(EI, L){
-  // Local beam stiffness (bending only, 4x4: v1,θ1,v2,θ2)
-  const c = EI / (L * L * L);
-  return [
-    [12*c, 6*L*c, -12*c, 6*L*c],
-    [6*L*c, 4*L*L*c, -6*L*c, 2*L*L*c],
-    [-12*c, -6*L*c, 12*c, -6*L*c],
-    [6*L*c, 2*L*L*c, -6*L*c, 4*L*L*c]
-  ];
-}function compute(){
-  const L = parseFloat(document.getElementById('fSpan').value);
-  const h = parseFloat(document.getElementById('fHeight').value);
-  const EIb = parseFloat(document.getElementById('fEIb').value);
-  const EIc = parseFloat(document.getElementById('fEIc').value);
-  const w = parseFloat(document.getElementById('fW').value);
-  const Fh = parseFloat(document.getElementById('fH').value);
-  const support = document.getElementById('supportType').value;
+function solve3(A, b){
+  var M = A.map(function(row, i){ return row.slice().concat(b[i]); });
+  for (var col = 0; col < 3; col++){
+    var pivot = col;
+    for (var r = col + 1; r < 3; r++){ if (Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r; }
+    if (Math.abs(M[pivot][col]) < 1e-12) return null;
+    if (pivot !== col){ var t = M[col]; M[col] = M[pivot]; M[pivot] = t; }
+    var div = M[col][col];
+    for (var c = col; c < 4; c++) M[col][c] /= div;
+    for (var r2 = 0; r2 < 3; r2++){ if (r2 === col) continue; var f = M[r2][col]; for (var c2 = col; c2 < 4; c2++) M[r2][c2] -= f * M[col][c2]; }
+  }
+  return M.map(function(row){ return row[3]; });
+}
 
-  // Simple analytical solution for portal frame
-  // Using slope-deflection method
-  // Members: col1 (0->1), beam (1->2), col2 (2->3)
-  // Fixed end moments for beam with UDL: Mf = wL²/12
+function readInputs(){
+  return {
+    L: parseFloat(document.getElementById('fSpan').value),
+    h: parseFloat(document.getElementById('fHeight').value),
+    EIb: parseFloat(document.getElementById('fEIb').value),
+    EIc: parseFloat(document.getElementById('fEIc').value),
+    w: parseFloat(document.getElementById('fW').value),
+    Fh: parseFloat(document.getElementById('fH').value),
+    support: document.getElementById('supportType').value
+  };
+}
 
-  const kb = EIb / L;
-  const kc = EIc / h;
-  const Mf = w * L * L / 12; // fixed end moment for beam
+// Solve the portal frame for an arbitrary load multiplier (used for animation ramp).
+function solveFrame(p){
+  var s = readInputs();
+  var L = s.L, h = s.h, EIb = s.EIb, EIc = s.EIc, w = s.w * p, Fh = s.Fh * p, support = s.support;
+  var kb = EIb / L, kc = EIc / h;
+  var Mf12 = -w * L * L / 12, Mf21 = -Mf12;
+  if (support === 'roller' && Math.abs(s.Fh) > 1e-9){
+    return { unstable:true, L:L, h:h, w:w, Fh:Fh, support:support };
+  }
+  var theta1, theta2, deltaH, sol;
+  if (support === 'fixed'){
+    sol = solve3([[4*kb+4*kc, 2*kb, -6*kc/h],[2*kb, 4*kb+4*kc, -6*kc/h],[6*kc/h, 6*kc/h, -24*kc/(h*h)]],[-Mf12, -Mf21, -Fh]);
+  } else {
+    sol = solve3([[4*kb+3*kc, 2*kb, -3*kc/h],[2*kb, 4*kb+3*kc, -3*kc/h],[3*kc/h, 3*kc/h, -6*kc/(h*h)]],[-Mf12, -Mf21, -Fh]);
+  }
+  if (!sol) return { unstable:false, bad:true, L:L, h:h, w:w, Fh:Fh, support:support };
+  theta1 = sol[0]; theta2 = sol[1]; deltaH = sol[2];
+  var Ma2 = 2*kb*(2*theta1+theta2) + Mf12;   // beam left end
+  var Mb2 = 2*kb*(2*theta2+theta1) + Mf21;   // beam right end
+  var Ma1, Mc1, Mc2, Mb1;
+  if (support === 'fixed'){
+    Ma1 = 2*kc*(2*theta1 - 3*deltaH/h);  // left col top
+    Mc1 = 2*kc*(theta1 - 3*deltaH/h);    // left col base
+    Mc2 = 2*kc*(2*theta2 - 3*deltaH/h);  // right col top
+    Mb1 = 2*kc*(theta2 - 3*deltaH/h);    // right col base
+  } else {
+    Ma1 = 3*kc*(theta1 - deltaH/h); Mc1 = 0; Mc2 = 3*kc*(theta2 - deltaH/h); Mb1 = 0;
+  }
+  return { unstable:false, bad:false, L:L, h:h, w:w, Fh:Fh, support:support,
+           Ma1:Ma1, Mc1:Mc1, Ma2:Ma2, Mb2:Mb2, Mc2:Mc2, Mb1:Mb1,
+           theta1:theta1, theta2:theta2, deltaH:deltaH };
+}
 
-  let Ma1, Mb1, Ma2, Mb2, Mc1, Mc2; // moments at ends of members
-  let deltaH = 0; // sway
-
-  if (support === 'fixed') {
-    // Distribution factors: stiffness of cols at joint = kc(4/h * EIc), beam = 4/L * EIb
-    // Exact solution via slope-deflection for symmetric frame with UDL + sway
-    // Symmetry: for UDL only (no sway), θ1 = -θ2
-    // Slope-deflection: M = 2EI/L * (2θA + θB - 3ψ) + Mf
-
-    // For UDL on beam, symmetric frame:
-    // At joint 1: M_beam_left + M_col1_top = 0
-    // 2EIb/L(2θ1 + θ2) - Mf + 2EIc/h(2θ1) = 0
-    // Symmetric: θ2 = -θ1
-    // 2EIb/L(θ1) - Mf + 4EIc/h(θ1) = 0
-    // θ1 = Mf / (2kb + 4kc)
-    const theta1_udl = Mf / (2 * kb + 4 * kc);
-    const theta2_udl = -theta1_udl;
-
-    // With sway Δ under horizontal load Fh:
-    // 6EIc/h² * Δ (shear in each column)
-    // From horizontal equilibrium: 2 * (6EIc/h² * Δ + sway moment correction) = Fh
-    // For fixed-fixed columns with sway: col shear = 12EIc/h³ * Δ
-    // Total shear from cols = 2 * 12EIc/h³ * Δ = Fh
-    deltaH = Fh * h * h * h / (2 * 12 * EIc);
-    const theta1_sway = -3 * EIc / (h * h) * deltaH / (2 * kb + 4 * kc) * 0; // correction
-
-    const theta1 = theta1_udl;
-    const theta2 = theta2_udl;
-
-    // Member end moments
-    // Col 1 (bottom=fixed, top=joint1): M_top = 2EIc/h*(2θ1 + 0 - 3Δ/h)
-    const swayFactor = 3 * deltaH / h;
-    Ma1 = 2 * kc * (theta1 - swayFactor);        // col1 top
-    Mc1 = 2 * kc * (0.5 * theta1 - swayFactor);  // col1 bottom (fixed end)
-    Ma2 = 2 * kb * (2 * theta1 + theta2) - Mf;   // beam left end
-    Mb2 = 2 * kb * (2 * theta2 + theta1) + Mf;   // beam right end
-    Mc2 = -Ma1; // col2 top (symmetry for UDL, adjusted for sway)
-    Mb1 = -Mc1; // col2 bottom
-
-    // Add sway contribution properly
-    const M_sway_top = 2 * EIc / h * (-swayFactor * 1.5);
-    const M_sway_bot = 2 * EIc / h * (-swayFactor * 1.5);
-    Ma1 += M_sway_top;
-    Mc1 += M_sway_bot;
-    // Right col opposes sway
-    Mc2 = Ma1;
-    Mb1 = Mc1;
-
-  }else if (support === 'pin'){
-    // Both column bases pinned: no moment at base
-    // Modified stiffness for col = 3EIc/h (far end pinned)
-    const kc3 = 3 * EIc / h;
-    const Mf2 = Mf;
-    // θ1(2kb + 2*kc3) = Mf2
-    const theta1 = Mf2 / (2 * kb + 2 * kc3);
-    const theta2 = -theta1;
-    Ma1 = 3 * EIc / h * theta1; // col top (pin base = 0 far end)
-    Mc1 = 0;
-    Ma2 = 2 * kb * (2 * theta1 + theta2) - Mf2;
-    Mb2 = 2 * kb * (2 * theta2 + theta1) + Mf2;
-    Mc2 = -Ma1;
-    Mb1 = 0;
-    deltaH = Fh * h * h * h / (2 * 3 * EIc);
-    const swayAdd = 3 * EIc / h / h * deltaH;
-    Ma1 += swayAdd; Mc2 += swayAdd;
-  }else{
-    // Roller on right base: simplified as pin-roller
-    Ma1 = Mf * (3 * kc) / (2 * kb + 6 * kc);
-    Mc1 = 0; Mb1 = 0;
-    Ma2 = -(Mf - Ma1);
-    Mb2 = Mf - Ma2 * 0.3;
-    Mc2 = 0;
-    deltaH = Fh * h * h * h / (2 * 3 * EIc);
-  }// Reactions
-  const RA_v = w * L / 2 + (Mb2 - Ma2) / L;
-  const RB_v = w * L / 2 - (Mb2 - Ma2) / L;
-  const RA_h = (Ma1 + Mc1) / h - Fh / 2;
-  const shear_beam = (Ma2 + Mb2) / L + w * L / 2;
-  const maxM_beam = Math.max(Math.abs(Ma2), Math.abs(Mb2), w * L * L / 8 - (Math.abs(Ma2) + Math.abs(Mb2)) / 2);
-  const maxM_col = Math.max(Math.abs(Ma1), Math.abs(Mc1), Math.abs(Mc2), Math.abs(Mb1));
-  const maxDisp = Math.abs(deltaH) * 1000; // mm
-  const swayAngle = h > 0 ? (Math.abs(deltaH) / h) : 0;
-
-  // Update stats
+function updateStats(r){
+  if (r.unstable || r.bad){
+    ['fStatDisp','fStatMbeam','fStatMcol','fStatSway','fStatReact'].forEach(function(id){ document.getElementById(id).textContent = '—'; });
+    return;
+  }
+  var maxM_beam = Math.max(Math.abs(r.Ma2), Math.abs(r.Mb2), r.w*r.L*r.L/8 - (Math.abs(r.Ma2)+Math.abs(r.Mb2))/2);
+  var maxM_col = Math.max(Math.abs(r.Ma1), Math.abs(r.Mc1), Math.abs(r.Mc2), Math.abs(r.Mb1));
+  var maxDisp = Math.abs(r.deltaH) * 1000;
+  var swayAngle = r.h > 0 ? (Math.abs(r.deltaH)/r.h) : 0;
+  var baseShear = Math.abs((r.Ma1+r.Mc1)/r.h) + Math.abs((r.Mc2+r.Mb1)/r.h);
   document.getElementById('fStatDisp').textContent = maxDisp.toFixed(2);
   document.getElementById('fStatMbeam').textContent = maxM_beam.toFixed(1);
   document.getElementById('fStatMcol').textContent = maxM_col.toFixed(1);
   document.getElementById('fStatSway').textContent = swayAngle.toFixed(5);
+  document.getElementById('fStatReact').textContent = baseShear.toFixed(1);
+}
 
-  fMoments ={ Ma1, Mc1, Ma2, Mb2, Mc2, Mb1, L, h, w, Fh, deltaH };
+// ===== Animation state =====
+var animId = null, loadPhase = 0, animFull = null;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  if (fCurrentTab === 'results'){
-    updateResultTable(L, h, w, Fh, Ma1, Mc1, Ma2, Mb2, Mc2, Mb1);
+window.compute = function(){
+  // Full-load solution drives the displayed numbers + results table (steady state).
+  var full = solveFrame(1);
+  animFull = full;
+  fMoments = full;
+  updateStats(full);
+  if (fCurrentTab === 'results') updateResultTable(full);
+  // (Re)start the load-ramp animation.
+  loadPhase = 0;
+  if (reduceMotion){
+    loadPhase = 1;
+    drawFrame(solveFrame(1), 1);
+    return;
   }
+  if (animId) cancelAnimationFrame(animId);
+  animId = requestAnimationFrame(animLoop);
+};
 
-  drawFrame();
-}function updateResultTable(L, h, w, Fh, Ma1, Mc1, Ma2, Mb2, Mc2, Mb1){
-  const Vb = (Ma2 + Mb2) / L + w * L / 2;
-  const tbody = document.getElementById('fResultTbody');
-  tbody.innerHTML = `
-    <tr><td>左柱</td><td>頂部</td><td>0</td><td>${(Vb).toFixed(1)}</td><td>${Ma1.toFixed(1)}</td></tr>
-    <tr><td>左柱</td><td>脚部</td><td>0</td><td>${(Vb).toFixed(1)}</td><td>${Mc1.toFixed(1)}</td></tr>
-    <tr><td>梁</td><td>左端</td><td>0</td><td>${Vb.toFixed(1)}</td><td>${Ma2.toFixed(1)}</td></tr>
-    <tr><td>梁</td><td>右端</td><td>0</td><td>${(-Vb + w * L).toFixed(1)}</td><td>${Mb2.toFixed(1)}</td></tr>
-    <tr><td>右柱</td><td>頂部</td><td>0</td><td>${(-Vb + w * L).toFixed(1)}</td><td>${Mc2.toFixed(1)}</td></tr>
-    <tr><td>右柱</td><td>脚部</td><td>0</td><td>${(-Vb + w * L).toFixed(1)}</td><td>${Mb1.toFixed(1)}</td></tr>
-  `;
-}function drawFrame(){
-  const canvas = document.getElementById('frameCanvas');
-  const ctx = canvas.getContext('2d');
-  const DPR = window.devicePixelRatio || 1;
-  canvas.width = canvas.offsetWidth * DPR;
-  canvas.height = 360 * DPR;
-  ctx.scale(DPR, DPR);
-  const cw = canvas.offsetWidth, ch = 360;
+var lastT = 0;
+function animLoop(ts){
+  if (!lastT) lastT = ts;
+  var dt = Math.min((ts - lastT)/1000, 0.05); lastT = ts;
+  // Ramp the load on over ~1.6s, then gently breathe so motion is always visible.
+  loadPhase += dt / 1.6;
+  var p;
+  if (loadPhase < 1){ p = loadPhase; }
+  else { p = 0.92 + 0.08*Math.sin((loadPhase-1)*1.4); } // settle + slow pulse
+  drawFrame(solveFrame(p), p);
+  animId = requestAnimationFrame(animLoop);
+}
 
-  ctx.fillStyle = '#0a1628';
-  ctx.fillRect(0, 0, cw, ch);
+function updateResultTable(r){
+  var tbody = document.getElementById('fResultTbody');
+  if (r.unstable){ tbody.innerHTML = '<tr><td colspan="5">' + LBL.unstable + '</td></tr>'; return; }
+  if (r.bad){ tbody.innerHTML = ''; return; }
+  var L = r.L, h = r.h, w = r.w, Fh = r.Fh;
+  var leftAxial = w*L/2 - Fh*h/L;
+  var rightAxial = w*L/2 + Fh*h/L;
+  var leftColShear = (r.Ma1 + r.Mc1)/h;
+  var rightColShear = (r.Mc2 + r.Mb1)/h;
+  var beamShearLeft = w*L/2 - (r.Ma2 + r.Mb2)/L;
+  var beamShearRight = w*L - beamShearLeft;
+  tbody.innerHTML =
+    '<tr><td>'+LBL.lcol+'</td><td>'+LBL.top+'</td><td>'+leftAxial.toFixed(1)+'</td><td>'+leftColShear.toFixed(1)+'</td><td>'+r.Ma1.toFixed(1)+'</td></tr>'+
+    '<tr><td>'+LBL.lcol+'</td><td>'+LBL.base+'</td><td>'+leftAxial.toFixed(1)+'</td><td>'+leftColShear.toFixed(1)+'</td><td>'+r.Mc1.toFixed(1)+'</td></tr>'+
+    '<tr><td>'+LBL.beam+'</td><td>'+LBL.lend+'</td><td>0</td><td>'+beamShearLeft.toFixed(1)+'</td><td>'+r.Ma2.toFixed(1)+'</td></tr>'+
+    '<tr><td>'+LBL.beam+'</td><td>'+LBL.rend+'</td><td>0</td><td>'+beamShearRight.toFixed(1)+'</td><td>'+r.Mb2.toFixed(1)+'</td></tr>'+
+    '<tr><td>'+LBL.rcol+'</td><td>'+LBL.top+'</td><td>'+rightAxial.toFixed(1)+'</td><td>'+rightColShear.toFixed(1)+'</td><td>'+r.Mc2.toFixed(1)+'</td></tr>'+
+    '<tr><td>'+LBL.rcol+'</td><td>'+LBL.base+'</td><td>'+rightAxial.toFixed(1)+'</td><td>'+rightColShear.toFixed(1)+'</td><td>'+r.Mb1.toFixed(1)+'</td></tr>';
+}
 
-  const { Ma1, Mc1, Ma2, Mb2, Mc2, Mb1, L, h, w, Fh, deltaH }= fMoments;
-  if (!L) return;
+// ===== HiDPI canvas + draw =====
+function drawFrame(r, p){
+  var canvas = document.getElementById('frameCanvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+  var cw = canvas.offsetWidth || 600, ch = 360;
+  if (canvas.width !== Math.round(cw*DPR) || canvas.height !== Math.round(ch*DPR)){
+    canvas.width = Math.round(cw*DPR); canvas.height = Math.round(ch*DPR);
+  }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, cw, ch);
+  if (!r || !r.L) return;
 
-  const pad = 60;
-  const scX = (cw - 2 * pad) / (L * 1.4);
-  const scY = (ch - 2 * pad) / (h * 1.5);
-  const sc = Math.min(scX, scY);
+  if (r.unstable){
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = '16px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(LBL.unstable, cw/2, ch/2); ctx.textAlign = 'left'; return;
+  }
+  if (r.bad) return;
 
-  const ox = cw / 2 - L * sc / 2;
-  const oy = ch - pad;
+  var pad = 64;
+  var scX = (cw - 2*pad) / (r.L * 1.5);
+  var scY = (ch - 2*pad) / (r.h * 1.6);
+  var sc = Math.min(scX, scY);
+  var ox = cw/2 - r.L*sc/2;
+  var oy = ch - pad;
+  var nodes = [[ox, oy],[ox, oy - r.h*sc],[ox + r.L*sc, oy - r.h*sc],[ox + r.L*sc, oy]];
 
-  // Node positions (undeformed)
-  const nodes = [
-    [ox, oy],                        // 0: left base
-    [ox, oy - h * sc],               // 1: left top
-    [ox + L * sc, oy - h * sc],      // 2: right top
-    [ox + L * sc, oy]                // 3: right base
-  ];
+  // Ground hatch
+  ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(pad-14, oy); ctx.lineTo(cw-pad+14, oy); ctx.stroke();
 
-  // Deformation scale
-  const defScale = 200;
+  drawSupports(ctx, nodes, r.support);
 
-  // Draw ground
-  ctx.strokeStyle = 'rgba(255,255,255,.2)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(pad - 10, oy); ctx.lineTo(cw - pad + 10, oy); ctx.stroke();
+  // Exaggerated deformed-shape scaling: target ~ h/7 sway at full load, clamped.
+  var defTarget = (r.h*sc)/7;
+  var defScale = Math.abs(r.deltaH) > 1e-9 ? Math.min(defTarget/Math.abs(r.deltaH), 1200) : 0;
+  var sway = r.deltaH * defScale;
+  // Beam bending bow (mid-span sag) scaled from beam max moment, sign = sagging downward.
+  var beamMmid = (r.Ma2 + r.Mb2)/2 - r.w*r.L*r.L/8; // mid-span moment (sagging negative in this sign convention)
+  var bowPix = -beamMmid; // positive => sag down
+  var bowScale = Math.abs(bowPix) > 1e-6 ? Math.min((r.h*sc*0.10)/Math.abs(bowPix), 6) : 0;
+  var beamSag = bowPix * bowScale;
 
-  // Support symbols
-  const support = document.getElementById('supportType').value;
-  [[0, support], [3, support === 'roller' ? 'roller' : support]].forEach(([ni, sp]) =>{
-    const [nx, ny] = nodes[ni];
+  // ---- Undeformed ghost ----
+  ctx.strokeStyle = 'rgba(120,160,210,.30)'; ctx.lineWidth = 2; ctx.setLineDash([5,5]);
+  [[0,1],[1,2],[2,3]].forEach(function(e){ ctx.beginPath(); ctx.moveTo(nodes[e[0]][0], nodes[e[0]][1]); ctx.lineTo(nodes[e[1]][0], nodes[e[1]][1]); ctx.stroke(); });
+  ctx.setLineDash([]);
+
+  // ---- Deformed shape (smooth curved members) ----
+  var topL = [nodes[1][0] + sway, nodes[1][1]];
+  var topR = [nodes[2][0] + sway, nodes[2][1]];
+  ctx.strokeStyle = '#2e9bff'; ctx.lineWidth = 3.5; ctx.lineJoin = 'round';
+  // Left column (base fixed/pin -> top swayed), cubic-ish bow
+  drawCurvedMember(ctx, nodes[0], topL, sway*0.35, true);
+  // Right column
+  drawCurvedMember(ctx, nodes[3], topR, sway*0.35, true);
+  // Beam with mid-span sag
+  drawBeam(ctx, topL, topR, beamSag);
+
+  // ---- Bending-moment diagram drawn ON the members (tension side hatch) ----
+  drawBMD(ctx, nodes, r, sc);
+
+  // ---- Load arrows (grow with p) ----
+  drawLoads(ctx, nodes, r, p);
+
+  // ---- Node markers ----
+  ctx.fillStyle = '#fff';
+  [nodes[0], topL, topR, nodes[3]].forEach(function(n){ ctx.beginPath(); ctx.arc(n[0], n[1], 4, 0, Math.PI*2); ctx.fill(); });
+
+  // ---- Member labels + live caption ----
+  ctx.fillStyle = 'rgba(255,255,255,.65)'; ctx.font = '11px Noto Sans JP, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(LBL.beam, (nodes[1][0]+nodes[2][0])/2 - 8, nodes[1][1] - 14);
+  ctx.fillText(LBL.lcol, nodes[0][0] - 34, (nodes[0][1]+nodes[1][1])/2);
+  ctx.fillText(LBL.rcol, nodes[3][0] + 8, (nodes[3][1]+nodes[2][1])/2);
+  ctx.fillStyle = 'rgba(0,180,216,.9)'; ctx.font = '11px Roboto Mono, monospace';
+  var capDisp = (Math.abs(r.deltaH)*1000).toFixed(1);
+  ctx.fillText('δ = ' + capDisp + ' mm   |M|max(梁) = ' + Math.max(Math.abs(r.Ma2),Math.abs(r.Mb2)).toFixed(1) + ' kN·m', 14, 22);
+}
+
+function drawCurvedMember(ctx, a, b, bow, vertical){
+  // a,b endpoints; bow = lateral offset of mid (perp to member). Approx with quadratic.
+  var mx = (a[0]+b[0])/2, my = (a[1]+b[1])/2;
+  var cx, cy;
+  if (vertical){ cx = mx + bow; cy = my; } else { cx = mx; cy = my + bow; }
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(cx, cy, b[0], b[1]); ctx.stroke();
+}
+function drawBeam(ctx, a, b, sag){
+  var mx = (a[0]+b[0])/2, my = (a[1]+b[1])/2;
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(mx, my + sag, b[0], b[1]); ctx.stroke();
+}
+
+function drawBMD(ctx, nodes, r, sc){
+  var Mmax = Math.max(Math.abs(r.Ma1), Math.abs(r.Mc1), Math.abs(r.Ma2), Math.abs(r.Mb2), Math.abs(r.Mc2), Math.abs(r.Mb1), 0.001);
+  var mScale = (r.h*sc*0.42) / Mmax;
+  ctx.fillStyle = 'rgba(225,112,85,0.28)'; ctx.strokeStyle = 'rgba(255,140,90,0.9)'; ctx.lineWidth = 1.6;
+  // Left column: moment offsets drawn horizontally (tension side). Sign convention from original.
+  ctx.beginPath();
+  ctx.moveTo(nodes[0][0], nodes[0][1]);
+  ctx.lineTo(nodes[0][0] - r.Mc1*mScale, nodes[0][1]);
+  ctx.lineTo(nodes[1][0] - r.Ma1*mScale, nodes[1][1]);
+  ctx.lineTo(nodes[1][0], nodes[1][1]);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Right column
+  ctx.beginPath();
+  ctx.moveTo(nodes[3][0], nodes[3][1]);
+  ctx.lineTo(nodes[3][0] + r.Mb1*mScale, nodes[3][1]);
+  ctx.lineTo(nodes[2][0] + r.Mc2*mScale, nodes[2][1]);
+  ctx.lineTo(nodes[2][0], nodes[2][1]);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Beam (parabolic, UDL) — offset perpendicular (vertical)
+  ctx.beginPath();
+  var nSeg = 36;
+  ctx.moveTo(nodes[1][0], nodes[1][1] - r.Ma2*mScale);
+  for (var i = 0; i <= nSeg; i++){
+    var xi = i/nSeg;
+    var x = nodes[1][0] + xi*r.L*sc;
+    var MB = r.Ma2*(1-xi) + r.Mb2*xi - r.w*r.L*r.L*xi*(1-xi)/2;
+    ctx.lineTo(x, nodes[1][1] - MB*mScale);
+  }
+  ctx.lineTo(nodes[2][0], nodes[2][1]);
+  ctx.lineTo(nodes[1][0], nodes[1][1]);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+}
+
+function drawLoads(ctx, nodes, r, p){
+  // Distributed load on beam
+  if (r.w > 0.01){
+    ctx.strokeStyle = 'rgba(0,184,148,' + (0.4 + 0.6*p) + ')'; ctx.lineWidth = 1.5;
+    var n = 8, top = nodes[1][1] - 18;
+    for (var i = 0; i <= n; i++){
+      var ax = nodes[1][0] + i*(nodes[2][0]-nodes[1][0])/n;
+      ctx.beginPath(); ctx.moveTo(ax, top); ctx.lineTo(ax, nodes[1][1]-2);
+      ctx.moveTo(ax, nodes[1][1]-2); ctx.lineTo(ax-3, nodes[1][1]-8);
+      ctx.moveTo(ax, nodes[1][1]-2); ctx.lineTo(ax+3, nodes[1][1]-8); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(nodes[1][0], top); ctx.lineTo(nodes[2][0], top); ctx.stroke();
+  }
+  // Horizontal load at top-left
+  if (Math.abs(r.Fh) > 0.01){
+    ctx.strokeStyle = 'rgba(249,202,36,' + (0.5 + 0.5*p) + ')'; ctx.lineWidth = 2.4;
+    var hy = nodes[1][1], hx0 = nodes[1][0] - 44, hx1 = nodes[1][0] - 4;
+    ctx.beginPath(); ctx.moveTo(hx0, hy); ctx.lineTo(hx1, hy);
+    ctx.moveTo(hx1, hy); ctx.lineTo(hx1-10, hy-5); ctx.moveTo(hx1, hy); ctx.lineTo(hx1-10, hy+5); ctx.stroke();
+  }
+}
+
+function drawSupports(ctx, nodes, support){
+  [[0, support],[3, support]].forEach(function(pair){
+    var n = nodes[pair[0]], nx = n[0], ny = n[1], sp = pair[1];
     ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1;
-    if (sp === 'fixed') {
-      for (let i = -2; i <= 2; i++) {
-        ctx.beginPath(); ctx.moveTo(nx - 8 + i * 6, ny + 5); ctx.lineTo(nx - 8 + i * 6 + 5, ny + 12); ctx.stroke();
-      }
-      ctx.beginPath(); ctx.moveTo(nx - 12, ny + 5); ctx.lineTo(nx + 12, ny + 5); ctx.stroke();
-    }else{
-      ctx.beginPath(); ctx.arc(nx, ny + 5, 5, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(nx - 10, ny + 12); ctx.lineTo(nx + 10, ny + 12); ctx.stroke();
+    if (sp === 'fixed'){
+      for (var i = -2; i <= 2; i++){ ctx.beginPath(); ctx.moveTo(nx-8+i*6, ny+5); ctx.lineTo(nx-8+i*6+5, ny+12); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(nx-12, ny+5); ctx.lineTo(nx+12, ny+5); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(nx-8, ny+11); ctx.lineTo(nx+8, ny+11); ctx.closePath(); ctx.stroke();
+      if (sp === 'roller'){ ctx.beginPath(); ctx.arc(nx-4, ny+14, 2.5, 0, Math.PI*2); ctx.arc(nx+4, ny+14, 2.5, 0, Math.PI*2); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.moveTo(nx-10, ny+11); ctx.lineTo(nx+10, ny+11); ctx.stroke(); }
     }
   });
+}
 
-  // Draw deformed shape or moment diagram
-  if (fCurrentTab === 'frame'){
-    // Deformed shape
-    const swayDef = deltaH * defScale;
-    const nodesD = [
-      [nodes[0][0], nodes[0][1]],
-      [nodes[1][0] + swayDef, nodes[1][1]],
-      [nodes[2][0] + swayDef, nodes[2][1]],
-      [nodes[3][0], nodes[3][1]]
-    ];
-
-    // Undeformed (ghost)
-    ctx.strokeStyle = 'rgba(0,123,255,.25)'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
-    [[0,1],[1,2],[2,3]].forEach(([a,b]) => {
-      ctx.beginPath(); ctx.moveTo(nodes[a][0], nodes[a][1]); ctx.lineTo(nodes[b][0], nodes[b][1]); ctx.stroke();
-    });
-    ctx.setLineDash([]);
-
-    // Deformed
-    ctx.strokeStyle = '#007BFF'; ctx.lineWidth = 3;
-    [[0,1],[1,2],[2,3]].forEach(([a,b]) =>{
-      ctx.beginPath(); ctx.moveTo(nodesD[a][0], nodesD[a][1]); ctx.lineTo(nodesD[b][0], nodesD[b][1]); ctx.stroke();
-    });
-
-    // Distributed load arrows
-    if (w > 0){
-      ctx.strokeStyle = '#00b894'; ctx.lineWidth = 1.5;
-      const nArrows = 8;
-      for (let i = 0; i <= nArrows; i++) {
-        const ax = nodes[1][0] + i * L * sc / nArrows;
-        const ay = nodes[1][1] - 16;
-        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax, nodes[1][1]);
-        ctx.moveTo(ax, nodes[1][1]); ctx.lineTo(ax - 3, nodes[1][1] - 6); ctx.moveTo(ax, nodes[1][1]); ctx.lineTo(ax + 3, nodes[1][1] - 6);
-        ctx.stroke();
-      }
-      ctx.beginPath(); ctx.moveTo(nodes[1][0], nodes[1][1] - 16); ctx.lineTo(nodes[2][0], nodes[2][1] - 16); ctx.stroke();
-    }// Horizontal load arrow
-    if (Fh > 0){
-      ctx.strokeStyle = '#f9ca24'; ctx.lineWidth = 2;
-      const hx = nodes[1][0] - 36, hy = nodes[1][1];
-      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 32, hy);
-      ctx.moveTo(hx + 32, hy); ctx.lineTo(hx + 22, hy - 5); ctx.moveTo(hx + 32, hy); ctx.lineTo(hx + 22, hy + 5);
-      ctx.stroke();
-    }// Node dots
-    ctx.fillStyle = '#fff';
-    nodesD.forEach(([nx, ny]) =>{ ctx.beginPath(); ctx.arc(nx, ny, 4, 0, Math.PI * 2); ctx.fill(); });
-
-  }else if (fCurrentTab === 'moment'){
-    // Moment diagram
-    const mScale = Math.max(Math.abs(Ma1), Math.abs(Mc1), Math.abs(Ma2), Math.abs(Mb2)) > 0
-      ? (h * sc * 0.5) / Math.max(Math.abs(Ma1), Math.abs(Mc1), Math.abs(Ma2), Math.abs(Mb2), 0.001)
-      : 1;
-
-    // Draw frame skeleton
-    ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 1.5;
-    [[0,1],[1,2],[2,3]].forEach(([a,b]) => {
-      ctx.beginPath(); ctx.moveTo(nodes[a][0], nodes[a][1]); ctx.lineTo(nodes[b][0], nodes[b][1]); ctx.stroke();
-    });
-
-    // Left col moment diagram
-    ctx.fillStyle = 'rgba(225,112,85,0.3)'; ctx.strokeStyle = '#e17055'; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(nodes[0][0], nodes[0][1]);
-    ctx.lineTo(nodes[0][0] - Mc1 * mScale, nodes[0][1]);
-    ctx.lineTo(nodes[1][0] - Ma1 * mScale, nodes[1][1]);
-    ctx.lineTo(nodes[1][0], nodes[1][1]);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-
-    // Right col moment diagram
-    ctx.beginPath();
-    ctx.moveTo(nodes[3][0], nodes[3][1]);
-    ctx.lineTo(nodes[3][0] + Mb1 * mScale, nodes[3][1]);
-    ctx.lineTo(nodes[2][0] + Mc2 * mScale, nodes[2][1]);
-    ctx.lineTo(nodes[2][0], nodes[2][1]);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-
-    // Beam moment diagram (parabolic for UDL)
-    ctx.beginPath();
-    const nSeg = 30;
-    ctx.moveTo(nodes[1][0], nodes[1][1] - Ma2 * mScale);
-    for (let i = 0; i <= nSeg; i++){
-      const xi = i / nSeg;
-      const x = nodes[1][0] + xi * L * sc;
-      const MBeam = Ma2 * (1 - xi) + Mb2 * xi - w * L * L * xi * (1 - xi) / 2;
-      ctx.lineTo(x, nodes[1][1] - MBeam * mScale);
-    }
-    ctx.lineTo(nodes[2][0], nodes[2][1]);
-    ctx.lineTo(nodes[1][0], nodes[1][1]);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-
-    // Labels
-    ctx.fillStyle = '#fff'; ctx.font = '10px Roboto Mono, monospace';
-    ctx.fillText(Ma1.toFixed(0) + ' kN·m', nodes[1][0] - Ma1 * mScale - 50, nodes[1][1] - 4);
-    ctx.fillText(Ma2.toFixed(0) + ' kN·m', nodes[1][0] + 4, nodes[1][1] - Ma2 * mScale - 4);
-  }
-
-  // Draw member labels
-  ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '11px Noto Sans JP, sans-serif';
-  ctx.fillText('梁', (nodes[1][0] + nodes[2][0]) / 2 - 8, nodes[1][1] - 10);
-  ctx.fillText('左柱', nodes[0][0] - 30, (nodes[0][1] + nodes[1][1]) / 2);
-  ctx.fillText('右柱', nodes[3][0] + 6, (nodes[3][1] + nodes[2][1]) / 2);
-}document.querySelectorAll('input[type=range]').forEach(el =>{
-  const mn = parseFloat(el.min), mx = parseFloat(el.max), v = parseFloat(el.value);
-  el.style.setProperty('--pct', ((v - mn) / (mx - mn) * 100) + '%');
+document.querySelectorAll('input[type=range]').forEach(function(el){
+  var mn = parseFloat(el.min), mx = parseFloat(el.max), v = parseFloat(el.value);
+  el.style.setProperty('--pct', ((v-mn)/(mx-mn)*100) + '%');
 });
 
 compute();
-window.addEventListener('resize', compute);
+window.addEventListener('resize', function(){ if (reduceMotion) drawFrame(solveFrame(1), 1); });
+})();
 </script>
+
+
 
 
 
@@ -639,6 +679,9 @@ window.addEventListener('resize', compute);
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="frame-analysis.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -692,15 +735,15 @@ window.addEventListener('resize', compute);
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>スパン数・スパン長(m)、階数・階高(m)を入力し、梁の曲げ剛性EIb(kN·m²)と柱の曲げ剛性EIc(kN·m²)を設定する</li>
-<li>支点条件(固定・ピン・ローラー)を各柱脚で指定し、梁の分布荷重(kN/m)や集中荷重(kN)、水平荷重(地震・風)を節点に付与する</li>
-<li>「計算実行」ボタンで直接剛性法により全体剛性マトリクスを組立・逆行列演算し、節点変位と支点反力を算出する</li>
-<li>変形図・曲げモーメント図・断面力(軸力・せん断力・曲げモーメント)がリアルタイム表示される</li>
+<li>1層1スパン門型フレームのスパンL（m）、柱高さh（m）、梁EIb、柱EIcを設定します</li>
+<li>柱脚条件（固定・ピン・ローラー）と、梁の等分布荷重w（kN/m）、水平荷重H（kN）を設定します</li>
+<li>固定・ピン柱脚は3未知数のたわみ角法で自動計算し、ローラー柱脚で水平荷重がある場合は機構として表示します</li>
+<li>変形図、曲げモーメント図、断面力一覧（N/V/M）を確認します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>5階建て鉄骨ラーメン(スパン6m×3スパン、階高4m)で、梁EIb=50000kN·m²(H形鋼)、柱EIc=80000kN·m²を設定。最下階梁に分布荷重20kN/m、最上階に水平荷重(地震想定)150kNを入力した場合、最大変位δ≈68mm(最上階)、梁最大曲げM≈90kN·m(1階)、柱最大曲げM≈180kN·m、層間変形角δ/h≈1/200を算出。鉄筋コンクリート造の場合、EIb=35000kN·m²で計算すると変位が1.4倍増加する。</p>
+<p>既定値（固定柱脚、L=6m、h=4m、EIb=EIc=10000kN·m²、w=20kN/m、H=0）では、梁端曲げモーメントは左端-45.0kN·m、右端+45.0kN·mです。柱頭の最大曲げは45.0kN·m、柱脚の最大曲げは22.5kN·m、水平変位δ=0.00mmです。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -710,6 +753,16 @@ window.addEventListener('resize', compute);
 <li>層間変形角δ/hが1/150以下を満たすことを構造規準で確認。風荷重と地震荷重は別々に計算し、二次応力(P-Δ効果)が無視できるか判定</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

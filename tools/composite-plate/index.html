@@ -39,14 +39,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "複合材料積層板 CLTシミュレーター",
       "description": "古典積層理論（CLT）に基づくABD行列、面内歪み・曲率、各ply応力、Tsai-Wu/Tsai-Hill破壊基準をリアルタイム計算・可視化するWebエンジニアリングツール。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/composite-plate.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "keywords": "複合材料,積層板,CLT,古典積層理論,ABD行列,Tsai-Wu,破壊基準,CFRP,GFRP"
@@ -291,7 +291,16 @@ body.ux-template-v1-page .main.top-grid>.panel{overflow-x:hidden;overflow-y:visi
             <input type="range" id="Mx" min="-500" max="500" step="5" value="0" oninput="syncToNum('Mx','mxVal');updateSlider(this,'mxVal',0,'');compute()">
           </div>
         </div>
-      </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 
   
 
@@ -499,9 +508,32 @@ function Qmatrix(E1, E2, G12, nu12){
 
   // Solve for midplane strains and curvatures (simplified: no B coupling for now)
   // Use [A]{e0}={N}, [D]{k}={M}
-const e0 = Ainv ? mat3mul(Ainv, [Nx, Ny, Nxy]) : [0,0,0];
   const Dinv = mat3inv(D);
-  const kappa = Dinv ? mat3mul(Dinv, [Mx, 0, 0]) : [0,0,0];
+  function solve6(M, b){
+    const n6 = 6;
+    const a = M.map((row, i) => row.slice().concat([b[i]]));
+    for (let col=0; col<n6; col++){
+      let piv = col;
+      for (let r=col+1; r<n6; r++) if (Math.abs(a[r][col]) > Math.abs(a[piv][col])) piv = r;
+      if (Math.abs(a[piv][col]) < 1e-20) return null;
+      [a[col], a[piv]] = [a[piv], a[col]];
+      const div = a[col][col];
+      for (let j=col; j<=n6; j++) a[col][j] /= div;
+      for (let r=0; r<n6; r++){
+        if (r === col) continue;
+        const f = a[r][col];
+        for (let j=col; j<=n6; j++) a[r][j] -= f * a[col][j];
+      }
+    }
+    return a.map(row => row[n6]);
+  }
+  const ABD = [
+    [...A[0], ...B[0]], [...A[1], ...B[1]], [...A[2], ...B[2]],
+    [...B[0], ...D[0]], [...B[1], ...D[1]], [...B[2], ...D[2]]
+  ];
+  const sol = solve6(ABD, [Nx, Ny, Nxy, Mx, 0, 0]);
+  const e0 = sol ? sol.slice(0,3) : (Ainv ? mat3mul(Ainv, [Nx, Ny, Nxy]) : [0,0,0]);
+  const kappa = sol ? sol.slice(3,6) : (Dinv ? mat3mul(Dinv, [Mx, 0, 0]) : [0,0,0]);
 
   // Compute ply stresses in material frame
   const sig1_arr = [], sig2_arr = [], tau12_arr = [];
@@ -670,6 +702,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="composite-plate.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -724,7 +759,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>CFRP積層板[0/90/45/-45]s(総8層、各層0.125mm)に面内荷重Nₓ=500N/mm、Nᵧ=200N/mm、Nₓᵧ=100N/mmを加えた場合、等価Eₓ≈95GPa、等価Eᵧ≈95GPa、等価Gₓᵧ≈35GPa、総板厚1.0mmが得られます。0度層の最大主応力σ1≈180MPa、45度層で最大τ12≈120MPaとなり、CFRP樹脂系の破壊強度Xt=1600MPa、Xc=1200MPa、Yt=50MPa、Yc=200MPaに対してTsai-Wu破壊指数は0.35となり、安全性が確認できます</p>
+<p>CFRP積層板[0/90/45/-45]s(総8層、各層0.125mm)に面内荷重Nₓ=500N/mm、Nᵧ=200N/mm、Nₓᵧ=100N/mmを加えた場合、等価Eₓ≈54.1GPa、等価Eᵧ≈54.1GPa、等価Gₓᵧ≈20.6GPa、総板厚1.0mmが得られます。最大主応力σ1≈1310MPaとなり、CFRP樹脂系の破壊強度Xt=1600MPa、Xc=1200MPa、Yt=50MPaに対して本ツールのTsai-Wu破壊指数は約0.45となり、安全性が確認できます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -735,6 +770,16 @@ compute();
 <li>成形時の繊維含有率VF低下(設計値60%→実績55%)により弾性係数が3-5%低下するため、シミュレーション値に0.95倍の係数を適用し検証してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

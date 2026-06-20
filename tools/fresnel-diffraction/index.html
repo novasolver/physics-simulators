@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "フレネル回折・近距離回折パターン計算機",
       "description": "フレネル回折シミュレーター。スリット・円孔・刀口の近距離回折パターンを計算し、フレネル数 N=a²/(λz) による領域判定とコルニュ螺旋をリアルタイム可視化・解析できます。",
       "url": "https://novasolver.jp/tools/fresnel-diffraction.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["フレネル積分による回折強度計算","コルニュ螺旋アニメーション","単スリット/円孔/ナイフエッジ対応","フレネル数N=a²/(λz)による領域自動判定","フレネル⇔フラウンホーファー遷移の可視化"],
       "keywords": "フレネル回折,コルニュ螺旋,フレネル積分,回折パターン,フレネル数,フラウンホーファー",
       "datePublished": "2026-04-08",
@@ -166,7 +166,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="param-group">
       <div class="param-name" style="font-size:0.83rem;font-weight:600;margin-bottom:5px;">開口タイプ</div>
-      <select class="type-select" id="apertureType" onchange="update()">
+      <select class="type-select" id="apertureType" onchange="window.__fresnelPoissonDisc=false;update()">
         <option value="slit">単スリット</option>
         <option value="circular">円形開口</option>
         <option value="knife">ナイフエッジ</option>
@@ -209,7 +209,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="divider"></div>
     <div class="panel-title">フレネル数と領域</div>
 <div id="regimeBadge"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -320,10 +328,39 @@ function fresnelCS(u) {
   // lambda in nm
   let r, g, b;
   if (lambda >= 380 && lambda < 440) { r = -(lambda - 440) / 60; g = 0; b = 1; }else if (lambda >= 440 && lambda < 490){ r = 0; g = (lambda - 440) / 50; b = 1; }else if (lambda >= 490 && lambda < 510){ r = 0; g = 1; b = -(lambda - 510) / 20; }else if (lambda >= 510 && lambda < 580){ r = (lambda - 510) / 70; g = 1; b = 0; }else if (lambda >= 580 && lambda < 645){ r = 1; g = -(lambda - 645) / 65; b = 0; }else if (lambda >= 645 && lambda <= 780){ r = 1; g = 0; b = 0; }else{ r = 0; g = 0; b = 0; }return `rgba(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)},0.85)`;
+}function besselJ0(x){
+  const ax=Math.abs(x);
+  if(ax<8){
+    const y=x*x;
+    const ans1=57568490574+y*(-13362590354+y*(651619640.7+y*(-11214424.18+y*(77392.33017+y*(-184.9052456)))));
+    const ans2=57568490411+y*(1029532985+y*(9494680.718+y*(59272.64853+y*(267.8532712+y))));
+    return ans1/ans2;
+  }
+  const z=8/ax, y=z*z, xx=ax-0.785398164;
+  const ans1=1+y*(-0.1098628627e-2+y*(0.2734510407e-4+y*(-0.2073370639e-5+y*0.2093887211e-6)));
+  const ans2=-0.1562499995e-1+y*(0.1430488765e-3+y*(-0.6911147651e-5+y*(0.7621095161e-6-y*0.934945152e-7)));
+  return Math.sqrt(0.636619772/ax)*(Math.cos(xx)*ans1-z*Math.sin(xx)*ans2);
+}function circularFresnelIntensity(r,a_m,lambda_m,z_m,opaqueDisc){
+  const steps=420;
+  const h=a_m/steps;
+  let re=0, im=0;
+  for(let i=0;i<steps;i++){
+    const rho=(i+0.5)*h;
+    const phase=Math.PI*rho*rho/(lambda_m*z_m);
+    const b=besselJ0(2*Math.PI*rho*r/(lambda_m*z_m));
+    const w=rho*h*b;
+    re+=Math.cos(phase)*w;
+    im+=Math.sin(phase)*w;
+  }
+  const scale=2*Math.PI/(lambda_m*z_m);
+  re*=scale; im*=scale;
+  if(opaqueDisc){ re=-re; im=1-im; }
+  return re*re+im*im;
 }function computeIntensity(a_m, lambda_m, z_m, type){
   const Npoints = 200;
   const xmax = Math.max(a_m * 3, Math.sqrt(lambda_m * z_m) * 5);
   const xs = [], Is = [];
+  const poissonDisc = type === 'circular' && !!window.__fresnelPoissonDisc;
 
   for (let i = 0; i <= Npoints; i++) {
     const x = -xmax + (i / Npoints) * 2 * xmax;
@@ -333,13 +370,13 @@ function fresnelCS(u) {
     if (type === 'knife') {
       // Knife edge: u from x to infinity
       const u0 = x * Math.sqrt(2 / (lambda_m * z_m));
-      // I = 0.5 * [(C(inf)-C(u0))^2 + (S(inf)-S(u0))^2]
-      // C(inf)=S(inf)=0.5
       const fu = fresnelCS(Math.abs(u0));
       const Cinf = 0.5, Sinf = 0.5;
       let Cx, Sx;
       if (u0 >= 0) { Cx = fu.C; Sx = fu.S; }else{ Cx = -fu.C; Sx = -fu.S; }
       I = 0.5 * ((Cinf - Cx) * (Cinf - Cx) + (Sinf - Sx) * (Sinf - Sx));
+    }else if(type === 'circular'){
+      I = circularFresnelIntensity(Math.abs(x), a_m, lambda_m, z_m, poissonDisc);
     }else{
       // Single slit: from (x - a/2) to (x + a/2) in fresnel param
       const scale = Math.sqrt(2 / (lambda_m * z_m));
@@ -352,7 +389,8 @@ function fresnelCS(u) {
       I = dC * dC + dS * dS;
     }
     Is.push(I);
-  }// Normalize
+  }
+  if(type === 'circular') return{ xs, Is };
   const Imax = Math.max(...Is);
   return{ xs, Is: Is.map(v => v / Imax) };
 }function drawCornu(){
@@ -448,6 +486,7 @@ function fresnelCS(u) {
   }// Intensity
   const{ xs, Is }= computeIntensity(a_m, lambda_m, z_m, type);
   const wlColor = wavelengthToColor(lambda_nm);
+  const yMax = Math.max(1.1, Math.ceil(Math.max(...Is)*10)/10);
 
   if (intensityChart) intensityChart.destroy();
   intensityChart = new Chart(document.getElementById('intensityChart'),{
@@ -470,7 +509,7 @@ function fresnelCS(u) {
       plugins: { legend: { display: false } },
       scales:{
         x: { ticks: { color: '#6c757d', font: { size: 8 }, maxTicksLimit: 8 }, grid:{ color: 'rgba(0,0,0,.06)' }, title:{ display: true, text: 'x (mm)', color: '#6c757d', font: { size: 9 } } },
-        y:{ ticks: { color: '#6c757d', font: { size: 9 } }, grid:{ color: 'rgba(0,0,0,.06)' }, min: 0, max: 1.1, title:{ display: true, text: '規格化強度', color: '#6c757d', font: { size: 9 } } }
+        y:{ ticks: { color: '#6c757d', font: { size: 9 } }, grid:{ color: 'rgba(0,0,0,.06)' }, min: 0, max: yMax, title:{ display: true, text: '規格化強度', color: '#6c757d', font: { size: 9 } } }
       }
     }
   });
@@ -503,12 +542,13 @@ function fresnelCS(u) {
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
   const slA = document.getElementById('slA'), slLam = document.getElementById('slLam'), slZ = document.getElementById('slZ'), at = document.getElementById('apertureType');
+  window.__fresnelPoissonDisc = name === 'poisson';
   if (name === 'fresnel_visible') {
     at.value = 'slit'; slA.value = 0.5; slLam.value = 550; slZ.value = 0.25;
     var _gvalA=document.getElementById('valANum');if(_gvalA)_gvalA.textContent = '0.50 mm'; var _gvalLam=document.getElementById('valLamNum');if(_gvalLam)_gvalLam.textContent = '550 nm'; var _gvalZ=document.getElementById('valZNum');if(_gvalZ)_gvalZ.textContent = '0.25 m';
   }else if (name === 'knife'){
-    at.value = 'knife'; slA.value = 0.5; slLam.value = 632; slZ.value = 1.0;
-    var _gvalA=document.getElementById('valANum');if(_gvalA)_gvalA.textContent = '0.50 mm'; var _gvalLam=document.getElementById('valLamNum');if(_gvalLam)_gvalLam.textContent = '632 nm'; var _gvalZ=document.getElementById('valZNum');if(_gvalZ)_gvalZ.textContent = '1.00 m';
+    at.value = 'knife'; slA.value = 0.5; slLam.value = 630; slZ.value = 1.0;
+    var _gvalA=document.getElementById('valANum');if(_gvalA)_gvalA.textContent = '0.50 mm'; var _gvalLam=document.getElementById('valLamNum');if(_gvalLam)_gvalLam.textContent = '630 nm'; var _gvalZ=document.getElementById('valZNum');if(_gvalZ)_gvalZ.textContent = '1.00 m';
   }else if (name === 'poisson'){
     at.value = 'circular'; slA.value = 1.0; slLam.value = 550; slZ.value = 0.5;
     var _gvalA=document.getElementById('valANum');if(_gvalA)_gvalA.textContent = '1.00 mm'; var _gvalLam=document.getElementById('valLamNum');if(_gvalLam)_gvalLam.textContent = '550 nm'; var _gvalZ=document.getElementById('valZNum');if(_gvalZ)_gvalZ.textContent = '0.50 m';
@@ -582,6 +622,9 @@ drawCornu();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fresnel-diffraction.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -643,7 +686,7 @@ drawCornu();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>波長λ=550nm、スリット幅a=0.1mm、観測距離Z=100mmの場合：フレネル数N=a²/(λZ)=(0.1×10⁻³)²/(550×10⁻⁹×0.1)=18.2となり、フレネル近距離回折領域です。スクリーン上の中心から±0.2mmの範囲で強度振動(フレネル縞)が観測され、スリット端での回折強度はジオメトリカル影の1/4程度に減少します。円孔直径d=1mmでZ=500mmならN=3.6で、中心に明るいアイリス状のスポットが形成されます</p>
+<p>波長λ=550nm、スリット幅a=0.1mm、観測距離Z=100mmの場合：フレネル数N=a²/(λZ)=(0.1×10⁻³)²/(550×10⁻⁹×0.1)≈0.18となり、N&lt;1のフラウンホーファー遠距離回折側の条件です。中心ピークを持つ比較的単純な単スリット回折パターンが支配的になります。円孔直径d=1mmでZ=500mmならN=3.6で、中心に明るいアイリス状のスポットが形成されます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -654,6 +697,16 @@ drawCornu();
 <li>紫外域(λ<400nm)での計算時は材質の吸収・散乱を別途考慮。石英ガラス使用推奨</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

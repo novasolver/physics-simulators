@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "JKR粘着接触シミュレーター",
       "description": "Johnson-Kendall-Roberts（JKR）理論で表面エネルギーγを考慮した弾性球の粘着接触を計算。接触半径、引離し力、Hertz接触との比較をリアルタイムに可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/jkr-adhesive-contact.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["JKR接触半径とHertz接触半径の同時計算","表面エネルギーγによるpull-off力の予測","接触概念図と接触半径-荷重カーブの可視化","ソフトゴム・ゲル・PDMS等のパラメータ想定"],
       "keywords": "JKR理論,粘着接触,表面エネルギー,引離し力,pull-off,Johnson-Kendall-Roberts,DMTモデル,Taborパラメータ,ソフトマター",
       "datePublished": "2026-05-16",
@@ -165,12 +165,23 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値はソフトゴム（E*≈10MPa）・典型表面エネルギーを想定。F&lt;0で引張荷重下の粘着保持を観察できます。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ計算結果（アニメ中も更新）</div>
       <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statFlive">—</div><div class="sl">現在の荷重 F [μN]（アニメ）</div></div>
+        <div class="stat-card"><div class="sv" id="statAlive">—</div><div class="sl">現在の JKR 接触半径 a [μm]</div></div>
         <div class="stat-card"><div class="sv" id="statAH">—</div><div class="sl">Hertz 接触半径 a_H (粘着無視)</div></div>
         <div class="stat-card"><div class="sv" id="statAJ">—</div><div class="sl">JKR 接触半径 a_J (粘着考慮)</div></div>
         <div class="stat-card"><div class="sv" id="statFpo">—</div><div class="sl">引離し力 F_pull-off = -3πRγ/2</div></div>
@@ -179,9 +190,14 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-area"></i> 接触概念図 + 接触半径 vs 荷重カーブ</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">左＝球と平面の粘着接触（赤線＝JKR接触半径）／右＝Hertz(青)とJKR(赤)の比較、F_po に縦点線、赤丸＝現在点</p>
+      <div class="chart-title"><i class="fas fa-film"></i> 接近→押付け→引離し スナップオフ アニメーション</div>
+      <canvas id="cv" width="600" height="400" tabindex="0" role="img" aria-label="球が平面に粘着接触し、引張で引離し力に達するとスナップ剥離するアニメーション。右に接触半径vs荷重カーブ。"></canvas>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+        <button class="btn" type="button" id="btnPlay" onclick="jkrToggle()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="jkrRestart()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <span style="font-size:.72rem;color:var(--muted);margin-left:auto" id="jkrPhase">接近中…</span>
+      </div>
+      <p class="canvas-hint">左＝球の接近・押付け・引離し（赤＝JKR接触半径と粘着ネック、青破線＝Hertz接触＝粘着無視）／右＝接触半径 vs 荷重、F_po に縦点線、黄丸＝現在点。引張で F_po に達すると接触がスナップ剥離します。</p>
     </div>
 
     <div class="chart-card">
@@ -203,9 +219,26 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== JKR Adhesive Contact Simulator ==========
+// ========== JKR Adhesive Contact Simulator (v2 animated) ==========
+(function(){
+"use strict";
+var I18N = {
+  phaseApproach: '接近中…',
+  phasePress:    '押付け（圧縮）',
+  phaseHold:     '引張・粘着が保持',
+  phaseSnap:     'スナップ剥離！',
+  compression:   '(圧縮)',
+  tension:       '(引張)',
+  schematicTag:  '粘着接触（JKR）',
+  hertzGhost:    'Hertz(粘着無)',
+  neckLabel:     '粘着ネック',
+  curveTitleA:   'a (μm)',
+  curveTitleF:   'F (μN)',
+  reduced:       'アニメ無効（reduced-motion）'
+};
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
+var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function fmtN(v) {
   if (!isFinite(v)) return '—';
@@ -274,13 +307,19 @@ function resizeCanvas() {
   if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
 }
 
-function drawSchematic(p, aJ, x0, y0, w, h) {
-  // Sphere + flat schematic showing adhesive neck
+// visualization scale for contact radius (log, robust to wide range)
+function aToPx(a_m, maxA) {
+  var aum = a_m * 1e6;
+  var s = Math.max(0, Math.min(1, Math.log10(1 + aum) / Math.log10(1 + 120)));
+  return maxA * s;
+}
+
+// st = animation state: {F_uN, aJ(m), aH(m), snapped(bool), liftPx(0..1)}
+function drawSchematic(p, st, x0, y0, w, h) {
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(x0, y0, w, h);
-  // axis
   var cx = x0 + w / 2;
-  var planeY = y0 + h * 0.78;
+  var planeY = y0 + h * 0.80;
   // plane (flat substrate)
   ctx.strokeStyle = '#7fbfff';
   ctx.lineWidth = 2;
@@ -298,9 +337,36 @@ function drawSchematic(p, aJ, x0, y0, w, h) {
     ctx.lineTo(sx + 6, planeY + 8);
     ctx.stroke();
   }
-  // sphere radius display (visual only — keep visible)
-  var rVis = Math.min(w * 0.32, h * 0.5);
-  var cy = planeY - rVis * 0.85; // overlap so it touches the plane
+  var maxA = w * 0.30;
+  var aJpx = aToPx(st.aJ, maxA);   // JKR contact half-width (with adhesion)
+  var aHpx = aToPx(st.aH, maxA);   // Hertz contact half-width (no adhesion)
+  var rVis = Math.min(w * 0.34, h * 0.46);
+  // sphere vertical position: when snapped it lifts away; while in contact it sits on plane.
+  // small overlap when compressed (flattened) controlled by lift.
+  var lift = st.snapped ? (st.liftPx || 0) : 0;
+  var compress = (!st.snapped && st.F_uN > 0) ? Math.min(6, st.F_uN / 1800) : 0;
+  var cy = planeY - rVis + compress - lift;
+  // adhesive neck (only when in contact): a meniscus drawn between sphere bottom and plane
+  if (!st.snapped) {
+    var neckTop = cy + rVis - 2;
+    ctx.fillStyle = 'rgba(231,76,60,0.30)';
+    ctx.beginPath();
+    ctx.moveTo(cx - aJpx, planeY);
+    ctx.quadraticCurveTo(cx - aJpx * 0.7, (neckTop + planeY) / 2, cx - aHpx * 0.9, neckTop);
+    ctx.lineTo(cx + aHpx * 0.9, neckTop);
+    ctx.quadraticCurveTo(cx + aJpx * 0.7, (neckTop + planeY) / 2, cx + aJpx, planeY);
+    ctx.closePath();
+    ctx.fill();
+  } else if (lift < rVis * 0.5) {
+    // snapping: thin breaking filament
+    ctx.strokeStyle = 'rgba(231,76,60,' + (0.5 * (1 - lift / (rVis * 0.5))).toFixed(2) + ')';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx, planeY);
+    ctx.lineTo(cx, cy + rVis);
+    ctx.stroke();
+  }
+  // sphere
   var grad = ctx.createRadialGradient(cx - rVis * 0.3, cy - rVis * 0.3, rVis * 0.1, cx, cy, rVis);
   grad.addColorStop(0, '#5da9ff');
   grad.addColorStop(0.6, '#1e6fc4');
@@ -312,60 +378,61 @@ function drawSchematic(p, aJ, x0, y0, w, h) {
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 1;
   ctx.stroke();
-  // contact patch (JKR): adhesive neck shown as red ellipse straddling plane
-  // scale contact radius for visualization (independent of physical scale)
-  var maxA = w * 0.28;
-  // normalize: use log scale because aJ can vary widely
-  var aJ_um = aJ * 1e6;
-  var aScale = Math.max(0.05, Math.min(1, Math.log10(1 + aJ_um) / Math.log10(1 + 100)));
-  var aPx = maxA * aScale;
-  // adhesive neck (semi-transparent red band that crosses the plane)
-  ctx.fillStyle = 'rgba(231,76,60,0.45)';
+  // Hertz contact width (blue dashed, no adhesion) on the plane
+  ctx.strokeStyle = 'rgba(0,180,216,0.85)';
+  ctx.setLineDash([4, 3]);
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.ellipse(cx, planeY, aPx, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // contact radius marker line
-  ctx.strokeStyle = '#e74c3c';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cx - aPx, planeY);
-  ctx.lineTo(cx + aPx, planeY);
+  ctx.moveTo(cx - aHpx, planeY);
+  ctx.lineTo(cx + aHpx, planeY);
   ctx.stroke();
-  // arrow showing load direction
-  var loadDir = p.F >= 0 ? 1 : -1; // 1 down (compression), -1 up (tension)
+  ctx.setLineDash([]);
+  // JKR contact radius (solid red, wider) on the plane
+  if (!st.snapped) {
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx - aJpx, planeY);
+    ctx.lineTo(cx + aJpx, planeY);
+    ctx.stroke();
+  }
+  // load direction arrow
+  var loadDir = st.F_uN >= 0 ? 1 : -1; // 1 down compression, -1 up tension
   ctx.strokeStyle = loadDir > 0 ? '#FFD166' : '#ff6b6b';
   ctx.fillStyle = loadDir > 0 ? '#FFD166' : '#ff6b6b';
   ctx.lineWidth = 2;
   var ax = cx;
-  var ay1 = y0 + 18;
-  var ay2 = ay1 + 28 * loadDir;
+  var ay1 = y0 + 22;
+  var ay2 = ay1 + 30 * loadDir;
+  ctx.beginPath(); ctx.moveTo(ax, ay1); ctx.lineTo(ax, ay2); ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(ax, ay1);
-  ctx.lineTo(ax, ay2);
-  ctx.stroke();
-  // arrowhead
-  ctx.beginPath();
-  ctx.moveTo(ax, ay2 + 5 * loadDir);
-  ctx.lineTo(ax - 5, ay2 - 3 * loadDir);
-  ctx.lineTo(ax + 5, ay2 - 3 * loadDir);
+  ctx.moveTo(ax, ay2 + 6 * loadDir);
+  ctx.lineTo(ax - 5, ay2 - 2 * loadDir);
+  ctx.lineTo(ax + 5, ay2 - 2 * loadDir);
   ctx.closePath();
   ctx.fill();
   // labels
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '11px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('F = ' + fmtN(p.F_uN) + ' μN', cx, y0 + 14);
-  ctx.fillText('a_J = ' + fmtN(aJ * 1e6) + ' μm', cx, planeY + 22);
-  ctx.fillText(p.F >= 0 ? '(圧縮)' : '(引張)', cx + 60, y0 + 14);
+  ctx.fillText('F = ' + fmtN(st.F_uN) + ' μN', cx, y0 + 16);
+  ctx.fillText(st.F_uN >= 0 ? I18N.compression : I18N.tension, cx + 70, y0 + 16);
+  if (!st.snapped) ctx.fillText('a_J = ' + fmtN(st.aJ * 1e6) + ' μm', cx, planeY + 22);
+  if (!st.snapped && aJpx > aHpx + 6) {
+    ctx.fillStyle = 'rgba(231,76,60,0.9)';
+    ctx.font = '10px "Roboto Mono",monospace';
+    ctx.fillText(I18N.neckLabel, cx, (cy + rVis + planeY) / 2 - 2);
+  }
   ctx.textAlign = 'left';
   ctx.fillStyle = '#7fbfff';
-  ctx.fillText('R = ' + fmtN(p.R_mm) + ' mm', x0 + 8, y0 + 14);
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.fillText('R = ' + fmtN(p.R_mm) + ' mm', x0 + 8, y0 + 16);
   ctx.fillStyle = '#aabfd6';
   ctx.font = '10px "Roboto Mono",monospace';
-  ctx.fillText('粘着接触（JKR）', x0 + 8, y0 + h - 6);
+  ctx.fillText(I18N.schematicTag, x0 + 8, y0 + h - 6);
 }
 
-function drawCurve(p, aJ_now, F_po, x0, y0, w, h) {
+function drawCurve(p, markF_uN, markA_m, F_po, x0, y0, w, h) {
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(x0, y0, w, h);
   // axes
@@ -445,13 +512,13 @@ function drawCurve(p, aJ_now, F_po, x0, y0, w, h) {
     else ctx.lineTo(X2, Y2);
   }
   ctx.stroke();
-  // current point marker (JKR)
-  if (isFinite(aJ_now)) {
-    var cxN = px(p.F_uN);
-    var cyN = py(aJ_now * 1e6);
+  // current point marker (JKR) — tracks the animated load
+  if (isFinite(markA_m) && markF_uN >= Fmin_uN && markF_uN <= Fmax_uN) {
+    var cxN = px(markF_uN);
+    var cyN = py(markA_m * 1e6);
     ctx.fillStyle = '#FFD166';
     ctx.beginPath();
-    ctx.arc(cxN, cyN, 5, 0, Math.PI * 2);
+    ctx.arc(cxN, cyN, 5.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#e74c3c';
     ctx.lineWidth = 1.5;
@@ -461,9 +528,9 @@ function drawCurve(p, aJ_now, F_po, x0, y0, w, h) {
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '11px "Roboto Mono",monospace';
   ctx.textAlign = 'left';
-  ctx.fillText('a (μm)', ax0 + 2, ay1 - 8 < y0 + 12 ? y0 + 12 : ay1 - 8);
+  ctx.fillText(I18N.curveTitleA, ax0 + 2, ay1 - 8 < y0 + 12 ? y0 + 12 : ay1 - 8);
   ctx.textAlign = 'center';
-  ctx.fillText('F (μN)', (ax0 + ax1) / 2, ay0 + 16);
+  ctx.fillText(I18N.curveTitleF, (ax0 + ax1) / 2, ay0 + 16);
   ctx.textAlign = 'left';
   ctx.fillText('-1000', ax0 - 8, ay0 + 14);
   ctx.textAlign = 'right';
@@ -480,36 +547,179 @@ function drawCurve(p, aJ_now, F_po, x0, y0, w, h) {
   ctx.fillText('— JKR', ax1 - 110, ay1 + 28);
 }
 
-function compute() {
+// ===== animation state =====
+// The load is driven on a loop: press in (compression up to F_set), hold,
+// then pull off (tension) until F < F_po → snap apart → reset.
+var anim = {
+  phase: 'approach', // approach -> press -> pull -> snap -> (reset)
+  cycT: 0,           // time within current cycle (s)
+  F_uN: 0,           // current animated load
+  snapLift: 0,       // sphere lift after snap (0..1 of rVis)
+  playing: !REDUCED,
+  rafId: null,
+  last: 0
+};
+var FSET_uN = 4000;  // peak compressive load during press
+
+function staticParams() {
   var p = getParams();
-  if (!isFinite(p.R) || !isFinite(p.E) || !isFinite(p.gamma) || !isFinite(p.F)) return;
-  var aH = hertzRadius(Math.max(p.F, 0), p.R, p.E);
-  var aJ = jkrRadius(p.F, p.R, p.E, p.gamma);
-  var F_po = pullOffForce(p.R, p.gamma);
-  var ratio = (isFinite(aJ) && aH > 0) ? (aJ / aH) : NaN;
+  p.F_po = pullOffForce(p.R, p.gamma);            // N (negative)
+  p.aH_set = hertzRadius(Math.max(p.F, 0), p.R, p.E);
+  p.aJ_set = jkrRadius(p.F, p.R, p.E, p.gamma);
+  p.ratio = (isFinite(p.aJ_set) && p.aH_set > 0) ? (p.aJ_set / p.aH_set) : NaN;
+  return p;
+}
 
-  document.getElementById('statAH').textContent = aH > 0 ? fmtN(aH * 1e6) + ' μm' : '—';
-  document.getElementById('statAJ').textContent = isFinite(aJ) ? fmtN(aJ * 1e6) + ' μm' : '—';
-  document.getElementById('statFpo').textContent = fmtN(F_po * 1e6) + ' μN';
-  document.getElementById('statRatio').textContent = isFinite(ratio) ? fmtN(ratio) : '—';
+// update the steady (slider-based) stat cards
+function updateStaticStats(p) {
+  document.getElementById('statAH').textContent = p.aH_set > 0 ? fmtN(p.aH_set * 1e6) + ' μm' : '—';
+  document.getElementById('statAJ').textContent = isFinite(p.aJ_set) ? fmtN(p.aJ_set * 1e6) + ' μm' : '—';
+  document.getElementById('statFpo').textContent = fmtN(p.F_po * 1e6) + ' μN';
+  document.getElementById('statRatio').textContent = isFinite(p.ratio) ? fmtN(p.ratio) : '—';
+}
 
-  // draw split canvas
+// advance the animated load along the approach/press/pull/snap cycle
+function stepAnim(p, dt) {
+  var F_po_uN = p.F_po * 1e6;             // negative
+  // durations (s)
+  var Tap = 0.9, Tpress = 1.6, Tpull = 2.4, Tsnap = 0.9;
+  anim.cycT += dt;
+  var t = anim.cycT;
+  if (t < Tap) {
+    anim.phase = 'approach';
+    anim.F_uN = 0;                         // touching, no load yet
+    anim.snapLift = 0;
+  } else if (t < Tap + Tpress) {
+    anim.phase = 'press';
+    var u = (t - Tap) / Tpress;
+    anim.F_uN = FSET_uN * (0.5 - 0.5 * Math.cos(Math.PI * u)); // ease 0->FSET
+    anim.snapLift = 0;
+  } else if (t < Tap + Tpress + Tpull) {
+    anim.phase = 'pull';
+    var u2 = (t - Tap - Tpress) / Tpull;
+    // sweep from FSET down through 0 into tension, slightly past F_po
+    anim.F_uN = FSET_uN + (F_po_uN * 1.15 - FSET_uN) * u2;
+    anim.snapLift = 0;
+    if (anim.F_uN <= F_po_uN) { anim.phase = 'snap'; anim.cycT = Tap + Tpress + Tpull; }
+  } else if (t < Tap + Tpress + Tpull + Tsnap) {
+    anim.phase = 'snap';
+    var u3 = (t - Tap - Tpress - Tpull) / Tsnap;
+    anim.snapLift = u3;                     // sphere flies up
+    anim.F_uN = F_po_uN;                    // load released at pull-off
+  } else {
+    anim.cycT = 0;                          // restart cycle
+    anim.phase = 'approach';
+    anim.snapLift = 0;
+    anim.F_uN = 0;
+  }
+  return F_po_uN;
+}
+
+function phaseLabel() {
+  if (REDUCED) return I18N.reduced;
+  switch (anim.phase) {
+    case 'approach': return I18N.phaseApproach;
+    case 'press':    return I18N.phasePress;
+    case 'pull':     return I18N.phaseHold;
+    case 'snap':     return I18N.phaseSnap;
+  }
+  return '';
+}
+
+function render(p) {
   resizeCanvas();
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, cv.width, cv.height);
   var W = __novaCanvasCssW(cv), H = __novaCanvasCssH(cv);
   var midX = Math.floor(W / 2);
-  drawSchematic(p, isFinite(aJ) ? aJ : 0, 0, 0, midX, H);
-  drawCurve(p, aJ, F_po, midX, 0, W - midX, H);
-  // divider
+
+  var Fm = anim.F_uN;
+  var snapped = (anim.phase === 'snap');
+  var aJ_live = snapped ? NaN : jkrRadius(Fm * 1e-6, p.R, p.E, p.gamma);
+  var aH_live = hertzRadius(Math.max(Fm * 1e-6, 0), p.R, p.E);
+  var st = {
+    F_uN: Fm,
+    aJ: isFinite(aJ_live) ? aJ_live : 0,
+    aH: isFinite(aH_live) ? aH_live : 0,
+    snapped: snapped,
+    liftPx: anim.snapLift * Math.min(midX * 0.34, H * 0.46) * 1.6
+  };
+  drawSchematic(p, st, 0, 0, midX, H);
+  drawCurve(p, snapped ? NaN : Fm, snapped ? NaN : aJ_live, p.F_po, midX, 0, W - midX, H);
   ctx.strokeStyle = 'rgba(143,184,224,0.4)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(midX, 0); ctx.lineTo(midX, H); ctx.stroke();
+
+  // live stat cards (never '—' for the live readouts)
+  document.getElementById('statFlive').textContent = fmtN(Fm) + ' μN';
+  document.getElementById('statAlive').textContent = snapped
+    ? (I18N.phaseSnap)
+    : (isFinite(aJ_live) ? fmtN(aJ_live * 1e6) + ' μm' : '0.000 μm');
+  var ph = document.getElementById('jkrPhase');
+  if (ph) ph.textContent = phaseLabel();
 }
 
+// main compute: recompute steady values + (re)render current frame
+function compute() {
+  var p = staticParams();
+  if (!isFinite(p.R) || !isFinite(p.E) || !isFinite(p.gamma)) return;
+  updateStaticStats(p);
+  render(p);
+}
+
+function loop(ts) {
+  if (!anim.playing) { anim.rafId = null; return; }
+  if (!anim.last) anim.last = ts;
+  var dt = Math.min(0.05, (ts - anim.last) / 1000);
+  anim.last = ts;
+  var p = staticParams();
+  stepAnim(p, dt);
+  updateStaticStats(p);
+  render(p);
+  anim.rafId = requestAnimationFrame(loop);
+}
+
+function startAnim() {
+  if (REDUCED) return;
+  anim.playing = true;
+  anim.last = 0;
+  var b = document.getElementById('btnPlay');
+  if (b) b.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+  if (!anim.rafId) anim.rafId = requestAnimationFrame(loop);
+}
+function stopAnim() {
+  anim.playing = false;
+  if (anim.rafId) { cancelAnimationFrame(anim.rafId); anim.rafId = null; }
+  var b = document.getElementById('btnPlay');
+  if (b) b.innerHTML = '<i class="fas fa-play"></i> 再生';
+}
+window.jkrToggle = function () { anim.playing ? stopAnim() : startAnim(); };
+window.jkrRestart = function () { anim.cycT = 0; anim.phase = 'approach'; anim.snapLift = 0; anim.F_uN = 0; compute(); if (!REDUCED) startAnim(); };
+
+// expose compute() for the inline slider oninput handlers
+window.compute = compute;
+
 window.addEventListener('resize', function () { compute(); });
+
+if (cv && cv.addEventListener) {
+  cv.addEventListener('keydown', function (e) {
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); window.jkrToggle(); }
+  });
+}
+
+// init
 resizeCanvas();
 compute();
+if (REDUCED) {
+  // single static frame at a representative pressed state
+  anim.phase = 'press'; anim.F_uN = FSET_uN * 0.6; anim.snapLift = 0;
+  compute();
+  var b0 = document.getElementById('btnPlay');
+  if (b0) b0.innerHTML = '<i class="fas fa-play"></i> 再生';
+} else {
+  startAnim();
+}
+})();
 </script>
 
 <section class="explanation">
@@ -577,6 +787,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="jkr-adhesive-contact.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -630,17 +843,17 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>球の半径 R (mm) をスライダーで設定します（例：5～50mm）</li>
-<li>弾性体のヤング率 E (GPa) を入力します（例：ゴム 0.01GPa、シリコン樹脂 2GPa）</li>
-<li>表面エネルギー γ (mJ/m²) を設定します（例：ゴム-金属間 50mJ/m²、粘着テープ 100mJ/m²）</li>
-<li>外部荷重 F (N) を加えます</li>
-<li>Hertz接触半径 a_H と JKR接触半径 a_J をリアルタイム比較し、粘着効果による拡大率を確認します</li>
-<li>引離し力 F_pull-off = -3πRγ/2 で粘着剥離に必要な負荷力を算出します</li>
+<li>球半径 R (mm) をスライダーで設定します（範囲 0.01～10 mm）</li>
+<li>等価弾性係数 E* (MPa) を入力します（範囲 0.1～1000 MPa、例：ソフトゴム≈10 MPa、PDMS≈数 MPa）</li>
+<li>表面エネルギー γ (mJ/m²) を設定します（範囲 1～1000、例：ゴム-金属間 50、粘着テープ 100）</li>
+<li>法線荷重 F (μN、負値=引張) を加えます（範囲 -1000～10000 μN）</li>
+<li>Hertz接触半径 a_H と JKR接触半径 a_J をリアルタイム比較し、粘着効果による拡大率 a_J/a_H を確認します</li>
+<li>引離し力 F_pull-off = -3πRγ/2 で粘着剥離に必要な引張力を算出します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>直径10mm（R=5mm）のシリコーンゴム球がアルミニウム基板に押し当てられる場合：E=0.8GPa、γ=45mJ/m²、外部荷重F=0.5Nを適用。Hertz理論では接触半径 a_H=0.82mm ですが、JKR理論では粘着効果により a_J=1.15mm に拡大します。引離し力は F_pull-off = -3π×0.005×0.045/2 = -2.12mN となり、わずかな負圧で剥離が発生します。この粘着増幅係数 a_J/a_H=1.40 は医療用粘着パッチやロボットグリッパーの設計で重要です。</p>
+<p>R=1 mm のソフトゴム球（E*=10 MPa）を γ=100 mJ/m²、法線荷重 F=100 μN で押し当てる場合：Hertz 接触半径は a_H≈19.6 μm ですが、JKR 理論では粘着効果により a_J≈53.8 μm に拡大し、増幅係数 a_J/a_H≈2.75 となります。引離し力は F_pull-off = -3π×0.001×0.1/2 ≈ -471 μN で、これを下回る引張で剥離します。F_po は E* に依存せず R と γ だけで決まる点が JKR の特徴で、医療用粘着パッチやソフトロボットのグリッパ設計で重要です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -651,6 +864,16 @@ compute();
 <li>負荷が引離し力を下回ると接触は保たれずシミュレーション結果は無効です</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

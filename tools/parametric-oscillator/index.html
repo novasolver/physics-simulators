@@ -42,7 +42,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "パラメトリック共振シミュレーター",
       "description": "マシュー方程式によるパラメトリック共振を可視化。δ-ε安定チャートと時刻歴応答をリアルタイム計算。",
       "url": "https://novasolver.jp/tools/parametric-oscillator.html",
@@ -52,7 +52,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["マシュー方程式のδ-ε安定チャート","時刻歴応答（RK4積分）","フロケ乗数の推定","減衰付きパラメトリック励振"],
       "keywords": "パラメトリック共振,マシュー方程式,フロケ理論,安定性解析,振動工学,CAE",
       "datePublished": "2026-04-08",
@@ -130,6 +130,18 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* v2 hero canvas + controls */
+.viz-panel canvas#pendCanvas,.viz-panel canvas#timeCanvas,.viz-panel canvas#stabCanvas{border-radius:8px;background:#0a1628;display:block;width:100%;max-width:100%}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.84rem;font-family:inherit;font-weight:600;transition:background .2s}
+.btn:hover{background:#0056b3}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.stat-val.sv{font-size:0.9rem}
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/parametric-oscillator.html">
@@ -183,212 +195,350 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div id="stability-badge" class="stability-badge stable">安定</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（実行中）</div>
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">フロケ乗数 |μ₁|</div><div class="stat-val" id="st-mu1">—</div></div>
-      <div class="stat-card"><div class="stat-label">フロケ乗数 |μ₂|</div><div class="stat-val" id="st-mu2">—</div></div>
-      <div class="stat-card"><div class="stat-label">成長率</div><div class="stat-val" id="st-growth">—</div></div>
-      <div class="stat-card"><div class="stat-label">共振次数</div><div class="stat-val" id="st-order">—</div></div>
-      <div class="stat-card"><div class="stat-label">Initial x0</div><div class="stat-val" id="st-x0">--</div></div>
-      <div class="stat-card"><div class="stat-label">Time span</div><div class="stat-val" id="st-tmax">--</div></div>
+      <div class="stat-card"><div class="stat-label">時刻 t / π</div><div class="stat-val sv" id="st-tnow">0.00</div></div>
+      <div class="stat-card"><div class="stat-label">振幅 |x|</div><div class="stat-val sv" id="st-amp">0.10</div></div>
+      <div class="stat-card"><div class="stat-label">変位 x(t)</div><div class="stat-val sv" id="st-x">0.100</div></div>
+      <div class="stat-card"><div class="stat-label">ポンプ比 δ/n²</div><div class="stat-val sv" id="st-order">n=1</div></div>
+      <div class="stat-card"><div class="stat-label">成長率 σ</div><div class="stat-val sv" id="st-growth">0.0000</div></div>
+      <div class="stat-card"><div class="stat-label">安定性</div><div class="stat-val sv" id="st-state">安定</div></div>
     </div>
     </div>
 
-    <div class="viz-tabs">
-      <button class="viz-tab active" onclick="setTab('stability',event)">安定チャート</button>
-      <button class="viz-tab" onclick="setTab('time',event)">時刻歴応答</button>
-      <button class="viz-tab" onclick="setTab('phase',event)">位相面</button>
-    </div>
-    <div id="tab-stability">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 安定性</div><canvas id="chartStability"></canvas>
-      <p style="font-size:0.75rem;color:var(--muted);margin-top:8px;">赤：不安定領域 / グレー：安定領域 / 黄色十字：現在の(δ,ε)</p>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> パラメトリック励振（ブランコ）— 振幅の成長</div>
+      <canvas id="pendCanvas" height="300" tabindex="0" role="img" aria-label="パラメトリック振動子のアニメーション。支点（実効長さ）がポンプ周波数で上下し、2:1共振で振幅が指数成長します。"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="poTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" id="btnReplay" onclick="poReplay()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <span style="font-size:.72rem;color:var(--muted);margin-left:auto" id="po-hint">支点が固有周波数の2倍で上下→ブランコのように振幅が育つ</span>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#00B4D8"></i>変位 x(t)</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>包絡線（振幅）</span>
+        <span><i class="swatch" style="background:#ff5252"></i>支点の上下（ポンプ）</span>
       </div>
     </div>
-    <div id="tab-time">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 時間変化</div><canvas id="chartTime"></canvas></div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-wave-square"></i> 時刻歴応答 x(t)（ライブ）</div>
+      <canvas id="timeCanvas" height="200" role="img" aria-label="マシュー方程式の時刻歴応答。不安定領域では振幅が指数的に成長します。"></canvas>
     </div>
-    <div id="tab-phase">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 位相</div><canvas class="ux-chartjs-canvas" id="chartPhase"></canvas></div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-area"></i> マシュー安定チャート（Ince–Strutt）— 不安定の舌</div>
+      <canvas id="stabCanvas" height="300" role="img" aria-label="マシュー方程式の安定チャート。赤い不安定の舌と現在の動作点(δ,ε)を表示します。"></canvas>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:8px;">赤：不安定の舌（δ≈n²で発生） / グレー：安定領域 / 黄色十字：現在の(δ,ε)。減衰γを上げると舌の先端が縮みます。</p>
     </div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 <br>
       $\ddot{x}+ 2\gamma\dot{x} + (\delta + \varepsilon\cos 2t)x = 0$<br><br>
-      主共振: $\delta \approx n^2$ ($n=1,2,3...$)
-    
+      主共振: $\delta \approx n^2$ ($n=1,2,3...$)。最強の主パラメトリック共振はポンプ周波数 $\approx 2f_0$（$\delta\approx1$）。
+
 </div>
 </div>
 </div>
 
 <script>
-let activeTab = 'stability';
-let chartStab = null, chartTime = null, chartPhase = null;
+(function(){
+  "use strict";
+  function el(id){ return document.getElementById(id); }
+  var pend = el('pendCanvas'), pctx = pend.getContext('2d');
+  var timeC = el('timeCanvas'), tctx = timeC.getContext('2d');
+  var stabC = el('stabCanvas'), sctx = stabC.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function getParams() {
-  return {
-    delta: +document.getElementById('s-delta').value,
-    eps: +document.getElementById('s-eps').value,
-    damp: +document.getElementById('s-damp').value,
-    x0: +document.getElementById('s-x0').value,
-    tmax: +document.getElementById('s-tmax').value * Math.PI
-  };
-}function rk4Mathieu(x, v, t, dt, delta, eps, damp){
-  function acc(x_, v_) { return -(delta + eps * Math.cos(2 * t)) * x_ - 2 * damp * v_; }
-  const k1x = v, k1v = acc(x, v);
-  const k2x = v + k1v*dt/2, k2v = acc(x+k1x*dt/2, v+k1v*dt/2);
-  const k3x = v + k2v*dt/2, k3v = acc(x+k2x*dt/2, v+k2v*dt/2);
-  const k4x = v + k3v*dt, k4v = acc(x+k3x*dt, v+k3v*dt);
-  return [x + dt*(k1x+2*k2x+2*k3x+k4x)/6, v + dt*(k1v+2*k2v+2*k3v+k4v)/6];
-}function computeFloquetMultiplier(delta, eps, damp){
-  // Compute monodromy matrix
-  const T = Math.PI; // period of Mathieu eq
-  const dt = 0.02;
-  const steps = Math.round(T / dt);
-  // Two independent solutions
-  let x1 = 1, v1 = 0, x2 = 0, v2 = 1;
-  for (let i = 0; i < steps; i++) {
-    const t = i * dt;
-    [x1, v1] = rk4Mathieu(x1, v1, t, dt, delta, eps, damp);
-    [x2, v2] = rk4Mathieu(x2, v2, t, dt, delta, eps, damp);
-  }// Eigenvalues of [[x1,x2],[v1,v2]]
-  const tr = x1 + v2;
-  const det = x1 * v2 - x2 * v1;
-  const disc = tr * tr - 4 * det;
-  if (disc >= 0){
-    const mu1 = (tr + Math.sqrt(disc)) / 2;
-    const mu2 = (tr - Math.sqrt(disc)) / 2;
-    return [Math.abs(mu1), Math.abs(mu2)];
-  }else{
-    const real = tr / 2;
-    const imag = Math.sqrt(-disc) / 2;
-    const mag = Math.sqrt(real*real + imag*imag);
-    return [mag, mag];
+  function getParams(){
+    return {
+      delta: +el('s-delta').value,
+      eps: +el('s-eps').value,
+      damp: +el('s-damp').value,
+      x0: +el('s-x0').value,
+      tmax: (+el('s-tmax').value) * Math.PI
+    };
   }
-}function isUnstable(delta, eps, damp){
-  const [mu1, mu2] = computeFloquetMultiplier(delta, eps, damp);
-  return Math.max(mu1, mu2) > 1.001;
-}function buildStabilityChart(p){
-  const res = 40;
-  const deltas = [], epsArr = [];
-  const stableData = [], unstableData = [];
-  for (let di = 0; di <= res; di++) {
-    const d = di / res * 6;
-    for (let ei = 0; ei <= res; ei++) {
-      const e = ei / res * 2;
-      const unstab = isUnstable(d, e, p.damp);
-      if (unstab) unstableData.push({x: d, y: e});
-      else stableData.push({x: d, y: e});
+
+  // Damped Mathieu: x'' + 2*damp*x' + (delta + eps*cos(2t)) x = 0
+  function acc(x, v, t, p){ return -(p.delta + p.eps*Math.cos(2*t))*x - 2*p.damp*v; }
+  function rk4(x, v, t, dt, p){
+    var k1x=v,                     k1v=acc(x,v,t,p);
+    var k2x=v+k1v*dt/2,            k2v=acc(x+k1x*dt/2, v+k1v*dt/2, t+dt/2, p);
+    var k3x=v+k2v*dt/2,            k3v=acc(x+k2x*dt/2, v+k2v*dt/2, t+dt/2, p);
+    var k4x=v+k3v*dt,             k4v=acc(x+k3x*dt,  v+k3v*dt,  t+dt,   p);
+    return [x+dt*(k1x+2*k2x+2*k3x+k4x)/6, v+dt*(k1v+2*k2v+2*k3v+k4v)/6];
+  }
+
+  // Floquet multipliers of the period-pi monodromy matrix -> growth rate
+  function floquet(p){
+    var T=Math.PI, dt=0.01, n=Math.round(T/dt);
+    var x1=1,v1=0,x2=0,v2=1;
+    for(var i=0;i<n;i++){
+      var t=i*dt;
+      var a=rk4(x1,v1,t,dt,p); x1=a[0]; v1=a[1];
+      var b=rk4(x2,v2,t,dt,p); x2=b[0]; v2=b[1];
     }
-  }const ctx = document.getElementById('chartStability').getContext('2d');
-  if (chartStab) chartStab.destroy();
-  chartStab = new Chart(ctx,{
-    type: 'scatter',
-    data: {
-      datasets: [
-        { label: '安定', data: stableData, backgroundColor: 'rgba(100,100,120,0.4)', pointRadius: 4, pointStyle: 'rect' },{ label: '不安定', data: unstableData, backgroundColor: 'rgba(231,76,60,0.6)', pointRadius: 4, pointStyle: 'rect' },{ label: '現在の点', data: [{x: p.delta, y: p.eps}], backgroundColor: '#FFD700', pointRadius: 10, pointStyle: 'crossRot', borderColor: '#FFD700', borderWidth: 2 }
-      ]
-    },
-    options:{
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      plugins: { legend: { display: true, position: 'top' } },
-      scales:{
-        x: { type:'linear', title: { display: true, text: 'δ（固有振動数²）' }, min: 0, max: 6 },
-        y:{ title: { display: true, text: 'ε（変調深さ）' }, min: 0, max: 2 }
+    var tr=x1+v2, det=x1*v2-x2*v1, disc=tr*tr-4*det, m1,m2;
+    if(disc>=0){ m1=Math.abs((tr+Math.sqrt(disc))/2); m2=Math.abs((tr-Math.sqrt(disc))/2); }
+    else { var mag=Math.sqrt(det); m1=mag; m2=mag; }
+    return [m1,m2];
+  }
+  function isUnstable(p){ var m=floquet(p); return Math.max(m[0],m[1])>1.001; }
+
+  // ---- precompute full trajectory for current params ----
+  var traj=[];        // {t, x}
+  var envT=[], envA=[]; // running amplitude envelope (per period)
+  var growth=0, unstable=false, sigma=0;
+  var DT=0.01;
+
+  function compute(){
+    var p=getParams();
+    var m=floquet(p);
+    var maxMu=Math.max(m[0],m[1]);
+    unstable = maxMu>1.001;
+    sigma = Math.log(Math.max(maxMu,1e-9))/Math.PI; // growth rate per unit time
+    traj=[]; envT=[]; envA=[];
+    var x=p.x0, v=0, t=0;
+    var n=Math.round(p.tmax/DT);
+    var pkT=0, pkA=Math.abs(p.x0);
+    var CAP=1e4;
+    for(var i=0;i<=n;i++){
+      traj.push({t:t, x:x});
+      // envelope: track running max within a sliding window of one pump period (pi)
+      if(Math.abs(x)>pkA) pkA=Math.abs(x);
+      if(t-pkT>=Math.PI){ envT.push(t); envA.push(pkA); pkT=t; pkA=Math.abs(x); }
+      var s=rk4(x,v,t,DT,p); x=s[0]; v=s[1]; t+=DT;
+      if(Math.abs(x)>CAP){ // cap runaway growth so it stays displayable
+        x=Math.sign(x)*CAP; v=0;
       }
     }
-  });
-}function buildTimeChart(p){
-  const dt = 0.05, steps = Math.round(p.tmax / dt);
-  const times = [], xs = [];
-  let x = p.x0, v = 0;
-  for (let i = 0; i < steps; i++) {
-    const t = i * dt;
-    times.push(+(t / Math.PI).toFixed(2));
-    xs.push(+x.toFixed(4));
-    [x, v] = rk4Mathieu(x, v, t, dt, p.delta, p.eps, p.damp);
-    if (Math.abs(x) > 100) break;
-  }const ctx = document.getElementById('chartTime').getContext('2d');
-  if (chartTime) chartTime.destroy();
-  chartTime = new Chart(ctx,{
-    type: 'line',
-    data: {
-      labels: times,
-      datasets: [{ label: 'x(t)', data: xs, borderColor: '#007BFF', borderWidth: 1.5, pointRadius: 0, tension: 0, fill: false }]
-    },
-    options:{
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      plugins: { legend: { display: false } },
-      scales:{
-        x: { type:'linear', title: { display: true, text: 't / π' } },
-        y:{ title: { display: true, text: '変位 x' } }
-      },
-      animation: false
-    }
-  });
-}function buildPhaseChart(p){
-  const dt = 0.05, steps = Math.round(p.tmax / dt);
-  const data = [];
-  let x = p.x0, v = 0;
-  for (let i = 0; i < steps; i++) {
-    const t = i * dt;
-    data.push({x: +x.toFixed(4), y: +v.toFixed(4)});
-    [x, v] = rk4Mathieu(x, v, t, dt, p.delta, p.eps, p.damp);
-    if (Math.abs(x) > 100 || Math.abs(v) > 100) break;
-  }const ctx = document.getElementById('chartPhase').getContext('2d');
-  if (chartPhase) chartPhase.destroy();
-  chartPhase = new Chart(ctx,{
-    type: 'scatter',
-    data: {
-      datasets: [{ label: '位相面', data, backgroundColor: 'rgba(0,123,255,0.3)', pointRadius: 1 }]
-    },
-    options:{
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      plugins: { legend: { display: false } },
-      scales:{
-        x: { type:'linear', title: { display: true, text: '変位 x' } },
-        y:{ title: { display: true, text: '速度 ẋ' } }
-      },
-      animation: false
-    }
-  });
-}function setTab(t, ev){
-  activeTab = t;
-  document.querySelectorAll('.viz-tab').forEach(b => b.classList.remove('active'));
-  ev.target.classList.add('active');
-  ['stability','time','phase'].forEach(id => {
-    document.getElementById('tab-' + id).style.display = id === t ? '' : 'none';
-  });
-  updateCharts();
-}function update(){
-  const p = getParams();
-  const [mu1, mu2] = computeFloquetMultiplier(p.delta, p.eps, p.damp);
-  const maxMu = Math.max(mu1, mu2);
-  const unstab = maxMu > 1.001;
-  const badge = document.getElementById('stability-badge');
-  badge.textContent = unstab ? '不安定 (発散)' : '安定 (有界)';
-  badge.className = 'stability-badge ' + (unstab ? 'unstable' : 'stable');
-  document.getElementById('st-mu1').textContent = mu1.toFixed(4);
-  document.getElementById('st-mu2').textContent = mu2.toFixed(4);
-  document.getElementById('st-growth').textContent = unstab ? (Math.log(maxMu) / Math.PI).toFixed(4) : '0';
-  // Resonance order
-  let order = '—';
-  for (let n = 1; n <= 3; n++) {
-    if (Math.abs(p.delta - n*n) < 0.5 && p.eps > 0.1) { order = 'n=' + n; break; }
+    envT.push(t); envA.push(pkA);
+    return p;
   }
-  document.getElementById('st-order').textContent = order;
-  document.getElementById('st-x0').textContent = p.x0.toFixed(2);
-  document.getElementById('st-tmax').textContent = (p.tmax / Math.PI).toFixed(0) + 'T';
-  updateCharts();
-}function updateCharts(){
-  const p = getParams();
-  buildStabilityChart(p);
-  buildTimeChart(p);
-  buildPhaseChart(p);
-}window.addEventListener('load', () =>{ update(); });
+
+  // ---- amplitude (peak |x|) as a function of time, for scaling ----
+  function ampMax(){ var m=Math.abs(getParams().x0); for(var i=0;i<traj.length;i++){ var a=Math.abs(traj[i].x); if(a>m)m=a; } return Math.max(m,0.2); }
+
+  // ---- HiDPI sizing ----
+  function fit(cv, h){
+    var w=Math.max(260, Math.floor(cv.parentElement.getBoundingClientRect().width - 44));
+    var dpr=Math.min(window.devicePixelRatio||1, 2.5);
+    cv.style.width=w+'px'; cv.style.height=h+'px';
+    cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+    cv.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+    return {w:w,h:h};
+  }
+
+  function sampleAt(t){
+    if(!traj.length) return {t:0,x:0};
+    if(t<=0) return traj[0];
+    var T=traj[traj.length-1].t;
+    if(t>=T) return traj[traj.length-1];
+    var idx=Math.min(traj.length-2, Math.floor(t/DT));
+    var a=traj[idx], b=traj[idx+1];
+    var f=(t-a.t)/(b.t-a.t||1);
+    return {t:t, x:a.x+f*(b.x-a.x)};
+  }
+
+  // ====== draw pendulum / swing whose pivot (effective length) is pumped ======
+  function drawPend(simT){
+    var sz=fit(pend,300), W=sz.w, H=sz.h;
+    pctx.clearRect(0,0,W,H); pctx.fillStyle='#0a1628'; pctx.fillRect(0,0,W,H);
+    var p=getParams();
+    var amax=ampMax();
+    var s=sampleAt(simT);
+    var ang=(s.x/amax)*0.9; // swing angle, scaled to keep on screen
+    // pump: pivot height oscillates at 2x natural freq (cos(2t)) like pumping a swing
+    var pivotX=W*0.5;
+    var pumpPhase=Math.cos(2*simT);
+    var pivotY=46 + p.eps*10*pumpPhase; // pivot bobs with modulation depth
+    var L=H*0.55;
+    var bobX=pivotX + L*Math.sin(ang);
+    var bobY=pivotY + L*Math.cos(ang);
+    // support beam
+    pctx.strokeStyle='rgba(255,255,255,0.25)'; pctx.lineWidth=4;
+    pctx.beginPath(); pctx.moveTo(W*0.5-70, 30); pctx.lineTo(W*0.5+70,30); pctx.stroke();
+    // pump arrows on pivot
+    pctx.strokeStyle='#ff5252'; pctx.lineWidth=2;
+    pctx.beginPath(); pctx.moveTo(pivotX, 30); pctx.lineTo(pivotX, pivotY); pctx.stroke();
+    pctx.fillStyle='#ff5252';
+    var ah=pumpPhase>=0?-5:5;
+    pctx.beginPath(); pctx.moveTo(pivotX, pivotY+ah*0); pctx.lineTo(pivotX-4, pivotY-ah); pctx.lineTo(pivotX+4, pivotY-ah); pctx.closePath(); pctx.fill();
+    // rod
+    pctx.strokeStyle='rgba(0,180,216,0.85)'; pctx.lineWidth=2.4;
+    pctx.beginPath(); pctx.moveTo(pivotX, pivotY); pctx.lineTo(bobX, bobY); pctx.stroke();
+    // pivot
+    pctx.beginPath(); pctx.arc(pivotX, pivotY, 4, 0, 7); pctx.fillStyle='#ff5252'; pctx.fill();
+    // bob
+    var bg=pctx.createRadialGradient(bobX-3,bobY-3,1,bobX,bobY,12);
+    bg.addColorStop(0,'#fff'); bg.addColorStop(1,'#007BFF');
+    pctx.beginPath(); pctx.arc(bobX,bobY,11,0,7); pctx.fillStyle=bg; pctx.fill();
+    // amplitude swing arc reference
+    pctx.strokeStyle='rgba(255,213,74,0.5)'; pctx.lineWidth=1; pctx.setLineDash([3,4]);
+    pctx.beginPath(); pctx.arc(pivotX, pivotY, L, Math.PI/2-0.9, Math.PI/2+0.9); pctx.stroke(); pctx.setLineDash([]);
+    // label
+    pctx.fillStyle='rgba(255,255,255,0.85)'; pctx.font='bold 12px Roboto Mono'; pctx.textAlign='right';
+    pctx.fillText('|x| = '+Math.abs(s.x).toFixed(3), W-12, 20); pctx.textAlign='left';
+    pctx.fillStyle = unstable?'#ff7b7b':'#7bffb0'; pctx.font='bold 12px Noto Sans JP';
+    pctx.fillText(unstable?'パラメトリック共振：振幅が成長':'安定：振幅は有界', 12, H-12);
+  }
+
+  // ====== live time-history x(t) with envelope ======
+  function drawTime(simT){
+    var sz=fit(timeC,200), W=sz.w, H=sz.h;
+    tctx.clearRect(0,0,W,H); tctx.fillStyle='#0a1628'; tctx.fillRect(0,0,W,H);
+    if(traj.length<2) return;
+    var p=getParams();
+    var Tend=traj[traj.length-1].t;
+    var amax=ampMax();
+    var padL=44, padB=22, padT=12, padR=14;
+    var tx=function(t){ return padL+(t/Tend)*(W-padL-padR); };
+    var ty=function(x){ return (H-padB+padT)/2 - (x/amax)*((H-padT-padB)/2); };
+    // zero axis + grid
+    tctx.strokeStyle='rgba(255,255,255,0.12)'; tctx.lineWidth=1;
+    tctx.beginPath(); tctx.moveTo(padL,ty(0)); tctx.lineTo(W-padR,ty(0)); tctx.stroke();
+    tctx.fillStyle='rgba(255,255,255,0.4)'; tctx.font='10px Roboto Mono'; tctx.textAlign='right';
+    tctx.fillText(amax.toFixed(2), padL-4, ty(amax)+8);
+    tctx.fillText((-amax).toFixed(2), padL-4, ty(-amax)+3);
+    tctx.fillText('x',padL-4,ty(0)+3);
+    tctx.textAlign='center'; tctx.fillText('t/π', W-padR-6, H-6);
+    // envelope (yellow) mirror
+    if(envT.length>1){
+      tctx.strokeStyle='rgba(255,213,74,0.55)'; tctx.lineWidth=1.4;
+      tctx.beginPath();
+      for(var k=0;k<envT.length;k++){ var X=tx(envT[k]),Y=ty(envA[k]); k?tctx.lineTo(X,Y):tctx.moveTo(X,Y); }
+      tctx.stroke();
+      tctx.beginPath();
+      for(var k2=0;k2<envT.length;k2++){ var X2=tx(envT[k2]),Y2=ty(-envA[k2]); k2?tctx.lineTo(X2,Y2):tctx.moveTo(X2,Y2); }
+      tctx.stroke();
+    }
+    // x(t) up to simT (blue), revealing progressively
+    tctx.strokeStyle='#00B4D8'; tctx.lineWidth=1.6; tctx.beginPath();
+    var started=false;
+    for(var i=0;i<traj.length;i++){
+      if(traj[i].t>simT) break;
+      var X=tx(traj[i].t), Y=ty(traj[i].x);
+      started?tctx.lineTo(X,Y):(tctx.moveTo(X,Y),started=true);
+    }
+    tctx.stroke();
+    // playhead
+    var s=sampleAt(simT);
+    tctx.strokeStyle='rgba(255,255,255,0.35)'; tctx.lineWidth=1;
+    tctx.beginPath(); tctx.moveTo(tx(simT),padT); tctx.lineTo(tx(simT),H-padB); tctx.stroke();
+    tctx.beginPath(); tctx.arc(tx(simT),ty(s.x),3,0,7); tctx.fillStyle='#fff'; tctx.fill();
+  }
+
+  // ====== Mathieu stability chart (Ince-Strutt) on canvas ======
+  var stabCache=null, stabKey='';
+  function buildStab(p){
+    var key=p.damp.toFixed(3);
+    if(stabKey===key && stabCache) return stabCache;
+    var res=46, grid=[];
+    for(var di=0; di<=res; di++){
+      var d=di/res*6;
+      for(var ei=0; ei<=res; ei++){
+        var e=ei/res*2;
+        grid.push({d:d,e:e,u:isUnstable({delta:d,eps:e,damp:p.damp})});
+      }
+    }
+    stabKey=key; stabCache={res:res, grid:grid};
+    return stabCache;
+  }
+  function drawStab(){
+    var sz=fit(stabC,300), W=sz.w, H=sz.h;
+    sctx.clearRect(0,0,W,H); sctx.fillStyle='#0a1628'; sctx.fillRect(0,0,W,H);
+    var p=getParams();
+    var data=buildStab(p);
+    var padL=42, padB=30, padT=12, padR=14;
+    var X=function(d){ return padL+(d/6)*(W-padL-padR); };
+    var Y=function(e){ return H-padB-(e/2)*(H-padT-padB); };
+    var cw=(W-padL-padR)/(data.res), ch=(H-padT-padB)/(data.res);
+    for(var i=0;i<data.grid.length;i++){
+      var g=data.grid[i];
+      sctx.fillStyle = g.u ? 'rgba(231,76,60,0.65)' : 'rgba(110,120,140,0.30)';
+      sctx.fillRect(X(g.d)-cw/2, Y(g.e)-ch/2, cw+0.6, ch+0.6);
+    }
+    // axes labels & ticks
+    sctx.strokeStyle='rgba(255,255,255,0.25)'; sctx.lineWidth=1;
+    sctx.strokeRect(padL,padT,W-padL-padR,H-padT-padB);
+    sctx.fillStyle='rgba(255,255,255,0.6)'; sctx.font='10px Roboto Mono'; sctx.textAlign='center';
+    for(var d=0; d<=6; d++){ sctx.fillText(d, X(d), H-padB+12); }
+    sctx.textAlign='right';
+    for(var e=0; e<=2; e+=0.5){ sctx.fillText(e.toFixed(1), padL-4, Y(e)+3); }
+    sctx.textAlign='center'; sctx.fillStyle='rgba(255,255,255,0.75)'; sctx.font='11px Noto Sans JP';
+    sctx.fillText('δ（固有振動数²）', W/2, H-6);
+    sctx.save(); sctx.translate(12, H/2); sctx.rotate(-Math.PI/2); sctx.fillText('ε（変調深さ）',0,0); sctx.restore();
+    // operating point cross
+    var px=X(p.delta), py=Y(p.eps);
+    sctx.strokeStyle='#FFD700'; sctx.lineWidth=2.4;
+    sctx.beginPath(); sctx.moveTo(px-9,py); sctx.lineTo(px+9,py); sctx.moveTo(px,py-9); sctx.lineTo(px,py+9); sctx.stroke();
+    sctx.beginPath(); sctx.arc(px,py,4,0,7); sctx.fillStyle='rgba(255,215,0,0.25)'; sctx.fill();
+  }
+
+  // ====== live stat readouts (never '—') ======
+  function setStats(simT){
+    var p=getParams();
+    var s=sampleAt(simT);
+    el('st-tnow').textContent=(simT/Math.PI).toFixed(2);
+    el('st-x').textContent=s.x.toFixed(3);
+    // current envelope amplitude
+    var amp=Math.abs(p.x0);
+    for(var i=0;i<traj.length;i++){ if(traj[i].t>simT) break; var a=Math.abs(traj[i].x); if(a>amp)amp=a; }
+    el('st-amp').textContent=amp.toFixed(3);
+    var order='—';
+    for(var n=1;n<=3;n++){ if(Math.abs(p.delta-n*n)<0.5 && p.eps>0.05){ order='n='+n; break; } }
+    el('st-order').textContent=order;
+    el('st-growth').textContent=(unstable?sigma:0).toFixed(4);
+    var st=el('st-state'); st.textContent=unstable?'不安定':'安定'; st.style.color=unstable?'#e74c3c':'#27ae60';
+    var badge=el('stability-badge');
+    if(badge){ badge.textContent=unstable?'不安定 (発散)':'安定 (有界)'; badge.className='stability-badge '+(unstable?'unstable':'stable'); }
+  }
+
+  // ====== animation loop ======
+  var simT=0, playing=!reduce, lastTs=0, animId=null, SPEED=2.2;
+  function frame(simT){ drawPend(simT); drawTime(simT); setStats(simT); }
+  function loop(ts){
+    if(!playing){ animId=null; return; }
+    if(!lastTs) lastTs=ts;
+    var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+    var Tend=traj.length?traj[traj.length-1].t:1;
+    simT+=dt*SPEED;
+    if(simT>=Tend){ simT=0; } // loop / restart
+    frame(simT);
+    animId=requestAnimationFrame(loop);
+  }
+  function start(){ if(reduce) return; playing=true; lastTs=0; el('btnPlay').innerHTML='<i class="fas fa-pause"></i> 一時停止'; if(!animId) animId=requestAnimationFrame(loop); }
+  function stop(){ playing=false; if(animId){cancelAnimationFrame(animId); animId=null;} el('btnPlay').innerHTML='<i class="fas fa-play"></i> 再生'; }
+  window.poTogglePlay=function(){ playing?stop():start(); };
+  window.poReplay=function(){ simT=0; frame(0); start(); };
+
+  function rebuild(){
+    compute();
+    drawStab();
+    if(reduce){ simT=0; frame(0); }
+    else { simT=0; }
+  }
+
+  // hook sliders: existing inline oninput calls update()
+  window.update=function(){ rebuild(); };
+
+  window.addEventListener('resize', function(){ drawStab(); frame(simT); });
+
+  // init
+  rebuild();
+  if(reduce){ frame(0); }
+  else { start(); }
+})();
 </script>
 
 <section class="explanation">
@@ -450,6 +600,9 @@ function getParams() {
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="parametric-oscillator.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -503,15 +656,15 @@ function getParams() {
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>δ（デルタ）パラメータを0～2の範囲で設定し、マシュー方程式の周期係数を調整する</li>
-<li>ε（イプシロン）を0～1の範囲で入力し、パラメトリック励起の振幅を決定する</li>
-<li>減衰係数（0～0.5）と初期変位（0～5mm）を設定後、シミュレーション開始ボタンをクリックして時刻歴応答とStability Chart上の軌跡をリアルタイム表示する</li>
+<li>δ（デルタ）パラメータを0～6の範囲で設定し、マシュー方程式の周期係数を調整する</li>
+<li>ε（イプシロン）を0～2の範囲で入力し、パラメトリック励起の変調深さを決定する</li>
+<li>減衰係数γ（0～0.5）と初期変位x₀（0.01～1、無次元）を設定すると、時刻歴応答と安定チャート上の現在点がリアルタイムに更新される</li>
 <li>δ-εパラメータ空間内で解の位置を確認し、第1～3不安定領域の境界を視覚的に把握する</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>梁の横揺れパラメトリック共振（f_0=2Hz、m=50kg）でδ=0.8、ε=0.6、減衰0.1、初期変位2mmを設定した場合、フロケ指数λが0.15/sとなり不安定領域に入る。10秒の応答計算では振幅が2mmから約45mmまで指数増幅され、マシュー方程式d²x/dt²+2ζω₀(dx/dt)+(ω₀²(1+εcos(Ωt)))x=0の予測と一致する。減衰を0.25に増加させると同一パラメータで安定化し、振幅は20mm以下に抑制される。</p>
+<p>無次元マシュー方程式 ẍ+2γẋ+(δ+εcos2t)x=0 で δ=1.0、ε=0.6、減衰γ=0.05、初期変位x₀=0.10 を設定すると、フロケ乗数の最大値が1を超え不安定領域に入り、時刻歴応答で振幅が指数的に増大します。減衰γを0.25まで増やすと同一の(δ,ε)でも安定化し、振幅は有界に保たれます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -519,9 +672,19 @@ function getParams() {
 <li>ε値が0.7を超える場合、高次非線形効果の影響で線形マシュー方程式の予測精度が低下する。鋼製パイプ（OD=40mm、厚さ2mm）のパラメトリック励起では実測と10%以上の誤差が生じやすい</li>
 <li>减衰係数は材料の内部摩擦と支持部の粘性減衰を合計する。コンクリート梁でζ≈0.05～0.08、鋼構造でζ≈0.02～0.04が目安</li>
 <li>安定・不安定の境界近傍（Stability Chartの曲線±1mm以内）では初期条件の微小な変化で応答が大きく変化するため、複数シミュレーション実行による信頼性確認が必須</li>
-<li>実機検証時は励起周波数Ωと固有振動数ω₀の比（δ=Ω/2ω₀）を正確に測定しないと設計値と実際の共振特性にズレが生じる</li>
+<li>実機検証時は固有振動数ω₀と励起周波数の関係（本ツールのδは固有振動数²に相当し、δ≈n²で主共振）を正確に把握しないと設計値と実際の共振特性にズレが生じる</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

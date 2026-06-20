@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "伝送線路・インピーダンス整合計算機",
       "description": "反射係数Γ、VSWR、入力インピーダンスZinをリアルタイム計算。電圧・電流定在波パターンを可視化。",
       "url": "https://novasolver.jp/tools/transmission-line.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["反射係数Γの大きさ・位相計算","VSWRと反射損失[dB]の算出","入力インピーダンスZinの計算","電圧・電流定在波パターンの可視化","整合・短絡・開放・λ/4変成器プリセット"],
       "keywords": "伝送線路,インピーダンス整合,VSWR,反射係数,定在波,高周波回路,EMC,RF設計",
       "datePublished": "2026-04-08",
@@ -130,6 +130,22 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== TL hero animation ===== */
+#tlhCanvas{border-radius:8px;background:#0a1628;display:block;width:100%;max-width:100%}
+#tlhCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.tlh-readouts{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
+.tlh-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.tlh-ro .rv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.1}
+.tlh-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.tlh-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.tlh-readouts{grid-template-columns:repeat(3,1fr)}}
+.tlh-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.tlh-legend span{display:inline-flex;align-items:center;gap:5px}
+.tlh-legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.tlh-presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.tlh-play{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+@media(prefers-reduced-motion:reduce){input[type=range]::-webkit-slider-thumb{transition:none}}
+/* end TL hero */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/transmission-line.html">
@@ -204,10 +220,69 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="panel-title">計算結果</div>
 <p style="font-size:0.8rem;color:var(--muted);margin-bottom:6px;">入力インピーダンス Z_in</p>
     <div class="zin-display" id="zinDisplay">—</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-wave-square"></i> リアルタイム定在波アニメーション（入射波＋反射波）</div>
+      <div class="tlh-readouts">
+        <div class="tlh-ro accent"><div class="rv" id="tlhGamma">0.33</div><div class="rl">|Γ| 反射係数</div></div>
+        <div class="tlh-ro accent"><div class="rv" id="tlhVSWR">2.00</div><div class="rl">VSWR</div></div>
+        <div class="tlh-ro"><div class="rv" id="tlhGphase">0°</div><div class="rl">∠Γ 位相</div></div>
+        <div class="tlh-ro"><div class="rv" id="tlhRLdb">9.5</div><div class="rl">反射損失 [dB]</div></div>
+        <div class="tlh-ro"><div class="rv" id="tlhVmax">1.33</div><div class="rl">V_max / V_min</div></div>
+        <div class="tlh-ro"><div class="rv" id="tlhMatch">不整合</div><div class="rl">整合状態</div></div>
+      </div>
+      <canvas id="tlhCanvas" height="300" tabindex="0" role="img" aria-label="伝送線路上を進む入射波と反射波が重なり定在波になる様子のアニメーション。"></canvas>
+      <div class="tlh-legend">
+        <span><i class="swatch" style="background:#ff7043"></i>入射波</span>
+        <span><i class="swatch" style="background:#42a5f5"></i>反射波</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>合成（実電圧）</span>
+        <span><i class="swatch" style="background:rgba(0,180,216,.85)"></i>定在波包絡線</span>
+      </div>
+      <div class="tlh-presets">
+        <button class="preset-btn" type="button" onclick="tlhPreset('matched')">整合 Z_L=Z₀</button>
+        <button class="preset-btn" type="button" onclick="tlhPreset('open')">開放</button>
+        <button class="preset-btn" type="button" onclick="tlhPreset('short')">短絡</button>
+        <button class="preset-btn" type="button" onclick="tlhPreset('mismatch')">2:1 不整合</button>
+      </div>
+      <div class="param-group" style="margin-top:10px">
+        <div class="param-label"><span class="param-name">特性インピーダンス Z₀</span><span class="param-value"><span id="tlhZ0v">50</span> Ω</span></div>
+        <input type="range" id="tlhZ0" min="10" max="200" step="1" value="50" oninput="tlhParam()" aria-label="特性インピーダンス Z0">
+      </div>
+      <div class="param-group">
+        <div class="param-label"><span class="param-name">負荷抵抗 R_L</span><span class="param-value"><span id="tlhRLv">100</span> Ω</span></div>
+        <input type="range" id="tlhRL" min="0" max="400" step="1" value="100" oninput="tlhParam()" aria-label="負荷抵抗 RL">
+      </div>
+      <div class="param-group">
+        <div class="param-label"><span class="param-name">負荷リアクタンス X_L</span><span class="param-value"><span id="tlhXLv">0</span> Ω</span></div>
+        <input type="range" id="tlhXL" min="-200" max="200" step="1" value="0" oninput="tlhParam()" aria-label="負荷リアクタンス XL">
+      </div>
+      <div class="param-group">
+        <div class="param-label"><span class="param-name">線路長 / 波長</span><span class="param-value"><span id="tlhLenv">1.5</span> λ</span></div>
+        <input type="range" id="tlhLen" min="0.5" max="3" step="0.05" value="1.5" oninput="tlhParam()" aria-label="線路長 波長比">
+      </div>
+      <div class="tlh-play">
+        <button class="btn" type="button" id="tlhPlayBtn" onclick="tlhToggle()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="tlhReset()"><i class="fas fa-redo"></i> リセット</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn tlh-spd" type="button" data-s="0.5" onclick="tlhSpeed(0.5)">0.5×</button>
+          <button class="preset-btn tlh-spd active" type="button" data-s="1" onclick="tlhSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn tlh-spd" type="button" data-s="2" onclick="tlhSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="cae-note"><strong>見方：</strong>入射波（橙）が負荷へ進み、反射波（青）が戻ってくる。両者の重ね合わせが実際の電圧（黄）で、その振幅の山＝<strong>包絡線</strong>（水色）が<strong>定在波</strong>。整合（Z_L=Z₀）なら反射ゼロで包絡線は平坦＝進行波のみ。短絡・開放では全反射で完全な定在波になる。山(V_max)と谷(V_min)はλ/2間隔。</div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card" id="cardGamma">
@@ -240,6 +315,171 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 </div>
 </div>
+
+<script>
+/* ===== TL hero standing-wave animation (self-contained IIFE) ===== */
+(function(){
+  "use strict";
+  const cv=document.getElementById('tlhCanvas'); if(!cv) return;
+  const ctx=cv.getContext('2d');
+  const $=id=>document.getElementById(id);
+  const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing=!reduce, raf=null, last=0, phase=0, speed=1, cssW=0, cssH=300;
+  const LBL={matched:'整合',mismatch:'不整合',open:'開放',short:'短絡'};
+
+  function num(id){return parseFloat($(id).value);}
+  function setSlider(id){const e=$(id),mn=+e.min,mx=+e.max;e.style.setProperty('--pct',((+e.value-mn)/(mx-mn)*100)+'%');}
+
+  function gamma(){
+    const Z0=num('tlhZ0'), RL=num('tlhRL'), XL=num('tlhXL');
+    const nr=RL-Z0, ni=XL, dr=RL+Z0, di=XL;
+    const dd=dr*dr+di*di||1e-9;
+    const Gr=(nr*dr+ni*di)/dd, Gi=(ni*dr-nr*di)/dd;
+    const mag=Math.min(1,Math.hypot(Gr,Gi)), ang=Math.atan2(Gi,Gr);
+    return {Gr,Gi,mag,ang,Z0,RL,XL};
+  }
+
+  function readouts(g){
+    const vswr=g.mag>=0.999?Infinity:(1+g.mag)/(1-g.mag);
+    const rl=g.mag>1e-9?-20*Math.log10(g.mag):99;
+    const vmax=1+g.mag, vmin=1-g.mag;
+    const ratio=vmin>1e-3?(vmax/vmin):Infinity;
+    $('tlhGamma').textContent=g.mag.toFixed(3);
+    $('tlhVSWR').textContent=isFinite(vswr)?vswr.toFixed(2):'∞';
+    $('tlhGphase').textContent=(g.ang*180/Math.PI).toFixed(0)+'°';
+    $('tlhRLdb').textContent=rl>90?'∞':rl.toFixed(1);
+    $('tlhVmax').textContent=isFinite(ratio)?(vmax.toFixed(2)+' / '+vmin.toFixed(2)):(vmax.toFixed(2)+' / 0');
+    $('tlhMatch').textContent=g.mag<0.02?LBL.matched:LBL.mismatch;
+  }
+
+  function resize(){
+    const rect=cv.parentElement.getBoundingClientRect();
+    cssW=Math.max(280,Math.floor(rect.width-(window.innerWidth<600?28:44)));
+    cssH=window.innerWidth<600?230:300;
+    const dpr=Math.min(window.devicePixelRatio||1,2.5);
+    cv.style.width=cssW+'px'; cv.style.height=cssH+'px';
+    cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function draw(){
+    resize();
+    const W=cssW,H=cssH;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+    const g=gamma(); readouts(g);
+    const padL=46,padR=70,padT=18,padB=40;
+    const x0=padL, x1=W-padR, lineW=x1-x0;
+    const len=num('tlhLen'); // wavelengths along the line
+    const midY=padT+(H-padT-padB)/2;
+    const A=(H-padT-padB)/2*0.92/(1+g.mag); // base incident amplitude so peak (1+|G|) fits
+
+    // axis
+    ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1;
+    for(let i=0;i<=4;i++){const yy=padT+(H-padT-padB)*i/4; ctx.beginPath(); ctx.moveTo(x0,yy); ctx.lineTo(x1,yy); ctx.stroke();}
+    ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(x0,midY); ctx.lineTo(x1,midY); ctx.stroke();
+
+    // position z measured in wavelengths from the SOURCE (left). Load at right (z=len).
+    // Forward wave: cos(2π z - ω t). Reflected: |G| cos(2π(2 len - z) + angG - ω t) relative; use distance from load.
+    function envAt(zFromLoad){
+      // |1 + |G| e^{j(angG + 2*2π*zFromLoad)}|  -> standing wave envelope
+      const ph=g.ang+2*(2*Math.PI*zFromLoad);
+      const re=1+g.mag*Math.cos(ph), im=g.mag*Math.sin(ph);
+      return Math.hypot(re,im);
+    }
+    function fwd(zFromLoad,t){return Math.cos(2*Math.PI*zFromLoad - t);}
+    function ref(zFromLoad,t){return g.mag*Math.cos(2*Math.PI*zFromLoad + g.ang + t);}
+
+    const NP=240;
+    // envelope (upper + lower), filled
+    ctx.beginPath();
+    for(let k=0;k<=NP;k++){const z=k/NP*len; const px=x0+ (1-z/len)*lineW; const e=envAt(z); const py=midY - e*A; (k===0?ctx.moveTo(px,py):ctx.lineTo(px,py));}
+    for(let k=NP;k>=0;k--){const z=k/NP*len; const px=x0+ (1-z/len)*lineW; const e=envAt(z); const py=midY + e*A; ctx.lineTo(px,py);}
+    ctx.closePath();
+    ctx.fillStyle='rgba(0,180,216,0.10)'; ctx.fill();
+    ctx.strokeStyle='rgba(0,180,216,0.85)'; ctx.lineWidth=1.6;
+    ctx.beginPath();
+    for(let k=0;k<=NP;k++){const z=k/NP*len; const px=x0+ (1-z/len)*lineW; const e=envAt(z); const py=midY - e*A; (k===0?ctx.moveTo(px,py):ctx.lineTo(px,py));}
+    ctx.stroke();
+    ctx.beginPath();
+    for(let k=0;k<=NP;k++){const z=k/NP*len; const px=x0+ (1-z/len)*lineW; const e=envAt(z); const py=midY + e*A; (k===0?ctx.moveTo(px,py):ctx.lineTo(px,py));}
+    ctx.stroke();
+
+    // incident (orange) and reflected (blue) traveling waves
+    function plot(fn,color,w){
+      ctx.strokeStyle=color; ctx.lineWidth=w; ctx.beginPath();
+      for(let k=0;k<=NP;k++){const z=k/NP*len; const px=x0+(1-z/len)*lineW; const py=midY - fn(z)*A; (k===0?ctx.moveTo(px,py):ctx.lineTo(px,py));}
+      ctx.stroke();
+    }
+    plot(z=>fwd(z,phase),'rgba(255,112,67,0.55)',1.3);
+    if(g.mag>0.001) plot(z=>ref(z,phase),'rgba(66,165,245,0.55)',1.3);
+    // resultant (yellow) = forward + reflected at time
+    plot(z=>fwd(z,phase)+ref(z,phase),'#ffd54a',2.2);
+
+    // V_max / V_min markers (antinodes/nodes) along the line
+    ctx.font='10px Roboto Mono';
+    for(let k=0;k<=NP;k++){
+      const z=k/NP*len, zn=(k+1)/NP*len;
+      // detect local extrema of envelope
+      if(k>0&&k<NP){
+        const e0=envAt((k-1)/NP*len), e1=envAt(z), e2=envAt(zn);
+        const px=x0+(1-z/len)*lineW;
+        if(e1>e0&&e1>e2&&g.mag>0.03){ctx.fillStyle='rgba(255,213,74,0.9)';ctx.beginPath();ctx.arc(px,midY-e1*A,2.5,0,7);ctx.fill();ctx.beginPath();ctx.arc(px,midY+e1*A,2.5,0,7);ctx.fill();}
+        if(e1<e0&&e1<e2&&g.mag>0.03){ctx.fillStyle='rgba(0,180,216,0.95)';ctx.beginPath();ctx.arc(px,midY,2.5,0,7);ctx.fill();}
+      }
+    }
+
+    // source (left) & load (right) markers
+    ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText('源 (Z₀)', x0, H-16);
+    // load box
+    const matched=g.mag<0.02;
+    ctx.fillStyle=matched?'rgba(0,184,148,0.85)':'rgba(225,112,85,0.85)';
+    ctx.fillRect(x1+6,midY-22,34,44);
+    ctx.fillStyle='#fff'; ctx.font='bold 10px Roboto Mono'; ctx.textAlign='center';
+    ctx.fillText('Z_L',x1+23,midY-6);
+    ctx.fillText(num('tlhRL')+'Ω',x1+23,midY+8);
+    ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Noto Sans JP';
+    ctx.fillText('負荷', x1+23, H-16);
+
+    // title overlay
+    ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='bold 11px Roboto Mono';
+    ctx.fillText((matched?'整合：反射なし・進行波':'VSWR='+(g.mag>=0.999?'∞':((1+g.mag)/(1-g.mag)).toFixed(2))),x0,padT-2);
+    ctx.textAlign='start';
+  }
+
+  function loop(ts){
+    if(!playing){raf=null;return;}
+    if(!last) last=ts;
+    const dt=Math.min(0.05,(ts-last)/1000); last=ts;
+    phase+=dt*2.2*speed;
+    draw();
+    raf=requestAnimationFrame(loop);
+  }
+  function start(){ if(reduce){draw();return;} playing=true; last=0; $('tlhPlayBtn').innerHTML='<i class="fas fa-pause"></i> 一時停止'; if(!raf) raf=requestAnimationFrame(loop); }
+  function stop(){ playing=false; if(raf){cancelAnimationFrame(raf);raf=null;} $('tlhPlayBtn').innerHTML='<i class="fas fa-play"></i> 再生'; }
+
+  window.tlhToggle=function(){ playing?stop():start(); };
+  window.tlhSpeed=function(s){ speed=s; document.querySelectorAll('.tlh-spd').forEach(b=>{const a=parseFloat(b.dataset.s)===s;b.classList.toggle('active',a);b.style.borderColor=a?'var(--accent)':'';b.style.color=a?'var(--accent)':'';}); };
+  window.tlhParam=function(){
+    $('tlhZ0v').textContent=num('tlhZ0'); $('tlhRLv').textContent=num('tlhRL');
+    $('tlhXLv').textContent=num('tlhXL'); $('tlhLenv').textContent=num('tlhLen').toFixed(2);
+    ['tlhZ0','tlhRL','tlhXL','tlhLen'].forEach(setSlider);
+    draw();
+  };
+  window.tlhPreset=function(name){
+    const P={matched:{z0:50,rl:50,xl:0},open:{z0:50,rl:400,xl:0},short:{z0:50,rl:0,xl:0},mismatch:{z0:50,rl:100,xl:0}}[name];
+    if(!P) return; $('tlhZ0').value=P.z0; $('tlhRL').value=P.rl; $('tlhXL').value=P.xl; window.tlhParam();
+  };
+  window.tlhReset=function(){ $('tlhZ0').value=50; $('tlhRL').value=100; $('tlhXL').value=0; $('tlhLen').value=1.5; window.tlhParam(); phase=0; if(!reduce&&!playing) start(); };
+
+  cv.addEventListener('keydown',e=>{ if(e.key===' '||e.key==='Enter'){e.preventDefault();window.tlhToggle();} });
+  window.addEventListener('resize',()=>{ if(!playing) draw(); });
+  window.tlhParam();
+  if(reduce){ draw(); $('tlhPlayBtn').innerHTML='<i class="fas fa-play"></i> 再生'; }
+  else start();
+})();
+</script>
 
 <script>
 function setPct(el){const mn=+el.min,mx=+el.max,v=+el.value;el.style.setProperty('--pct',((v-mn)/(mx-mn)*100)+'%');}const sZ0=document.getElementById('sZ0'), sLen=document.getElementById('sLen');
@@ -400,6 +640,9 @@ update();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="transmission-line.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -473,6 +716,16 @@ update();
 <li>スタブマッチング設計時、分布定数と集中定数の境界周波数（特に同軸ケーブルで 30 MHz 以上）を確認し、必要に応じて完全な分布定数モデルを採用</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

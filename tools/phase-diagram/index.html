@@ -40,7 +40,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "二元合金状態図・凝固シミュレーター",
       "description": "Cu-Ni型等晶・Sn-Pb型共晶などの二元合金状態図をインタラクティブに表示。レバールール計算と凝固シミュレーションで固相率・液相率をリアルタイム可視化。",
       "url": "https://novasolver.jp/tools/phase-diagram.html",
@@ -50,7 +50,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["等晶・共晶・包晶系の状態図","レバールールによる固相率・液相率計算","シール凝固シミュレーション","固相率vs温度曲線のリアルタイム表示","組成と温度のインタラクティブ選択"],
       "keywords": "状態図,相図,レバールール,凝固,固相率,液相率,Cu-Ni,Sn-Pb,共晶,包晶,材料科学",
       "datePublished": "2026-04-08",
@@ -183,7 +183,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="tab-btn active" id="tab-diagram" onclick="switchTab('diagram')">状態図</button>
       <button class="tab-btn" id="tab-solidification" onclick="switchTab('solidification')">凝固曲線</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -229,7 +237,7 @@ const SYSTEMS = {
     eutectic: {C: 61.9, T: 183},
     liquidus: c =>{
       if(c <= 61.9) return 327 - (327-183)*(c/61.9);
-      else          return 183 + (232-183)*((100-c)/(100-61.9));
+      else          return 183 + (232-183)*((c-61.9)/(100-61.9));
     },
     solidus: c => 183,
   },
@@ -241,8 +249,8 @@ const SYSTEMS = {
     peritectic:{C: 0.16, T: 1493},
     liquidus: c =>{
       if(c <= 0.16) return 1538 - (1538-1493)*(c/0.16);
-      else if(c <= 2.0) return 1493 - (1493-1148)*((c-0.16)/(2.0-0.16));
-      else return 1148 + (1538-1148)*Math.pow((4.3-c)/4.3,0.8);
+      const cc = Math.min(c, 4.3); // clamp at eutectic composition (no NaN beyond 4.3)
+      return 1493 - (1493-1148)*((cc-0.16)/(4.3-0.16));
     },
     solidus: c =>{
       if(c <= 0.022) return 1493 - 30*(c/0.022);
@@ -264,7 +272,7 @@ function getSystem(){ return SYSTEMS[currentSystem]; }function changeSystem(){
   tSlider.min = sys.Tmin;
   tSlider.max = sys.Tmax;
   tSlider.value = mid;
-  var _gtempVal=document.getElementById('tempValNum');if(_gtempVal)_gtempVal.textContent = mid + '°C';
+  var _gtempVal=document.getElementById('tempValNum');if(_gtempVal){if(_gtempVal.tagName==='INPUT')_gtempVal.value = mid;else _gtempVal.textContent = mid + '°C';}
   updateSliderPct(tSlider);
   updateDiagram();
 }function onSlider(el, valId, suffix){
@@ -280,23 +288,24 @@ function getSystem(){ return SYSTEMS[currentSystem]; }function changeSystem(){
   const fs = (C0 - CL) / (CS - CL);
   return {fs: Math.max(0, Math.min(1, fs)), CL, CS};
 }function inv_liquidus(T, sys){
-  // Numerical inversion using bisection
-  const C0 = 0, C1 = 100;
-  let lo = C0, hi = C1;
+  // Numerical inversion using bisection (direction-aware)
+  const inc = sys.liquidus(100) > sys.liquidus(0);
+  let lo = 0, hi = 100;
   for(let i=0;i<60;i++) {
     const mid = (lo+hi)/2;
     const v = sys.liquidus(mid);
-    if(v < T) hi = mid; else lo = mid;
+    if((v < T) === inc) lo = mid; else hi = mid;
   }
   const c = (lo+hi)/2;
   if(Math.abs(sys.liquidus(c)-T)>50) return null;
   return c;
 }function inv_solidus(T, sys){
+  const inc = sys.solidus(100) > sys.solidus(0);
   let lo = 0, hi = 100;
   for(let i=0;i<60;i++) {
     const mid = (lo+hi)/2;
     const v = sys.solidus(mid);
-    if(v < T) hi = mid; else lo = mid;
+    if((v < T) === inc) lo = mid; else hi = mid;
   }
   const c = (lo+hi)/2;
   if(Math.abs(sys.solidus(c)-T)>50) return null;
@@ -574,10 +583,10 @@ changeSystem();
       <div class="bub">その通り！二相共存域（L+S）では、温度によって固相と液相の組成と量が変わる。レバールールは、その量の比をてこの原理で求める方法だ。シミュレーターで「Sn-Pb」系を選び、組成C₀を50%くらいに設定して温度を二相域内で上下させてみて。グラフ上の点から水平に引いた線（タイライン）の両端の組成C_S, C_Lと、全体の組成C₀を使って、固相率f_sが自動計算されるのが見えるよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">なるほど！でも、計算された固相率と、下に表示される「シール凝固曲線」や「微細組織」はどう関係するんですか？</div>
+      <div class="bub">なるほど！でも、計算された固相率と、下に表示される「シール凝固曲線」はどう関係するんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">いいところに気づいたね。レバールールで各温度での固相率がわかると、それを積分することで「どれだけ凝固が進んだか」を温度の関数として描ける。それがシール凝固曲線だ。実務では、この曲線の形が鋳造品の収縮巣の発生や、溶接部の割れに直結する。微細組織の可視化は、その温度・組成でどんな結晶が生まれ、成長するかをイメージするためのものだ。パラメータを変えると、組織の形がガラリと変わるのが面白いよ。</div>
+      <div class="bub">いいところに気づいたね。レバールールで各温度での固相率がわかると、それを積分することで「どれだけ凝固が進んだか」を温度の関数として描ける。それがシール凝固曲線だ。実務では、この曲線の形が鋳造品の収縮巣の発生や、溶接部の割れに直結する。パラメータを変えると、曲線の形がガラリと変わるのが面白いよ。</div>
     </div>
   </div>
   <h2>よくある質問</h2>
@@ -616,6 +625,9 @@ changeSystem();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="phase-diagram.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -673,12 +685,18 @@ changeSystem();
 <li>合金元素（Cu-Ni系またはSn-Pb系）と初期濃度をc0スライダーで0～100%の範囲で設定</li>
 <li>温度スライダーで液相線・固相線間の二相域温度を選択し、該当する平衡状態を指定</li>
 <li>レバールール計算により固相率fs、液相率fl、固相組成Cs、液相組成CLが自動更新される</li>
-<li>凝固曲線グラフで冷却過程における組成変化と微細組織の層状構造を確認</li>
+<li>凝固曲線グラフで冷却過程における固相率の変化を確認</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>Cu-Ni系合金で初期濃度30%Ni、温度1250℃の場合、液相線上の組成は45%Ni、固相線上の組成は15%Niとします。レバールール：fs=(CL-C0)/(CL-Cs)=(45-30)/(45-15)=0.5（50%固相率）、fl=0.5（50%液相率）。固相はNi濃度15%の低Ni相、液相は45%Niの高Ni相が共存し、降温時にセイジャー凝固により固相組成は徐々に45%へ上昇します。</p>
+<p>Cu-Ni系合金で初期濃度C0=55%Ni、温度1280℃の場合：液相線上の組成はCL≈53.0%Ni、固相線上の組成はCS≈61.3%Niとなります。レバールール：fs=(C0-CL)/(CS-CL)=(55-53.0)/(61.3-53.0)≈0.24（固相率24%）、fl≈0.76（液相率76%）。Ni濃度約61%の高Ni固相と約53%Niの液相が共存し、降温とともに固相率が増加します。急冷時にはシャイル(Scheil)凝固により固相内拡散が追いつかず、ミクロ偏析が生じます。</p>
+</div>
+<div class="howto-card">
+<h3>準拠規格・前提条件</h3>
+<p><strong>準拠/参考：</strong> てこの法則（レバールール）\(f_s = (C_0 - C_L)/(C_S - C_L)\)、\(f_s+f_L=1\)（質量保存）。二相共存域のタイラインに基づく古典的構成（Callister『材料科学』、Gibbsの相平衡）。非平衡はScheil式を参照。</p>
+<p><strong>モデルの前提：</strong> 平衡凝固（固相内拡散が十分）を仮定。レバールールは質量分率を与え、密度差がある系では体積分率と一致しない。各系の液相線・固相線は教育用の解析的近似曲線（Cu-Ni固相線=べき1.3、Fe-Cは区分線形）であり、CALPHAD評価値ではない。Sn-Pb共晶（61.9 wt% Sn / 183 °C）は文献値。</p>
+<p><strong>適用範囲・限界：</strong> 二相域でのみレバールールが有効。表示の状態図境界は傾向把握用の模式線であり、凝固曲線のScheilモデルは \(k_0=C_S/C_L\) を用いた簡略版。定量設計には実測状態図・CALPHAD・凝固解析を併用すること。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -688,6 +706,16 @@ changeSystem();
 <li>工業用銅合金設計では、所定の強度・耐食性確保のため目標濃度と凝固組織の関係をシミュレーションで事前検証が必須</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

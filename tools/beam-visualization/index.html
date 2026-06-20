@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "はり断面特性ビジュアライザー",
       "description": "矩形・円形・中空矩形・中空円形・I形・T形の6断面に対し、断面積A・重心ȳ・断面二次モーメントIx/Iy・断面係数Zx/Zy・慣性半径・最大曲げ応力をリアルタイム計算し、応力分布をカラー可視化するCAE学習ツール。",
       "url": "https://novasolver.jp/tools/beam-visualization.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["6種類の断面形状（矩形・円形・中空矩形・中空円・I形・T形）","断面二次モーメントIx・Iy・断面係数Zx・Zy・慣性半径rx・断面効率I/Aを計算","曲げモーメント入力による断面応力分布のカラーグラデーション表示","Chart.jsによる断面高さ方向の曲げ応力分布グラフ"],
       "keywords": "断面二次モーメント,断面係数,曲げ応力,はり理論,構造解析,CAE,I形鋼",
       "datePublished": "2026-04-08",
@@ -73,7 +73,7 @@
         },{
           "@type": "Question",
           "name": "曲げ応力の符号（圧縮・引張）はどう見分けますか？",
-          "acceptedAnswer": {"@type": "Answer", "text": "正の曲げモーメント（下に凸の変形）では上縁が圧縮（青色）、下縁が引張（赤色）になります。中立軸でゼロとなる線形分布です。このツールでは応力の大きさをカラーグラデーションで表示しているため、どの部位に最大応力が生じるかを直感的に確認できます。"}
+          "acceptedAnswer": {"@type": "Answer", "text": "本ツールの符号規約では、正の曲げモーメントで上縁のσ=+My/Iを赤（引張）、下縁を青（圧縮）として表示します。中立軸でゼロとなる線形分布です。"}
         }
       ]
     },{
@@ -137,6 +137,15 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+.btn-row{display:flex;gap:8px;margin:6px 0 10px}
+.ctrl-btn{flex:1;padding:8px 0;border:1px solid var(--border);border-radius:8px;background:var(--accent);color:#fff;font-size:0.9rem;cursor:pointer;transition:filter .15s}
+.ctrl-btn:hover{filter:brightness(1.08)}
+.preset-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.preset-btn{flex:1 1 45%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.72rem;cursor:pointer;font-family:inherit}
+.preset-btn:hover{background:rgba(0,123,255,.08);border-color:var(--accent)}
+#beamCanvas,#sfdCanvas,#bmdCanvas{display:block;width:100%;background:#f7fafc;border-radius:8px;border:1px solid var(--border)}
+@media(max-width:820px){ .ctrl-btn{font-size:0.82rem} .preset-btn{font-size:0.68rem} }
+
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/beam-visualization.html">
@@ -159,75 +168,108 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <div class="hero">
   <div class="hero-inner">
     <div class="hero-badge"><i class="fas fa-drafting-compass"></i> 構造解析ツール</div>
-    <h1>はり（梁）の断面特性ビジュアライザー</h1>
-    <p class="hero-sub">6種類の断面形状を選び、寸法スライダーを動かすと断面二次モーメント・断面係数・曲げ応力分布がリアルタイム更新。I形鋼の断面効率を矩形と比較しよう。</p>
+    <h1>はり（梁）の挙動ビジュアライザー</h1>
+    <p class="hero-sub">荷重が加わるにつれて梁のたわみ形状がリアルタイムにアニメーション。反力・せん断力図(SFD)・曲げモーメント図(BMD)を同時に描き、最大モーメント・せん断ゼロ点・変曲点をマーク。移動荷重で図の変化も体感できる。</p>
   </div>
 </div>
 
 <div class="main">
   <div class="panel">
-    <div class="panel-title"><i class="fas fa-shapes"></i> 断面設定</div>
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> 梁・支持条件</div>
 
-    <select class="section-select" id="sectionType" onchange="onSectionChange()">
-      <option value="rect">矩形断面</option>
-      <option value="circle">円形断面</option>
-      <option value="hollow_rect">中空矩形断面</option>
-      <option value="hollow_circle">中空円形断面</option>
-      <option value="ibeam" selected>I形断面</option>
-      <option value="tee">T形断面</option>
+    <select class="section-select" id="supportType">
+      <option value="ss" selected>単純支持（両端ピン・ローラー）</option>
+      <option value="cant">片持ち梁（左端固定）</option>
     </select>
 
-    <div id="dimControls"></div>
-
-    <div class="divider"></div>
-    <div class="panel-title"><i class="fas fa-compress-arrows-alt"></i> 荷重</div>
+    <select class="section-select" id="loadKind">
+      <option value="udl" selected>等分布荷重 UDL</option>
+      <option value="point">集中荷重</option>
+      <option value="moving">移動荷重（集中）</option>
+    </select>
 
     <div class="param-group">
-      <div class="param-label">
-        <span class="param-name">曲げモーメント M</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="momVal" value="5000" min="0" max="10000" step="100" oninput="syncFromNum('moment','momVal')"><span class="num-unit">N·m</span></div>
-      </div>
-      <input type="range" id="moment" min="0" max="10000" step="100" value="5000"
-             oninput="syncToNum('moment','momentNum');syncToNum('moment','momVal');updateSlider(this,'momVal',0,' N·m');onUpdate()">
-<input type="number" class="num-input" id="momentNum" value="5000" min="0" max="10000" step="100" style="width:70px;margin-left:6px;" oninput="syncFromNum('moment','momentNum')">
+      <div class="param-label"><span class="param-name">スパン L</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="spanLNum" value="4" min="1" max="10" step="0.5"><span class="num-unit">m</span></div></div>
+      <input type="range" id="spanL" min="1" max="10" step="0.5" value="4">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">弾性係数 E</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="beamENum" value="200" min="10" max="400" step="10"><span class="num-unit">GPa</span></div></div>
+      <input type="range" id="beamE" min="10" max="400" step="10" value="200">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">断面二次モーメント I</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="beamINum" value="8" min="0.5" max="100" step="0.5"><span class="num-unit">×10⁻⁶m⁴</span></div></div>
+      <input type="range" id="beamI" min="0.5" max="100" step="0.5" value="8">
+    </div>
+
+    <div class="param-group" id="grpUDL">
+      <div class="param-label"><span class="param-name">分布荷重 w</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="udlWNum" value="10000" min="0" max="50000" step="500"><span class="num-unit">N/m</span></div></div>
+      <input type="range" id="udlW" min="0" max="50000" step="500" value="10000">
+    </div>
+
+    <div class="param-group" id="grpP">
+      <div class="param-label"><span class="param-name">集中荷重 P</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="ptPNum" value="20" min="0" max="100" step="1"><span class="num-unit">kN</span></div></div>
+      <input type="range" id="ptP" min="0" max="100" step="1" value="20">
+    </div>
+
+    <div class="param-group" id="grpPos">
+      <div class="param-label"><span class="param-name">荷重位置 a/L</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="ptPosNum" value="50" min="0" max="100" step="1"><span class="num-unit">%</span></div></div>
+      <input type="range" id="ptPos" min="0" max="100" step="1" value="50">
     </div>
 
     <div class="divider"></div>
-    <div class="panel-title"><i class="fas fa-table"></i> 断面諸量</div>
+    <div class="btn-row" role="group" aria-label="再生コントロール">
+      <button class="ctrl-btn" id="btnPlay" aria-label="再生 / 一時停止"><i class="fas fa-pause"></i></button>
+      <button class="ctrl-btn" id="btnReset" aria-label="最初から"><i class="fas fa-undo"></i></button>
+    </div>
+    <div class="preset-row" role="group" aria-label="プリセット">
+      <button class="preset-btn" data-preset="ss_udl">単純支持・UDL</button>
+      <button class="preset-btn" data-preset="ss_point">単純支持・集中</button>
+      <button class="preset-btn" data-preset="cant">片持ち・先端集中</button>
+      <button class="preset-btn" data-preset="moving">移動荷重</button>
+    </div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-grid">
-      <div class="stat-card"><div class="sv" id="statA">—</div><div class="sl">断面積 A (mm²)</div></div>
-      <div class="stat-card"><div class="sv" id="statYbar">—</div><div class="sl">重心 ȳ (mm)</div></div>
-      <div class="stat-card"><div class="sv" id="statIx">—</div><div class="sl">Ix (×10⁴ mm⁴)</div></div>
-      <div class="stat-card"><div class="sv" id="statIy">—</div><div class="sl">Iy (×10⁴ mm⁴)</div></div>
-      <div class="stat-card"><div class="sv" id="statZx">—</div><div class="sl">Zx (×10³ mm³)</div></div>
-      <div class="stat-card"><div class="sv" id="statZy">—</div><div class="sl">Zy (×10³ mm³)</div></div>
-      <div class="stat-card"><div class="sv" id="statRx">—</div><div class="sl">慣性半径 rx (mm)</div></div>
-      <div class="stat-card"><div class="sv" id="statIoA">—</div><div class="sl">I/A 断面効率 (mm²)</div></div>
-      <div class="stat-card wide"><div class="sv" id="statSigma" style="color:#dc3545">—</div><div class="sl">最大曲げ応力 σ_max (MPa)</div></div>
+      <div class="stat-card"><div class="sv" id="statRA">—</div><div class="sl">反力 R_A</div></div>
+      <div class="stat-card"><div class="sv" id="statRB">—</div><div class="sl">反力 R_B</div></div>
+      <div class="stat-card"><div class="sv" id="statMmax" style="color:#7b2ff7">—</div><div class="sl">最大曲げモーメント</div></div>
+      <div class="stat-card"><div class="sv" id="statMpos">—</div><div class="sl">M_max の位置 x</div></div>
+      <div class="stat-card"><div class="sv" id="statVmax" style="color:#e8590c">—</div><div class="sl">最大せん断力</div></div>
+      <div class="stat-card"><div class="sv" id="statDmax" style="color:#dc3545">—</div><div class="sl">最大たわみ δ_max</div></div>
+      <div class="stat-card"><div class="sv" id="statDpos">—</div><div class="sl">δ_max の位置 x</div></div>
+      <div class="stat-card"><div class="sv" id="statPhase">—</div><div class="sl">載荷率 / 移動位置</div></div>
     </div>
     </div>
 
-    <div class="canvas-row">
-      <div>
-        <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 断面形状（応力カラー）</div><canvas id="sectionCanvas" width="600" height="560"></canvas></div>
-      </div>
-      <div>
-        <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 応力分布</div><canvas id="stressCanvas" width="160" height="320"></canvas></div>
-      </div>
-    </div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 可視化</div><canvas class="ux-chartjs-canvas" id="chartCanvas"></canvas></div>
-  
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-drafting-compass"></i> 梁のたわみ形状・反力（アニメーション）</div><canvas id="beamCanvas" width="600" height="220"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-area"></i> せん断力図 SFD（V=0 をマーク）</div><canvas id="sfdCanvas" width="600" height="170"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-area"></i> 曲げモーメント図 BMD（M_max・変曲点をマーク）</div><canvas id="bmdCanvas" width="600" height="170"></canvas></div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      $I_x = \displaystyle\int y^2\,dA$<br>
-      $Z_x = \dfrac{I_x}{c}$,&nbsp;&nbsp;$\sigma = \dfrac{M \cdot y}{I_x}$<br>
-      $r_x = \sqrt{\dfrac{I_x}{A}}$
-    
+      <p>単純支持＋等分布荷重：$\displaystyle M_{max}=\frac{wL^2}{8},\quad \delta_{max}=\frac{5wL^4}{384EI}$</p>
+      <p>単純支持＋中央集中荷重：$\displaystyle M_{max}=\frac{PL}{4},\quad \delta_{max}=\frac{PL^3}{48EI}$</p>
+      <p>反力は静定（$\sum F=0,\ \sum M=0$）、せん断力 $V(x)=-\int w\,dx$、曲げモーメント $M(x)=\int V\,dx$、たわみは $EI\,y''=M$ の二重積分で求める。</p>
+
 </div>
 </div>
 </div>
@@ -235,191 +277,273 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
-}
+(function(){
+  'use strict';
+  function $(id){ return document.getElementById(id); }
 
-
-const DEFS ={
-  rect:   [{id:'b',label:'幅 b',min:20,max:300,step:5,val:100},{id:'h',label:'高さ h',min:20,max:400,step:5,val:200}],
-  circle: [{id:'d',label:'直径 d',min:20,max:300,step:5,val:150}],
-  hollow_rect: [{id:'B',label:'外幅 B',min:40,max:300,step:5,val:120},{id:'H',label:'外高さ H',min:40,max:400,step:5,val:200},{id:'t',label:'板厚 t',min:2,max:40,step:1,val:10}],
-  hollow_circle:[{id:'D',label:'外径 D',min:40,max:300,step:5,val:150},{id:'t',label:'板厚 t',min:2,max:40,step:1,val:8}],
-  ibeam:[{id:'bf',label:'フランジ幅 bf',min:40,max:300,step:5,val:150},{id:'tf',label:'フランジ厚 tf',min:4,max:40,step:2,val:12},{id:'hw',label:'ウェブ高さ hw',min:40,max:400,step:5,val:176},{id:'tw',label:'ウェブ厚 tw',min:2,max:30,step:1,val:8}],
-  tee:[{id:'bf',label:'フランジ幅 bf',min:40,max:300,step:5,val:150},{id:'tf',label:'フランジ厚 tf',min:4,max:40,step:2,val:12},{id:'hw',label:'ウェブ高さ hw',min:20,max:300,step:5,val:100},{id:'tw',label:'ウェブ厚 tw',min:2,max:30,step:1,val:8}]
-};
-
-function onSectionChange(){
-  buildControls();
-  onUpdate();
-}function buildControls(){
-  const type = document.getElementById('sectionType').value;
-  const c = document.getElementById('dimControls');
-  c.innerHTML = '';
-  DEFS[type].forEach(p => {
-    c.innerHTML += `<div class="param-group"><div class="param-label"><span class="param-name">${p.label}</span><div class="num-wrap"><input type="number" class="num-input" id="pr_${p.id}Num" value="${p.val}" min="${p.min}" max="${p.max}" step="${p.step}" oninput="syncFromNum('pr_${p.id}','pr_${p.id}Num')"></div></div><input type="range" id="pr_${p.id}" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.val}" oninput="syncToNum('pr_${p.id}','pr_${p.id}Num');updateSlider(this,'pv_${p.id}',0,' mm');onUpdate()"></div>`;
-  });
-  DEFS[type].forEach(p =>{
-    const el = document.getElementById('pr_' + p.id);
-    if(el){ const mn=parseFloat(el.min),mx=parseFloat(el.max),v=parseFloat(el.value); el.style.setProperty('--pct',((v-mn)/(mx-mn)*100)+'%'); }
-  });
-}function gp(id){ const el=document.getElementById('pr_'+id); return el?parseFloat(el.value):0; }function calcSection(){
-  const type = document.getElementById('sectionType').value;
-  let A,ybar,Ix,Iy,secH,secW,cx;
-  if(type==='rect'){
-    const b=gp('b'),h=gp('h'); A=b*h; ybar=h/2; Ix=b*h*h*h/12; Iy=h*b*b*b/12; secH=h; secW=b; cx=b/2;
-  }else if(type==='circle'){
-    const r=gp('d')/2; A=Math.PI*r*r; ybar=r; Ix=Math.PI*r*r*r*r/4; Iy=Ix; secH=gp('d'); secW=gp('d'); cx=r;
-  }else if(type==='hollow_rect'){
-    const B=gp('B'),H=gp('H'),t=gp('t'),bi=B-2*t,hi=H-2*t;
-    A=B*H-bi*hi; ybar=H/2; Ix=(B*H*H*H-bi*hi*hi*hi)/12; Iy=(H*B*B*B-hi*bi*bi*bi)/12; secH=H; secW=B; cx=B/2;
-  }else if(type==='hollow_circle'){
-    const R=gp('D')/2,r=R-gp('t'); A=Math.PI*(R*R-r*r); ybar=R; Ix=Math.PI*(R*R*R*R-r*r*r*r)/4; Iy=Ix; secH=gp('D'); secW=gp('D'); cx=R;
-  }else if(type==='ibeam'){
-    const bf=gp('bf'),tf=gp('tf'),hw=gp('hw'),tw=gp('tw'); const H=hw+2*tf;
-    A=2*bf*tf+hw*tw; ybar=H/2;
-    const If=bf*tf*tf*tf/12+bf*tf*(hw/2+tf/2)*(hw/2+tf/2);
-    Ix=2*If+tw*hw*hw*hw/12; Iy=2*(tf*bf*bf*bf/12)+hw*tw*tw*tw/12;
-    secH=H; secW=bf; cx=bf/2;
-  }else{
-    const bf=gp('bf'),tf=gp('tf'),hw=gp('hw'),tw=gp('tw'); const H=hw+tf;
-    const A1=bf*tf,y1=H-tf/2,A2=hw*tw,y2=hw/2;
-    A=A1+A2; ybar=(A1*y1+A2*y2)/A;
-    Ix=bf*tf*tf*tf/12+A1*(y1-ybar)*(y1-ybar)+tw*hw*hw*hw/12+A2*(y2-ybar)*(y2-ybar);
-    Iy=tf*bf*bf*bf/12+hw*tw*tw*tw/12; secH=H; secW=bf; cx=bf/2;
-  }const c_top=ybar, c_bot=secH-ybar, c=Math.max(c_top,c_bot);
-  const Zx=Ix/c, Zy=Iy/cx, rx=Math.sqrt(Ix/A);
-  const M=parseFloat(document.getElementById('moment').value);
-  const sigma=M*1000*c/Ix;
-  return{A,ybar,Ix,Iy,Zx,Zy,rx,sigma,secH,secW,M,c_top,c_bot};
-}let chart=null;
-
-function drawSection(s){
-  const cv=document.getElementById('sectionCanvas'); const ctx = cv.getContext('2d');const __novaDims0 = __novaHiDpiCanvas(cv, cv.clientWidth || cv.width, cv.clientHeight || cv.height, ctx);
-const W = __novaDims0.w, HC = __novaDims0.h; ctx.clearRect(0,0,W,HC);
-  const type=document.getElementById('sectionType').value;
-  const pad=36, aW=W-2*pad, aH=HC-2*pad;
-  const scale=Math.min(aW/s.secW, aH/s.secH);
-  const ox=W/2, oy=HC/2;
-
-  function sc(sig) {
-    if(s.sigma<0.001) return 'rgba(0,123,255,0.55)';
-    const t=sig/s.sigma;
-    if(t>0){ return `rgba(${Math.round(200+55*t)},${Math.round(80-60*t)},${Math.round(80-60*t)},0.75)`; }else{ const a=-t; return `rgba(${Math.round(60+40*a)},${Math.round(80+60*a)},${Math.round(200+55*a)},0.75)`; }
-  }function fillR(xb,yb,w,h){
-    const px=ox+(xb-s.secW/2)*scale, py=oy+(s.secH/2-(yb+h))*scale, pw=w*scale, ph=h*scale;
-    const g=ctx.createLinearGradient(px,py,px,py+ph);
-    const ns=12;
-    for(let i=0;i<=ns;i++){const f=i/ns;const yrel=(yb+h*(1-f))-s.ybar;const sig=s.Ix>0?s.M*1000*yrel/s.Ix:0;g.addColorStop(f,sc(sig));}
-    ctx.fillStyle=g; ctx.fillRect(px,py,pw,ph);
-    ctx.strokeStyle='rgba(0,30,60,0.5)'; ctx.lineWidth=1; ctx.strokeRect(px,py,pw,ph);
-  }if(type==='rect'){ fillR(0,0,gp('b'),gp('h')); }else if(type==='circle'){
-    const r=gp('d')/2;
-    const g=ctx.createLinearGradient(ox,oy-r*scale,ox,oy+r*scale);
-    g.addColorStop(0,sc(r-s.ybar)); g.addColorStop(1,sc(-s.ybar));
-    ctx.beginPath(); ctx.arc(ox,oy,r*scale,0,2*Math.PI);
-    ctx.fillStyle=g; ctx.fill(); ctx.strokeStyle='rgba(0,30,60,0.5)'; ctx.lineWidth=1; ctx.stroke();
-  }else if(type==='hollow_rect'){
-    const B=gp('B'),H=gp('H'),t=gp('t');
-    fillR(0,H-t,B,t); fillR(0,0,B,t); fillR(0,t,t,H-2*t); fillR(B-t,t,t,H-2*t);
-  }else if(type==='hollow_circle'){
-    const R=gp('D')/2,r=R-gp('t');
-    const g=ctx.createLinearGradient(ox,oy-R*scale,ox,oy+R*scale);
-    g.addColorStop(0,sc(R-s.ybar)); g.addColorStop(1,sc(-s.ybar));
-    ctx.beginPath(); ctx.arc(ox,oy,R*scale,0,2*Math.PI); ctx.fillStyle=g; ctx.fill(); ctx.strokeStyle='rgba(0,30,60,0.5)'; ctx.lineWidth=1; ctx.stroke();
-    ctx.beginPath(); ctx.arc(ox,oy,r*scale,0,2*Math.PI); ctx.fillStyle='#f0f4f8'; ctx.fill(); ctx.strokeStyle='rgba(0,30,60,0.5)'; ctx.lineWidth=1; ctx.stroke();
-  }else if(type==='ibeam'){
-    const bf=gp('bf'),tf=gp('tf'),hw=gp('hw'),tw=gp('tw'),H=hw+2*tf;
-    fillR(0,H-tf,bf,tf); fillR((bf-tw)/2,tf,tw,hw); fillR(0,0,bf,tf);
-  }else{
-    const bf=gp('bf'),tf=gp('tf'),hw=gp('hw'),tw=gp('tw'),H=hw+tf;
-    fillR(0,H-tf,bf,tf); fillR((bf-tw)/2,0,tw,hw);
+  function hidpi(canvas, cssW, cssH, ctx){
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.setAttribute('data-ux-no-scale','1');
+    var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
+    var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 200));
+    canvas.style.width = w+'px'; canvas.style.height = h+'px';
+    canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+    if (ctx && ctx.setTransform) ctx.setTransform(dpr,0,0,dpr,0,0);
+    return { w:w, h:h, dpr:dpr };
   }
 
-  // centroid line
-  const cy2=oy+(s.secH/2-s.ybar)*scale;
-  ctx.setLineDash([5,4]); ctx.strokeStyle='#FFD700'; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(pad/2,cy2); ctx.lineTo(W-pad/2,cy2); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle='#FFD700'; ctx.font='bold 11px Roboto Mono,monospace';
-  ctx.fillText('ȳ',W-pad/2+2,cy2+4);
-}function drawStress(s){
-  const cv=document.getElementById('stressCanvas'); const ctx = cv.getContext('2d');
-const __novaDims1 = __novaHiDpiCanvas(cv, cv.clientWidth || cv.width, cv.clientHeight || cv.height, ctx);
-const W = __novaDims1.w, HC = __novaDims1.h; ctx.clearRect(0,0,W,HC);
-  ctx.fillStyle='#f0f4f8'; ctx.fillRect(0,0,W,HC);
-  const pad=24,midX=W*0.5,chartH=HC-2*pad,maxBar=midX-8;
-  ctx.strokeStyle='#bbb'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(midX,pad); ctx.lineTo(midX,HC-pad); ctx.stroke();
-  if(s.Ix<1) return;
-  ctx.beginPath();
-  const steps=60;
-  for(let i=0;i<=steps;i++){
-    const f=i/steps; const yabs=s.secH*f; const yrel=yabs-s.ybar;
-    const sig=s.M*1000*yrel/s.Ix;
-    const x=midX+(s.sigma>0?sig/s.sigma*maxBar:0);
-    const cy2=HC-pad-f*chartH;
-    i===0?ctx.moveTo(x,cy2):ctx.lineTo(x,cy2);
-  }ctx.lineTo(midX,pad); ctx.closePath();
-  const g=ctx.createLinearGradient(0,HC-pad,0,pad);
-  g.addColorStop(0,'rgba(220,53,69,0.65)'); g.addColorStop(s.ybar/s.secH,'rgba(100,150,220,0.1)'); g.addColorStop(1,'rgba(0,86,179,0.65)');
-  ctx.fillStyle=g; ctx.fill();
-  ctx.strokeStyle='#0056b3'; ctx.lineWidth=1.5; ctx.stroke();
-  ctx.fillStyle='#555'; ctx.font='9px Roboto Mono,monospace'; ctx.textAlign='center';
-  if(s.sigma>0.1){
-    ctx.fillText('+'+s.sigma.toFixed(1),W*0.78,HC-pad+12);
-    ctx.fillText('-'+s.sigma.toFixed(1),W*0.78,pad-3);
+  var N = 400;
+  var state = { t:0, dir:1, playing:true };
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function readUI(){
+    return {
+      support: $('supportType').value,
+      kind: $('loadKind').value,
+      L: parseFloat($('spanL').value),
+      EI: parseFloat($('beamE').value)*1e9 * (parseFloat($('beamI').value)*1e-6),
+      w: parseFloat($('udlW').value),
+      P: parseFloat($('ptP').value)*1000,
+      aFrac: parseFloat($('ptPos').value)/100
+    };
   }
-  ctx.fillText('MPa',W*0.78,HC-4);
-  ctx.textAlign='left';
-}function onUpdate(){
-  const s=calcSection();
-  document.getElementById('statA').textContent=s.A.toFixed(0);
-  document.getElementById('statYbar').textContent=s.ybar.toFixed(1);
-  document.getElementById('statIx').textContent=(s.Ix/1e4).toFixed(1);
-  document.getElementById('statIy').textContent=(s.Iy/1e4).toFixed(1);
-  document.getElementById('statZx').textContent=(s.Zx/1e3).toFixed(2);
-  document.getElementById('statZy').textContent=(s.Zy/1e3).toFixed(2);
-  document.getElementById('statRx').textContent=s.rx.toFixed(1);
-  document.getElementById('statIoA').textContent=(s.Ix/s.A).toFixed(0);
-  document.getElementById('statSigma').textContent=s.sigma.toFixed(1)+' MPa';
-  drawSection(s); drawStress(s); updateChart(s);
-}function updateChart(s){
-  const labels=[],data=[],colors=[];
-  const steps=50;
-  for(let i=0;i<=steps;i++){
-    const f=i/steps; const yabs=s.secH*f;
-    const sig=s.Ix>0?s.M*1000*(yabs-s.ybar)/s.Ix:0;
-    labels.push(yabs.toFixed(0));
-    data.push(parseFloat(sig.toFixed(2)));
-    colors.push(sig>=0?'rgba(220,53,69,0.7)':'rgba(0,86,179,0.7)');
-  }if(chart){ chart.data.labels=labels; chart.data.datasets[0].data=data; chart.data.datasets[0].backgroundColor=colors; chart.update('none'); }else{
-    chart=new Chart(document.getElementById('chartCanvas'),{
-      type:'bar',
-      data:{labels,datasets:[{label:'曲げ応力 σ (MPa)',data,backgroundColor:colors,borderWidth:0,barPercentage:1.0,categoryPercentage:1.0}]},
-      options:{
-        indexAxis:'y',responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,plugins:{legend:{display:false},title:{display:true,text:'断面高さ方向の曲げ応力分布 σ = My/Ix',font:{size:12}}},
-        scales:{
-          x:{ title:{display:true,text:'応力 σ (MPa)'}},
-          y:{title:{display:true,text:'高さ y (mm)'},reverse:true,ticks:{maxTicksLimit:8}}
-        }
+
+  // Solve statics + deflection. k = applied-load fraction (0..1) for the "applying load" animation.
+  function solve(ui, k, movFrac){
+    var L=ui.L, EI=ui.EI, dx=L/N, support=ui.support, kind=ui.kind;
+    var udl = (kind==='udl') ? ui.w*k : 0;
+    var a   = (kind==='moving') ? movFrac*L : ui.aFrac*L;
+    var P   = (kind==='point'||kind==='moving') ? ui.P*k : 0;
+
+    var Wtot = udl*L + P;
+    var Mabout0 = udl*L*(L/2) + P*a;
+    var RA,RB;
+    if(support==='ss'){ RB=Mabout0/L; RA=Wtot-RB; }
+    else { RA=Wtot; RB=0; } // cantilever fixed at x=0
+
+    var x=new Array(N+1), V=new Array(N+1), M=new Array(N+1), i, xi;
+    if(support==='ss'){
+      for(i=0;i<=N;i++){ xi=i*dx; x[i]=xi; V[i]=RA - udl*xi - ((P>0 && a<=xi+1e-9)?P:0); }
+      M[0]=0;
+      for(i=1;i<=N;i++){ M[i]=M[i-1]+(V[i-1]+V[i])/2*dx; }
+    } else {
+      for(i=0;i<=N;i++){ xi=i*dx; x[i]=xi;
+        var wR=udl*(L-xi), pR=(P>0 && a>=xi-1e-9)?P:0;
+        V[i]=wR+pR;
+        var mu=udl*(L-xi)*((L-xi)/2), mp=(P>0 && a>=xi-1e-9)?P*(a-xi):0;
+        M[i]=-(mu+mp);
       }
-    });
+    }
+    var th=new Array(N+1), df=new Array(N+1); th[0]=0; df[0]=0;
+    for(i=1;i<=N;i++){ th[i]=th[i-1]+(M[i-1]+M[i])/2/EI*dx; }
+    for(i=1;i<=N;i++){ df[i]=df[i-1]+(th[i-1]+th[i])/2*dx; }
+    var defl=new Array(N+1);
+    if(support==='ss'){ var t0=-df[N]/L; for(i=0;i<=N;i++){ defl[i]=df[i]+t0*x[i]; } }
+    else { for(i=0;i<=N;i++){ defl[i]=df[i]; } }
+
+    var Mmax=0,Mmaxx=0,Vmax=0,dmax=0,dmaxx=0, zeroShear=[], contra=[];
+    for(i=0;i<=N;i++){
+      if(Math.abs(M[i])>Math.abs(Mmax)){ Mmax=M[i]; Mmaxx=x[i]; }
+      if(Math.abs(V[i])>Math.abs(Vmax)){ Vmax=V[i]; }
+      if(Math.abs(defl[i])>Math.abs(dmax)){ dmax=defl[i]; dmaxx=x[i]; }
+      if(i>0){
+        if((V[i-1]<0)!==(V[i]<0) && Math.abs(V[i])>1e-6) zeroShear.push((x[i-1]+x[i])/2);
+        if((M[i-1]<0)!==(M[i]<0)) contra.push((x[i-1]+x[i])/2);
+      }
+    }
+    return {x:x,V:V,M:M,defl:defl,RA:RA,RB:RB,Mmax:Mmax,Mmaxx:Mmaxx,Vmax:Vmax,
+            dmax:dmax,dmaxx:dmaxx,zeroShear:zeroShear,contra:contra,a:a,udl:udl,P:P,L:L,kind:kind,support:support};
   }
-}buildControls();
-onUpdate();
-(function(){const el=document.getElementById('moment');const mn=parseFloat(el.min),mx=parseFloat(el.max),v=parseFloat(el.value);el.style.setProperty('--pct',((v-mn)/(mx-mn)*100)+'%');})();
+
+  // ---------- drawing ----------
+  function drawBeam(s, k){
+    var cv=$('beamCanvas'); if(!cv) return; var ctx=cv.getContext('2d');
+    var d=hidpi(cv, cv.clientWidth||cv.width, 220, ctx);
+    var W=d.w, H=d.h; ctx.clearRect(0,0,W,H);
+    var padX=46, padTop=40, baseY=H*0.42, L=s.L;
+    var sx=function(x){ return padX + x/L*(W-2*padX); };
+    // deflection scale: magnify so max ~ 46px
+    var maxAbs=1e-12; for(var i=0;i<=N;i++) maxAbs=Math.max(maxAbs,Math.abs(s.defl[i]));
+    var dScale = maxAbs>0 ? Math.min(46, 46)/maxAbs : 0;
+    if(maxAbs<1e-9) dScale=0;
+    var sy=function(d2){ return baseY + d2*dScale; };
+
+    // undeformed reference
+    ctx.strokeStyle='#c4ccd6'; ctx.setLineDash([4,4]); ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(sx(0),baseY); ctx.lineTo(sx(L),baseY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // distributed load arrows
+    if(s.udl>0){
+      ctx.strokeStyle='rgba(0,123,255,.55)'; ctx.fillStyle='rgba(0,123,255,.55)'; ctx.lineWidth=1.2;
+      var na=14;
+      for(var j=0;j<=na;j++){
+        var xx=sx(j/na*L), y0=padTop-18, y1=padTop-2;
+        ctx.beginPath(); ctx.moveTo(xx,y0); ctx.lineTo(xx,y1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(xx,y1); ctx.lineTo(xx-3,y1-5); ctx.lineTo(xx+3,y1-5); ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle='#0056b3'; ctx.font='11px Roboto Mono,monospace'; ctx.textAlign='left';
+      ctx.fillText('w', sx(L)+4, padTop-8);
+    }
+    // point load arrow
+    if(s.P>0){
+      var px=sx(s.a);
+      ctx.strokeStyle='#dc3545'; ctx.fillStyle='#dc3545'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(px, padTop-22); ctx.lineTo(px, sy(s.defl[Math.round(s.a/L*N)])-2); ctx.stroke();
+      var ty=sy(s.defl[Math.round(s.a/L*N)])-2;
+      ctx.beginPath(); ctx.moveTo(px,ty); ctx.lineTo(px-5,ty-8); ctx.lineTo(px+5,ty-8); ctx.closePath(); ctx.fill();
+      ctx.font='bold 11px Roboto Mono,monospace'; ctx.textAlign='center';
+      ctx.fillText('P', px, padTop-26);
+    }
+
+    // deflected beam
+    ctx.strokeStyle='#007BFF'; ctx.lineWidth=3; ctx.beginPath();
+    for(var i2=0;i2<=N;i2++){ var X=sx(s.x[i2]), Y=sy(s.defl[i2]); i2===0?ctx.moveTo(X,Y):ctx.lineTo(X,Y); }
+    ctx.stroke();
+
+    // supports
+    function pin(x){ ctx.fillStyle='#001F3F'; ctx.beginPath(); ctx.moveTo(x,baseY); ctx.lineTo(x-9,baseY+15); ctx.lineTo(x+9,baseY+15); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='#001F3F'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x-13,baseY+15); ctx.lineTo(x+13,baseY+15); ctx.stroke(); }
+    function roller(x){ pin(x); ctx.beginPath(); ctx.arc(x-5,baseY+20,3,0,6.283); ctx.arc(x+5,baseY+20,3,0,6.283); ctx.fillStyle='#001F3F'; ctx.fill(); }
+    function fixed(x){ ctx.fillStyle='#001F3F'; ctx.fillRect(x-6,baseY-26,6,52);
+      ctx.strokeStyle='#001F3F'; ctx.lineWidth=1.5;
+      for(var h=-24;h<=24;h+=8){ ctx.beginPath(); ctx.moveTo(x-6,baseY+h); ctx.lineTo(x-14,baseY+h+8); ctx.stroke(); } }
+    if(s.support==='ss'){ pin(sx(0)); roller(sx(L)); } else { fixed(sx(0)); }
+
+    // reaction arrows + labels
+    ctx.font='10px Roboto Mono,monospace'; ctx.fillStyle='#0a7d2c'; ctx.textAlign='center';
+    function reac(x,val){ if(Math.abs(val)<1e-6) return; ctx.strokeStyle='#0a7d2c'; ctx.fillStyle='#0a7d2c'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(x,baseY+40); ctx.lineTo(x,baseY+18); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x,baseY+18); ctx.lineTo(x-5,baseY+26); ctx.lineTo(x+5,baseY+26); ctx.closePath(); ctx.fill();
+      ctx.fillText((val/1000).toFixed(1)+' kN', x, baseY+54); }
+    reac(sx(0), s.RA); if(s.support==='ss') reac(sx(L), s.RB);
+    if(s.support==='cant'){ ctx.fillStyle='#0a7d2c'; ctx.textAlign='left'; ctx.fillText('Mfix '+(s.Mmax/1000).toFixed(1)+' kN·m', sx(0)+10, baseY+50); }
+
+    // max-deflection marker
+    if(Math.abs(s.dmax)>1e-7){
+      var mxX=sx(s.dmaxx), mxY=sy(s.dmax);
+      ctx.fillStyle='#7b2ff7'; ctx.beginPath(); ctx.arc(mxX,mxY,4,0,6.283); ctx.fill();
+      ctx.font='9px Roboto Mono,monospace'; ctx.textAlign='center';
+      ctx.fillText('δmax', mxX, mxY+16);
+    }
+  }
+
+  function diagram(cid, s, arr, color, label, markers){
+    var cv=$(cid); if(!cv) return; var ctx=cv.getContext('2d');
+    var d=hidpi(cv, cv.clientWidth||cv.width, 170, ctx);
+    var W=d.w, H=d.h; ctx.clearRect(0,0,W,H);
+    var padX=46, padY=22, L=s.L;
+    var sx=function(x){ return padX + x/L*(W-2*padX); };
+    var maxAbs=1e-9; for(var i=0;i<=N;i++) maxAbs=Math.max(maxAbs,Math.abs(arr[i]));
+    var zeroY=H/2;
+    var sy=function(v){ return zeroY - v/maxAbs*(H/2-padY); };
+    // axis
+    ctx.strokeStyle='#cbd3dd'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(sx(0),zeroY); ctx.lineTo(sx(L),zeroY); ctx.stroke();
+    // fill
+    ctx.beginPath(); ctx.moveTo(sx(0),zeroY);
+    for(var k=0;k<=N;k++){ ctx.lineTo(sx(s.x[k]), sy(arr[k])); }
+    ctx.lineTo(sx(L),zeroY); ctx.closePath();
+    ctx.fillStyle=color+'22'; ctx.fill();
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath();
+    for(var k2=0;k2<=N;k2++){ var X=sx(s.x[k2]),Y=sy(arr[k2]); k2===0?ctx.moveTo(X,Y):ctx.lineTo(X,Y); }
+    ctx.stroke();
+    // title
+    ctx.fillStyle='#102033'; ctx.font='bold 11px Roboto Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText(label, 6, 14);
+    // markers
+    if(markers){ markers.forEach(function(m){
+      var X=sx(m.x);
+      ctx.strokeStyle=m.c; ctx.setLineDash([3,3]); ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(X,padY-6); ctx.lineTo(X,H-padY+6); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle=m.c; ctx.font='9px Roboto Mono,monospace'; ctx.textAlign='center';
+      ctx.fillText(m.t, X, m.top?padY+2:H-4);
+    }); }
+  }
+
+  function fmtMM(m){ return (m*1000).toFixed(2); }
+
+  function render(){
+    var ui=readUI();
+    // animation phase: load is "applied" by ramping k 0->1 over the cycle, except moving load where magnitude fixed and position sweeps.
+    var k=1, movFrac=ui.aFrac;
+    if(ui.kind==='moving'){ k=1; movFrac = state.t; }
+    else { k = reduced ? 1 : (0.15 + 0.85*state.t); }
+    var s=solve(ui, k, movFrac);
+
+    // numbers
+    $('statRA').textContent=(s.RA/1000).toFixed(2)+' kN';
+    $('statRB').textContent=(s.support==='ss')?((s.RB/1000).toFixed(2)+' kN'):'—';
+    $('statMmax').textContent=(s.Mmax/1000).toFixed(2)+' kN·m';
+    $('statMpos').textContent=s.Mmaxx.toFixed(2)+' m';
+    $('statVmax').textContent=(s.Vmax/1000).toFixed(2)+' kN';
+    $('statDmax').textContent=fmtMM(s.dmax)+' mm';
+    $('statDpos').textContent=s.dmaxx.toFixed(2)+' m';
+    var phase=$('statPhase');
+    if(phase){ phase.textContent = ui.kind==='moving' ? (movFrac*100).toFixed(0)+'%' : (k*100).toFixed(0)+'%'; }
+
+    drawBeam(s,k);
+    // SFD markers: zero-shear points
+    var vMark=s.zeroShear.map(function(x){ return {x:x,c:'#e8590c',t:'V=0',top:true}; });
+    diagram('sfdCanvas', s, s.V, '#e8590c', 'SFD  V(x) [kN]', vMark);
+    // BMD markers: max moment + contraflexure
+    var mMark=[{x:s.Mmaxx,c:'#7b2ff7',t:'Mmax',top:s.Mmax<0}];
+    s.contra.forEach(function(x){ mMark.push({x:x,c:'#0a7d2c',t:'M=0',top:true}); });
+    diagram('bmdCanvas', s, s.M, '#1d4ed8', 'BMD  M(x) [kN·m]', mMark);
+  }
+
+  // ---------- animation loop ----------
+  var last=0;
+  function loop(ts){
+    if(state.playing){
+      if(!last) last=ts;
+      var dt=Math.min(0.05,(ts-last)/1000); last=ts;
+      state.t += state.dir*dt*0.45;
+      if(state.t>1){ state.t=1; state.dir=-1; }
+      if(state.t<0){ state.t=0; state.dir=1; }
+    } else { last=ts; }
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- controls ----------
+  function syncLoadVisibility(){
+    var kind=$('loadKind').value;
+    $('grpUDL').style.display = (kind==='udl')?'block':'none';
+    $('grpP').style.display = (kind==='point'||kind==='moving')?'block':'none';
+    $('grpPos').style.display = (kind==='point')?'block':'none';
+  }
+
+  function applyPreset(name){
+    var set=function(id,v){ var el=$(id); if(el){ el.value=v; if(window.updateSlider){ try{ updateSlider(el); }catch(e){} } } };
+    if(name==='ss_udl'){ $('supportType').value='ss'; $('loadKind').value='udl'; set('spanL',4); set('udlW',10000); }
+    else if(name==='ss_point'){ $('supportType').value='ss'; $('loadKind').value='point'; set('spanL',4); set('ptP',20); set('ptPos',50); }
+    else if(name==='cant'){ $('supportType').value='cant'; $('loadKind').value='point'; set('spanL',3); set('ptP',10); set('ptPos',100); }
+    else if(name==='moving'){ $('supportType').value='ss'; $('loadKind').value='moving'; set('spanL',6); set('ptP',15); }
+    // mirror number inputs
+    ['spanL','beamE','beamI','udlW','ptP','ptPos'].forEach(function(id){ var n=$(id+'Num'); var r=$(id); if(n&&r) n.value=r.value; });
+    syncLoadVisibility(); state.t=0; state.dir=1;
+  }
+  window.bvPreset=applyPreset;
+
+  function bindPair(rangeId){
+    var r=$(rangeId), n=$(rangeId+'Num');
+    if(r) r.addEventListener('input', function(){ if(n) n.value=r.value; if(window.updateSlider){ try{updateSlider(r);}catch(e){}} render(); });
+    if(n) n.addEventListener('input', function(){ if(r){ r.value=n.value; if(window.updateSlider){try{updateSlider(r);}catch(e){}} } render(); });
+  }
+
+  function init(){
+    ['spanL','beamE','beamI','udlW','ptP','ptPos'].forEach(bindPair);
+    $('supportType').addEventListener('change', function(){ state.t=0; state.dir=1; render(); });
+    $('loadKind').addEventListener('change', function(){ syncLoadVisibility(); state.t=0; state.dir=1; render(); });
+    $('btnPlay').addEventListener('click', function(){ state.playing=!state.playing; this.innerHTML = state.playing?'<i class="fas fa-pause"></i>':'<i class="fas fa-play"></i>'; });
+    $('btnReset').addEventListener('click', function(){ state.t=0; state.dir=1; render(); });
+    document.querySelectorAll('[data-preset]').forEach(function(b){ b.addEventListener('click', function(){ applyPreset(b.getAttribute('data-preset')); }); });
+    syncLoadVisibility();
+    if(reduced){ state.playing=false; state.t=1; var bp=$('btnPlay'); if(bp) bp.innerHTML='<i class="fas fa-play"></i>'; render(); }
+    requestAnimationFrame(loop);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
 </script>
 
 <section class="explanation">
@@ -456,7 +580,7 @@ onUpdate();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">スライダーを動かしても応力分布が変わらないのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">曲げ応力分布は、断面形状と寸法に加え、作用する曲げモーメントの値にも依存します。本ツールでは曲げモーメントを固定値（例：1kNm）としているため、寸法変更で断面係数が変わらないと最大応力も変化しません。スライダーを大きく動かして確認してください。</div>
+    <div class="faq-a">曲げ応力分布は、断面形状と寸法に加え、作用する曲げモーメントの値にも依存します。本ツールでは曲げモーメントを0～10kN·m（0～10000N·m）の範囲で変更できます。Mを大きくすると応力分布の色と最大応力が比例して変化します。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">このツールで得た数値を実際の設計に使えますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -480,6 +604,9 @@ onUpdate();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="beam-visualization.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -533,16 +660,11 @@ onUpdate();
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol>
-<li>ビジュアライザー左側で断面形状（I形鋼・矩形・円形・H形・T形・L形）を選択します</li>
-<li>各寸法パラメータ（フランジ幅、ウェブ厚さ、高さなど）をmm単位で入力してください</li>
-<li>「計算」ボタンをクリックすると、断面積・断面二次モーメント・断面係数がリアルタイム更新され、グラフィカル表示と数値結果が同期します</li>
-<li>複数断面を並べて比較する場合は、pr_Num入力欄で最大6形状まで同時検討可能です</li>
-</ol>
+<ol><li>ビジュアライザー左側で断面形状（矩形・円形・中空矩形・中空円形・I形・T形）を選択します</li><li>寸法スライダーを動かすと、断面積・重心位置・断面二次モーメントIx/Iy・断面係数Zx/Zyなどがリアルタイム更新されます</li><li>曲げモーメントMは0～10kN·m（0～10000N·m）の範囲で設定でき、断面上の応力分布を色で確認できます</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>SS400鋼 I形梁（H-250×125×6×9mm）の場合：断面積A=3,840mm²、断面二次モーメントIx=9.07×10⁴mm⁴、Iy=1.14×10⁴mm⁴、断面係数Zx=7.25×10³mm³、曲げ応力度σ=(曲げモーメント100kN·m÷Zx)=138MPa。同じ材料で矩形断面300×200×12mmの場合、Ix=1.80×10⁵mm⁴で約2倍の剛性ですが、重量は約1.3倍となり、設計最適化の判断データになります。</p>
+<p>H-250×125×6×9mm相当のI形断面（bf=125mm、tf=9mm、hw=232mm、tw=6mm）の場合：断面積A=3,642mm²、断面二次モーメントIx≈3,893×10⁴mm⁴、断面係数Zx≈311×10³mm³です。曲げモーメントM=5kN·mを入力すると最大曲げ応力σ≈16.1MPaとなります。比較として、200×300mmの中実矩形断面ではIx=4.5×10⁸mm⁴です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -553,6 +675,16 @@ onUpdate();
 <li>断面効率（I/A）が高いほど軽量で効率的ですが、製造可能性・コスト・在庫性とのバランスも現場では重要な選定要因です</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

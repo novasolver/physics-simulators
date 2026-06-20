@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "平均自由行程 シミュレーター",
       "description": "気体分子運動論に基づき、温度・圧力・分子直径・分子量から剛球気体の平均自由行程・平均速さ・衝突頻度・数密度を実時間に計算する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/mean-free-path.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["剛球モデルによる平均自由行程 λ の閉じた式の評価","マクスウェル分布の平均速さと衝突頻度の同時計算","T・P・d・M_g の同時調整と単位の自動切替","分子箱描画と λ vs P 対数プロットの可視化"],
       "keywords": "平均自由行程,気体分子運動論,衝突頻度,剛球モデル,数密度,マクスウェル分布,平均速さ,分子直径,真空度,Knudsen数",
       "datePublished": "2026-05-15",
@@ -102,6 +102,21 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #gasCanvas,#lambdaCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.62rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.preset-btn{padding:5px 10px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.speed-btn{padding:4px 9px;font-size:0.72rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit}
+.speed-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+#gasCanvas:focus-visible,#lambdaCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.preset-btn,.speed-btn{transition:none}}
 </style>
 </head>
 <body>
@@ -165,11 +180,28 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+    <div class="preset-row">
+      <button type="button" class="preset-btn" data-preset="stp" onclick="setPreset('stp')">STP空気 ~68nm</button>
+      <button type="button" class="preset-btn" data-preset="vacuum" onclick="setPreset('vacuum')">高真空・長いλ</button>
+      <button type="button" class="preset-btn" data-preset="dense" onclick="setPreset('dense')">高密度・短いλ</button>
+      <button type="button" class="preset-btn" data-preset="large" onclick="setPreset('large')">大きな分子</button>
+    </div>
+
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> P をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は窒素分子（N₂、d ≈ 370 pm、M_g = 28 g/mol）の常温常圧。Boltzmann 定数 k = 1.380649×10⁻²³ J/K、Avogadro 数 N_A = 6.02214076×10²³ を使用。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="一般物理の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">一般物理 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -184,9 +216,28 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-route"></i> 分子箱の運動（剛球モデル）</div>
-      <canvas id="gasCanvas"></canvas>
-      <p class="canvas-hint">青円＝気体分子（剛球）／矢印＝速度ベクトル／黄円＝注目分子／黄破線＝予想自由行程 λ（箱スケール換算）／背景の数密度は n に応じて変化</p>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（注目分子の追跡）</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roLambda">—</div><div class="rl">理論 λ</div></div>
+        <div class="live-ro"><div class="rv" id="roMeas">—</div><div class="rl">実測 λ（平均区間長）</div></div>
+        <div class="live-ro"><div class="rv" id="roZ">—</div><div class="rl">衝突頻度 z</div></div>
+        <div class="live-ro"><div class="rv" id="roColl">0</div><div class="rl">衝突回数（注目分子）</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-route"></i> 分子箱の運動と自由行程のジグザグ軌跡（剛球モデル）</div>
+      <canvas id="gasCanvas" tabindex="0" role="img" aria-label="気体分子の箱。注目分子の衝突間ジグザグ軌跡と自由行程を表示します。"></canvas>
+      <div class="play-row">
+        <button type="button" class="btn" id="gasPlayBtn" onclick="toggleGas()"><i class="fas fa-pause"></i> アニメ一時停止</button>
+        <button type="button" class="btn secondary" onclick="reseedGas()"><i class="fas fa-rotate-left"></i> 軌跡をクリア</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button type="button" class="speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+          <button type="button" class="speed-btn active" data-speed="1" onclick="setSpeed(1)">1×</button>
+          <button type="button" class="speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+        </div>
+      </div>
+      <p class="canvas-hint">青円＝気体分子（剛球）／黄円＝注目分子／黄線＝衝突間のジグザグ自由行程（各直線が1区間）／実測 λ＝過去区間の平均長が理論 λ に収束／背景の分子数は数密度 n に応じて変化</p>
     </div>
 
     <div class="chart-card">
@@ -210,247 +261,346 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Mean Free Path (kinetic theory of gases) Simulator ==========
+// ========== Mean Free Path (kinetic theory of gases) v2 Simulator ==========
+(function(){
+"use strict";
 var gasCanvas = document.getElementById('gasCanvas');
 var gasCtx = gasCanvas.getContext('2d');
 var lambdaCanvas = document.getElementById('lambdaCanvas');
 var lambdaCtx = lambdaCanvas.getContext('2d');
-var playing = false;
-var animId = null;
-var sweepDir = 1;
-var KB = 1.380649e-23; // J/K
-var NA = 6.02214076e23;
-var molecules = []; // [{x,y,vx,vy}]
-var animTime = 0;
 
-function fmtLength(L) {
-  if (!isFinite(L)) return '—';
+var KB = 1.380649e-23;      // J/K
+var NA = 6.02214076e23;
+var SQRT2 = Math.SQRT2;
+
+var sweeping = false;       // pressure auto-sweep
+var sweepId = null;
+var sweepDir = -1;          // start sweeping toward lower P
+var gasRunning = true;      // box animation running
+var gasId = null;
+var speedMult = 1;
+var molecules = [];         // background molecules [{x,y,vx,vy}]
+var prefersReduced = false;
+try { prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+
+// tagged molecule state (in px)
+var tag = null;             // {x,y,vx,vy}
+var tagTrail = [];          // poly-points of current flight + recent flights
+var segLensPx = [];         // measured free-path segment lengths (px), most recent last
+var collisions = 0;
+var pxPerMeter = 1;         // current px->meter scale for the gas box
+var freeFlightPx = 0;       // distance travelled in current flight (px)
+var targetFreePx = 40;      // expected flight length in px for current params
+
+function el(id){ return document.getElementById(id); }
+
+function fmtLength(L){
+  if(!isFinite(L)) return '—';
   var a = Math.abs(L);
-  if (a >= 1e3) return (L/1e3).toFixed(2) + ' km';
-  if (a >= 1) return L.toFixed(2) + ' m';
-  if (a >= 1e-3) return (L*1e3).toFixed(2) + ' mm';
-  if (a >= 1e-6) return (L*1e6).toFixed(2) + ' μm';
-  if (a >= 1e-9) return (L*1e9).toFixed(1) + ' nm';
-  if (a >= 1e-12) return (L*1e12).toFixed(1) + ' pm';
-  if (a === 0) return '0 nm';
-  return L.toExponential(2) + ' m';
+  if(a >= 1e3) return (L/1e3).toFixed(2)+' km';
+  if(a >= 1) return L.toFixed(2)+' m';
+  if(a >= 1e-3) return (L*1e3).toFixed(2)+' mm';
+  if(a >= 1e-6) return (L*1e6).toFixed(2)+' μm';
+  if(a >= 1e-9) return (L*1e9).toFixed(1)+' nm';
+  if(a >= 1e-12) return (L*1e12).toFixed(1)+' pm';
+  if(a === 0) return '0 nm';
+  return L.toExponential(2)+' m';
 }
-function fmtFreq(f) {
-  if (!isFinite(f)) return '—';
+function fmtFreq(f){
+  if(!isFinite(f)) return '—';
   var a = Math.abs(f);
-  if (a >= 1e12) return (f/1e12).toFixed(2) + ' THz';
-  if (a >= 1e9)  return (f/1e9).toFixed(2)  + ' GHz';
-  if (a >= 1e6)  return (f/1e6).toFixed(2)  + ' MHz';
-  if (a >= 1e3)  return (f/1e3).toFixed(2)  + ' kHz';
-  if (a === 0) return '0 Hz';
-  return f.toFixed(2) + ' Hz';
+  if(a >= 1e12) return (f/1e12).toFixed(2)+' THz';
+  if(a >= 1e9)  return (f/1e9).toFixed(2)+' GHz';
+  if(a >= 1e6)  return (f/1e6).toFixed(2)+' MHz';
+  if(a >= 1e3)  return (f/1e3).toFixed(2)+' kHz';
+  if(a === 0) return '0 Hz';
+  return f.toFixed(2)+' Hz';
 }
-function fmtNumDensity(n) {
-  if (!isFinite(n)) return '—';
-  if (n === 0) return '0 /m³';
+function fmtNumDensity(n){
+  if(!isFinite(n)) return '—';
+  if(n === 0) return '0 /m³';
   var exp = Math.floor(Math.log10(Math.abs(n)));
   var mant = n / Math.pow(10, exp);
   var sign = exp >= 0 ? '+' : '';
-  return mant.toFixed(2) + 'e' + sign + exp + ' /m³';
+  return mant.toFixed(2)+'e'+sign+exp+' /m³';
 }
 
-function getParams() {
-  var T = parseFloat(document.getElementById('slT').value);
-  var P_kPa = parseFloat(document.getElementById('slP').value);
-  var d_pm = parseFloat(document.getElementById('slD').value);
-  var Mg = parseFloat(document.getElementById('slM').value);
-  var P = P_kPa * 1000; // Pa
-  var d = d_pm * 1e-12; // m
-  var m = Mg * 1e-3 / NA; // kg
+function getParams(){
+  var T = parseFloat(el('slT').value);
+  var P_kPa = parseFloat(el('slP').value);
+  var d_pm = parseFloat(el('slD').value);
+  var Mg = parseFloat(el('slM').value);
+  var P = P_kPa * 1000;          // Pa
+  var d = d_pm * 1e-12;          // m
+  var m = Mg * 1e-3 / NA;        // kg
   return { T:T, P_kPa:P_kPa, d_pm:d_pm, Mg:Mg, P:P, d:d, m:m };
 }
 
-function meanFreePath(T, d, P) {
-  if (P <= 0 || d <= 0) return Infinity;
-  return KB * T / (Math.SQRT2 * Math.PI * d*d * P);
+function meanFreePath(T, d, P){
+  if(P <= 0 || d <= 0) return Infinity;
+  return KB * T / (SQRT2 * Math.PI * d*d * P);
 }
-function meanSpeed(T, m) {
-  if (m <= 0) return 0;
+function meanSpeed(T, m){
+  if(m <= 0) return 0;
   return Math.sqrt(8 * KB * T / (Math.PI * m));
 }
-function numberDensity(T, P) {
-  if (T <= 0) return 0;
+function numberDensity(T, P){
+  if(T <= 0) return 0;
   return P / (KB * T);
 }
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
+function cssW(cv){ return parseFloat(cv.dataset.cssW) || cv.width / Math.min(window.devicePixelRatio || 1, 2.5); }
+function cssH(cv){ return parseFloat(cv.dataset.cssH) || cv.height / Math.min(window.devicePixelRatio || 1, 2.5); }
 
-function resizeCanvases() {
+function resizeCanvases(){
   [gasCanvas, lambdaCanvas].forEach(function(cv){
     var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.55);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+    var W = w, H = Math.round(w * 0.55);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = W + 'px';
+    cv.style.height = H + 'px';
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    cv.dataset.cssW = String(W);
+    cv.dataset.cssH = String(H);
+    var c = cv.getContext && cv.getContext('2d');
+    if(c) c.setTransform(dpr, 0, 0, dpr, 0, 0);
   });
 }
 
-function initMolecules(count) {
+var PAD = 16;
+function initMolecules(count){
   molecules = [];
-  var W = __novaCanvasCssW(gasCanvas), H = __novaCanvasCssH(gasCanvas);
-  var pad = 20;
-  for (var i = 0; i < count; i++) {
-    var ang = Math.random() * Math.PI * 2;
-    var sp = 0.6 + Math.random() * 1.2;
+  var W = cssW(gasCanvas), H = cssH(gasCanvas);
+  for(var i=0;i<count;i++){
+    var ang = Math.random()*Math.PI*2;
+    var sp = 0.6 + Math.random()*1.0;
     molecules.push({
-      x: pad + Math.random() * (W - 2*pad),
-      y: pad + Math.random() * (H - 2*pad),
-      vx: Math.cos(ang) * sp,
-      vy: Math.sin(ang) * sp
+      x: PAD+8 + Math.random()*(W-2*PAD-16),
+      y: PAD+8 + Math.random()*(H-2*PAD-16),
+      vx: Math.cos(ang)*sp,
+      vy: Math.sin(ang)*sp
     });
   }
 }
 
-function drawGas(p, lambdaM) {
-  var ctx = gasCtx, W = __novaCanvasCssW(gasCanvas), H = __novaCanvasCssH(gasCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  // Outer box
-  var pad = 16;
-  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1.4;
-  ctx.strokeRect(pad, pad, W - 2*pad, H - 2*pad);
-  // Number of molecules to draw scales softly with log10(n) so the box does not get full at high P
-  var n = numberDensity(p.T, p.P);
-  // map log10(n) ~ [20, 26] -> count [8, 80]
-  var ln = Math.log10(Math.max(1, n));
-  var count = Math.round(8 + Math.max(0, Math.min(72, (ln - 20) * 12)));
-  if (molecules.length !== count) initMolecules(count);
-  // box scale: assume the box represents some physical width Lbox in meters
-  // pick Lbox so default lambda (~67 nm) becomes ~25% of the box
-  var Lbox_m = (lambdaM > 0 && isFinite(lambdaM)) ? lambdaM * 4 : 1e-6;
-  // limit to reasonable range
-  if (Lbox_m < 1e-12) Lbox_m = 1e-12;
-  // animate
-  var dt = 1;
-  for (var i = 0; i < molecules.length; i++) {
-    var mol = molecules[i];
-    if (playing) { mol.x += mol.vx * dt; mol.y += mol.vy * dt; }
-    else { mol.x += mol.vx * 0.15 * dt; mol.y += mol.vy * 0.15 * dt; }
-    if (mol.x < pad + 4) { mol.x = pad + 4; mol.vx = Math.abs(mol.vx); }
-    if (mol.x > W - pad - 4) { mol.x = W - pad - 4; mol.vx = -Math.abs(mol.vx); }
-    if (mol.y < pad + 4) { mol.y = pad + 4; mol.vy = Math.abs(mol.vy); }
-    if (mol.y > H - pad - 4) { mol.y = H - pad - 4; mol.vy = -Math.abs(mol.vy); }
-    // draw molecule
-    ctx.beginPath();
-    ctx.arc(mol.x, mol.y, 3.2, 0, Math.PI*2);
-    ctx.fillStyle = (i === 0) ? '#FFD166' : 'rgba(74,198,255,0.85)';
-    ctx.fill();
-    // velocity arrow
-    var ax = mol.x + mol.vx * 6, ay = mol.y + mol.vy * 6;
-    ctx.strokeStyle = (i === 0) ? '#FFD166' : 'rgba(74,198,255,0.55)';
-    ctx.lineWidth = (i === 0) ? 1.6 : 1;
-    ctx.beginPath(); ctx.moveTo(mol.x, mol.y); ctx.lineTo(ax, ay); ctx.stroke();
-  }
-  // highlighted molecule's lambda preview
-  var m0 = molecules[0];
-  if (m0) {
-    var pxScale = (W - 2*pad) / Lbox_m; // pixels per meter
-    var lambdaPx = lambdaM * pxScale;
-    // clip to box diagonal
-    var maxLine = Math.sqrt(Math.pow(W-2*pad,2) + Math.pow(H-2*pad,2));
-    var dlen = Math.min(lambdaPx, maxLine);
-    var sp = Math.sqrt(m0.vx*m0.vx + m0.vy*m0.vy) || 1;
-    var ux = m0.vx / sp, uy = m0.vy / sp;
-    var ex = m0.x + ux * dlen, ey = m0.y + uy * dlen;
-    ctx.strokeStyle = '#FFD166';
-    ctx.lineWidth = 1.6;
-    ctx.setLineDash([5,4]);
-    ctx.beginPath(); ctx.moveTo(m0.x, m0.y); ctx.lineTo(ex, ey); ctx.stroke();
-    ctx.setLineDash([]);
-    // label
-    ctx.fillStyle = '#FFD166';
-    ctx.font = '11px "Roboto Mono",monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('λ ≈ ' + fmtLength(lambdaM), Math.min(W - 110, ex + 6), ey - 4);
-  }
-  // top-left readout
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('T = ' + p.T.toFixed(0) + ' K  P = ' + p.P_kPa.toFixed(2) + ' kPa  d = ' + p.d_pm.toFixed(0) + ' pm  M = ' + p.Mg.toFixed(0) + ' g/mol', 10, H - 8);
-  ctx.textAlign = 'right';
-  ctx.fillText('箱スケール ≈ ' + fmtLength(Lbox_m), W - 10, H - 8);
+function seedTag(){
+  var W = cssW(gasCanvas), H = cssH(gasCanvas);
+  var ang = Math.random()*Math.PI*2;
+  tag = { x: W*0.5, y: H*0.5, vx: Math.cos(ang), vy: Math.sin(ang) };
+  tagTrail = [{x:tag.x, y:tag.y}];
+  segLensPx = [];
+  collisions = 0;
+  freeFlightPx = 0;
 }
 
-function drawLambdaPlot(p, lambdaM) {
-  var ctx = lambdaCtx, W = __novaCanvasCssW(lambdaCanvas), H = __novaCanvasCssH(lambdaCanvas);
+// pick a new random direction after a collision (record the finished segment)
+function scatterTag(){
+  segLensPx.push(freeFlightPx);
+  if(segLensPx.length > 60) segLensPx.shift();
+  collisions++;
+  freeFlightPx = 0;
+  var ang = Math.random()*Math.PI*2;
+  var sp = Math.sqrt(tag.vx*tag.vx + tag.vy*tag.vy) || 1;
+  tag.vx = Math.cos(ang)*sp;
+  tag.vy = Math.sin(ang)*sp;
+  // start a new flight segment in the trail
+  tagTrail.push({x:tag.x, y:tag.y, brk:true});
+}
+
+function measuredLambdaPx(){
+  if(!segLensPx.length) return NaN;
+  var s = 0;
+  for(var i=0;i<segLensPx.length;i++) s += segLensPx[i];
+  return s / segLensPx.length;
+}
+
+function stepGas(dt){
+  var W = cssW(gasCanvas), H = cssH(gasCanvas);
+  var lo = PAD+4, hiX = W-PAD-4, hiY = H-PAD-4;
+  var i, mol;
+  // background molecules
+  for(i=0;i<molecules.length;i++){
+    mol = molecules[i];
+    mol.x += mol.vx*dt; mol.y += mol.vy*dt;
+    if(mol.x < lo){ mol.x = lo; mol.vx = Math.abs(mol.vx); }
+    if(mol.x > hiX){ mol.x = hiX; mol.vx = -Math.abs(mol.vx); }
+    if(mol.y < lo){ mol.y = lo; mol.vy = Math.abs(mol.vy); }
+    if(mol.y > hiY){ mol.y = hiY; mol.vy = -Math.abs(mol.vy); }
+  }
+  // tagged molecule: straight free flight, scatter stochastically so that
+  // the expected flight length in px equals targetFreePx (= theoretical lambda in box px)
+  if(tag){
+    var sp = Math.sqrt(tag.vx*tag.vx + tag.vy*tag.vy) || 1;
+    var stepPx = sp*dt;
+    tag.x += tag.vx*dt; tag.y += tag.vy*dt;
+    freeFlightPx += stepPx;
+    var bounced = false;
+    if(tag.x < lo){ tag.x = lo; tag.vx = Math.abs(tag.vx); bounced = true; }
+    if(tag.x > hiX){ tag.x = hiX; tag.vx = -Math.abs(tag.vx); bounced = true; }
+    if(tag.y < lo){ tag.y = lo; tag.vy = Math.abs(tag.vy); bounced = true; }
+    if(tag.y > hiY){ tag.y = hiY; tag.vy = -Math.abs(tag.vy); bounced = true; }
+    // collision probability per px so that mean flight length = targetFreePx
+    var lam = Math.max(targetFreePx, 0.5);
+    var pColl = 1 - Math.exp(-stepPx / lam);
+    if(!bounced && Math.random() < pColl){
+      scatterTag();
+    } else {
+      // wall reflection also ends a free segment visually but is not a molecular collision
+      if(bounced){
+        segLensPx.push(freeFlightPx);
+        if(segLensPx.length > 60) segLensPx.shift();
+        freeFlightPx = 0;
+        tagTrail.push({x:tag.x, y:tag.y, brk:true});
+      } else {
+        tagTrail.push({x:tag.x, y:tag.y});
+      }
+    }
+    if(tagTrail.length > 600) tagTrail.splice(0, tagTrail.length-600);
+  }
+}
+
+function drawGas(p, lambdaM){
+  var ctx = gasCtx, W = cssW(gasCanvas), H = cssH(gasCanvas);
   ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(PAD, PAD, W-2*PAD, H-2*PAD);
+
+  // number of background molecules scales softly with log10(n)
+  var n = numberDensity(p.T, p.P);
+  var ln = Math.log10(Math.max(1, n));
+  var count = Math.round(8 + Math.max(0, Math.min(72, (ln-20)*12)));
+  if(molecules.length !== count) initMolecules(count);
+
+  // physical width that the box represents: choose so theoretical lambda is ~22% of box width
+  var boxPx = W - 2*PAD;
+  var Lbox_m = (lambdaM > 0 && isFinite(lambdaM)) ? lambdaM / 0.22 : 1e-6;
+  if(Lbox_m < 1e-12) Lbox_m = 1e-12;
+  pxPerMeter = boxPx / Lbox_m;
+  targetFreePx = lambdaM * pxPerMeter;
+  // clamp so the tag still visibly scatters / flies within the box
+  if(!isFinite(targetFreePx) || targetFreePx < 3) targetFreePx = 3;
+  var diag = Math.sqrt(Math.pow(W-2*PAD,2)+Math.pow(H-2*PAD,2));
+  if(targetFreePx > diag*1.2) targetFreePx = diag*1.2;
+
+  var i, mol;
+  for(i=0;i<molecules.length;i++){
+    mol = molecules[i];
+    ctx.beginPath();
+    ctx.arc(mol.x, mol.y, 2.8, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(74,198,255,0.75)';
+    ctx.fill();
+  }
+
+  // tagged molecule zig-zag trail (each straight segment = one free flight)
+  if(tagTrail.length > 1){
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = 'rgba(255,209,102,0.85)';
+    ctx.beginPath();
+    var started = false;
+    for(i=0;i<tagTrail.length;i++){
+      var pt = tagTrail[i];
+      if(!started || pt.brk){ ctx.moveTo(pt.x, pt.y); started = true; }
+      else ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.stroke();
+  }
+  if(tag){
+    // velocity arrow
+    var sp = Math.sqrt(tag.vx*tag.vx+tag.vy*tag.vy)||1;
+    var ax = tag.x + tag.vx/sp*16, ay = tag.y + tag.vy/sp*16;
+    ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(tag.x, tag.y); ctx.lineTo(ax, ay); ctx.stroke();
+    // tagged molecule
+    ctx.beginPath();
+    ctx.arc(tag.x, tag.y, 4.6, 0, Math.PI*2);
+    ctx.fillStyle = '#FFD166';
+    ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 8;
+    ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  // measured vs theoretical lambda annotation
+  var measPx = measuredLambdaPx();
+  var measM = isFinite(measPx) ? measPx / pxPerMeter : NaN;
+  ctx.fillStyle = '#FFD166';
+  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('λ理論 = ' + fmtLength(lambdaM), 10, PAD+16);
+  ctx.fillStyle = '#cfe3f7';
+  ctx.fillText('λ実測 = ' + (isFinite(measM)?fmtLength(measM):'集計中…') + '  (n=' + segLensPx.length + ')', 10, PAD+32);
+
+  ctx.fillStyle = '#cfe3f7';
+  ctx.textAlign = 'left';
+  ctx.fillText('T='+p.T.toFixed(0)+'K  P='+p.P_kPa.toFixed(2)+'kPa  d='+p.d_pm.toFixed(0)+'pm  M='+p.Mg.toFixed(0)+'g/mol', 10, H-8);
+  ctx.textAlign = 'right';
+  ctx.fillText('箱幅 ≈ '+fmtLength(Lbox_m), W-10, H-8);
+  ctx.textAlign = 'left';
+
+  // live readouts
+  var v = meanSpeed(p.T, p.m);
+  var z = (lambdaM>0 && isFinite(lambdaM)) ? v/lambdaM : 0;
+  el('roLambda').textContent = fmtLength(lambdaM);
+  el('roMeas').textContent = isFinite(measM) ? fmtLength(measM) : '—';
+  el('roZ').textContent = fmtFreq(z);
+  el('roColl').textContent = String(collisions);
+}
+
+function drawLambdaPlot(p, lambdaM){
+  var ctx = lambdaCtx, W = cssW(lambdaCanvas), H = cssH(lambdaCanvas);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0,0,W,H);
   var mx = 64, my = 32;
-  var x0 = mx, x1 = W - 14, y0 = H - my, y1 = my + 4;
-  var gw = x1 - x0, gh = y0 - y1;
-  // x: log10(P_kPa) in [-2, 3] (0.01 .. 1000 kPa)
+  var x0 = mx, x1 = W-14, y0 = H-my, y1 = my+4;
+  var gw = x1-x0, gh = y0-y1;
   var xLogMin = -2, xLogMax = 3;
-  // y: log10(lambda) — compute from x range using current T, d
-  function lambdaAt(P_kPa) { return meanFreePath(p.T, p.d, P_kPa * 1000); }
+  function lambdaAt(P_kPa){ return meanFreePath(p.T, p.d, P_kPa*1000); }
   var lamMin = lambdaAt(Math.pow(10, xLogMax));
   var lamMax = lambdaAt(Math.pow(10, xLogMin));
   var yLogMin = Math.floor(Math.log10(lamMin));
   var yLogMax = Math.ceil(Math.log10(lamMax));
-  if (!isFinite(yLogMin) || !isFinite(yLogMax)) { yLogMin = -10; yLogMax = 2; }
-  if (yLogMax - yLogMin < 4) yLogMax = yLogMin + 4;
-  function px(P_kPa) { return x0 + (Math.log10(P_kPa) - xLogMin) / (xLogMax - xLogMin) * gw; }
-  function py(L_m) { return y0 - (Math.log10(L_m) - yLogMin) / (yLogMax - yLogMin) * gh; }
-  // gridlines + labels
+  if(!isFinite(yLogMin) || !isFinite(yLogMax)){ yLogMin = -10; yLogMax = 2; }
+  if(yLogMax-yLogMin < 4) yLogMax = yLogMin+4;
+  function px(P_kPa){ return x0 + (Math.log10(P_kPa)-xLogMin)/(xLogMax-xLogMin)*gw; }
+  function py(L_m){ return y0 - (Math.log10(L_m)-yLogMin)/(yLogMax-yLogMin)*gh; }
   ctx.strokeStyle = 'rgba(143,184,224,0.18)';
   ctx.fillStyle = '#8fb8e0';
   ctx.font = '10px "Roboto Mono",monospace';
   ctx.lineWidth = 1;
   ctx.textAlign = 'center';
-  for (var xi = xLogMin; xi <= xLogMax; xi++) {
+  var sup = ['⁰','¹','²','³','⁴','⁵','⁶'];
+  for(var xi=xLogMin; xi<=xLogMax; xi++){
     var xx = px(Math.pow(10, xi));
     ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
-    var lab = (xi >= 0) ? '10' + ['⁰','¹','²','³','⁴','⁵','⁶'][xi] : '10⁻' + (-xi);
-    ctx.fillText(lab, xx, y0 + 14);
+    var lab = (xi>=0) ? '10'+sup[xi] : '10⁻'+(-xi);
+    ctx.fillText(lab, xx, y0+14);
   }
   ctx.textAlign = 'right';
-  for (var yi = yLogMin; yi <= yLogMax; yi++) {
+  for(var yi=yLogMin; yi<=yLogMax; yi++){
     var yy = py(Math.pow(10, yi));
-    if (yy < y1 - 2 || yy > y0 + 2) continue;
+    if(yy < y1-2 || yy > y0+2) continue;
     ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    var labY;
-    if (yi >= 0) labY = '10^' + yi;
-    else labY = '10⁻' + (-yi);
-    ctx.fillText(labY, x0 - 4, yy + 3);
+    var labY = (yi>=0) ? '10^'+yi : '10⁻'+(-yi);
+    ctx.fillText(labY, x0-4, yy+3);
   }
-  // axes
   ctx.strokeStyle = 'rgba(143,184,224,0.55)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-  // curve λ vs P (log-log straight line, slope -1)
   ctx.strokeStyle = '#00B4D8';
   ctx.lineWidth = 2.5;
   ctx.beginPath();
   var Npts = 80;
-  for (var i = 0; i <= Npts; i++) {
-    var lp = xLogMin + (xLogMax - xLogMin) * i / Npts;
+  for(var i=0;i<=Npts;i++){
+    var lp = xLogMin + (xLogMax-xLogMin)*i/Npts;
     var Pk = Math.pow(10, lp);
     var L = lambdaAt(Pk);
     var X = px(Pk), Y = py(L);
-    if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+    if(i===0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
   }
   ctx.stroke();
-  // current marker
-  if (p.P_kPa > 0 && lambdaM > 0 && isFinite(lambdaM)) {
+  if(p.P_kPa > 0 && lambdaM > 0 && isFinite(lambdaM)){
     var cx = px(p.P_kPa), cy = py(lambdaM);
     ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI*2);
     ctx.fillStyle = '#FFD166';
@@ -461,91 +611,164 @@ function drawLambdaPlot(p, lambdaM) {
     ctx.beginPath(); ctx.moveTo(cx, y0); ctx.lineTo(cx, cy); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x0, cy); ctx.lineTo(cx, cy); ctx.stroke();
   }
-  // axis labels
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '12px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('P (kPa, log)', (x0 + x1) / 2, H - 6);
+  ctx.fillText('P (kPa, log)', (x0+x1)/2, H-6);
   ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
+  ctx.translate(14, (y0+y1)/2);
+  ctx.rotate(-Math.PI/2);
   ctx.fillText('λ (m, log)', 0, 0);
   ctx.restore();
 }
 
-function compute() {
+function compute(){
   var p = getParams();
-  if (!isFinite(p.T) || !isFinite(p.P) || !isFinite(p.d) || !isFinite(p.m)) return;
+  if(!isFinite(p.T) || !isFinite(p.P) || !isFinite(p.d) || !isFinite(p.m)) return;
   var lam = meanFreePath(p.T, p.d, p.P);
   var v = meanSpeed(p.T, p.m);
-  var nu = (lam > 0 && isFinite(lam)) ? v / lam : 0;
+  var nu = (lam>0 && isFinite(lam)) ? v/lam : 0;
   var n = numberDensity(p.T, p.P);
-  document.getElementById('statLambda').textContent = fmtLength(lam);
-  document.getElementById('statVavg').textContent = (isFinite(v) ? v.toFixed(0) + ' m/s' : '—');
-  document.getElementById('statNu').textContent = fmtFreq(nu);
-  document.getElementById('statN').textContent = fmtNumDensity(n);
+  el('statLambda').textContent = fmtLength(lam);
+  el('statVavg').textContent = (isFinite(v) ? v.toFixed(0)+' m/s' : '—');
+  el('statNu').textContent = fmtFreq(nu);
+  el('statN').textContent = fmtNumDensity(n);
   drawGas(p, lam);
   drawLambdaPlot(p, lam);
 }
+window.compute = compute;
 
-function animationStep() {
-  if (!playing) return;
-  // sweep slP between 0.01 and 1000 kPa on a log scale
-  var sl = document.getElementById('slP');
-  var cur = parseFloat(sl.value);
-  if (!isFinite(cur) || cur <= 0) cur = 0.01;
-  var lp = Math.log10(cur);
-  lp += sweepDir * 0.04;
-  if (lp > 3) { lp = 3; sweepDir = -1; }
-  if (lp < -2) { lp = -2; sweepDir = 1; }
-  var nv = Math.pow(10, lp);
-  if (nv < 0.01) nv = 0.01;
-  if (nv > 1000) nv = 1000;
-  sl.value = nv.toFixed(2);
-  updateSlider(sl, 'slPVal', 2, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
-}
-
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> P をスイープ';
-    if (animId) cancelAnimationFrame(animId);
-  }
-}
-
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> P をスイープ';
-  var defs = { slT: 300, slP: 101.32, slD: 370, slM: 28 };
-  Object.keys(defs).forEach(function(id){
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slT'), 'slTVal', 0, '');
-  updateSlider(document.getElementById('slP'), 'slPVal', 2, '');
-  updateSlider(document.getElementById('slD'), 'slDVal', 0, '');
-  updateSlider(document.getElementById('slM'), 'slMVal', 0, '');
-  initMolecules(20);
-  compute();
-}
-
-window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
-
-resizeCanvases();
-initMolecules(20);
-compute();
-// keep gas canvas animating slowly even when not in play
-setInterval(function(){
+// ----- gas box animation loop -----
+function gasLoop(){
+  if(!gasRunning){ gasId = null; return; }
   var p = getParams();
   var lam = meanFreePath(p.T, p.d, p.P);
+  stepGas(1.1 * speedMult);
   drawGas(p, lam);
-}, 60);
+  gasId = requestAnimationFrame(gasLoop);
+}
+function startGas(){
+  if(prefersReduced) return;
+  if(!gasRunning){
+    gasRunning = true;
+    var b = el('gasPlayBtn'); if(b) b.innerHTML = '<i class="fas fa-pause"></i> アニメ一時停止';
+  }
+  if(!gasId) gasId = requestAnimationFrame(gasLoop);
+}
+function stopGas(){
+  gasRunning = false;
+  if(gasId){ cancelAnimationFrame(gasId); gasId = null; }
+  var b = el('gasPlayBtn'); if(b) b.innerHTML = '<i class="fas fa-play"></i> アニメ再生';
+}
+function toggleGas(){ gasRunning ? stopGas() : startGas(); }
+window.toggleGas = toggleGas;
+
+function reseedGas(){
+  seedTag();
+  compute();
+}
+window.reseedGas = reseedGas;
+
+function setSpeed(s){
+  speedMult = s;
+  var btns = document.querySelectorAll('.speed-btn');
+  for(var i=0;i<btns.length;i++){
+    btns[i].classList.toggle('active', parseFloat(btns[i].dataset.speed) === s);
+  }
+}
+window.setSpeed = setSpeed;
+
+// ----- pressure auto-sweep -----
+function sweepStep(){
+  if(!sweeping) return;
+  var sl = el('slP');
+  var cur = parseFloat(sl.value);
+  if(!isFinite(cur) || cur <= 0) cur = 0.01;
+  var lp = Math.log10(cur);
+  lp += sweepDir * 0.03;
+  if(lp > 3){ lp = 3; sweepDir = -1; }
+  if(lp < -2){ lp = -2; sweepDir = 1; }
+  var nv = Math.pow(10, lp);
+  if(nv < 0.01) nv = 0.01;
+  if(nv > 1000) nv = 1000;
+  sl.value = nv.toFixed(2);
+  if(typeof updateSlider === 'function') updateSlider(sl, 'slPVal', 2, '');
+  else { var v = el('slPVal'); if(v) v.value = nv.toFixed(2); }
+  compute();
+  sweepId = requestAnimationFrame(sweepStep);
+}
+function togglePlay(){
+  sweeping = !sweeping;
+  var btn = el('playBtn');
+  if(sweeping){
+    if(btn) btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    sweepId = requestAnimationFrame(sweepStep);
+  } else {
+    if(btn) btn.innerHTML = '<i class="fas fa-play"></i> P をスイープ';
+    if(sweepId) cancelAnimationFrame(sweepId);
+  }
+}
+window.togglePlay = togglePlay;
+
+// ----- presets -----
+function markPreset(name){
+  var btns = document.querySelectorAll('.preset-btn');
+  for(var i=0;i<btns.length;i++) btns[i].classList.toggle('active', btns[i].dataset.preset === name);
+}
+function applyVals(T, P_kPa, d_pm, Mg){
+  el('slT').value = T; el('slP').value = P_kPa; el('slD').value = d_pm; el('slM').value = Mg;
+  if(typeof updateSlider === 'function'){
+    updateSlider(el('slT'),'slTVal',0,''); updateSlider(el('slP'),'slPVal',2,'');
+    updateSlider(el('slD'),'slDVal',0,''); updateSlider(el('slM'),'slMVal',0,'');
+  } else {
+    el('slTVal').value=T; el('slPVal').value=P_kPa; el('slDVal').value=d_pm; el('slMVal').value=Mg;
+  }
+}
+function setPreset(name){
+  var P = {
+    stp:    [273, 101.325, 370, 28],   // STP air ~ 66 nm
+    vacuum: [300, 0.001,   370, 28],   // high vacuum, long lambda
+    dense:  [300, 1000,    370, 28],   // dense gas, short lambda
+    large:  [300, 101.325, 700, 120]   // large molecules
+  }[name];
+  if(!P) return;
+  applyVals(P[0], P[1], P[2], P[3]);
+  markPreset(name);
+  seedTag();
+  compute();
+}
+window.setPreset = setPreset;
+
+function resetParams(){
+  if(sweeping){ sweeping = false; if(sweepId) cancelAnimationFrame(sweepId); }
+  var b = el('playBtn'); if(b) b.innerHTML = '<i class="fas fa-play"></i> P をスイープ';
+  applyVals(300, 101.32, 370, 28);
+  markPreset('');
+  initMolecules(20);
+  seedTag();
+  speedMult = 1; setSpeed(1);
+  if(!gasRunning) startGas();
+  compute();
+}
+window.resetParams = resetParams;
+
+window.addEventListener('resize', function(){ resizeCanvases(); seedTag(); compute(); });
+gasCanvas.addEventListener('keydown', function(e){
+  if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); toggleGas(); }
+});
+
+// init
+resizeCanvases();
+initMolecules(20);
+seedTag();
+compute();
+if(prefersReduced){
+  gasRunning = false;
+  var gb = el('gasPlayBtn'); if(gb) gb.innerHTML = '<i class="fas fa-play"></i> アニメ再生';
+} else {
+  startGas();
+}
+})();
 </script>
 
 <section class="explanation">
@@ -613,6 +836,9 @@ setInterval(function(){
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="mean-free-path.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -669,12 +895,22 @@ setInterval(function(){
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>窒素ガス（N₂、分子直径d=3.7Å）が298K、1気圧の条件下：数密度n=2.69×10²⁵m⁻³、平均速さ⟨v⟩=511m/s、衝突断面積σ=4.3×10⁻¹⁹m²、衝突頻度ν=9.4×10⁹s⁻¹、平均自由行程λ=68nm。圧力を10気圧に上昇させると数密度が10倍となり、λは6.8nmに短縮されます。温度を500Kに上昇させると⟨v⟩が増加してもνの増加が支配的となり、λはさらに縮小します。</p>
+<p>窒素ガス（N₂、分子直径d=3.7Å）が298K、1気圧の条件下：数密度n≒2.46×10²⁵m⁻³、平均速さ⟨v⟩≒475m/s、衝突断面積σ=πd²≒4.3×10⁻¹⁹m²、衝突頻度ν≒7.1×10⁹s⁻¹、平均自由行程λ≒66.8nm。圧力を10気圧に上昇させると数密度が10倍となり、λは約6.7nmに短縮されます。温度を上げるとλ∝Tで伸びますが、⟨v⟩∝√Tも増えるため衝突頻度νの変化は緩やかです。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol><li>真空ポンプ設計時：λが装置特性長より大きい場合は分子流領域（Knudsen数Kn＞1）であり、連続体仮定は破綻します</li><li>高温ガスタービン翼周辺の希薄気体解析では、T=1200K超での平均自由行程変化と熱伝達係数の関係を確認してください</li><li>マイクロ流体デバイスではチャネル高さとλの比較によりレジーム判定（Kn＜0.01で連続流、0.01＜Kn＜0.1で遷移流）が必須です</li><li>分子直径データは参考文献によって±10%の差異があるため、実験値との比較検証を推奨します</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="一般物理の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">一般物理 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

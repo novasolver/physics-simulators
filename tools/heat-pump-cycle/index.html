@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ヒートポンプ・冷凍サイクルシミュレーター",
       "description": "R134a・R410A・R290を選択して蒸気圧縮冷凍サイクルのCOP（冷房・暖房）をリアルタイム計算。p-h線図で状態点1〜4を可視化。",
       "url": "https://novasolver.jp/tools/heat-pump-cycle.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["R134a/R410A/R290冷媒の選択","蒸発温度・凝縮温度・過熱度・過冷度・圧縮機効率の設定","p-h線図（モリエ線図）上の状態点1〜4の可視化","COP_冷房・COP_暖房のカルノーCOPとの比較"],
       "keywords": "ヒートポンプ,冷凍サイクル,COP,成績係数,p-h線図,モリエ線図,R134a,R410A,蒸気圧縮,冷媒",
       "datePublished": "2026-04-09",
@@ -209,10 +209,29 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="eta" oninput="syncToNum('eta','etaValNum')" min="0.60" max="0.95" value="0.80" step="0.01">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-sync-alt"></i> 蒸気圧縮サイクル ライブアニメーション</div>
+      <canvas id="cycleCanvas" height="380" role="img" aria-label="蒸気圧縮冷凍サイクルのアニメーション。冷媒が圧縮機・凝縮器・膨張弁・蒸発器を循環し、相変化と熱の出入りを表示します。"></canvas>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:8px;line-height:1.6">
+        <i class="fas fa-circle" style="color:#e74c3c;font-size:.6rem"></i> 高温・高圧（蒸気）
+        <i class="fas fa-circle" style="color:#f39c12;font-size:.6rem"></i> 高圧液
+        <i class="fas fa-circle" style="color:#3498db;font-size:.6rem"></i> 低温・低圧（二相）
+        <i class="fas fa-circle" style="color:#2980b9;font-size:.6rem"></i> 低圧蒸気<br>
+        左下の蒸発器が冷源から熱 Q_c を吸収し、右上の凝縮器が高温源へ熱 Q_h を放出。圧縮機が仕事 W を投入して熱を低温側から高温側へ汲み上げます。
+      </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stats-grid">
       <div class="stat-card highlight">
@@ -262,6 +281,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
+(function(){
+"use strict";
+const CYCLE_LABELS = {
+  compressor: '圧縮機', condenser: '凝縮器', expansion: '膨張弁', evaporator: '蒸発器',
+  qhot: '高温源へ放熱 Q_h', qcold: '冷源から吸熱 Q_c', work: '圧縮仕事 W',
+  s1: '①低圧蒸気', s2: '②高温高圧蒸気', s3: '③高圧液', s4: '④低圧二相',
+  cop: 'COP暖房', hint: '冷媒が循環 → 低温側の熱を高温側へ汲み上げる'
+};
 
 // Simplified refrigerant saturation data (tabulated approximations)
 // Properties: T(°C) -> {P_sat(kPa), h_f(kJ/kg), h_g(kJ/kg), s_g(kJ/kg·K), cp_v(kJ/kg·K)}
@@ -498,12 +525,238 @@ function drawCOPChart(refKey, eta){
 
   drawPHDiagram(cycle, refKey);
   drawCOPChart(refKey, eta);
+  lastCycle = cycle;
 }['refrigerant','Te','Tc','Tsh','Tsc','eta'].forEach(id =>{
   document.getElementById(id).addEventListener('input', onParamChange);
   document.getElementById(id).addEventListener('change', onParamChange);
 });
 
+/* ===================== V2 vapor-compression loop animation ===================== */
+let lastCycle = null;
+const cyc = document.getElementById('cycleCanvas');
+if (cyc){
+  const cctx = cyc.getContext('2d');
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let cw = 0, chh = 0;
+
+  function resizeCyc(){
+    const rect = cyc.parentElement.getBoundingClientRect();
+    cw = Math.max(280, Math.floor(rect.width - 44));
+    chh = 380;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cyc.style.width = cw + 'px';
+    cyc.style.height = chh + 'px';
+    cyc.width = Math.round(cw * dpr);
+    cyc.height = Math.round(chh * dpr);
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // Loop geometry: rectangle with 4 corners = 4 components.
+  // Corner order (clockwise): evaporator(BL) -> compressor(TL via left wall up)...
+  // We define explicit node positions and a piecewise path between them.
+  function nodes(){
+    const mL = 70, mR = 70, mT = 70, mB = 70;
+    const x0 = mL, x1 = cw - mR, y0 = mT, y1 = chh - mB;
+    return {
+      // 4 component centers
+      comp: { x: x0, y: (y0+y1)/2 },          // compressor: left-mid (between evap and cond)
+      cond: { x: (x0+x1)/2, y: y0 },          // condenser: top
+      exp:  { x: x1, y: (y0+y1)/2 },          // expansion valve: right-mid
+      evap: { x: (x0+x1)/2, y: y1 },          // evaporator: bottom
+      x0, x1, y0, y1
+    };
+  }
+
+  // Path as a sequence of segments forming the closed loop (clockwise):
+  // evap(bottom) -> comp(left): segment 4->1 (suction, low-P vapor)
+  // comp(left) -> cond(top): segment 1->2 (discharge, high-P hot vapor)
+  // cond(top) -> exp(right): segment 2->3 (high-P liquid)
+  // exp(right) -> evap(bottom): segment 3->4 (low-P two-phase)
+  function buildPath(n){
+    return [
+      { a:n.evap, b:n.comp, phase:'suction' },   // 4 -> 1
+      { a:n.comp, b:n.cond, phase:'discharge' }, // 1 -> 2
+      { a:n.cond, b:n.exp,  phase:'liquid' },    // 2 -> 3
+      { a:n.exp,  b:n.evap, phase:'twophase' }   // 3 -> 4
+    ];
+  }
+
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function ptOn(seg, t){ return { x: lerp(seg.a.x, seg.b.x, t), y: lerp(seg.a.y, seg.b.y, t) }; }
+
+  // Color by fraction of full loop (0..1), starting at state 4 (exp->evap end / evap inlet)
+  // We color particles by which segment they are on (phase).
+  function phaseColor(phase){
+    switch(phase){
+      case 'discharge': return '#e74c3c'; // high-P hot vapor (1->2)
+      case 'liquid':    return '#f39c12'; // high-P liquid (2->3)
+      case 'twophase':  return '#3498db'; // low-P two-phase (3->4)
+      case 'suction':   return '#2980b9'; // low-P vapor (4->1)
+    }
+    return '#888';
+  }
+
+  function roundRectPath(x,y,w,h,r){
+    cctx.beginPath();
+    cctx.moveTo(x+r,y);
+    cctx.arcTo(x+w,y,x+w,y+h,r);
+    cctx.arcTo(x+w,y+h,x,y+h,r);
+    cctx.arcTo(x,y+h,x,y,r);
+    cctx.arcTo(x,y,x+w,y,r);
+    cctx.closePath();
+  }
+
+  function drawComponent(n, key, label, accent){
+    const w = 96, h = 50;
+    const x = n.x - w/2, y = n.y - h/2;
+    roundRectPath(x,y,w,h,9);
+    cctx.fillStyle = '#10243f';
+    cctx.fill();
+    cctx.lineWidth = 2; cctx.strokeStyle = accent; cctx.stroke();
+    cctx.fillStyle = '#fff';
+    cctx.font = 'bold 12px "Noto Sans JP", sans-serif';
+    cctx.textAlign = 'center'; cctx.textBaseline = 'middle';
+    cctx.fillText(label, n.x, n.y);
+  }
+
+  function arrowHead(x,y,ang,size,color){
+    cctx.fillStyle = color;
+    cctx.beginPath();
+    cctx.moveTo(x, y);
+    cctx.lineTo(x - size*Math.cos(ang-0.4), y - size*Math.sin(ang-0.4));
+    cctx.lineTo(x - size*Math.cos(ang+0.4), y - size*Math.sin(ang+0.4));
+    cctx.closePath(); cctx.fill();
+  }
+
+  function drawHeatArrows(n, phase01){
+    // pulsing magnitude
+    const pulse = reduceMotion ? 0.7 : (0.55 + 0.45*Math.abs(Math.sin(phase01*Math.PI*2)));
+    // Q_c absorbed at evaporator (arrows pointing INTO evaporator from below = heat in)
+    cctx.lineWidth = 3;
+    cctx.strokeStyle = 'rgba(52,152,219,'+(0.5+0.5*pulse).toFixed(2)+')';
+    for (let i=-1;i<=1;i++){
+      const x = n.evap.x + i*26;
+      const ytop = n.evap.y + 30, ybot = n.evap.y + 30 + 26*pulse;
+      cctx.beginPath(); cctx.moveTo(x, ybot); cctx.lineTo(x, ytop); cctx.stroke();
+      arrowHead(x, ytop, -Math.PI/2, 8, 'rgba(52,152,219,'+(0.5+0.5*pulse).toFixed(2)+')');
+    }
+    cctx.fillStyle = '#3498db'; cctx.font = 'bold 11px "Noto Sans JP",sans-serif'; cctx.textAlign='center';
+    cctx.fillText(CYCLE_LABELS.qcold, n.evap.x, n.evap.y + 30 + 40);
+
+    // Q_h rejected at condenser (arrows pointing OUT/up from condenser = heat out)
+    cctx.strokeStyle = 'rgba(231,76,60,'+(0.5+0.5*pulse).toFixed(2)+')';
+    for (let i=-1;i<=1;i++){
+      const x = n.cond.x + i*26;
+      const ybot = n.cond.y - 30, ytop = n.cond.y - 30 - 26*pulse;
+      cctx.beginPath(); cctx.moveTo(x, ybot); cctx.lineTo(x, ytop); cctx.stroke();
+      arrowHead(x, ytop, -Math.PI/2, 8, 'rgba(231,76,60,'+(0.5+0.5*pulse).toFixed(2)+')');
+    }
+    cctx.fillStyle = '#e74c3c';
+    cctx.fillText(CYCLE_LABELS.qhot, n.cond.x, n.cond.y - 30 - 30);
+  }
+
+  function drawCycle(tnorm){
+    resizeCyc();
+    cctx.clearRect(0,0,cw,chh);
+    cctx.fillStyle = '#0a1628'; cctx.fillRect(0,0,cw,chh);
+
+    const n = nodes();
+    const path = buildPath(n);
+
+    // pipe (loop) base
+    cctx.lineWidth = 8; cctx.lineCap = 'round';
+    path.forEach(seg => {
+      cctx.strokeStyle = 'rgba(255,255,255,0.10)';
+      cctx.beginPath(); cctx.moveTo(seg.a.x, seg.a.y); cctx.lineTo(seg.b.x, seg.b.y); cctx.stroke();
+    });
+    // colored pipe per phase (thin overlay)
+    cctx.lineWidth = 3;
+    path.forEach(seg => {
+      cctx.strokeStyle = phaseColor(seg.phase);
+      cctx.globalAlpha = 0.55;
+      cctx.beginPath(); cctx.moveTo(seg.a.x, seg.a.y); cctx.lineTo(seg.b.x, seg.b.y); cctx.stroke();
+      cctx.globalAlpha = 1;
+    });
+
+    // flow direction arrowheads at segment midpoints
+    path.forEach(seg => {
+      const m = ptOn(seg, 0.5);
+      const ang = Math.atan2(seg.b.y-seg.a.y, seg.b.x-seg.a.x);
+      arrowHead(m.x, m.y, ang, 9, phaseColor(seg.phase));
+    });
+
+    // heat arrows
+    drawHeatArrows(n, tnorm);
+
+    // moving refrigerant particles: distribute N particles along the 4-segment loop
+    const N = 16;
+    for (let i=0;i<N;i++){
+      let f = (i/N + tnorm) % 1;            // global loop fraction [0,1)
+      const segF = f*4;                     // which segment
+      const si = Math.floor(segF);
+      const st = segF - si;
+      const seg = path[si];
+      const p = ptOn(seg, st);
+      // particle size grows slightly on vapor phases
+      const r = (seg.phase==='liquid') ? 3.2 : 4.2;
+      const col = phaseColor(seg.phase);
+      cctx.beginPath(); cctx.arc(p.x, p.y, r, 0, Math.PI*2);
+      cctx.fillStyle = col; cctx.fill();
+      cctx.strokeStyle = 'rgba(255,255,255,0.5)'; cctx.lineWidth = 1; cctx.stroke();
+    }
+
+    // components on top
+    drawComponent(n, 'comp', CYCLE_LABELS.compressor, '#e74c3c');
+    drawComponent(n, 'cond', CYCLE_LABELS.condenser, '#e74c3c');
+    drawComponent(n, 'exp',  CYCLE_LABELS.expansion, '#3498db');
+    drawComponent(n, 'evap', CYCLE_LABELS.evaporator, '#3498db');
+
+    // state point labels near corners
+    cctx.font = 'bold 11px "Roboto Mono", monospace';
+    cctx.fillStyle = '#ffd54a'; cctx.textAlign='left';
+    cctx.fillText('①', n.comp.x - 56, n.comp.y - 36);
+    cctx.fillText('②', n.cond.x + 54, n.cond.y - 4);
+    cctx.fillText('③', n.exp.x + 8,  n.exp.y - 36);
+    cctx.fillText('④', n.evap.x - 70, n.evap.y + 6);
+
+    // W input badge at compressor
+    cctx.fillStyle = '#9b59b6'; cctx.font='bold 11px "Noto Sans JP",sans-serif'; cctx.textAlign='center';
+    cctx.fillText(CYCLE_LABELS.work, n.comp.x, n.comp.y + 46);
+
+    // live COP overlay
+    if (lastCycle){
+      cctx.fillStyle = 'rgba(255,255,255,0.92)';
+      cctx.font = 'bold 13px "Roboto Mono", monospace';
+      cctx.textAlign = 'left';
+      cctx.fillText(CYCLE_LABELS.cop + ' = ' + lastCycle.COP_h.toFixed(2), 14, 22);
+      cctx.fillStyle = 'rgba(255,255,255,0.6)';
+      cctx.font = '11px "Roboto Mono", monospace';
+      cctx.fillText('Q_h=' + lastCycle.Q_c.toFixed(1) + '  Q_c=' + lastCycle.Q_e.toFixed(1) + '  W=' + lastCycle.w_comp.toFixed(1) + ' kJ/kg', 14, 40);
+    }
+  }
+
+  let animPhase = 0, lastTs = 0;
+  function loop(ts){
+    if (!lastTs) lastTs = ts;
+    const dt = Math.min(0.05, (ts - lastTs)/1000);
+    lastTs = ts;
+    // flow speed scales with COP-ish work; keep gentle
+    animPhase = (animPhase + dt*0.18) % 1;
+    drawCycle(animPhase);
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', () => drawCycle(animPhase));
+
+  if (reduceMotion){
+    drawCycle(0); // single static frame
+  } else {
+    requestAnimationFrame(loop);
+  }
+}
+
 onParamChange();
+})();
 </script>
 
 <section class="explanation">
@@ -557,12 +810,15 @@ onParamChange();
 </div>
 <h2>よくある誤解と注意点</h2>
 <div class="fblock">
-<p>シミュレーションを始める際、特に初心者がやりがちな落とし穴がいくつかあります。まず<strong>「蒸発温度を下げれば、とにかく冷える」という誤解</strong>。確かに蒸発温度を下げると冷房能力は上がりますが、同時に圧縮機の仕事量が急増します。例えば、蒸発温度を5℃から0℃に下げると、COPは約15%も低下することがあります。実機ではこれが消費電力の大幅な増加や、圧縮機の過負荷故障につながるので要注意です。</p>
+<p>シミュレーションを始める際、特に初心者がやりがちな落とし穴がいくつかあります。まず<strong>「蒸発温度を下げれば、とにかく冷える」という誤解</strong>。確かに蒸発温度を下げると冷房能力は上がりますが、同時に圧縮機の仕事量が急増します。例えば、蒸発温度を5℃から0℃に下げると、COPは約25%も低下することがあります。実機ではこれが消費電力の大幅な増加や、圧縮機の過負荷故障につながるので要注意です。</p>
 <p>次に<strong>冷媒の選択で「新しい冷媒ほど常に高性能」と思い込むこと</strong>。R410AはR134aより高効率ですが、作動圧力が約1.6倍と高く、配管や機器の強度設計が全く異なります。シミュレーター上で同じ温度条件を設定しても、システム全体のコストや安全性は大きく変わります。また、<strong>p-h線図上の点は「状態」であって「位置」ではない</strong>という点。蒸発器出口（点1）は、常に蒸発温度に対応する飽和蒸気線上にあるとは限らず、「過熱度」分だけ右にずれます。この過熱度が小さすぎると圧縮機に液体が戻る「液圧縮」という重大故障の原因になります。</p>
 
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-pump-cycle.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -613,6 +869,16 @@ onParamChange();
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

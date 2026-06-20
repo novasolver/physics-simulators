@@ -40,7 +40,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "斜方投射シミュレーター（空気抵抗付き）",
       "description": "空気抵抗付き斜方投射の軌道をリアルタイム計算・アニメーション。最適射出角・飛距離・滞空時間を自動計算。バスケ・野球・ゴルフボールのプリセット付き。",
       "url": "https://novasolver.jp/tools/projectile-advanced.html",
@@ -50,7 +50,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["空気抵抗（ドラッグ力）付き軌道計算","複数軌道の同時表示・比較","最適射出角の自動計算","バスケ・野球・ゴルフ・砲弾プリセット"],
       "keywords": "斜方投射,空気抵抗,飛距離,最適角度,物理シミュレーター,高校物理",
       "datePublished": "2026-04-08",
@@ -235,7 +235,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <button class="btn secondary" style="width:100%;margin-bottom:8px" onclick="findOptimalAngle()"><i class="fas fa-bullseye"></i> 最適角を探す</button>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="一般物理の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">一般物理 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -255,7 +263,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
       $$\ddot{x}= -\frac{F_d}{m}\frac{\dot{x}}{v}, \quad \ddot{y}= -g - \frac{F_d}{m}\frac{\dot{y}}{v}$$
       $$F_d = \frac{1}{2}\rho C_D A v^2, \quad v = \sqrt{\dot{x}^2+\dot{y}^2}$$
-      <small style="color:var(--muted)">4次Runge-Kutta法で数値積分（Δt=0.01s）</small>
+      <small style="color:var(--muted)">速度二乗抗力を明示時間積分で計算（Δt=0.005s）</small>
     
 </div>
 </div>
@@ -290,6 +298,7 @@ function getParams() {
   let maxY = h0, t = 0;
   let vImp = v0;
   for (let i = 0; i < 20000; i++){
+    const xPrev = x, yPrev = y, tPrev = t;
     const v = Math.sqrt(vx*vx + vy*vy);
     const Fd = 0.5 * rho * cd * area * v * v;
     const ax = -(Fd / mass) * (vx / (v || 1));
@@ -301,7 +310,13 @@ function getParams() {
     t += dt;
     if (y > maxY) maxY = y;
     if (y <= 0) {
-      pts.push({x: x - vx*dt*(y/(vy*dt||1)), y: 0, t});
+      const denom = yPrev - y;
+      const alphaRaw = denom !== 0 ? yPrev / denom : 1;
+      const alpha = Math.max(0, Math.min(1, alphaRaw));
+      const xHit = xPrev + (x - xPrev) * alpha;
+      const tHit = tPrev + dt * alpha;
+      pts.push({x: Math.max(0, xHit), y: 0, t: tHit});
+      t = tHit;
       vImp = Math.sqrt(vx*vx + vy*vy);
       break;
     }pts.push({x, y, t});
@@ -494,7 +509,7 @@ function resizeCanvas() {
     const traj = computeTrajectory(pp);
     if (traj.range > bestRange){ bestRange = traj.range; bestAngle = a; }
   }document.getElementById('angle').value = bestAngle;
-  var _gangleVal=document.getElementById('angleValNum');if(_gangleVal)_gangleVal.textContent = bestAngle + '°';
+  syncToNum('angle','angleValNum');
   updateSliderGradient(document.getElementById('angle'));
   launchAnimation();
   var _hint=document.querySelector('.canvas-hint');if(_hint)_hint.textContent=`最適射出角: ${bestAngle}° / 飛距離 ${bestRange.toFixed(1)} m`;
@@ -522,18 +537,19 @@ function resizeCanvas() {
 function applyPreset(name){
   const p = presets[name];
   document.getElementById('v0').value = p.v0;
-  var _gv0Val=document.getElementById('v0ValNum');if(_gv0Val)_gv0Val.textContent = p.v0;
   document.getElementById('angle').value = p.angle;
-  var _gangleVal=document.getElementById('angleValNum');if(_gangleVal)_gangleVal.textContent = p.angle + '°';
   document.getElementById('h0').value = p.h0;
-  var _gh0Val=document.getElementById('h0ValNum');if(_gh0Val)_gh0Val.textContent = p.h0;
   document.getElementById('mass').value = p.mass;
-  var _gmassVal=document.getElementById('massValNum');if(_gmassVal)_gmassVal.textContent = p.mass.toFixed(2);
   document.getElementById('cd').value = p.cd;
-  var _gcdVal=document.getElementById('cdValNum');if(_gcdVal)_gcdVal.textContent = p.cd.toFixed(2);
   document.getElementById('area').value = p.area;
-  var _gareaVal=document.getElementById('areaValNum');if(_gareaVal)_gareaVal.textContent = p.area;
   document.getElementById('rho').value = p.rho;
+  syncToNum('v0','v0ValNum');
+  syncToNum('angle','angleValNum');
+  syncToNum('h0','h0ValNum');
+  syncToNum('mass','massValNum');
+  syncToNum('cd','cdValNum');
+  syncToNum('area','areaValNum');
+  syncToNum('rho','rhoNum');
   ['v0','angle','h0','mass','cd','area','rho'].forEach(id => updateSliderGradient(document.getElementById(id)));
   launchAnimation();
 }function draw(){
@@ -605,6 +621,9 @@ launchAnimation();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="projectile-advanced.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -667,7 +686,7 @@ launchAnimation();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>砲弾（質量46kg）を初速800m/s、射出角35度で発射する場合：真空では飛距離約63km、最大高度約19kmとなるが、空気密度1.225kg/m³、ドラッグ係数Cd=0.295では飛距離約24km、最大高度約6kmに減少。同じ条件でテニスボール（質量58g）を初速40m/s、角度45度で投げると、真空では81.6mだが空気抵抗で約35mに短縮。滞空時間は5.8秒から3.2秒へ低下</p>
+<p>初速20m/s、射出角45度、質量0.43kg、Cd=0.47、断面積46cm²、空気密度1.225kg/m³では、ページの計算で飛距離は約37.1m、最大高度は約9.7m、滞空時間は約2.81秒です。同じ条件でCd=0かつ空気密度0の真空近似にすると、飛距離は約40.7m、最大高度は約10.2m、滞空時間は約2.88秒となり、空気抵抗による短縮が確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -678,6 +697,16 @@ launchAnimation();
 <li>実験値との検証には高速カメラ（60fps以上）での弾道記録が必須</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="一般物理の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">一般物理 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -42,7 +42,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "薄肉レンズ計算機",
       "description": "薄肉レンズの公式 1/f=1/do+1/di を使って像距離・倍率・実像/虚像を計算し、光線図をリアルタイム描画するインタラクティブツール。",
       "url": "https://novasolver.jp/tools/optics-lens.html",
@@ -52,7 +52,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["薄肉レンズ公式による像距離・倍率の計算","3主光線による光線図の描画","di vs do のグラフ表示","凸・凹レンズ対応"],
       "keywords": "薄肉レンズ,光線図,焦点距離,像距離,倍率,凸レンズ,凹レンズ,光学計算,結像",
       "datePublished": "2026-04-09",
@@ -133,6 +133,20 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* v2 ray animation controls */
+.ray-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+.ray-btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:600;transition:background .2s}
+.ray-btn:hover{background:#0056b3}
+.ray-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted)}
+.ray-legend span{display:inline-flex;align-items:center;gap:5px}
+.ray-legend i.sw{width:16px;height:3px;border-radius:2px;display:inline-block}
+.ray-live{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.rl-card{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.rl-card .sv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.1}
+.rl-card .sl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px}
+@media(max-width:600px){.ray-live{grid-template-columns:repeat(2,1fr)}}
+canvas#rayCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.ray-btn{transition:none}}
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/optics-lens.html">
@@ -184,7 +198,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
 <div class="divider"></div>
-    
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -205,7 +227,23 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 光線図</div><canvas id="rayCanvas" height="340" data-ux-no-scale="1"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 光線図アニメーション（実時間結像）</div>
+      <canvas id="rayCanvas" height="340" data-ux-no-scale="1" tabindex="0" role="img" aria-label="薄肉レンズの光線図。物体・3本の主光線・像をリアルタイムに描画します。"></canvas>
+      <div class="ray-controls">
+        <button class="ray-btn" type="button" id="btnSweep"><i class="fas fa-pause"></i> 物体スイープ停止</button>
+        <span class="ray-legend">
+          <span><i class="sw" style="background:#FF6B6B"></i>平行光線</span>
+          <span><i class="sw" style="background:#4ECDC4"></i>中心光線</span>
+          <span><i class="sw" style="background:#FFD93D"></i>焦点光線</span>
+        </span>
+      </div>
+      <div class="ray-live">
+        <div class="rl-card"><div class="sv" id="live-do">—</div><div class="sl">物体距離 d<sub>o</sub> (mm)</div></div>
+        <div class="rl-card"><div class="sv" id="live-di">—</div><div class="sl">像距離 d<sub>i</sub> (mm)</div></div>
+        <div class="rl-card"><div class="sv" id="live-m">—</div><div class="sl">倍率 m (×)</div></div>
+        <div class="rl-card"><div class="sv" id="live-kind">—</div><div class="sl">像の種類</div></div>
+      </div>
+    </div>
     <div class="canvas-wrap">
       <div style="font-size:0.8rem;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;margin-top:4px;">像距離 d<sub>i</sub> vs 物体距離 d<sub>o</sub></div>
       <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 像距離 vs 物距離</div><canvas class="ux-chartjs-canvas" id="diChart" height="200"></canvas></div>
@@ -222,234 +260,280 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-const slF = document.getElementById('sl-f');
-const slDo = document.getElementById('sl-do');
-const valF = document.getElementById('val-f');
-const valDo = document.getElementById('val-do');
-const statDi = document.getElementById('stat-di');
-const statM = document.getElementById('stat-m');
-const statType = document.getElementById('stat-type');
+(function(){
+  "use strict";
+  var T = {
+    real: '実像', virtual: '虚像', inverted: '倒立', upright: '正立',
+    realImg: '実像', virtualImg: '虚像', atFocus: '焦点（無限遠）',
+    sweepStop: '<i class="fas fa-pause"></i> 物体スイープ停止',
+    sweepStart: '<i class="fas fa-play"></i> 物体スイープ再生',
+    obj: '物体', curPoint: '現在の点', font: 'Noto Sans JP'
+  };
 
-function updateSliderBg(el) {
-  const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
-  const pct = ((val - min) / (max - min)) * 100;
-  el.style.setProperty('--pct', pct + '%');
-}[slF, slDo].forEach(sl =>{ updateSliderBg(sl); sl.addEventListener('input', () => { updateSliderBg(sl); render(); }); });
+  var slF = document.getElementById('sl-f');
+  var slDo = document.getElementById('sl-do');
+  var statDi = document.getElementById('stat-di');
+  var statM = document.getElementById('stat-m');
+  var statType = document.getElementById('stat-type');
+  var liveDo = document.getElementById('live-do');
+  var liveDi = document.getElementById('live-di');
+  var liveM = document.getElementById('live-m');
+  var liveKind = document.getElementById('live-kind');
+  var btnSweep = document.getElementById('btnSweep');
 
-// Ray diagram canvas
+  var rc = document.getElementById('rayCanvas');
+  var ctx = rc.getContext('2d');
+  var CSSH = 340, cssW = 0;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const rc = document.getElementById('rayCanvas');
-const ctx = rc.getContext('2d');
-
-function resizeCanvas() {
-  rc.width = rc.offsetWidth * window.devicePixelRatio;
-  rc.height = 340 * window.devicePixelRatio;
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  render();
-}
-window.addEventListener('resize', resizeCanvas);
-
-// Chart.js di vs do
-
-const diCtx = document.getElementById('diChart').getContext('2d');
-const diChart = new Chart(diCtx, {
-  type: 'line',
-  data: { datasets: [
-    { label: 'di (mm)', data: [], borderColor: '#007BFF', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: false },{ label: '現在の点', data: [], borderColor: '#FF5733', backgroundColor: '#FF5733', pointRadius: 6, showLine: false }
-  ]},
-  options:{
-    animation: false,
-    responsive: true,
-    maintainAspectRatio:false,resizeDelay:100,plugins: { legend: { labels: { font: { family: 'Noto Sans JP', size: 11 }, color: '#1a1a2e' } } },
-    scales:{
-      x: { type:'linear', title: { display: true, text: 'do (mm)', font: { size: 11 } }, min: 10, max: 1000, ticks:{ maxTicksLimit: 8, font: { size: 10 } } },
-      y:{ title: { display: true, text: 'di (mm)', font: { size: 11 } }, min: -1000, max: 2000, ticks:{ maxTicksLimit: 8, font: { size: 10 } } }
-    }
-  }
-});
-
-function calcLens(f, do_){
-  if (Math.abs(do_ - f) < 0.1) return { di: Infinity, m: 0 };
-  const di = (f * do_) / (do_ - f);
-  const m = -di / do_;
-  return{ di, m };
-}function render(){
-  const f = parseFloat(slF.value);
-  const do_ = parseFloat(slDo.value);
-  if(valF)valF.textContent=f >= 0 ? '+' + f : '' + f;
-  if(valDo)valDo.textContent=do_;
-
-  const { di, m }= calcLens(f, do_);
-
-  // Update stats
-  if (!isFinite(di)){
-    statDi.textContent = '∞';
-    statM.textContent = '0';
-  }else{
-    statDi.textContent = di.toFixed(1);
-    statM.textContent = m.toFixed(3);
-  }const isReal = isFinite(di) && di > 0;
-  const isInverted = isFinite(m) && m < 0;
-  statType.innerHTML =
-    `<span class="image-type-badge ${isReal ? 'badge-real' : 'badge-virtual'}">${isReal ? '実像' : '虚像'}</span>` +
-    ` <span class="image-type-badge ${isInverted ? 'badge-inverted' : 'badge-upright'}">${isInverted ? '倒立' : '正立'}</span>`;
-
-  drawRays(f, do_, di, m);
-  updateChart(f, do_, di);
-}function drawRays(f, do_, di, m){
-  const W = rc.offsetWidth, H = 340;
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#020d1a';
-  ctx.fillRect(0, 0, W, H);
-
-  const cx = W * 0.45; // lens x position
-  const cy = H / 2;
-  const scale = Math.min(W / 900, H / 400) * 280; // pixels per 100mm
-
-  // draw optical axis
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // draw lens
-  const lensH = Math.min(H * 0.7, 160);
-  ctx.strokeStyle = f >= 0 ? '#00B4D8' : '#FF9F43';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.moveTo(cx, cy - lensH / 2); ctx.lineTo(cx, cy + lensH / 2); ctx.stroke();
-
-  // lens arrows
-  const aw = 8;
-  ctx.fillStyle = f >= 0 ? '#00B4D8' : '#FF9F43';
-  if (f >= 0) {
-    // convex: arrows pointing outward
-    ctx.beginPath(); ctx.moveTo(cx, cy - lensH/2); ctx.lineTo(cx - aw, cy - lensH/2 + 14); ctx.lineTo(cx + aw, cy - lensH/2 + 14); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(cx, cy + lensH/2); ctx.lineTo(cx - aw, cy + lensH/2 - 14); ctx.lineTo(cx + aw, cy + lensH/2 - 14); ctx.closePath(); ctx.fill();
-  }else{
-    // concave: arrows pointing inward
-    ctx.beginPath(); ctx.moveTo(cx, cy - lensH/2 + 14); ctx.lineTo(cx - aw, cy - lensH/2); ctx.lineTo(cx + aw, cy - lensH/2); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(cx, cy + lensH/2 - 14); ctx.lineTo(cx - aw, cy + lensH/2); ctx.lineTo(cx + aw, cy + lensH/2); ctx.closePath(); ctx.fill();
-  }// Convert mm to pixels: object is left of lens
-  const mmToPx = (mm) => mm * (scale / 300);
-  const objX = cx - mmToPx(do_);
-  const objH_px = 50; // fixed object height in px
-
-  // Clamp to visible area
-  const visObjX = Math.max(10, objX);
-
-  // Draw object arrow
-  drawArrow(ctx, visObjX, cy, visObjX, cy - objH_px, '#4ade80', 2);
-
-  // Focal points
-  const fPx = mmToPx(Math.abs(f));
-  const f1x = cx - fPx; // front focal point
-  const f2x = cx + fPx; // back focal point
-
-  if (Math.abs(f) < 600){
-    ctx.fillStyle = 'rgba(255,255,100,0.8)';
-    ctx.beginPath(); ctx.arc(f1x, cy, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,100,0.8)';
-    ctx.beginPath(); ctx.arc(f2x, cy, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = '10px Roboto Mono';
-    ctx.fillText('F', f1x - 4, cy + 14);
-    ctx.fillText('F\'', f2x - 4, cy + 14);
-  }// Draw image
-  if (isFinite(di) && Math.abs(di) < 2000){
-    const imgX = cx + mmToPx(di);
-    const imgH_px = objH_px * Math.abs(m);
-    const clampedImgH = Math.min(imgH_px, lensH / 2 - 5);
-    const imgDir = m < 0 ? 1 : -1; // inverted means arrow goes down
-    const isVirtual = di < 0;
-
-    drawArrow(ctx, imgX, cy, imgX, cy + imgDir * clampedImgH,
-      isVirtual ? 'rgba(255,165,0,0.7)' : '#f97316', 2, isVirtual);
-
-    ctx.fillStyle = isVirtual ? 'rgba(255,165,0,0.7)' : '#f97316';
-    ctx.font = '10px Noto Sans JP';
-    ctx.fillText(isVirtual ? '虚像' : '実像', imgX + 5, cy - 5);
-  }// Ray 1: parallel to axis → through back focal point
-  const tipY = cy - objH_px;
-  const r1Color = '#FF6B6B';
-  ctx.strokeStyle = r1Color; ctx.lineWidth = 1.5; ctx.setLineDash([]);
-  // from object tip to lens (at height of tip)
-  ctx.beginPath(); ctx.moveTo(visObjX, tipY); ctx.lineTo(cx, tipY); ctx.stroke();
-  // after lens: through F2
-  if (f > 0){
-    const slope = (cy - tipY) / (f2x - cx);
-    const endX = W + 20;
-    const endY = tipY + slope * (endX - cx);
-    ctx.beginPath(); ctx.moveTo(cx, tipY); ctx.lineTo(endX, endY); ctx.stroke();
-  }else{
-    // concave: diverges as if coming from F1 (which is on right side for concave)
-    const fVirtX = cx + fPx; // virtual focal point on right
-    const slope = (tipY - cy) / (cx - fVirtX);
-    const endX = W + 20;
-    const endY = tipY + slope * (endX - cx);
-    ctx.beginPath(); ctx.moveTo(cx, tipY); ctx.lineTo(endX, endY); ctx.stroke();
-    // dashed extension back to virtual focus
-    ctx.setLineDash([3, 3]); ctx.globalAlpha = 0.4;
-    ctx.beginPath(); ctx.moveTo(cx, tipY); ctx.lineTo(fVirtX, cy); ctx.stroke();
-    ctx.setLineDash([]); ctx.globalAlpha = 1;
-  }// Ray 2: through center — unchanged direction
-  const r2Color = '#4ECDC4';
-  ctx.strokeStyle = r2Color; ctx.lineWidth = 1.5;
-  const slope2 = (cy - tipY) / (cx - visObjX);
-  const endX2 = W + 20;
-  const endY2 = tipY + slope2 * (endX2 - visObjX);
-  ctx.beginPath(); ctx.moveTo(visObjX, tipY); ctx.lineTo(endX2, endY2); ctx.stroke();
-
-  // Ray 3: through front focal point → parallel after lens
-  const r3Color = '#FFD93D';
-  ctx.strokeStyle = r3Color; ctx.lineWidth = 1.5;
-  if (f > 0 && f1x > visObjX){
-    // from tip toward F1 (front), hits lens at some height
-    const slope3 = (cy - tipY) / (f1x - visObjX);
-    const hitY = tipY + slope3 * (cx - visObjX);
-    ctx.beginPath(); ctx.moveTo(visObjX, tipY); ctx.lineTo(cx, hitY); ctx.stroke();
-    // parallel after
-    ctx.beginPath(); ctx.moveTo(cx, hitY); ctx.lineTo(W + 20, hitY); ctx.stroke();
-  }else if (f < 0){
-    // concave: aimed at virtual front focal point (on right)
-    const fFrontX = cx + fPx;
-    const slope3 = (tipY - cy) / (visObjX - fFrontX);
-    const hitY = tipY + slope3 * (cx - visObjX);
-    ctx.beginPath(); ctx.moveTo(visObjX, tipY); ctx.lineTo(cx, hitY); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx, hitY); ctx.lineTo(W + 20, hitY); ctx.stroke();
+  // ---- thin lens physics: 1/f = 1/do + 1/di  ->  di = f*do/(do-f), m = -di/do ----
+  function calcLens(f, dov){
+    if (Math.abs(dov - f) < 0.1) return { di: Infinity, m: 0 };
+    var di = (f * dov) / (dov - f);
+    var m = -di / dov;
+    return { di: di, m: m };
   }
 
-  // Label
-  ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  ctx.font = '11px Roboto Mono';
-  ctx.fillText('f = ' + (f >= 0 ? '+' : '') + f + ' mm', cx + 8, cy - lensH/2 + 16);
-}function drawArrow(ctx, x1, y1, x2, y2, color, lw, dashed = false){
-  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw;
-  if (dashed) ctx.setLineDash([4, 4]); else ctx.setLineDash([]);
-  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-  ctx.setLineDash([]);
-  // arrowhead
-  const angle = Math.atan2(y2 - y1, x2 - x1);
-  const as = 8;
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - as * Math.cos(angle - 0.4), y2 - as * Math.sin(angle - 0.4));
-  ctx.lineTo(x2 - as * Math.cos(angle + 0.4), y2 - as * Math.sin(angle + 0.4));
-  ctx.closePath(); ctx.fill();
-}function updateChart(f, do_, currentDi){
-  const doVals = [], diVals = [];
-  for (let d = 10; d <= 1000; d += 5) {
-    const { di }= calcLens(f, d);
-    if (isFinite(di) && di > -1200 && di < 2200){
-      doVals.push({ x: d, y: di });
-    }
-  }diChart.data.datasets[0].data = doVals;
-  diChart.data.datasets[1].data = isFinite(currentDi) ? [{ x: do_, y: currentDi }] : [];
-  diChart.update('none');
-}// Init
+  function updateSliderBg(el){
+    var mn = parseFloat(el.min), mx = parseFloat(el.max), v = parseFloat(el.value);
+    el.style.setProperty('--pct', ((v - mn) / (mx - mn)) * 100 + '%');
+  }
 
-window.addEventListener('load', () =>{ resizeCanvas(); });
-render();
+  // ---- di vs do chart ----
+  var diChart = new Chart(document.getElementById('diChart').getContext('2d'), {
+    type: 'line',
+    data: { datasets: [
+      { label: 'di (mm)', data: [], borderColor: '#007BFF', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: false },
+      { label: T.curPoint, data: [], borderColor: '#FF5733', backgroundColor: '#FF5733', pointRadius: 6, showLine: false }
+    ]},
+    options: {
+      animation: false, responsive: true, maintainAspectRatio: false, resizeDelay: 100,
+      plugins: { legend: { labels: { font: { family: T.font, size: 11 }, color: '#1a1a2e' } } },
+      scales: {
+        x: { type: 'linear', title: { display: true, text: 'do (mm)', font: { size: 11 } }, min: 10, max: 1000, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+        y: { title: { display: true, text: 'di (mm)', font: { size: 11 } }, min: -1000, max: 2000, ticks: { maxTicksLimit: 8, font: { size: 10 } } }
+      }
+    }
+  });
+  var lastChartF = null;
+  function updateChartCurve(f){
+    var pts = [];
+    for (var d = 10; d <= 1000; d += 5){
+      var r = calcLens(f, d);
+      if (isFinite(r.di) && r.di > -1200 && r.di < 2200) pts.push({ x: d, y: r.di });
+    }
+    diChart.data.datasets[0].data = pts;
+    lastChartF = f;
+  }
+  function updateChartPoint(f, dov, di){
+    if (lastChartF !== f) updateChartCurve(f);
+    diChart.data.datasets[1].data = isFinite(di) ? [{ x: dov, y: di }] : [];
+    diChart.update('none');
+  }
+
+  // ---- HiDPI ----
+  function resizeCanvas(){
+    cssW = rc.clientWidth || rc.offsetWidth || 600;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    rc.width = Math.round(cssW * dpr);
+    rc.height = Math.round(CSSH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawArrow(x1, y1, x2, y2, color, lw, dashed){
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw;
+    ctx.setLineDash(dashed ? [4, 4] : []);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.setLineDash([]);
+    var ang = Math.atan2(y2 - y1, x2 - x1), as = 8;
+    if (Math.hypot(x2 - x1, y2 - y1) < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - as * Math.cos(ang - 0.4), y2 - as * Math.sin(ang - 0.4));
+    ctx.lineTo(x2 - as * Math.cos(ang + 0.4), y2 - as * Math.sin(ang + 0.4));
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawRays(f, dov, di, m){
+    var W = cssW, H = CSSH;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#020d1a'; ctx.fillRect(0, 0, W, H);
+
+    var cx = W * 0.46, cy = H / 2;
+    var mmToPx = (W / 1300);                  // px per mm so a 1000mm scene fits with room
+    var objH_px = 46;
+    var lensH = Math.min(H * 0.74, 168);
+
+    // optical axis
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke(); ctx.setLineDash([]);
+
+    // lens
+    var lensCol = f >= 0 ? '#00B4D8' : '#FF9F43';
+    ctx.strokeStyle = lensCol; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(cx, cy - lensH / 2); ctx.lineTo(cx, cy + lensH / 2); ctx.stroke();
+    var aw = 8; ctx.fillStyle = lensCol;
+    if (f >= 0){
+      ctx.beginPath(); ctx.moveTo(cx, cy - lensH/2); ctx.lineTo(cx - aw, cy - lensH/2 + 14); ctx.lineTo(cx + aw, cy - lensH/2 + 14); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx, cy + lensH/2); ctx.lineTo(cx - aw, cy + lensH/2 - 14); ctx.lineTo(cx + aw, cy + lensH/2 - 14); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.moveTo(cx, cy - lensH/2 + 14); ctx.lineTo(cx - aw, cy - lensH/2); ctx.lineTo(cx + aw, cy - lensH/2); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx, cy + lensH/2 - 14); ctx.lineTo(cx - aw, cy + lensH/2); ctx.lineTo(cx + aw, cy + lensH/2); ctx.closePath(); ctx.fill();
+    }
+
+    var objX = cx - dov * mmToPx;
+    var visObjX = Math.max(12, objX);
+    var tipY = cy - objH_px;
+
+    // focal points (geometric: both sides at |f|)
+    var fPx = Math.abs(f) * mmToPx;
+    var f1x = cx - fPx, f2x = cx + fPx;
+    if (fPx < W){
+      ctx.fillStyle = 'rgba(255,255,100,0.85)';
+      ctx.beginPath(); ctx.arc(f1x, cy, 4, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(f2x, cy, 4, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '10px Roboto Mono';
+      ctx.fillText('F', f1x - 3, cy + 14); ctx.fillText("F'", f2x - 3, cy + 14);
+    }
+
+    // object
+    drawArrow(visObjX, cy, visObjX, tipY, '#4ade80', 2.4);
+    ctx.fillStyle = '#4ade80'; ctx.font = '10px ' + T.font;
+    ctx.fillText(T.obj, visObjX - 6, cy + 16);
+
+    // image
+    var isVirtual = isFinite(di) && di < 0;
+    if (isFinite(di) && Math.abs(di) * mmToPx < W * 1.2){
+      var imgX = cx + di * mmToPx;
+      var imgH = objH_px * Math.abs(m);
+      var clampedH = Math.min(imgH, lensH / 2 + 30);
+      var imgDir = m < 0 ? 1 : -1;
+      drawArrow(imgX, cy, imgX, cy + imgDir * clampedH,
+        isVirtual ? 'rgba(255,170,40,0.9)' : '#f97316', 2.4, isVirtual);
+      ctx.fillStyle = isVirtual ? 'rgba(255,170,40,0.95)' : '#f97316'; ctx.font = 'bold 10px ' + T.font;
+      ctx.fillText(isVirtual ? T.virtualImg : T.realImg, imgX + 5, cy - clampedH * imgDir - 4 * imgDir + (imgDir < 0 ? 12 : 0));
+    }
+
+    // Ray 1: parallel -> through back focal point (F')
+    ctx.strokeStyle = '#FF6B6B'; ctx.lineWidth = 1.6; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(visObjX, tipY); ctx.lineTo(cx, tipY); ctx.stroke();
+    if (f > 0){
+      var s1 = (cy - tipY) / (f2x - cx);
+      ctx.beginPath(); ctx.moveTo(cx, tipY); ctx.lineTo(W + 20, tipY + s1 * (W + 20 - cx)); ctx.stroke();
+    } else if (f < 0){
+      var s1c = (tipY - cy) / (cx - f2x); // diverge as if from virtual focus F' on near side
+      ctx.beginPath(); ctx.moveTo(cx, tipY); ctx.lineTo(W + 20, tipY + s1c * (W + 20 - cx)); ctx.stroke();
+      ctx.setLineDash([3, 3]); ctx.globalAlpha = 0.4;
+      ctx.beginPath(); ctx.moveTo(cx, tipY); ctx.lineTo(f1x, cy); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+
+    // Ray 2: through center, straight
+    ctx.strokeStyle = '#4ECDC4'; ctx.lineWidth = 1.6;
+    var s2 = (cy - tipY) / (cx - visObjX);
+    ctx.beginPath(); ctx.moveTo(visObjX, tipY); ctx.lineTo(W + 20, tipY + s2 * (W + 20 - visObjX)); ctx.stroke();
+    if (isVirtual){ // back-extension of center ray to show virtual convergence
+      ctx.setLineDash([3, 3]); ctx.globalAlpha = 0.35;
+      ctx.beginPath(); ctx.moveTo(visObjX, tipY); ctx.lineTo(visObjX - 60, tipY - s2 * 60); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+
+    // Ray 3: through front focal point F -> parallel after lens
+    ctx.strokeStyle = '#FFD93D'; ctx.lineWidth = 1.6;
+    if (f > 0){
+      var s3 = (cy - tipY) / (f1x - visObjX);
+      var hitY = tipY + s3 * (cx - visObjX);
+      ctx.beginPath(); ctx.moveTo(visObjX, tipY); ctx.lineTo(cx, hitY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, hitY); ctx.lineTo(W + 20, hitY); ctx.stroke();
+    } else if (f < 0){
+      var s3c = (tipY - cy) / (visObjX - f2x);
+      var hitYc = tipY + s3c * (cx - visObjX);
+      ctx.beginPath(); ctx.moveTo(visObjX, tipY); ctx.lineTo(cx, hitYc); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, hitYc); ctx.lineTo(W + 20, hitYc); ctx.stroke();
+    }
+
+    // label
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = '11px Roboto Mono';
+    ctx.fillText('f = ' + (f >= 0 ? '+' : '') + f + ' mm', cx + 8, cy - lensH/2 + 16);
+  }
+
+  function updateReadouts(f, dov, di, m){
+    var atFocus = !isFinite(di);
+    var isReal = isFinite(di) && di > 0;
+    var isInverted = isFinite(m) && m < 0;
+    statDi.textContent = atFocus ? '∞' : di.toFixed(1);
+    statM.textContent = atFocus ? '0' : m.toFixed(3);
+    statType.innerHTML =
+      '<span class="image-type-badge ' + (isReal ? 'badge-real' : 'badge-virtual') + '">' + (isReal ? T.real : T.virtual) + '</span>' +
+      ' <span class="image-type-badge ' + (isInverted ? 'badge-inverted' : 'badge-upright') + '">' + (isInverted ? T.inverted : T.upright) + '</span>';
+    liveDo.textContent = dov.toFixed(0);
+    liveDi.textContent = atFocus ? '∞' : di.toFixed(0);
+    liveM.textContent = atFocus ? '0' : m.toFixed(2);
+    liveKind.textContent = atFocus ? T.atFocus : (isReal ? T.real : T.virtual);
+    liveKind.style.color = isReal ? '#4ade80' : '#ffaa28';
+  }
+
+  function render(){
+    var f = parseFloat(slF.value), dov = parseFloat(slDo.value);
+    var r = calcLens(f, dov);
+    updateReadouts(f, dov, r.di, r.m);
+    drawRays(f, dov, r.di, r.m);
+    updateChartPoint(f, dov, r.di);
+  }
+
+  // ---- object-distance auto sweep ----
+  var sweeping = !reduceMotion, lastTs = 0;
+  var doMin = parseFloat(slDo.min), doMax = parseFloat(slDo.max);
+  function frame(ts){
+    if (!sweeping){ return; }
+    if (!lastTs) lastTs = ts;
+    var dt = Math.min(0.05, (ts - lastTs) / 1000); lastTs = ts;
+    var f = parseFloat(slF.value);
+    // sweep object across a meaningful range that crosses the focal point
+    var lo = Math.max(doMin, 20), hi = doMax;
+    var v = parseFloat(slDo.value);
+    if (!frame._dir) frame._dir = 1;
+    v += frame._dir * (hi - lo) * 0.10 * dt * 4;   // ~ a few seconds per sweep
+    if (v >= hi){ v = hi; frame._dir = -1; }
+    if (v <= lo){ v = lo; frame._dir = 1; }
+    slDo.value = v;
+    updateSliderBg(slDo);
+    render();
+    requestAnimationFrame(frame);
+  }
+  function startSweep(){
+    if (reduceMotion) return;
+    sweeping = true; lastTs = 0;
+    btnSweep.innerHTML = T.sweepStop;
+    requestAnimationFrame(frame);
+  }
+  function stopSweep(){
+    sweeping = false;
+    btnSweep.innerHTML = T.sweepStart;
+  }
+  if (btnSweep){
+    btnSweep.addEventListener('click', function(){ if (sweeping) stopSweep(); else startSweep(); });
+    if (reduceMotion) btnSweep.innerHTML = T.sweepStart;
+  }
+
+  // manual interaction stops the sweep
+  [slF, slDo].forEach(function(sl){
+    updateSliderBg(sl);
+    sl.addEventListener('input', function(){ updateSliderBg(sl); if (sl === slDo) stopSweep(); render(); });
+  });
+  slF.addEventListener('input', function(){ lastChartF = null; });
+
+  window.addEventListener('resize', function(){ resizeCanvas(); render(); });
+
+  function init(){
+    resizeCanvas();
+    updateChartCurve(parseFloat(slF.value));
+    render();
+    if (!reduceMotion) startSweep();
+  }
+  if (document.readyState === 'complete') init();
+  else window.addEventListener('load', init);
+})();
 </script>
 
 <section class="explanation">
@@ -510,6 +594,9 @@ render();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="optics-lens.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -581,6 +668,16 @@ render();
 <li>高倍率(|m|&gt;5)の場合、光軸からの高さが大きい光線は収差の影響を受けやすくなります。薄肉レンズ近軸光学の仮定が破綻する可能性があります</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

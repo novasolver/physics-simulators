@@ -100,7 +100,7 @@ header{background:var(--navy);color:#fff;padding:0 24px}
 <link href="https://novasolver.jp/tools/thermal-stress.html" hreflang="x-default" rel="alternate"/>
 <script type="application/ld+json">[{
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
+    "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
     "name": "熱応力 シミュレーター｜温度差・拘束条件・クリープ",
     "description": "拘束熱膨張・バイメタル曲げ・2層板界面応力をインタラクティブに計算。Timoshenko理論に基づく反り量・界面応力をリアルタイム可視化する熱応力解析シミュレーター。",
     "url": "https://novasolver.jp/tools/thermal-stress.html",
@@ -144,7 +144,7 @@ header{background:var(--navy);color:#fff;padding:0 24px}
         "name": "バイメタル板の反り量はどのような式で計算しますか？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Timoshenko（1925年）の理論によると、熱膨張係数が異なる2層板（厚さ t₁, t₂、弾性率 E₁, E₂）が温度変化 ΔT を受けるとき、曲率 κ は κ = 6(α₂−α₁)ΔT(1+m)² / [h{3(1+m)² + (1+mn)(m² + 1/(mn)))] で求められます（m = t₁/t₂、n = E₁/E₂、h = t₁+t₂）。反り量（梁長さ L）は δ = κL²/8 です。"
+          "text": "Timoshenko（1925年）の理論によると、熱膨張係数が異なる2層板（厚さ t₁, t₂、弾性率 E₁, E₂）が温度変化 ΔT を受けるとき、曲率 κ は κ = 6(α₂−α₁)ΔT(1+m)² / [h{3(1+m)² + (1+mn)(m² + 1/(mn)))] で求められます（m = t₁/t₂、n = E₁/E₂、h = t₁+t₂）。反り量（片持ち端部、梁長さ L）は δ = κL²/2 です。"
         }
       },{
         "@type": "Question",
@@ -347,7 +347,16 @@ header{background:var(--navy);color:#fff;padding:0 24px}
 <input id="DTi" max="500" min="-200" oninput="syncToNum('DTi','lDTi');syncLabel('DTi','lDTi','°C');update()" step="5" type="range" value="100"/>
 </div>
 </div>
-</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 <!-- Right -->
 <div class="viz-panel">
 
@@ -367,7 +376,7 @@ header{background:var(--navy);color:#fff;padding:0 24px}
 <div class="stat-card">
 <div class="stat-val" id="sInt">—</div>
 <div class="stat-unit">MPa</div>
-<div class="stat-lbl">界面応力 σ_int</div>
+<div class="stat-lbl" id="sIntLbl">界面応力 σ_int</div>
 </div>
 <div class="stat-card">
 <div class="stat-val" id="sFree">—</div>
@@ -474,13 +483,13 @@ function onTypeChange(){
   const dAlpha = a1 - a2;
   const m = t2 / t1;
   const n = E2 / E1;
-  const denom = t1 * t1 * (4 + 6 * m + 4 * m * m + n * m * m * m);
+  const denom = t1 * t1 * (1 / (n * m) + 4 + 6 * m + 4 * m * m + n * m * m * m);
   if (Math.abs(denom) < 1e-30) return{ kappa: 0, delta: 0, R: Infinity, sigma_int: 0 };
   const kappa = 6 * dAlpha * DT * (t1 + t2) / denom;
   const delta = kappa * L * L / 2;
   const R = Math.abs(kappa) > 1e-12 ? 1 / Math.abs(kappa) : Infinity;
   // Interface shear stress approximation
-  const sigma_int = Math.abs(E1 * dAlpha * DT * t1 / (2 * (1 + n * m)));
+  const sigma_int = Math.abs(E1 * dAlpha * DT / (2 * (1 + n * m)));
   return{ kappa, delta, R, sigma_int };
 }function initCharts(){
   chartThick = new Chart(document.getElementById('chartThick'), {
@@ -541,10 +550,11 @@ function onTypeChange(){
   const p = getParams();
 
   if (p.type === 'constrained') {
-    const sig = p.E * p.alpha * p.DT / (1 - p.nu);
+    const sig = p.E * p.alpha * p.DT;
     const sigUni = p.E * p.alpha * p.DT;
     const dL = p.alpha * p.DT * p.L * 1e6;
 
+    document.getElementById('sIntLbl').textContent = '熱応力 σ';
     document.getElementById('sDelta').textContent = '—';
     document.getElementById('sRadius').textContent = '—';
     document.getElementById('sInt').textContent = (sig / 1e6).toFixed(1);
@@ -570,7 +580,7 @@ function onTypeChange(){
     const dts = [], ds = [];
     for (let i = -200; i <= 500; i += 20){
       dts.push(i);
-      ds.push(parseFloat(((p.E * p.alpha * i / (1 - p.nu)) / 1e6).toFixed(2)));
+      ds.push(parseFloat(((p.E * p.alpha * i) / 1e6).toFixed(2)));
     }
     chartDT.data.labels = dts;
     chartDT.data.datasets[0].label = '拘束応力 σ (MPa)';
@@ -587,6 +597,7 @@ function onTypeChange(){
   const{ kappa, delta, R, sigma_int }= res;
   const dL = (p.a1 > 0 ? p.a1 : p.a2) * p.DT * p.L * 1e6;
 
+  document.getElementById('sIntLbl').textContent = '界面応力 σ_int';
   document.getElementById('sDelta').textContent = isFinite(delta) ? (delta * 1e3).toFixed(3) : '—';
   document.getElementById('sRadius').textContent = isFinite(R) && R < 1e8 ? (R * 1e3).toFixed(1) : '∞';
   document.getElementById('sInt').textContent = (sigma_int / 1e6).toFixed(1);
@@ -785,6 +796,9 @@ update();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="thermal-stress.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -838,16 +852,14 @@ update();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>材料1の縦弾性係数(lEc)と線膨張係数(lAlpha)を入力。例：銅Ec=130GPa、Alpha=16.5×10⁻⁶/K</li>
-<li>材料2の縦弾性係数(Ec)と線膨張係数(Alpha)を入力。例：鋼Ec=200GPa、Alpha=12×10⁻⁶/K</li>
-<li>各層の厚さ(lNuc、Nuc)をマイクロメートル単位で指定。はんだ層0.2mm、銅箔0.035mm等</li>
-<li>温度変化(lDTc、DTc)をケルビン入力。リフロー工程の250K(室温20℃→270℃)等を設定</li>
-<li>Timoshenko二層梁理論により界面曲率κ、反り変位δ、剪断応力τを自動計算</li>
+<li>拘束熱膨張ではE、α、ν、ΔT、Lを入力します。</li>
+<li>バイメタル/界面モードでは各層のE₁/E₂、α₁/α₂、厚さt₁/t₂（mm）、ΔT、Lを設定します。</li>
+<li>値を変えると曲率κ、反りδ、界面応力σ_intが自動更新されます。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>PCB基板(厚さ1.6mm、ガラス繊維強化樹脂E=20GPa、α=15×10⁻⁶/K)とはんだ層(厚さ0.15mm、E=55GPa、α=23×10⁻⁶/K)の組合せで、ΔT=200K加熱時：拘束膨張差=Δα×ΔT=(23-15)×200=1600μstrain。中立軸の深さzn=0.74mmで、曲率κ=1.2m⁻¹、反り量δ=2.8mm/100mm。BGA接点での剪断応力τ=18MPa発生。</p>
+<p>PCB基板(厚さ1.6mm、E=20GPa、α=15×10⁻⁶/K)とはんだ層(厚さ0.15mm、E=55GPa、α=23×10⁻⁶/K)をL=50mm、ΔT=200Kで計算すると、修正式では曲率κ≈-0.774m⁻¹、端部反りδ≈-0.967mm、界面応力σ_int≈12.7MPaです。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -858,6 +870,16 @@ update();
 <li>界面接着層：エポキシ樹脂接着(G=3GPa厚さ10μm)存在時は剪断弾性係数で補正。複合梁のEI値を再計算</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
 <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

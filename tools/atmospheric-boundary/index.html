@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "大気境界層プロファイル計算",
       "description": "地表粗度ごとの大気境界層風速プロファイルを対数則・べき乗則で計算・可視化するツール。",
       "url": "https://novasolver.jp/tools/atmospheric-boundary.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["対数則・べき乗則の同時比較","地表粗度5種類（海上・平地・郊外・市街地・都市）","乱流強度・風エネルギー密度の計算","風力タービンハブ高度での諸量表示"],
       "keywords": "大気境界層,風速プロファイル,対数則,べき乗則,地表粗度,乱流強度,風エネルギー,CFDインフロー",
       "datePublished": "2026-04-09",
@@ -135,6 +135,22 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+.faq-section { margin-top: 16px; }
+.faq-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+.faq-q { width: 100%; text-align: left; background: var(--card); border: none; padding: 12px 16px; font-size: 0.9rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; color: var(--text); }
+.faq-q:hover { background: var(--bg); }
+.faq-a { display: none; padding: 12px 16px; font-size: 0.88rem; line-height: 1.7; color: var(--text); border-top: 1px solid var(--border); background: var(--bg); }
+
+/* v2 controls */
+.preset-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+.preset-btn{ flex:1 1 auto; padding:6px 8px; font-size:0.76rem; font-weight:600; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); cursor:pointer; transition:all .15s; }
+.preset-btn:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.anim-row{ display:flex; gap:8px; }
+.btn{ flex:1 1 auto; padding:8px 12px; font-size:0.82rem; font-weight:600; border:none; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; transition:opacity .15s; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+.btn:hover{ opacity:.88; }
+.btn-ghost{ background:var(--bg); color:var(--text); border:1px solid var(--border); }
+#windCanvas{ display:block; width:100%; border-radius:8px; background:#001F3F; }
+
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/atmospheric-boundary.html">
@@ -170,7 +186,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="param-label">
         <span class="param-name">地表粗度クラス</span>
       </div>
-      <select id="terrainSelect" onchange="updateAll()">
+      <select id="terrainSelect" onchange="onTerrainSelect()">
         <option value="sea">海上・湖面 (z₀=0.0002 m)</option>
         <option value="flat" selected>平坦・農耕地 (z₀=0.03 m)</option>
         <option value="suburban">郊外・低層住宅地 (z₀=0.1 m)</option>
@@ -196,21 +212,61 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
+    <div class="panel-title">プリセット地形</div>
+    <div class="preset-row">
+      <button type="button" class="preset-btn" onclick="applyPreset('sea')">開けた海</button>
+      <button type="button" class="preset-btn" onclick="applyPreset('flat')">草原</button>
+      <button type="button" class="preset-btn" onclick="applyPreset('suburban')">郊外</button>
+      <button type="button" class="preset-btn" onclick="applyPreset('city')">都市</button>
+    </div>
+
+    <div class="divider"></div>
+    <div class="panel-title">アニメーション操作</div>
+    <div class="anim-row">
+      <button type="button" class="btn anim-btn" id="playBtn" onclick="togglePlay()" aria-label="再生 / 一時停止"><i class="fas fa-pause"></i> 一時停止</button>
+      <button type="button" class="btn anim-btn btn-ghost" onclick="resetAnim()" aria-label="最初から"><i class="fas fa-rotate-left"></i> 最初から</button>
+    </div>
+
+    <div class="divider"></div>
     <div class="panel-title">ハブ高度での計算結果</div>
 <div class="hub-line" id="ustarLine"></div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
+        <div class="sv" id="statUref">—</div>
+        <div class="sl">U @10m (m/s)</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statUstar">—</div>
+        <div class="sl">摩擦速度 u* (m/s)</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statZ0">—</div>
+        <div class="sl">粗度長 z₀ (m)</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statBL">—</div>
+        <div class="sl">境界層高さ (m)</div>
+      </div>
+      <div class="stat-card">
         <div class="sv" id="statUlog">—</div>
-        <div class="sl">U_log (m/s)</div>
+        <div class="sl">U_log @ハブ (m/s)</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="statUpow">—</div>
-        <div class="sl">U_pow (m/s)</div>
+        <div class="sl">U_pow @ハブ (m/s)</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="statTI">—</div>
@@ -223,10 +279,13 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 境界層</div><canvas class="ux-chartjs-canvas" id="ablChart"></canvas></div>
-    <canvas id="terrainCanvas" width="600" height="160" style="width:100%;margin-top:18px;border-radius:8px;display:block;"></canvas>
-    <p style="font-size:0.75rem;color:var(--muted);text-align:center;margin-top:6px;">地表粗度イメージと風速矢印（矢印の長さが風速に対応）</p>
-  
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-wind"></i> 風のリアルタイム可視化（高さで速度が変わる）</div>
+      <canvas id="windCanvas" role="img" aria-label="地形上を流れる風粒子のアニメーション。高いほど風が速く、地表が粗いほど低層の風が弱まる様子を示す。"></canvas>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:6px;">水色の粒子＝風の流れ（速いほど長い軌跡）。白い曲線＝対数則の速度プロファイル U(z)。黄破線＝ハブ高度。地表の凹凸が大きいほど低層の風が遅くなる。</p>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 速度プロファイル U(z)：対数則 vs べき乗則</div><canvas class="ux-chartjs-canvas" id="ablChart"></canvas></div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
       対数則：$U(z)=\dfrac{u_*}{\kappa}\ln\!\left(\dfrac{z}{z_0}\right)$<br>
@@ -234,220 +293,278 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       べき乗則：$U(z)=U_{ref}\!\left(\dfrac{z}{z_{ref}}\right)^{\!\alpha}$<br><br>
       乱流強度：$I(z)\approx\dfrac{1}{\ln(z/z_0)}$<br><br>
       風力密度：$E=\dfrac{1}{2}\rho U^3,\;\rho=1.225\,\text{kg/m}^3$
-    
+
 </div>
 </div>
 </div>
 
 <script>
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
-}
-
+(function(){
 const terrainData = {
   sea:      {z0:0.0002, alpha:0.10, label:'海上・湖面',      color:'#0077b6'},
-  flat:{z0:0.03,   alpha:0.14, label:'平坦・農耕地',    color:'#52b788'},
-  suburban:{z0:0.1,    alpha:0.22, label:'郊外・低層住宅地',color:'#f4a261'},
-  urban:{z0:0.5,    alpha:0.28, label:'市街地',          color:'#e76f51'},
-  city:{z0:1.0,    alpha:0.35, label:'高層ビル街',      color:'#6d6875'},
+  flat:     {z0:0.03,   alpha:0.14, label:'平坦・農耕地',    color:'#52b788'},
+  suburban: {z0:0.1,    alpha:0.22, label:'郊外・低層住宅地',color:'#f4a261'},
+  urban:    {z0:0.5,    alpha:0.28, label:'市街地',          color:'#e76f51'},
+  city:     {z0:1.0,    alpha:0.35, label:'高層ビル街',      color:'#6d6875'},
 };
 const kappa = 0.41, zref = 10, rho = 1.225;
+const ZMAX = 500;                       // visual top of domain (m)
 const heights = [];
-for(let z=2;z<=500;z+=z<20?1:z<100?5:10) heights.push(z);
+for(let z=2;z<=ZMAX;z+=z<20?1:z<100?5:10) heights.push(z);
+
+function logProfile(z, ustar, z0){ return (ustar/kappa)*Math.log(Math.max(z,z0*1.001)/z0); }
+function powProfile(z, Uref, alpha){ return Uref*Math.pow(z/zref, alpha); }
+
+// boundary-layer height estimate: delta = ~0.07 u*/f  (f=1e-4 s^-1 Coriolis), clamped to visual domain
+function blHeight(ustar){ return Math.min(2000, Math.max(150, 0.07*ustar/1e-4)); }
 
 let chart = null;
+let playing = true;
+let rafId = null;
+let particles = [];
+const N_PART = 150;
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function logProfile(z, ustar, z0){ return (ustar/kappa)*Math.log(z/z0); }function powProfile(z, Uref, alpha){ return Uref*Math.pow(z/zref, alpha); }function updateAll(){
+function getState(){
   const terrain = terrainData[document.getElementById('terrainSelect').value];
   const Uref = parseFloat(document.getElementById('uref').value);
   const hub  = parseFloat(document.getElementById('hubHeight').value);
-
-  (function(){var e=document.getElementById('urefVal');if(e){if(e.tagName==='INPUT')e.value=Uref.toFixed(1);else e.textContent=Uref.toFixed(1);}})();
-  (function(){var e=document.getElementById('hubVal');if(e){if(e.tagName==='INPUT')e.value=hub;else e.textContent=hub;}})()
-
   const ustar = Uref*kappa/Math.log(zref/terrain.z0);
+  return {terrain, Uref, hub, ustar};
+}
+
+function updateStats(){
+  const {terrain, Uref, hub, ustar} = getState();
   const Ulog  = logProfile(hub, ustar, terrain.z0);
   const Upow  = powProfile(hub, Uref, terrain.alpha);
   const TI    = 1/Math.log(hub/terrain.z0);
   const Edens = 0.5*rho*Math.pow(Ulog,3);
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('statUref', Uref.toFixed(1));
+  set('statUstar', ustar.toFixed(3));
+  set('statZ0', terrain.z0);
+  set('statBL', blHeight(ustar).toFixed(0));
+  set('statUlog', Ulog.toFixed(2));
+  set('statUpow', Upow.toFixed(2));
+  set('statTI', (TI*100).toFixed(1)+'%');
+  set('statE', Edens.toFixed(0));
+  const line=document.getElementById('ustarLine');
+  if(line) line.innerHTML = `<strong>摩擦速度 u* = ${ustar.toFixed(3)} m/s</strong>　冪指数 α = ${terrain.alpha}　粗度長 z₀ = ${terrain.z0} m`;
+}
 
-  document.getElementById('statUlog').textContent = Ulog.toFixed(2);
-  document.getElementById('statUpow').textContent = Upow.toFixed(2);
-  document.getElementById('statTI').textContent   = (TI*100).toFixed(1)+'%';
-  document.getElementById('statE').textContent    = Edens.toFixed(0);
-  document.getElementById('ustarLine').innerHTML  =
-    `<strong>摩擦速度 u* = ${ustar.toFixed(3)}m/s</strong>　冪指数 α = ${terrain.alpha}`;
-
-  // Build chart data
-  const logData = heights.map(z=>({x:logProfile(z, ustar, terrain.z0).toFixed(3), y:z}));
-  const powData = heights.map(z=>({x:powProfile(z, Uref, terrain.alpha).toFixed(3), y:z}));
-
-  // Hub annotation line data
+function updateChart(){
+  const {terrain, Uref, hub, ustar} = getState();
+  const logData = heights.map(z=>({x:+logProfile(z, ustar, terrain.z0).toFixed(3), y:z}));
+  const powData = heights.map(z=>({x:+powProfile(z, Uref, terrain.alpha).toFixed(3), y:z}));
   const hubUlog = logProfile(hub, ustar, terrain.z0);
   const hubUpow = powProfile(hub, Uref, terrain.alpha);
-
+  const hubLine = [{x:0,y:hub},{x:Math.max(hubUlog,hubUpow)+2,y:hub}];
   if(chart){
     chart.data.datasets[0].data = logData;
     chart.data.datasets[1].data = powData;
-    chart.data.datasets[2].data = [{x:0,y:hub},{x:Math.max(hubUlog,hubUpow)+2,y:hub}];
+    chart.data.datasets[2].data = hubLine;
+    chart.data.datasets[2].label = `ハブ高度 ${hub}m`;
     chart.update('none');
   }else{
     const ctx = document.getElementById('ablChart').getContext('2d');
     chart = new Chart(ctx, {
       type: 'scatter',
-      data: {
-        datasets: [
-          {
-            label: '対数則 (Log law)',
-            data: logData,
-            borderColor: '#007BFF',
-            backgroundColor: 'rgba(0,123,255,0.1)',
-            showLine: true,
-            fill: false,
-            pointRadius: 0,
-            borderWidth: 2.5,
-            tension: 0.3,
-          },{
-            label: 'べき乗則 (Power law)',
-            data: powData,
-            borderColor: '#e07b39',
-            backgroundColor: 'rgba(224,123,57,0.1)',
-            showLine: true,
-            fill: false,
-            pointRadius: 0,
-            borderWidth: 2.5,
-            tension: 0.3,
-            borderDash: [6,4],
-          },{
-            label: `ハブ高度 ${hub}m`,
-            data: [{x:0,y:hub},{x:Math.max(hubUlog,hubUpow)+2,y:hub}],
-            borderColor: 'rgba(0,180,216,0.7)',
-            borderWidth: 1.5,
-            borderDash: [4,3],
-            showLine: true,
-            pointRadius: 0,
-          }
-        ]
-      },
+      data: { datasets: [
+        { label:'対数則 (Log law)', data:logData, borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,0.1)', showLine:true, fill:false, pointRadius:0, borderWidth:2.5, tension:0.3 },
+        { label:'べき乗則 (Power law)', data:powData, borderColor:'#e07b39', backgroundColor:'rgba(224,123,57,0.1)', showLine:true, fill:false, pointRadius:0, borderWidth:2.5, tension:0.3, borderDash:[6,4] },
+        { label:`ハブ高度 ${hub}m`, data:hubLine, borderColor:'rgba(0,180,216,0.7)', borderWidth:1.5, borderDash:[4,3], showLine:true, pointRadius:0 }
+      ]},
       options:{
-        responsive: true,
-        maintainAspectRatio:false,resizeDelay:100,animation: false,
-        plugins: {
-          legend: { position: 'top', labels: { font: { family: 'Noto Sans JP', size: 12 }, color:'#1a1a2e' } },
-          tooltip:{
-            callbacks: {
-              label: ctx => `${ctx.dataset.label}: U=${ctx.parsed.x}m/s @ z=${ctx.parsed.y}m`
-            }
-          }
+        responsive:true, maintainAspectRatio:false, resizeDelay:100, animation:false,
+        plugins:{
+          legend:{ position:'top', labels:{ font:{ family:'Noto Sans JP', size:12 }, color:'#1a1a2e' } },
+          tooltip:{ callbacks:{ label: c => `${c.dataset.label}: U=${c.parsed.x}m/s @ z=${c.parsed.y}m` } }
         },
         scales:{
-          x: { type:'linear',
-            title: { display: true, text: '風速 U (m/s)', color:'#6c757d', font:{size:12} },
-            grid:{ color: 'rgba(0,0,0,0.05)' },
-            ticks:{ color:'#6c757d' },
-          },
-          y:{
-            title: { display: true, text: '高度 z (m)', color:'#6c757d', font:{size:12} },
-            min: 0, max: 500,
-            grid:{ color: 'rgba(0,0,0,0.05)' },
-            ticks:{ color:'#6c757d' },
-          }
+          x:{ type:'linear', title:{ display:true, text:'風速 U (m/s)', color:'#6c757d', font:{size:12} }, grid:{ color:'rgba(0,0,0,0.05)' }, ticks:{ color:'#6c757d' } },
+          y:{ title:{ display:true, text:'高度 z (m)', color:'#6c757d', font:{size:12} }, min:0, max:ZMAX, grid:{ color:'rgba(0,0,0,0.05)' }, ticks:{ color:'#6c757d' } }
         }
       }
     });
   }
+}
 
-  drawTerrain(terrain, hub, Uref);
-  updateSliderPct('uref', 1, 30, Uref);
-  updateSliderPct('hubHeight', 20, 200, hub);
-}function updateSliderPct(id, mn, mx, val){
-  const el = document.getElementById(id);
-  el.style.setProperty('--pct', ((val-mn)/(mx-mn)*100)+'%');
-}function drawTerrain(terrain, hub, Uref){
-  const cvs = document.getElementById('terrainCanvas');
-  const ctx = cvs.getContext('2d');const __novaDims0 = __novaHiDpiCanvas(cvs, cvs.clientWidth || cvs.width, cvs.clientHeight || cvs.height, ctx);
-const W = __novaDims0.w, H = __novaDims0.h;
-  ctx.clearRect(0,0,W,H);
+// ===== Real-time wind animation =====
+let cvs, ctx, W=600, H=340, dpr=1;
+function sizeCanvas(){
+  cvs = document.getElementById('windCanvas');
+  if(!cvs) return false;
+  ctx = cvs.getContext('2d');
+  dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const cssW = Math.max(280, cvs.clientWidth || 600);
+  const cssH = Math.round(cssW * 0.58);
+  if(cvs.dataset.cssW != cssW || cvs.dataset.cssH != cssH){
+    cvs.style.width = cssW + 'px';
+    cvs.style.height = cssH + 'px';
+    cvs.width  = Math.round(cssW * dpr);
+    cvs.height = Math.round(cssH * dpr);
+    cvs.dataset.cssW = cssW; cvs.dataset.cssH = cssH;
+  }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  W = cssW; H = cssH;
+  return true;
+}
 
-  // Sky gradient
-  const sky = ctx.createLinearGradient(0,0,0,H*0.7);
-  sky.addColorStop(0,'#001F3F'); sky.addColorStop(1,'#003875');
-  ctx.fillStyle = sky; ctx.fillRect(0,0,W,H*0.7);
+function initParticles(){
+  particles = [];
+  for(let i=0;i<N_PART;i++){
+    particles.push({ x: Math.random()*W, z: 5 + Math.random()*ZMAX });
+  }
+}
 
-  // Ground
-  ctx.fillStyle = terrain.color;
-  ctx.fillRect(0, H*0.7, W, H*0.3);
+// vertical map: ground at GY, top of domain (z=ZMAX) at small margin
+function zToY(z){ const GY = H*0.86; return GY - (z/ZMAX)*(GY - H*0.05); }
 
-  // Rough terrain features
-  const key = document.getElementById('terrainSelect').value;
-  ctx.fillStyle = terrain.color;
-  if(key === 'city' || key === 'urban'){
-    const bldH = key==='city'?55:35;
-    for(let i=0;i<8;i++){
-      const bx = 20+i*(W/8), bw=W/10, bh=bldH-i%3*10;
-      ctx.fillStyle = key==='city'?'#4a4e69':'#6d8a94';
-      ctx.fillRect(bx, H*0.7-bh, bw, bh);
-      ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=0.5;
-      ctx.strokeRect(bx, H*0.7-bh, bw, bh);
+function drawGround(terrain, key){
+  const GY = H*0.86;
+  // sky
+  const sky = ctx.createLinearGradient(0,0,0,GY);
+  sky.addColorStop(0,'#001F3F'); sky.addColorStop(1,'#0a3a6e');
+  ctx.fillStyle = sky; ctx.fillRect(0,0,W,GY);
+  // ground band
+  ctx.fillStyle = terrain.color; ctx.fillRect(0, GY, W, H-GY);
+  // roughness elements
+  ctx.save();
+  if(key==='city' || key==='urban'){
+    const base = key==='city'?44:28;
+    for(let i=0;i<9;i++){
+      const bw=W/13, bx=8+i*(W/9), bh=base - (i%3)*8;
+      ctx.fillStyle = key==='city'?'#3d4160':'#5d7a84';
+      ctx.fillRect(bx, GY-bh, bw, bh);
+      ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=0.6; ctx.strokeRect(bx, GY-bh, bw, bh);
     }
   }else if(key==='suburban'){
-    for(let i=0;i<10;i++){
-      const bx=10+i*(W/10), bw=W/13;
-      ctx.fillStyle='#8d99ae'; ctx.fillRect(bx, H*0.7-18, bw, 18);
-      // roof
-      ctx.fillStyle='#e76f51';
-      ctx.beginPath(); ctx.moveTo(bx-2, H*0.7-18); ctx.lineTo(bx+bw/2, H*0.7-30); ctx.lineTo(bx+bw+2, H*0.7-18); ctx.closePath(); ctx.fill();
+    for(let i=0;i<11;i++){
+      const bw=W/16, bx=8+i*(W/11);
+      ctx.fillStyle='#8d99ae'; ctx.fillRect(bx, GY-15, bw, 15);
+      ctx.fillStyle='#e76f51'; ctx.beginPath(); ctx.moveTo(bx-2,GY-15); ctx.lineTo(bx+bw/2,GY-25); ctx.lineTo(bx+bw+2,GY-15); ctx.closePath(); ctx.fill();
     }
   }else if(key==='flat'){
-    // trees
-    for(let i=0;i<12;i++){
-      const bx=15+i*(W/12);
-      ctx.fillStyle='#52b788'; ctx.beginPath(); ctx.arc(bx,H*0.7-12,8,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='#6b4226'; ctx.fillRect(bx-2, H*0.7-6, 4, 8);
+    for(let i=0;i<13;i++){
+      const bx=12+i*(W/13);
+      ctx.fillStyle='#3f8f63'; ctx.beginPath(); ctx.arc(bx,GY-10,7,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#6b4226'; ctx.fillRect(bx-2,GY-5,4,7);
     }
-  }// Wind arrows (horizontal, proportional to log-law at sampled heights)
-  const ustar = Uref*kappa/Math.log(zref/terrain.z0);
-  const maxH = H*0.65;
-  const arrowHeights = [10,30,60,100,150,220,300,400];
-  arrowHeights.forEach(zh=>{
-    if(zh < terrain.z0) return;
-    const u = logProfile(zh, ustar, terrain.z0);
-    const yPos = H*0.7 - (zh/500)*H*0.65;
-    if(yPos < 5) return;
-    const arrowLen = Math.min(u/30*120, 130);
-    const startX = 30;
-    ctx.strokeStyle = 'rgba(0,180,216,0.85)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(startX, yPos); ctx.lineTo(startX+arrowLen, yPos); ctx.stroke();
-    // arrowhead
-    ctx.beginPath();
-    ctx.moveTo(startX+arrowLen, yPos);
-    ctx.lineTo(startX+arrowLen-6, yPos-4);
-    ctx.lineTo(startX+arrowLen-6, yPos+4);
-    ctx.closePath(); ctx.fillStyle='rgba(0,180,216,0.85)'; ctx.fill();
-  });
-
-  // Hub height marker
-  const hubY = H*0.7 - (hub/500)*H*0.65;
-  if(hubY > 5){
-    ctx.strokeStyle='rgba(255,200,0,0.85)'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
-    ctx.beginPath(); ctx.moveTo(0,hubY); ctx.lineTo(W,hubY); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle='rgba(255,200,0,0.9)'; ctx.font='bold 11px Roboto Mono,monospace';
-    ctx.fillText(`hub ${hub}m`, 5, hubY-4);
+  }else{ // sea: wavelets
+    ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+    for(let i=0;i<W;i+=26){ ctx.beginPath(); ctx.moveTo(i,GY+6); ctx.quadraticCurveTo(i+8,GY+2,i+16,GY+6); ctx.stroke(); }
   }
-}updateAll();
+  ctx.restore();
+}
+
+function drawProfileCurve(ustar, z0){
+  // white log-law speed profile drawn as a horizontal-offset curve
+  const GY = H*0.86;
+  const Umax = logProfile(ZMAX, ustar, z0);
+  const scale = (W*0.42)/Math.max(Umax, 0.1);
+  ctx.beginPath();
+  let first=true;
+  for(let z=z0*2; z<=ZMAX; z+= z<20?1:5){
+    const u = logProfile(z, ustar, z0);
+    const x = 4 + u*scale;
+    const y = zToY(z);
+    if(first){ ctx.moveTo(x,y); first=false; } else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='11px Roboto Mono,monospace';
+  ctx.fillText('U(z)', 6 + Umax*scale - 30, zToY(ZMAX)+14);
+}
+
+function drawHub(hub){
+  const y = zToY(hub);
+  ctx.save();
+  ctx.strokeStyle='rgba(255,200,0,0.9)'; ctx.lineWidth=1.4; ctx.setLineDash([5,4]);
+  ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,200,0,0.95)'; ctx.font='bold 11px Roboto Mono,monospace';
+  ctx.fillText(`ハブ ${hub}m`, W-78, y-5);
+  ctx.restore();
+}
+
+function speedAt(z, ustar, z0){
+  // px/frame proportional to physical wind speed at that height
+  const u = logProfile(z, ustar, z0);
+  return Math.max(0.2, u*0.30);
+}
+
+function frame(){
+  if(!sizeCanvas()){ rafId=requestAnimationFrame(frame); return; }
+  const {terrain, hub, ustar} = getState();
+  const key = document.getElementById('terrainSelect').value;
+  if(particles.length===0) initParticles();
+  drawGround(terrain, key);
+  drawProfileCurve(ustar, terrain.z0);
+
+  // particles: streaks moving left->right at height-dependent speed
+  for(const p of particles){
+    const v = speedAt(p.z, ustar, terrain.z0);
+    if(playing && !prefersReduced){ p.x += v; }
+    if(p.x > W+10){ p.x = -10; p.z = 5 + Math.random()*ZMAX; }
+    const y = zToY(p.z);
+    const streak = Math.min(2 + v*2.2, 26);
+    const a = 0.25 + Math.min(v/8, 0.55);
+    ctx.strokeStyle = `rgba(120,210,255,${a})`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(p.x - streak, y); ctx.lineTo(p.x, y); ctx.stroke();
+    ctx.fillStyle = `rgba(180,235,255,${a+0.15})`;
+    ctx.beginPath(); ctx.arc(p.x, y, 1.6, 0, Math.PI*2); ctx.fill();
+  }
+  drawHub(hub);
+  rafId = requestAnimationFrame(frame);
+}
+
+function startAnim(){
+  if(rafId) cancelAnimationFrame(rafId);
+  if(prefersReduced){ if(sizeCanvas()){ const {terrain,hub,ustar}=getState(); initParticles(); drawGround(terrain,document.getElementById('terrainSelect').value); drawProfileCurve(ustar,terrain.z0); for(const p of particles){const y=zToY(p.z);ctx.fillStyle='rgba(160,225,255,0.7)';ctx.beginPath();ctx.arc(p.x,y,1.8,0,Math.PI*2);ctx.fill();} drawHub(hub);} return; }
+  rafId = requestAnimationFrame(frame);
+}
+
+window.togglePlay = function(){
+  playing = !playing;
+  const b = document.getElementById('playBtn');
+  if(b) b.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+};
+window.resetAnim = function(){
+  if(sizeCanvas()) initParticles();
+  playing = true;
+  const b = document.getElementById('playBtn'); if(b) b.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+};
+window.applyPreset = function(key){
+  const sel = document.getElementById('terrainSelect'); if(sel) sel.value = key;
+  initParticles();
+  updateAll();
+};
+window.onTerrainSelect = function(){ initParticles(); updateAll(); };
+
+window.updateAll = function(){
+  const Uref = parseFloat(document.getElementById('uref').value);
+  const hub  = parseFloat(document.getElementById('hubHeight').value);
+  (function(){var e=document.getElementById('urefVal');if(e){if(e.tagName==='INPUT')e.value=Uref.toFixed(1);else e.textContent=Uref.toFixed(1);}})();
+  (function(){var e=document.getElementById('hubVal');if(e){if(e.tagName==='INPUT')e.value=hub;else e.textContent=hub;}})();
+  updateStats();
+  updateChart();
+  updateSliderPct('uref', 1, 30, Uref);
+  updateSliderPct('hubHeight', 20, 200, hub);
+};
+function updateSliderPct(id, mn, mx, val){
+  const el = document.getElementById(id);
+  if(el) el.style.setProperty('--pct', ((val-mn)/(mx-mn)*100)+'%');
+}
+
+function boot(){
+  if(!sizeCanvas()){ setTimeout(boot, 120); return; }
+  initParticles();
+  updateAll();
+  startAnim();
+  window.addEventListener('resize', ()=>{ sizeCanvas(); });
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
 </script>
 
 <section class="explanation">
@@ -480,7 +597,7 @@ const W = __novaDims0.w, H = __novaDims0.h;
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">地表粗度の選択肢にない地形（例：都市郊外）はどう設定すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">粗度長z0を直接入力してください。都市郊外はz0=0.1～0.5m程度が目安です。プルダウンにない場合は、近い地形（例：田園地帯）を選び、粗度長を手動調整してご利用ください。</div>
+    <div class="faq-a">本ツールは粗度長 z0 を 5 つの地表粗度クラス（海上 0.0002m／平坦・農耕地 0.03m／郊外 0.1m／市街地 0.5m／高層ビル街 1.0m）から選びます。都市郊外は z0=0.1～0.5m 程度が目安なので、「郊外」または「市街地」のうち実地形に近い方を選択してください。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">基準高度の風速はどの高さで計測した値を入れればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -508,6 +625,9 @@ const W = __novaDims0.w, H = __novaDims0.h;
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="atmospheric-boundary.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -563,14 +683,14 @@ const W = __novaDims0.w, H = __novaDims0.h;
 <h3>使い方ガイド</h3>
 <ol>
 <li>基準高さ(通常10m)での風速を「基準風速」欄に入力します。例:12 m/s</li>
-<li>地表粗度長z0をドロップダウンから選択します(市街地0.8m、農地0.1m、海上0.001m)</li>
+<li>地表粗度クラスをドロップダウンから選択します（海上0.0002m、平坦・農耕地0.03m、郊外0.1m、市街地0.5m、高層ビル街1.0m）</li>
 <li>計算高さ(ハブ高さなど)を指定するとログ則・べき乗則の風速が自動計算されます</li>
 <li>乱流強度Iと風力密度を同時出力で、風車設計の可能性評価が即座に判定できます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>沿岸部農地でハブ高さ80mの風力発電計画を想定します。基準高さ10mで計測風速11.5 m/s、地表粗度z0=0.15mの場合、ログ則ではU_log=14.8 m/s、べき乗則(α=0.25)ではU_pow=14.6 m/sと計算されます。乱流強度I=0.08(8%)、風力密度は782 W/m²となり、年間発電量推定に必要な基礎データが確定します。</p>
+<p>農地でハブ高さ 80 m の風力発電計画を想定し、地表粗度クラス「平坦・農耕地」（z₀=0.03 m、α=0.14）を選択します。基準高さ 10 m の風速 11.5 m/s の場合、摩擦速度 u*=0.81 m/s から対数則 U_log=15.62 m/s、べき乗則 U_pow=15.39 m/s と計算されます。乱流強度 I=12.7%、風力密度は 2,333 W/m² となり、年間発電量推定の基礎データが得られます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -581,6 +701,16 @@ const W = __novaDims0.w, H = __novaDims0.h;
 <li>冬季の逆転層や海陸風の日変化は本モデルに未反映のため、季節別・時間帯別の層別解析を推奨</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

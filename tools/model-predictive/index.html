@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "モデル予測制御シミュレーター",
       "description": "1次プロセスを離散化し、予測ホライズン先までの出力誤差を最小化する最適入力を毎ステップ解析的に計算するMPCの教育用シミュレーター。PID制御との応答比較も可能。",
       "url": "https://novasolver.jp/tools/model-predictive.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["1次プロセスのMPC応答計算","予測ホライズン・制御ホライズン・入力ペナルティの調整","PIDとの応答比較","無拘束QPの解析解による最適入力計算"],
       "keywords": "モデル予測制御,MPC,有限ホライズン,最適制御,予測制御,プロセス制御,QP,DMC,GPC",
       "datePublished": "2026-05-16",
@@ -102,6 +102,18 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.15rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.62rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.03em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.mpc-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.mpc-legend span{display:inline-flex;align-items:center;gap:5px}
+.mpc-legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+#cv:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.live-ro{transition:none}}
 </style>
 </head>
 <body>
@@ -169,6 +181,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">プロセス: K = 2、T = 5 s、dt = 0.1 s（固定）。シミュレーション時間 15 s。比較対象として同じ系に PID（Kp=2, Ki=0.4）を適用した応答も表示します。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -183,9 +204,37 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 出力 y(t)、目標 r、入力 u(t)</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">上段＝出力 y（青）・目標 r（赤破線）・PID応答（灰）・予測ホライズン先読み線（青点線）／下段＝入力 u（緑）・Nc 個の最適化入力（黄点）</p>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> 受信ホライズン ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roY">0.00</div><div class="rl">現在の出力 y</div></div>
+        <div class="live-ro"><div class="rv" id="roR">1.00</div><div class="rl">目標値 r</div></div>
+        <div class="live-ro"><div class="rv" id="roErr">0.00</div><div class="rl">予測誤差 r−ŷ</div></div>
+        <div class="live-ro"><div class="rv" id="roU">0.00</div><div class="rl">制御入力 u(適用)</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 受信ホライズン制御 — 予測窓がスライド</div>
+      <canvas id="cv" width="600" height="400" tabindex="0" role="img" aria-label="モデル予測制御のリアルタイムアニメーション。現在時刻で予測ホライズン先までの将来軌道を予測し、最初の制御入力を適用して予測窓が前進します。"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="mpcTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" id="btnReplay" onclick="mpcReplay()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn mpc-speed" type="button" data-speed="0.5" onclick="mpcSetSpeed(0.5)">0.5×</button>
+          <button class="preset-btn mpc-speed active" type="button" data-speed="1" onclick="mpcSetSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn mpc-speed" type="button" data-speed="2" onclick="mpcSetSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="mpc-legend">
+        <span><i class="swatch" style="background:#00B4D8"></i>実出力 y（MPC）</span>
+        <span><i class="swatch" style="background:#7ad2eb"></i>予測軌道（Np 先読み）</span>
+        <span><i class="swatch" style="background:#e74c3c"></i>目標 r</span>
+        <span><i class="swatch" style="background:#b4c8dc"></i>PID 応答</span>
+        <span><i class="swatch" style="background:#00b894"></i>入力 u</span>
+        <span><i class="swatch" style="background:#FFD166"></i>計画入力 Nc</span>
+        <span><i class="swatch" style="background:#ff8a5c"></i>入力制約 ±u<sub>max</sub></span>
+      </div>
+      <p class="canvas-hint">上段＝出力 y（青）・目標 r（赤破線）・PID応答（灰）・現在時刻からの予測軌道（青点線）と予測窓（影）／下段＝入力 u（緑）・Nc 個の計画入力（黄点）・入力制約 ±u<sub>max</sub>（橙）。先頭の入力だけを適用し、窓が前進します。</p>
     </div>
 
     <div class="chart-card">
@@ -205,7 +254,20 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Model Predictive Control Simulator ==========
+var MPC_I18N = {
+  predict: '予測（Np 先読み）',
+  yMPC: 'y(t)（MPC）',
+  yPID: 'y(t)（PID）',
+  uMPC: 'u(t)（MPC）',
+  plan: 'Nc 計画入力',
+  constr: '制約 ±u_max',
+  apply: '適用',
+  win: '予測窓',
+  tNow: 't = '
+};
+(function(){
+"use strict";
+// ========== Model Predictive Control Simulator (V2 receding-horizon animation) ==========
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
 
@@ -324,27 +386,48 @@ function mpcStep(x_k, u_prev, r, Np, Nc, lam) {
   return solveLinear(A, bv);
 }
 
-// simulate MPC over full time horizon (with incremental input formulation)
+// input constraint |u| <= UMAX (receding horizon respects it; visible as boundaries)
+var UMAX = 8;
+function clampU(v){ return v > UMAX ? UMAX : (v < -UMAX ? -UMAX : v); }
+
+// simulate MPC over full time horizon (with incremental input formulation).
+// At every step k we record the receding-horizon "frame": the predicted future
+// output trajectory over Np, the Nc planned moves, and the move actually applied.
 function simulateMPC(p) {
   var y = new Array(Nsteps);
   var u = new Array(Nsteps);
+  var frames = new Array(Nsteps); // per-step prediction window
   var x = 0;
   var uprev = 0;
-  // first U for prediction display
   var firstU = null;
   for (var k = 0; k < Nsteps; k++) {
     y[k] = x;
     if (k < Nsteps - 1) {
       var U = mpcStep(x, uprev, p.r, p.Np, p.Nc, p.lam);
-      if (firstU === null) firstU = U.slice();
-      u[k] = U[0];
+      // planned moves (Nc), clamped to the input constraint (constrained MPC view)
+      var plan = new Array(p.Nc);
+      for (var j = 0; j < p.Nc; j++) plan[j] = clampU(U[j]);
+      // predicted output trajectory over the prediction horizon Np using the
+      // planned (clamped) moves, holding the last move beyond Nc-1 (input blocking)
+      var preds = new Array(p.Np + 1);
+      preds[0] = x;
+      var xp = x;
+      for (var i = 1; i <= p.Np; i++) {
+        var uIdx = Math.min(i - 1, p.Nc - 1);
+        xp = aProc * xp + bProc * plan[uIdx];
+        preds[i] = xp;
+      }
+      frames[k] = { preds: preds, plan: plan, applied: plan[0] };
+      if (firstU === null) firstU = plan.slice();
+      u[k] = plan[0];           // receding horizon: apply only the first move
       x = aProc * x + bProc * u[k];
       uprev = u[k];
     } else {
       u[k] = u[k - 1];
+      frames[k] = frames[k - 1];
     }
   }
-  return { y: y, u: u, firstU: firstU };
+  return { y: y, u: u, firstU: firstU, frames: frames };
 }
 
 // simple PI controller for comparison: Kp = 2, Ki = 0.4 (tuned for ~20% overshoot)
@@ -389,36 +472,20 @@ function computeStats(y, u, r) {
   return { rise: rise, settle: settle, os: os, u0: u[0] };
 }
 
-// build prediction line for plot (predicted y over Np steps from chosen reference time)
-function buildPredictionLine(y, u, atIdx, p) {
-  // predict from x_k = y[atIdx] forward Np steps using same MPC with u_prev = 0 (initial step)
-  var x = y[atIdx];
-  var u_prev = atIdx > 0 ? u[atIdx - 1] : 0;
-  var U = mpcStep(x, u_prev, p.r, p.Np, p.Nc, p.lam);
-  var preds = [x];
-  for (var i = 1; i <= p.Np; i++) {
-    var uIdx = Math.min(i - 1, p.Nc - 1);
-    var uu = U[uIdx];
-    x = aProc * x + bProc * uu;
-    preds.push(x);
-  }
-  return preds;
-}
-
-// ========== Drawing ==========
-function drawPlot(simMPC, simPID, p) {
+// ========== Drawing (animated receding horizon) ==========
+// kStep = index of the "current" control step being shown (0..Nsteps-1)
+function drawPlot(simMPC, simPID, p, kStep) {
   var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
 
-  // top panel: y(t) and r
-  // bottom panel: u(t)
-  var pad = 32;
   var topY0 = 24, topY1 = H * 0.55 - 4;
-  var botY0 = H * 0.55 + 14, botY1 = H - 26;
-  var x0 = pad + 24, x1 = W - 14;
+  var botY0 = H * 0.55 + 16, botY1 = H - 26;
+  var x0 = 56, x1 = W - 14;
 
-  // determine ranges
+  var frame = simMPC.frames[kStep] || simMPC.frames[simMPC.frames.length - 1];
+
+  // ----- y-range (top) includes predictions so the window never clips -----
   var yMin = Math.min(0, p.r);
   var yMax = Math.max(p.r * 1.4, 0.1);
   for (var k = 0; k < simMPC.y.length; k++) {
@@ -427,141 +494,148 @@ function drawPlot(simMPC, simPID, p) {
     if (simPID.y[k] < yMin) yMin = simPID.y[k];
     if (simPID.y[k] > yMax) yMax = simPID.y[k];
   }
-  var yRange = yMax - yMin;
-  if (yRange < 1e-6) yRange = 1;
+  var yRange = yMax - yMin; if (yRange < 1e-6) yRange = 1;
   yMin -= 0.05 * yRange; yMax += 0.05 * yRange;
 
-  var uMin = Infinity, uMax = -Infinity;
+  // ----- u-range (bottom): always include the constraint band -----
+  var uMin = -UMAX, uMax = UMAX;
   for (var k = 0; k < simMPC.u.length; k++) {
     if (simMPC.u[k] < uMin) uMin = simMPC.u[k];
     if (simMPC.u[k] > uMax) uMax = simMPC.u[k];
   }
-  if (!isFinite(uMin)) { uMin = 0; uMax = 1; }
-  if (uMax - uMin < 1e-3) { uMax = uMin + 1; }
-  var uRange = uMax - uMin;
-  uMin -= 0.1 * uRange; uMax += 0.1 * uRange;
+  var uRange = uMax - uMin; if (uRange < 1e-3) uRange = 1;
+  uMin -= 0.08 * uRange; uMax += 0.08 * uRange;
 
   function tx(t) { return x0 + (t / Tend) * (x1 - x0); }
   function tyTop(yv) { return topY1 - ((yv - yMin) / (yMax - yMin)) * (topY1 - topY0); }
   function tyBot(uv) { return botY1 - ((uv - uMin) / (uMax - uMin)) * (botY1 - botY0); }
 
-  // axes top
-  ctx.strokeStyle = 'rgba(143,184,224,0.45)';
-  ctx.lineWidth = 1;
+  var tNow = kStep * dt;
+  var tWinEnd = Math.min(Tend, (kStep + p.Np) * dt);
+
+  // ----- prediction window shading (top + bottom) -----
+  ctx.fillStyle = 'rgba(120,210,235,0.08)';
+  ctx.fillRect(tx(tNow), topY0, tx(tWinEnd) - tx(tNow), topY1 - topY0);
+  ctx.fillRect(tx(tNow), botY0, tx(tWinEnd) - tx(tNow), botY1 - botY0);
+
+  // axes
+  ctx.strokeStyle = 'rgba(143,184,224,0.45)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x0, topY1); ctx.lineTo(x1, topY1); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, topY0); ctx.lineTo(x0, topY1); ctx.stroke();
-  // axes bottom
   ctx.beginPath(); ctx.moveTo(x0, botY1); ctx.lineTo(x1, botY1); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, botY0); ctx.lineTo(x0, botY1); ctx.stroke();
 
   // reference line r (dashed)
-  ctx.strokeStyle = 'rgba(231,76,60,0.85)';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(231,76,60,0.85)'; ctx.lineWidth = 1.5;
   ctx.setLineDash([6, 4]);
   ctx.beginPath(); ctx.moveTo(x0, tyTop(p.r)); ctx.lineTo(x1, tyTop(p.r)); ctx.stroke();
   ctx.setLineDash([]);
 
-  // PID curve (gray, behind)
-  ctx.strokeStyle = 'rgba(180,200,220,0.55)';
-  ctx.lineWidth = 1.5;
+  // input constraint band ±UMAX (orange dashed) — bottom
+  ctx.strokeStyle = 'rgba(255,138,92,0.8)'; ctx.lineWidth = 1.4;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath(); ctx.moveTo(x0, tyBot(UMAX)); ctx.lineTo(x1, tyBot(UMAX)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0, tyBot(-UMAX)); ctx.lineTo(x1, tyBot(-UMAX)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // PID curve (gray) — full reference response
+  ctx.strokeStyle = 'rgba(180,200,220,0.5)'; ctx.lineWidth = 1.5;
   ctx.beginPath();
   for (var k = 0; k < simPID.y.length; k++) {
-    var x = tx(k * dt), yy = tyTop(simPID.y[k]);
-    if (k === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+    var xx = tx(k * dt), yy = tyTop(simPID.y[k]);
+    if (k === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
   }
   ctx.stroke();
 
-  // MPC curve (blue)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
+  // MPC actual output up to the current step (solid blue)
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.6;
   ctx.beginPath();
-  for (var k = 0; k < simMPC.y.length; k++) {
-    var x = tx(k * dt), yy = tyTop(simMPC.y[k]);
-    if (k === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+  for (var k = 0; k <= kStep; k++) {
+    var xx = tx(k * dt), yy = tyTop(simMPC.y[k]);
+    if (k === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
   }
   ctx.stroke();
 
-  // Prediction line at t = 0 (dotted) — Np steps ahead
-  var preds = buildPredictionLine(simMPC.y, simMPC.u, 0, p);
-  ctx.strokeStyle = 'rgba(120,210,235,0.75)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  for (var i = 0; i < preds.length; i++) {
-    var tt = i * dt;
-    var x = tx(tt), yy = tyTop(preds[i]);
-    if (i === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+  // predicted future trajectory over Np from the current step (dotted light blue)
+  if (frame) {
+    ctx.strokeStyle = 'rgba(120,210,235,0.9)'; ctx.lineWidth = 1.8;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    for (var i = 0; i < frame.preds.length; i++) {
+      var tt = (kStep + i) * dt;
+      var xx = tx(tt), yy = tyTop(frame.preds[i]);
+      if (i === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(120,210,235,0.95)';
+    for (var i = 0; i < frame.preds.length; i++) {
+      var tt = (kStep + i) * dt;
+      ctx.beginPath(); ctx.arc(tx(tt), tyTop(frame.preds[i]), 1.6, 0, Math.PI * 2); ctx.fill();
+    }
   }
-  ctx.stroke();
+
+  // "now" marker on the output curve
+  var pxNow = tx(tNow), pyNow = tyTop(simMPC.y[kStep]);
+  ctx.beginPath(); ctx.arc(pxNow, pyNow, 4.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2; ctx.stroke();
+  // vertical "now" line spanning both panels
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+  ctx.beginPath(); ctx.moveTo(pxNow, topY0); ctx.lineTo(pxNow, botY1); ctx.stroke();
   ctx.setLineDash([]);
-  // mark prediction endpoint
-  ctx.fillStyle = 'rgba(120,210,235,0.9)';
-  for (var i = 0; i < preds.length; i++) {
-    var tt = i * dt;
-    ctx.beginPath(); ctx.arc(tx(tt), tyTop(preds[i]), 1.6, 0, Math.PI * 2); ctx.fill();
-  }
 
   // labels top
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('y(t) (MPC)', x0 + 4, topY0 + 12);
-  ctx.fillStyle = 'rgba(231,76,60,0.95)';
-  ctx.fillText('r = ' + p.r.toFixed(2), x0 + 90, topY0 + 12);
-  ctx.fillStyle = 'rgba(180,200,220,0.85)';
-  ctx.fillText('y(t) (PID)', x0 + 170, topY0 + 12);
-  ctx.fillStyle = 'rgba(120,210,235,0.95)';
-  ctx.fillText('予測（Np 先読み）', x0 + 240, topY0 + 12);
-  // axis labels top
-  ctx.fillStyle = '#cfe3f7';
-  ctx.textAlign = 'right';
+  ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#cfe3f7'; ctx.fillText(MPC_I18N.yMPC, x0 + 4, topY0 + 12);
+  ctx.fillStyle = 'rgba(231,76,60,0.95)'; ctx.fillText('r = ' + p.r.toFixed(2), x0 + 96, topY0 + 12);
+  ctx.fillStyle = 'rgba(180,200,220,0.85)'; ctx.fillText(MPC_I18N.yPID, x0 + 176, topY0 + 12);
+  ctx.fillStyle = 'rgba(120,210,235,0.95)'; ctx.fillText(MPC_I18N.predict, x0 + 250, topY0 + 12);
+  ctx.fillStyle = '#cfe3f7'; ctx.textAlign = 'right';
   ctx.fillText(yMax.toFixed(2), x0 - 4, topY0 + 4);
   ctx.fillText(yMin.toFixed(2), x0 - 4, topY1);
   ctx.fillText('y', x0 - 4, (topY0 + topY1) / 2);
 
-  // u(t) curve (green) — step look
-  ctx.strokeStyle = '#00b894';
-  ctx.lineWidth = 2;
+  // u(t) applied so far (green step)
+  ctx.strokeStyle = '#00b894'; ctx.lineWidth = 2;
   ctx.beginPath();
-  for (var k = 0; k < simMPC.u.length; k++) {
-    var x = tx(k * dt), yy = tyBot(simMPC.u[k]);
-    if (k === 0) { ctx.moveTo(x, yy); }
-    else {
-      var xPrev = tx((k - 1) * dt);
-      ctx.lineTo(x, tyBot(simMPC.u[k - 1]));
-      ctx.lineTo(x, yy);
-    }
+  for (var k = 0; k <= kStep; k++) {
+    var xx = tx(k * dt), yy = tyBot(simMPC.u[k]);
+    if (k === 0) { ctx.moveTo(xx, yy); }
+    else { ctx.lineTo(xx, tyBot(simMPC.u[k - 1])); ctx.lineTo(xx, yy); }
   }
   ctx.stroke();
 
-  // Nc optimal inputs at k=0 as yellow dots
-  if (simMPC.firstU) {
+  // Nc planned moves of the CURRENT optimization (yellow dots), inside the window
+  if (frame) {
     ctx.fillStyle = '#FFD166';
-    for (var j = 0; j < simMPC.firstU.length; j++) {
-      var tt = j * dt;
-      ctx.beginPath(); ctx.arc(tx(tt), tyBot(simMPC.firstU[j]), 4, 0, Math.PI * 2); ctx.fill();
+    for (var j = 0; j < frame.plan.length; j++) {
+      var tt = (kStep + j) * dt;
+      ctx.beginPath(); ctx.arc(tx(tt), tyBot(frame.plan[j]), 4, 0, Math.PI * 2); ctx.fill();
     }
+    // highlight the applied (first) move
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(tx(tNow), tyBot(frame.applied), 5.5, 0, Math.PI * 2); ctx.stroke();
   }
 
   // labels bottom
-  ctx.fillStyle = '#00b894';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('u(t) (MPC)', x0 + 4, botY0 + 12);
-  ctx.fillStyle = '#FFD166';
-  ctx.fillText('Nc 個の最適入力 (k=0)', x0 + 110, botY0 + 12);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.textAlign = 'right';
+  ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#00b894'; ctx.fillText(MPC_I18N.uMPC, x0 + 4, botY0 + 12);
+  ctx.fillStyle = '#FFD166'; ctx.fillText(MPC_I18N.plan, x0 + 96, botY0 + 12);
+  ctx.fillStyle = 'rgba(255,138,92,0.95)'; ctx.fillText(MPC_I18N.constr, x0 + 210, botY0 + 12);
+  ctx.fillStyle = '#cfe3f7'; ctx.textAlign = 'right';
   ctx.fillText(uMax.toFixed(2), x0 - 4, botY0 + 4);
   ctx.fillText(uMin.toFixed(2), x0 - 4, botY1);
   ctx.fillText('u', x0 - 4, (botY0 + botY1) / 2);
 
-  // time axis
-  ctx.fillStyle = '#cfe3f7';
-  ctx.textAlign = 'left';
+  // time axis + current time stamp
+  ctx.fillStyle = '#cfe3f7'; ctx.textAlign = 'left';
   ctx.fillText('t = 0', x0, botY1 + 14);
   ctx.textAlign = 'right';
   ctx.fillText('t = ' + Tend + ' s', x1, botY1 + 14);
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = 'bold 12px "Roboto Mono",monospace';
+  ctx.fillText(MPC_I18N.tNow + tNow.toFixed(2) + ' s', x1, topY0 + 4);
+  ctx.textAlign = 'left';
 }
 
 function resizeCanvas() {
@@ -577,40 +651,126 @@ function resizeCanvas() {
   cv.dataset.cssH = String(h);
 }
 
+// ----- live state -----
+var curMPC = null, curPID = null, curP = null;
+var kStep = 0;
+var playing = false, animId = null, lastTs = 0, speed = 1, acc = 0;
+var STEP_INTERVAL = 0.10; // seconds of wall time per control step at 1x
+
+function setLive(kIdx) {
+  if (!curMPC || !curP) return;
+  var y = curMPC.y[kIdx];
+  var fr = curMPC.frames[kIdx];
+  var applied = fr ? fr.applied : curMPC.u[kIdx];
+  // predicted error at end of horizon (r - predicted final output)
+  var predFinal = fr ? fr.preds[fr.preds.length - 1] : y;
+  document.getElementById('roY').textContent = y.toFixed(2);
+  document.getElementById('roR').textContent = curP.r.toFixed(2);
+  document.getElementById('roErr').textContent = (curP.r - predFinal).toFixed(2);
+  document.getElementById('roU').textContent = applied.toFixed(2);
+}
+
+function renderFrame() {
+  drawPlot(curMPC, curPID, curP, kStep);
+  setLive(kStep);
+}
+
+function loop(ts) {
+  if (!playing) { animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dtReal = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  acc += dtReal * speed;
+  while (acc >= STEP_INTERVAL) {
+    acc -= STEP_INTERVAL;
+    kStep++;
+    if (kStep >= Nsteps - 1) {
+      // hold the settled frame briefly, then restart the receding horizon
+      kStep = Nsteps - 1;
+      renderFrame();
+      playing = false; animId = null;
+      setTimeout(function () { kStep = 0; if (!playing) { playing = true; lastTs = 0; acc = 0; animId = requestAnimationFrame(loop); } }, 900);
+      return;
+    }
+  }
+  renderFrame();
+  animId = requestAnimationFrame(loop);
+}
+
+function startPlay() {
+  if (playing) return;
+  playing = true; lastTs = 0; acc = 0;
+  document.getElementById('btnPlay').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay() {
+  playing = false;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  document.getElementById('btnPlay').innerHTML = '<i class="fas fa-play"></i> 再生';
+}
+window.mpcTogglePlay = function () { playing ? stopPlay() : startPlay(); };
+window.mpcReplay = function () { kStep = 0; renderFrame(); startPlay(); };
+window.mpcSetSpeed = function (s) {
+  speed = s;
+  var btns = document.querySelectorAll('.mpc-speed');
+  for (var i = 0; i < btns.length; i++) {
+    var a = parseFloat(btns[i].dataset.speed) === s;
+    btns[i].classList.toggle('active', a);
+    btns[i].style.borderColor = a ? 'var(--accent)' : '';
+    btns[i].style.color = a ? 'var(--accent)' : '';
+  }
+};
+
+var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function compute() {
   var p = getParams();
-  if (!isFinite(p.Np) || !isFinite(p.Nc) || p.Nc > p.Np) {
-    // clamp Nc
-    p.Nc = Math.min(p.Nc, p.Np);
+  if (!isFinite(p.Np)) p.Np = 10;
+  if (!isFinite(p.Nc)) p.Nc = 3;
+  if (p.Nc > p.Np) p.Nc = p.Np;
+  curP = p;
+  curMPC = simulateMPC(p);
+  curPID = simulatePID(p);
+  var stats = computeStats(curMPC.y, curMPC.u, p.r);
+
+  document.getElementById('statRise').textContent = isFinite(stats.rise) ? stats.rise.toFixed(2) + ' s' : '0.00 s';
+  document.getElementById('statSettle').textContent = isFinite(stats.settle) ? stats.settle.toFixed(2) + ' s' : '0.00 s';
+  document.getElementById('statOS').textContent = isFinite(stats.os) ? stats.os.toFixed(1) + ' %' : '0.0 %';
+  document.getElementById('statU0').textContent = isFinite(stats.u0) ? stats.u0.toFixed(3) : '0.000';
+
+  if (kStep >= Nsteps - 1) kStep = 0;
+  if (prefersReduced) {
+    // single static frame showing the first receding-horizon prediction
+    stopPlay();
+    kStep = 0;
+    renderFrame();
+  } else {
+    renderFrame();
+    if (!playing) startPlay();
   }
-  var simMPC = simulateMPC(p);
-  var simPID = simulatePID(p);
-  var stats = computeStats(simMPC.y, simMPC.u, p.r);
-
-  document.getElementById('statRise').textContent = isFinite(stats.rise) ? stats.rise.toFixed(2) + ' s' : '—';
-  document.getElementById('statSettle').textContent = isFinite(stats.settle) ? stats.settle.toFixed(2) + ' s' : '—';
-  document.getElementById('statOS').textContent = isFinite(stats.os) ? stats.os.toFixed(1) + ' %' : '—';
-  document.getElementById('statU0').textContent = isFinite(stats.u0) ? stats.u0.toFixed(3) : '—';
-
-  drawPlot(simMPC, simPID, p);
 }
 
 function resetParams() {
   var defs = { slNp: 10, slNc: 3, slLambda: 0.10, slR: 1.0 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
+  Object.keys(defs).forEach(function (id) { document.getElementById(id).value = defs[id]; });
   updateSlider(document.getElementById('slNp'), 'slNpVal', 0, '');
   updateSlider(document.getElementById('slNc'), 'slNcVal', 0, '');
   updateSlider(document.getElementById('slLambda'), 'slLambdaVal', 2, '');
   updateSlider(document.getElementById('slR'), 'slRVal', 1, '');
+  kStep = 0;
   compute();
 }
+window.compute = compute;
+window.resetParams = resetParams;
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+cv.addEventListener('keydown', function (e) {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); window.mpcTogglePlay(); }
+});
+window.addEventListener('resize', function () { resizeCanvas(); renderFrame(); });
 
 resizeCanvas();
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -678,6 +838,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="model-predictive.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -731,15 +894,15 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>予測ホライズン（Np）を2～20ステップ範囲で設定。サンプリング時間0.1sの1次遅延プロセス（時定数τ=1s）に対し、Np=10で約1秒先まで予測</li>
+<li>予測ホライズン（Np）を2～30ステップ範囲で設定。サンプリング時間0.1sの1次遅延プロセス（時定数T=5s・固定）に対し、Np=10で約1秒先まで予測</li>
 <li>制御ホライズン（Nc）をNp以下で指定。Nc=3に設定すると最初の3ステップのみ制御入力を最適化し、以降は一定</li>
-<li>重み係数λ（制御入力ペナルティ）とR（目標値重み）をスライダーで調整。λ=0.1、R=1.0から開始し、応答速度と消費エネルギーのトレードオフを観察</li>
-<li>「シミュレート実行」ボタンで有限ホライズン最適化を計算。二次計画法（QP）により最適入力系列u(0)～u(Nc-1)を算出</li>
+<li>入力ペナルティλと目標値rをスライダーで調整。λ=0.1、r=1.0から開始し、応答速度と入力の大きさ（消費エネルギー）のトレードオフを観察</li>
+<li>スライダーを動かすたびに有限ホライズン最適化が自動再計算され、無拘束QPの解析解で最適入力系列u(0)～u(Nc-1)を算出します（実行ボタンは不要、リセットで既定値に戻ります）</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>プロセスモデル：G(z)=0.0952/(z-0.9048)、サンプリング時間Ts=0.1s。Np=10、Nc=3、λ=0.1、R=1.0の設定で、ステップ目標値1.0に対し初期入力u(0)=8.42が計算される。この場合、立ち上がり時間は約0.35s、オーバーシュート5.2%、整定時間（±2%）1.8sを達成。同じプロセスをPID制御（Kp=1.5、Ki=0.3、Kd=0.05）と比較すると、MPC応答は立ち上がりで20%高速だが、λ=0.01に低減するとオーバーシュートが18%に増加する制約をシミュレータで確認可能</p>
+<p>本ツールのプロセスは固定で K=2、T=5 s、dt=0.1 s、すなわち G(z)=0.0396/(z−0.9802)。既定の Np=10、Nc=3、λ=0.1、目標値 r=1.0 では、ステップ応答の初期入力 u(0)=2.292、立ち上がり時間（0→90%）約0.90s、オーバーシュート約0.9%、整定時間（±2%）約1.20s となります。入力ペナルティ λ を 0 にすると u(0) が約25.3まで跳ね上がり、λ を大きくすると入力が穏やかになる代わりに応答が遅くなる、というトレードオフをカードで確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -750,6 +913,16 @@ compute();
 <li>実装時はQP行列の条件数確認（κ&gt;1000で悪条件）、予測ホライズン内の非測定外乱やモデル化誤差補償にはオブザーバゲインを併用</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

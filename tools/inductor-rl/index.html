@@ -44,14 +44,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "インダクタ・RL回路の過渡応答シミュレーター",
       "description": "RL直列回路の充電・放電過渡応答と交流定常状態をリアルタイム計算・可視化。時定数τ=L/R、エネルギーU=½LI²、誘導性リアクタンスXL=ωL、インピーダンス|Z|を自動計算。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/inductor-rl.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -267,7 +267,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="acFreq" min="1" max="10000" step="1" value="60" oninput="syncToNum('acFreq','acFreqValNum');updateSlider(this);compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -291,6 +299,20 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="sl">X_L / |Z| [Ω]</div>
       </div>
     </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-bolt"></i> RL回路ライブアニメーション — スイッチを閉じて電流が立ち上がる</div>
+      <canvas id="rlAnim" height="300" style="background:#0a1628;border-radius:8px;display:block;width:100%"></canvas>
+      <div class="rl-live" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px">
+        <div style="background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center"><div class="sv" id="rlI" style="font-family:'Roboto Mono',monospace;font-size:1.1rem;font-weight:700;color:#ffd54a">0.00</div><div style="font-size:.6rem;color:rgba(255,255,255,.6);margin-top:3px">電流 i(t) [A]</div></div>
+        <div style="background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center"><div class="sv" id="rlVL" style="font-family:'Roboto Mono',monospace;font-size:1.1rem;font-weight:700;color:#fff">0.00</div><div style="font-size:.6rem;color:rgba(255,255,255,.6);margin-top:3px">V_L(t) [V]</div></div>
+        <div style="background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center"><div class="sv" id="rlU" style="font-family:'Roboto Mono',monospace;font-size:1.1rem;font-weight:700;color:#fff">0.00</div><div style="font-size:.6rem;color:rgba(255,255,255,.6);margin-top:3px">蓄積U=½Li² [mJ]</div></div>
+        <div style="background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center"><div class="sv" id="rlPct" style="font-family:'Roboto Mono',monospace;font-size:1.1rem;font-weight:700;color:#00d4a0">0%</div><div style="font-size:.6rem;color:rgba(255,255,255,.6);margin-top:3px">最終値到達 i/I∞</div></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+        <button class="btn" type="button" id="rlPlayBtn"><i class="fas fa-redo"></i> スイッチ操作を再生</button>
+        <span style="font-size:.72rem;color:var(--muted)">τ＝L/R の点（63.2%）と 5τ の定常状態を表示。L・R・電圧を変えると即時に反映されます。</span>
+      </div>
     </div>
 
       <div class="charts" id="transientCharts">
@@ -510,6 +532,255 @@ document.querySelectorAll('input[type=range]').forEach(el =>{
 compute();
 </script>
 
+<script>
+(function(){
+  "use strict";
+  var cv = document.getElementById('rlAnim');
+  if(!cv) return;
+  var ctx = cv.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function logSV(pct,mn,mx){ return mn*Math.pow(mx/mn, pct/100); }
+  function num(id){ var e=document.getElementById(id); return e?parseFloat(e.value):0; }
+  function params(){
+    var L = logSV(num('lSlider'),1e-6,100);
+    var R = logSV(num('rSlider'),0.01,1e5);
+    var V0 = num('v0')||12;
+    return { L:L, R:R, V0:V0, tau:L/R, Iinf:V0/R };
+  }
+
+  // animation traverses 0..5tau on energize, then 0..5tau on decay, looping
+  var phase = 'energize'; // 'energize' | 'decay'
+  var u = 0;              // normalized 0..1 across 5 tau
+  var running = !reduce;
+  var last = 0, animId = null;
+  var dotPhase = 0;
+
+  var cssW=0, cssH=0;
+  function resize(){
+    var rect = cv.parentElement.getBoundingClientRect();
+    cssW = Math.max(280, Math.floor(rect.width - 44));
+    cssH = 300;
+    var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    cv.style.width = cssW+'px'; cv.style.height = cssH+'px';
+    cv.width = Math.round(cssW*dpr); cv.height = Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function fmtV(v){ var a=Math.abs(v); if(a>=1000) return (v/1000).toFixed(2)+'k'; if(a>=1) return v.toFixed(2); if(a>=1e-3) return (v*1e3).toFixed(2)+'m'; return v.toFixed(3); }
+
+  function curState(p){
+    // t spans 0..5tau
+    var t = u*5*p.tau;
+    var i, vl, frac;
+    if(phase==='energize'){
+      frac = 1 - Math.exp(-5*u);            // i/Iinf
+      i = p.Iinf*frac;
+      vl = p.V0*Math.exp(-5*u);             // V_L = V0 e^{-t/tau}
+    } else {
+      frac = Math.exp(-5*u);
+      i = p.Iinf*frac;
+      vl = -p.R*p.Iinf*Math.exp(-5*u);      // decay through R
+    }
+    return { t:t, i:i, vl:vl, frac:frac };
+  }
+
+  function drawCircuit(p, st){
+    var W=cssW, H=cssH;
+    // schematic occupies left ~55%, curve right ~45%
+    var bx=20, by=40, bw=Math.min(300, W*0.52), bh=H-90;
+    // loop rectangle corners
+    var Lx=bx, Rx=bx+bw, Ty=by, By=by+bh;
+    ctx.lineWidth=2.4; ctx.strokeStyle='rgba(150,180,220,0.55)';
+    // intensity of wire glow scales with current fraction
+    var glow = phase==='energize'? st.frac : st.frac;
+    // battery on left side (gap), switch on top, resistor on right, inductor on bottom
+    // Top wire with switch
+    ctx.beginPath(); ctx.moveTo(Lx,Ty); ctx.lineTo(Lx+bw*0.32,Ty); ctx.stroke();
+    // switch
+    var swX=Lx+bw*0.32, swEnd=Lx+bw*0.50;
+    var closed = (phase==='energize');
+    ctx.strokeStyle = closed? '#00d4a0':'#e17055'; ctx.lineWidth=2.6;
+    ctx.beginPath(); ctx.arc(swX,Ty,3,0,7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(swEnd,Ty,3,0,7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(swX,Ty);
+    if(closed){ ctx.lineTo(swEnd,Ty); } else { ctx.lineTo(swEnd-4,Ty-16); }
+    ctx.stroke();
+    ctx.fillStyle = closed? '#00d4a0':'#e17055'; ctx.font='11px Roboto Mono';
+    ctx.fillText(closed?'SW closed':'SW open', swX-6, Ty-20);
+    ctx.strokeStyle='rgba(150,180,220,0.55)'; ctx.lineWidth=2.4;
+    ctx.beginPath(); ctx.moveTo(swEnd,Ty); ctx.lineTo(Rx,Ty); ctx.stroke();
+    // Right side wire down to resistor
+    ctx.beginPath(); ctx.moveTo(Rx,Ty); ctx.lineTo(Rx,Ty+bh*0.30); ctx.stroke();
+    // resistor zigzag on right side
+    var rTop=Ty+bh*0.30, rBot=Ty+bh*0.62;
+    ctx.strokeStyle='#4aa3ff'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.moveTo(Rx,rTop);
+    var zsteps=6;
+    for(var z=0;z<zsteps;z++){ var yy=rTop+(rBot-rTop)*(z+0.5)/zsteps; var xx=Rx+(z%2===0?9:-9); ctx.lineTo(xx,yy); }
+    ctx.lineTo(Rx,rBot); ctx.stroke();
+    ctx.fillStyle='#4aa3ff'; ctx.fillText('R', Rx+14, (rTop+rBot)/2);
+    ctx.strokeStyle='rgba(150,180,220,0.55)'; ctx.lineWidth=2.4;
+    ctx.beginPath(); ctx.moveTo(Rx,rBot); ctx.lineTo(Rx,By); ctx.stroke();
+    // Bottom wire to inductor (coils)
+    ctx.beginPath(); ctx.moveTo(Rx,By); ctx.lineTo(Lx+bw*0.62,By); ctx.stroke();
+    // inductor coils
+    var coilR=8, nC=4, cStart=Lx+bw*0.38, cEnd=Lx+bw*0.62;
+    ctx.strokeStyle='#ffd54a'; ctx.lineWidth=2.2;
+    var step=(cEnd-cStart)/nC;
+    for(var c=0;c<nC;c++){ var cxp=cStart+step*(c+0.5); ctx.beginPath(); ctx.arc(cxp,By,coilR,Math.PI,0,false); ctx.stroke(); }
+    // magnetic field strength around inductor (grows with current)
+    var bField = Math.min(1, Math.abs(st.i)/(Math.abs(p.Iinf)+1e-9));
+    if(bField>0.02){
+      for(var f=1;f<=3;f++){
+        ctx.strokeStyle='rgba(255,213,74,'+(0.30*bField/f).toFixed(3)+')';
+        ctx.lineWidth=1.4;
+        ctx.beginPath(); ctx.ellipse((cStart+cEnd)/2, By, coilR*(1.4+f*0.7), coilR*(0.7+f*0.35), 0, 0, 7); ctx.stroke();
+      }
+    }
+    ctx.fillStyle='#ffd54a'; ctx.font='11px Roboto Mono'; ctx.fillText('L', (cStart+cEnd)/2-4, By+24);
+    ctx.strokeStyle='rgba(150,180,220,0.55)'; ctx.lineWidth=2.4;
+    ctx.beginPath(); ctx.moveTo(cStart,By); ctx.lineTo(Lx,By); ctx.stroke();
+    // Left side: wire up to battery
+    ctx.beginPath(); ctx.moveTo(Lx,By); ctx.lineTo(Lx,Ty+bh*0.62); ctx.stroke();
+    // battery symbol
+    var batY1=Ty+bh*0.40, batY2=Ty+bh*0.52;
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(Lx-7,batY1); ctx.lineTo(Lx+7,batY1); ctx.stroke(); // long +
+    ctx.beginPath(); ctx.moveTo(Lx-4,batY1+5); ctx.lineTo(Lx+4,batY1+5); ctx.stroke(); // short -
+    ctx.beginPath(); ctx.moveTo(Lx-7,batY2); ctx.lineTo(Lx+7,batY2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(Lx-4,batY2+5); ctx.lineTo(Lx+4,batY2+5); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='11px Roboto Mono'; ctx.fillText('V₀='+fmtV(p.V0)+'V', Lx-14, batY1-8);
+    ctx.strokeStyle='rgba(150,180,220,0.55)'; ctx.lineWidth=2.4;
+    ctx.beginPath(); ctx.moveTo(Lx,batY2+5); ctx.lineTo(Lx,Ty); ctx.stroke();
+
+    // current-flow dots travelling around the loop, speed ∝ current
+    var iAbs=Math.abs(st.i), spd=Math.min(1, iAbs/(Math.abs(p.Iinf)+1e-9));
+    if(spd>0.01 && (phase==='energize' || st.frac>0.01)){
+      var perim = 2*(bw+bh);
+      var nDots=10;
+      for(var d=0;d<nDots;d++){
+        var pos = ((dotPhase + d/nDots)%1)*perim;
+        var pt = loopPoint(pos, Lx,Ty,Rx,By,bw,bh);
+        var rad = 2+2.5*spd;
+        ctx.fillStyle='rgba(0,212,160,'+(0.35+0.6*spd).toFixed(3)+')';
+        ctx.beginPath(); ctx.arc(pt.x,pt.y,rad,0,7); ctx.fill();
+      }
+    }
+    // label i
+    ctx.fillStyle='#00d4a0'; ctx.font='bold 12px Roboto Mono';
+    ctx.fillText('i = '+st.i.toFixed(3)+' A', Lx+bw*0.30, By+34);
+  }
+
+  function loopPoint(s, Lx,Ty,Rx,By,bw,bh){
+    // clockwise from top-left: top -> right -> bottom -> left
+    if(s < bw) return { x:Lx+s, y:Ty };
+    s-=bw; if(s<bh) return { x:Rx, y:Ty+s };
+    s-=bh; if(s<bw) return { x:Rx-s, y:By };
+    s-=bw; return { x:Lx, y:By-s };
+  }
+
+  function drawCurve(p, st){
+    var W=cssW, H=cssH;
+    var gx=Math.min(320, W*0.55)+6, gy=40, gw=W-gx-18, gh=H-90;
+    if(gw<80) return; // too narrow (stack mobile) -> skip side curve
+    ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1;
+    ctx.strokeRect(gx,gy,gw,gh);
+    // axes labels
+    ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='10px Roboto Mono';
+    ctx.fillText('i', gx+4, gy+12);
+    ctx.fillText('t →', gx+gw-22, gy+gh+14);
+    // Iinf line
+    var Iinf=p.Iinf;
+    ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(gx,gy+gh*0.08); ctx.lineTo(gx+gw,gy+gh*0.08); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.fillText('I∞='+Iinf.toExponential(2)+'A', gx+4, gy+gh*0.08-3);
+    // tau marker (x at 1/5 of width since width=5tau)
+    var tauX=gx+gw/5;
+    ctx.strokeStyle='rgba(0,212,160,0.5)'; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(tauX,gy); ctx.lineTo(tauX,gy+gh); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#00d4a0'; ctx.fillText('τ (63%)', tauX+3, gy+gh-4);
+    // curve i(t) full path (faint) + traced (bright up to u)
+    function yOf(frac){ return gy + gh*(0.08 + (1-frac)*0.84); } // frac 0..1 maps
+    // full faint
+    ctx.strokeStyle='rgba(0,180,216,0.25)'; ctx.lineWidth=1.4; ctx.beginPath();
+    for(var k=0;k<=100;k++){
+      var uu=k/100, fr = phase==='energize'? 1-Math.exp(-5*uu) : Math.exp(-5*uu);
+      var xx=gx+gw*uu, yy=yOf(fr);
+      if(k===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy);
+    }
+    ctx.stroke();
+    // traced bright
+    ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2.4; ctx.beginPath();
+    var lim=Math.max(0.001,u);
+    for(var k2=0;k2<=100;k2++){
+      var uu2=(k2/100)*lim; if(uu2>u) break;
+      var fr2 = phase==='energize'? 1-Math.exp(-5*uu2) : Math.exp(-5*uu2);
+      var x2=gx+gw*uu2, y2=yOf(fr2);
+      if(k2===0) ctx.moveTo(x2,y2); else ctx.lineTo(x2,y2);
+    }
+    ctx.stroke();
+    // moving dot
+    var fr3 = st.frac;
+    var dx=gx+gw*u, dy=yOf(fr3);
+    ctx.fillStyle='#ffd54a'; ctx.beginPath(); ctx.arc(dx,dy,4.5,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=1; ctx.stroke();
+  }
+
+  function updateStats(p, st){
+    document.getElementById('rlI').textContent = st.i.toFixed(st.i<1?4:3);
+    document.getElementById('rlVL').textContent = fmtV(st.vl);
+    var U = 0.5*p.L*st.i*st.i;
+    document.getElementById('rlU').textContent = (U*1000).toFixed(U*1000<1?3:2);
+    document.getElementById('rlPct').textContent = Math.round((Math.abs(st.i)/(Math.abs(p.Iinf)+1e-9))*100)+'%';
+  }
+
+  function frame(){
+    resize();
+    var W=cssW,H=cssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+    var p=params();
+    var st=curState(p);
+    ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText((phase==='energize'?'充電中: i↑ → I∞':'放電中: i↓ → 0')+'   t='+(st.t*1000<1000?(st.t*1000).toFixed(2)+'ms':(st.t).toFixed(3)+'s'), 16, 22);
+    drawCircuit(p, st);
+    drawCurve(p, st);
+    updateStats(p, st);
+  }
+
+  function loop(ts){
+    if(!running){ animId=null; return; }
+    if(!last) last=ts;
+    var dt=Math.min(0.05,(ts-last)/1000); last=ts;
+    u += dt*0.35;            // ~ traverse 5tau in ~2.9s
+    dotPhase = (dotPhase + dt*0.6) % 1;
+    if(u>=1){
+      u=0;
+      phase = (phase==='energize')?'decay':'energize';
+    }
+    frame();
+    animId=requestAnimationFrame(loop);
+  }
+
+  function start(){ if(reduce){ phase='energize'; u=1; frame(); return; } running=true; last=0; if(!animId) animId=requestAnimationFrame(loop); }
+  var btn=document.getElementById('rlPlayBtn');
+  if(btn) btn.addEventListener('click', function(){ phase='energize'; u=0; start(); });
+
+  // re-render immediately when params change
+  ['lSlider','rSlider','v0'].forEach(function(id){
+    var e=document.getElementById(id);
+    if(e) e.addEventListener('input', function(){ if(reduce){ frame(); } });
+  });
+  window.addEventListener('resize', frame);
+
+  // init
+  if(reduce){ phase='energize'; u=1; frame(); }
+  else { frame(); start(); }
+})();
+</script>
+
 <section class="explanation">
   <h2>インダクタ・RL回路の過渡応答とは</h2>
   <div class="chat">
@@ -568,6 +839,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="inductor-rl.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -624,12 +898,22 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>R=40Ω、L=200mHのRL直列回路で、V0=12Vを印加した場合：時定数τ=L/R=200×10⁻³/40=5msとなります。τ時点での電流はI(τ)=V0/R(1-e⁻¹)≈2.16A、磁気エネルギーは½×0.2×2.16²≈0.47Jです。交流モード（f=50Hz）では、X_L=2πfL=2π×50×0.2≈62.8Ω、インピーダンス|Z|=√(R²+X_L²)=√(1600+3943.8)≈74.6Ωとなります</p>
+<p>R=40Ω、L=200mHのRL直列回路で、V0=12Vを印加した場合：時定数τ=L/R=200×10⁻³/40=5msとなります。τ時点での電流はI(τ)=V0/R(1-e⁻¹)≈0.190A、磁気エネルギーは½×0.2×0.190²≈0.0036Jです。交流モード（f=50Hz）では、X_L=2πfL=2π×50×0.2≈62.8Ω、インピーダンス|Z|=√(R²+X_L²)=√(1600+3943.8)≈74.6Ωとなります</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol><li>モーター制御回路では、L値が大きいほど電流上昇が遅くなるため、τ>>5msの設計は加速特性を悪化させます。自動車エンジン制御（L=50mH程度）での過渡応答確認に活用してください</li><li>交流電源接続時、誘導性リアクタンスX_Lは周波数に比例するため、50Hzと60Hz電源では|Z|が異なり、消費電力が変わります</li><li>直流遮断時（放電モード）、逆起電力が発生するため、保護ダイオード（フリーホイーリングダイオード）なしでは半導体素子が破壊される危険があります</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

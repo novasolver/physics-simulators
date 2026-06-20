@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "質量分析装置 シミュレーター",
       "description": "電荷数 z、質量 m、加速電圧 V、磁束密度 B から、加速後速度 v、円軌道半径 r、質量電荷比 m/q、運動エネルギー KE をリアルタイムに計算する質量分析装置シミュレーター。",
       "url": "https://novasolver.jp/tools/mass-spectrometer.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["加速電圧 V によるイオン速度 v = √(2qV/m) の計算","磁場 B 中での円軌道半径 r = mv/(qB) の計算","質量電荷比 m/q による分離原理の可視化","軽・中・重イオンの軌道差を磁場領域で同時表示"],
       "keywords": "質量分析,マススペクトロメーター,円運動,ローレンツ力,磁場,イオン,質量電荷比,Bモニター,加速電圧,分析機器",
       "datePublished": "2026-05-15",
@@ -102,6 +102,24 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #chamberCanvas,#rCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.preset-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.preset-btn{ padding:5px 10px; font-size:0.76rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); cursor:pointer; font-family:inherit; transition:all .2s; }
+.preset-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.preset-btn.active{ background:rgba(0,123,255,.1); border-color:var(--accent); color:var(--accent); font-weight:600; }
+.live-readouts{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+.live-ro{ background:linear-gradient(135deg,#0a1628,#102a4c); border:1px solid rgba(0,180,216,.25); border-radius:10px; padding:10px 8px; text-align:center; }
+.live-ro .rv{ font-family:'Roboto Mono',monospace; font-size:1.0rem; font-weight:700; color:#fff; line-height:1.1; }
+.live-ro .rl{ font-size:0.62rem; color:rgba(255,255,255,.6); margin-top:4px; letter-spacing:.03em; }
+.live-ro.accent .rv{ color:#ffd54a; }
+@media(max-width:600px){ .live-readouts{ grid-template-columns:repeat(2,1fr); } }
+.play-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+.legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:0.72rem; color:var(--muted); margin-top:10px; }
+.legend span{ display:inline-flex; align-items:center; gap:5px; }
+.legend i.swatch{ width:18px; height:3px; border-radius:2px; display:inline-block; }
+.toggle-btn{ display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:0.82rem; font-family:inherit; cursor:pointer; transition:all .2s; }
+.toggle-btn.active{ background:rgba(0,123,255,.1); border-color:var(--accent); color:var(--accent); font-weight:600; }
+canvas:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+@media(prefers-reduced-motion:reduce){ input[type=range]::-webkit-slider-thumb{ transition:none; } }
 </style>
 </head>
 <body>
@@ -130,6 +148,18 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 <div class="main">
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット（同位体シナリオ）</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn active" id="psNeon" onclick="setPreset('neon')">ネオン ²⁰/²²</button>
+        <button type="button" class="preset-btn" id="psUranium" onclick="setPreset('uranium')">ウラン ²³⁵/²³⁸ 濃縮</button>
+        <button type="button" class="preset-btn" id="psSelector" onclick="setPreset('selector')">速度選別器ON</button>
+        <button type="button" class="preset-btn" id="psSingle" onclick="setPreset('single')">単一イオン</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
 
     <div class="param-group">
       <div class="param-label">
@@ -163,36 +193,68 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <input type="range" id="slB" min="0.05" max="2.00" step="0.05" value="0.50" oninput="syncToNum('slB','slBVal');updateSlider(this,'slBVal',2,'');compute()">
     </div>
 
+    <div class="param-group" style="margin-top:6px;">
+      <div class="param-label">
+        <span class="param-name">速度選別器 (E×B)</span>
+        <button class="toggle-btn" type="button" id="selToggle" onclick="toggleSelector()"><i class="fas fa-filter"></i> OFF</button>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">ONにすると磁場手前で E = vB を満たす速度 v = √(2qV/m) のイオンのみ通過。理想化のため全イオンを通過させ、選別線のみ表示します。</div>
+    </div>
+
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> m をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 発射</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は Ar 一価イオン (z=1, m=40 u, V=2000 V, B=0.50 T)。素電荷 e = 1.602×10⁻¹⁹ C、原子質量単位 u = 1.6605×10⁻²⁷ kg、相対論補正は無視。質量は u 単位、磁場は T、電圧は V。</p>
+    <div class="play-row">
+      <span style="font-size:.72rem;color:var(--muted)">速度</span>
+      <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+      <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+      <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は Ar 一価イオン (z=1, m=40 u, V=2000 V, B=0.50 T)。プリセットで同位体ペアを発射すると、軽い同位体ほど内側、重い同位体ほど外側に着地して分離します。素電荷 e = 1.602×10⁻¹⁹ C、原子質量単位 u = 1.6605×10⁻²⁷ kg、相対論補正は無視。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-      <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statV_speed">—</div><div class="sl">加速後速度 v</div></div>
-        <div class="stat-card"><div class="sv" id="statR">—</div><div class="sl">円軌道半径 r</div></div>
-        <div class="stat-card"><div class="sv" id="statMQ">—</div><div class="sl">質量電荷比 m/q</div></div>
-        <div class="stat-card"><div class="sv" id="statKE">—</div><div class="sl">運動エネルギー KE</div></div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> 選択中イオンのライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roV">—</div><div class="rl">加速後速度 v</div></div>
+        <div class="live-ro"><div class="rv" id="roR">—</div><div class="rl">円軌道半径 r</div></div>
+        <div class="live-ro"><div class="rv" id="roLand">—</div><div class="rl">着地位置 2r</div></div>
+        <div class="live-ro"><div class="rv" id="roMQ">—</div><div class="rl">質量電荷比 m/q</div></div>
+        <div class="live-ro"><div class="rv" id="roPos">—</div><div class="rl">飛行中の位置 (x, y)</div></div>
+        <div class="live-ro"><div class="rv" id="roVel">—</div><div class="rl">飛行中の速度 |v|</div></div>
+        <div class="live-ro"><div class="rv" id="roKE">—</div><div class="rl">運動エネルギー KE</div></div>
+        <div class="live-ro"><div class="rv" id="roF">—</div><div class="rl">ローレンツ力 qvB</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-magnet"></i> 質量分析装置の模式図</div>
-      <canvas id="chamberCanvas"></canvas>
-      <p class="canvas-hint">左＝イオン源と加速電極（電圧 V）／中央＝磁場領域 B（×印は紙面奥向き）／磁場で曲がった 3 つの軌道（青＝軽イオン、黄＝現在の m、赤＝重イオン）／右端＝検出器面</p>
+      <div class="chart-title"><i class="fas fa-magnet"></i> 質量分析装置（リアルタイム飛行）</div>
+      <canvas id="chamberCanvas" tabindex="0" role="img" aria-label="質量分析装置の飛行アニメーション。イオン源から加速され磁場で半円を描き検出器に着地するイオンを表示します。"></canvas>
+      <div class="play-row">
+        <button type="button" class="btn" id="launchBtn" onclick="launch()"><i class="fas fa-bolt"></i> 発射</button>
+        <button type="button" class="btn secondary" id="replayBtn" onclick="replay()"><i class="fas fa-rotate-left"></i> 最初から</button>
+      </div>
+      <div class="legend" id="ionLegend"></div>
+      <p class="canvas-hint">左＝イオン源と加速電極（電圧 V）／中央＝磁場領域 B（×印は紙面奥向き）／各イオンが半円を描いて飛行し残像（軌跡）を残す／右端＝検出器面に着地。軽い同位体ほど内側、重い同位体ほど外側に分離します。</p>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 質量電荷比 m/z に対する円軌道半径 r</div>
+      <div class="chart-title"><i class="fas fa-chart-column"></i> 質量スペクトル（検出器の到達位置）</div>
       <canvas id="rCanvas"></canvas>
-      <p class="canvas-hint">横軸＝m/z [u/e]（1〜250）／縦軸＝r [mm]／青曲線＝r = (1/B)√(2·m·V/q)／黄点＝現在の m/z</p>
+      <p class="canvas-hint">横軸＝検出器位置 2r [mm]（重いほど右）／縦軸＝相対強度／着地したイオンがピークとして蓄積。各ピークは m/q でラベル表示。青曲線＝m/z に対する半径 r の理論曲線。</p>
     </div>
 
     <div class="chart-card">
@@ -200,8 +262,9 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <p>電荷 q = ze のイオンを加速電圧 V で加速すると、エネルギー保存より速度 v が決まります。</p>
       <p style="margin-top:8px;">加速後の速度：</p>
       $$v = \sqrt{\frac{2qV}{m}}$$
-      <p style="margin-top:6px;">磁束密度 B の中での円軌道半径（ローレンツ力 = 向心力）：</p>
+      <p style="margin-top:6px;">磁場中ではローレンツ力 $\mathbf{F} = q\,\mathbf{v}\times\mathbf{B}$ が速度に常に直交し、向心力としてはたらきます。$qvB = \dfrac{m v^{2}}{r}$ を $r$ について解くと円軌道半径が得られます：</p>
       $$r = \frac{m v}{q B} = \frac{1}{B}\sqrt{\frac{2 m V}{q}}$$
+      <p style="margin-top:6px;font-size:.8rem;color:var(--muted)">検証例：²⁰Ne 一価 (m=20 u, q=e), V=1000 V, B=0.1 T → v ≈ 9.82×10⁴ m/s, r ≈ 0.204 m。²²Ne の半径比は √(22/20) ≈ 1.0488 で、本ツールの ²⁰/²² 分離比と一致します。</p>
       <p style="margin-top:6px;">質量電荷比（u/e で表すと）：</p>
       $$\frac{m}{q} = \frac{r^{2} B^{2}}{2 V}$$
       <p style="margin-top:6px;">運動エネルギー：</p>
@@ -212,34 +275,45 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Mass Spectrometer (Magnetic Sector) Simulator ==========
-var E_CHG  = 1.602e-19;  // C
-var U_MASS = 1.6605e-27; // kg
+"use strict";
+// ========== Mass Spectrometer (Magnetic Sector) v2 — real-time multi-isotope ==========
+var E_CHG  = 1.602e-19;   // C
+var U_MASS = 1.6605e-27;  // kg
+var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 var chamberCanvas = document.getElementById('chamberCanvas');
 var chamberCtx = chamberCanvas.getContext('2d');
 var rCanvas = document.getElementById('rCanvas');
 var rCtx = rCanvas.getContext('2d');
+
 var playing = false;
 var animId = null;
-var sweepDir = 1;
+var speedMult = 1;
+var simProg = 0;          // normalized flight progress 0..1 (shared visual clock)
+var lastTs = 0;
+var selectorOn = false;
+var spectrumHits = [];    // accumulated detector hits {x2r_mm, color, label}
+var ions = [];            // active ions for this run
+
+// Isotope color palette
+var COL_LIGHT = '#4ac6ff';
+var COL_HEAVY = '#ff6b6b';
+var COL_MID   = '#ffd166';
+
+function el(id){ return document.getElementById(id); }
 
 function getParams() {
-  var z   = parseFloat(document.getElementById('slZ').value);
-  var m_u = parseFloat(document.getElementById('slM_amu').value);
-  var V   = parseFloat(document.getElementById('slV').value);
-  var B   = parseFloat(document.getElementById('slB').value);
-  var q   = z * E_CHG;       // C
-  var m   = m_u * U_MASS;    // kg
-  return { z: z, m_u: m_u, V: V, B: B, q: q, m: m };
+  var z   = parseFloat(el('slZ').value);
+  var m_u = parseFloat(el('slM_amu').value);
+  var V   = parseFloat(el('slV').value);
+  var B   = parseFloat(el('slB').value);
+  return { z:z, m_u:m_u, V:V, B:B, q:z*E_CHG, m:m_u*U_MASS };
 }
 
 function speed(q, V, m) { return (q > 0 && m > 0) ? Math.sqrt(2 * q * V / m) : 0; }
 function radius(m, v, q, B) { return (q > 0 && B > 0) ? (m * v) / (q * B) : 0; }
-function kineticEnergy_eV(q, V) { return V; } // KE in eV is exactly V (since q = z*e, eV unit means per electron charge — for z=1 KE=V eV; we will return KE in J and convert)
-function kineticEnergy_J(q, V) { return q * V; }
 
 function fmtSpeed(v_ms) {
-  // m/s vs km/s
   if (!isFinite(v_ms) || v_ms <= 0) return '0 m/s';
   if (v_ms >= 1000) return (v_ms / 1000).toFixed(1) + ' km/s';
   return v_ms.toFixed(0) + ' m/s';
@@ -255,432 +329,502 @@ function fmtMQ(m_u, z) {
   return (m_u / z).toFixed(1) + ' u/e';
 }
 function fmtKE(q, V) {
-  var J = q * V;
-  // eV is more intuitive for KE: KE[eV] = z*V (for z=1 → V eV)
-  // Show eV/keV
-  // z*V eV: but stat asks "2.0 keV" for default → z=1, V=2000 → 2000 eV = 2.0 keV
-  var eV = J / E_CHG;
+  var eV = (q * V) / E_CHG;
   if (eV >= 1000) return (eV / 1000).toFixed(1) + ' keV';
   return eV.toFixed(0) + ' eV';
 }
+function fmtForce(F) {
+  if (!isFinite(F) || F <= 0) return '0 N';
+  return F.toExponential(2) + ' N';
+}
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
+// ----- HiDPI -----
+function __cssW(cv){ return parseFloat(cv.dataset.cssW) || cv.width / Math.min(window.devicePixelRatio || 1, 2.5); }
+function __cssH(cv){ return parseFloat(cv.dataset.cssH) || cv.height / Math.min(window.devicePixelRatio || 1, 2.5); }
 
 function resizeCanvases() {
   [chamberCanvas, rCanvas].forEach(function(cv){
     var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.55);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+    var h = Math.round(w * (cv === chamberCanvas ? 0.62 : 0.45));
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    cv.dataset.cssW = String(w);
+    cv.dataset.cssH = String(h);
+    var c = cv.getContext('2d');
+    if (c) c.setTransform(dpr, 0, 0, dpr, 0, 0);
   });
+}
+
+// ----- Build the ion set for the current scenario -----
+function buildIons(p) {
+  var list = [];
+  if (selectorOn || (window.__scenario === 'single')) {
+    list.push({ m_u: p.m_u, z: p.z, color: COL_MID, name: p.m_u.toFixed(0) + ' u' });
+  } else if (window.__scenario === 'neon') {
+    list.push({ m_u: 20, z: 1, color: COL_LIGHT, name: '²⁰Ne' });
+    list.push({ m_u: 22, z: 1, color: COL_HEAVY, name: '²²Ne' });
+  } else if (window.__scenario === 'uranium') {
+    list.push({ m_u: 235, z: 1, color: COL_LIGHT, name: '²³⁵U' });
+    list.push({ m_u: 238, z: 1, color: COL_HEAVY, name: '²³⁸U' });
+  } else {
+    // free-parameter mode: current ion plus a lighter & heavier reference isotope
+    list.push({ m_u: Math.max(1, p.m_u - 2), z: p.z, color: COL_LIGHT, name: (p.m_u - 2).toFixed(0) + ' u' });
+    list.push({ m_u: p.m_u,                 z: p.z, color: COL_MID,   name: p.m_u.toFixed(0) + ' u' });
+    list.push({ m_u: p.m_u + 2,             z: p.z, color: COL_HEAVY, name: (p.m_u + 2).toFixed(0) + ' u' });
+  }
+  // compute physics for each
+  list.forEach(function(io){
+    io.q = io.z * E_CHG;
+    io.m = io.m_u * U_MASS;
+    io.v = speed(io.q, p.V, io.m);
+    io.r = radius(io.m, io.v, io.q, p.B);
+    io.mq = io.m_u / io.z;
+  });
+  return list;
+}
+
+// ----- Selected ion = the one matching current sliders, else mid ion -----
+function selectedIon() {
+  if (!ions.length) return null;
+  var best = ions[0], bestD = Infinity;
+  var tgt = parseFloat(el('slM_amu').value);
+  ions.forEach(function(io){
+    var d = Math.abs(io.m_u - tgt);
+    if (d < bestD){ bestD = d; best = io; }
+  });
+  return best;
+}
+
+// ----- Chamber geometry & drawing -----
+function chamberLayout(W, H, p) {
+  var marginL = 16, marginR = 14, marginT = 12, marginB = 14;
+  var srcX = marginL + 10;
+  var gapX = srcX + 30;          // accelerating gap
+  var entryX = gapX + 30;        // enters field moving +x
+  var entryY = H - marginB - 18; // near bottom
+  // max radius among ions -> scale to fit
+  var rMax = 1e-9;
+  ions.forEach(function(io){ if (io.r > rMax) rMax = io.r; });
+  var availW = (W - marginR) - entryX;
+  var availH = entryY - marginT;
+  // arc spans 2r in x and r in y (semicircle apex). Fit min.
+  var scaleX = availW / (2 * rMax);
+  var scaleY = availH / rMax;
+  var pix = Math.max(1e-6, Math.min(scaleX, scaleY) * 0.92);
+  return { srcX:srcX, gapX:gapX, entryX:entryX, entryY:entryY, pix:pix, rMax:rMax,
+           marginT:marginT, marginR:marginR, fieldX0:entryX };
+}
+
+// ion position at flight progress prog (0..1):
+//  phase A (0..0.18): source -> gap -> field entry (straight, accelerating)
+//  phase B (0.18..1): semicircular arc, angle from -pi/2 to +pi/2 (CCW, curving up then down to detector at x=2r)
+function ionState(io, L, prog) {
+  var cx = L.entryX;            // arc center x = entry x
+  var cy = L.entryY - io.r * L.pix; // center directly above entry by r
+  var rPx = io.r * L.pix;
+  if (prog < 0.18) {
+    var f = prog / 0.18;
+    var x = L.srcX + (L.entryX - L.srcX) * f;
+    return { x:x, y:L.entryY, ang:-Math.PI/2, vfac:f, inField:false };
+  }
+  var fa = (prog - 0.18) / 0.82;
+  var ang = -Math.PI/2 + Math.PI * fa; // -pi/2 .. +pi/2
+  var x = cx + rPx * Math.cos(ang);
+  var y = cy + rPx * Math.sin(ang);
+  return { x:x, y:y, ang:ang, vfac:1, inField:true };
 }
 
 function drawChamber(p) {
-  var ctx = chamberCtx, W = __novaCanvasCssW(chamberCanvas), H = __novaCanvasCssH(chamberCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = 'rgba(143,184,224,0.4)';
-  ctx.lineWidth = 1.2;
-  ctx.strokeRect(8, 8, W - 16, H - 16);
+  var ctx = chamberCtx, W = __cssW(chamberCanvas), H = __cssH(chamberCanvas);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(143,184,224,0.35)'; ctx.lineWidth = 1.2;
+  ctx.strokeRect(7, 7, W - 14, H - 14);
 
-  // Layout: left ion source, middle accelerator, right magnetic sector + detector
-  var marginL = 18, marginR = 14, marginT = 14, marginB = 14;
-  var x0 = marginL, y0 = marginT;
-  var areaW = W - marginL - marginR;
-  var areaH = H - marginT - marginB;
-  var bottom = y0 + areaH;
+  var L = chamberLayout(W, H, p);
 
-  // Ion source (left)
-  var srcW = Math.min(70, areaW * 0.12);
-  var srcCx = x0 + srcW * 0.5;
-  var srcCy = y0 + areaH * 0.85;
+  // --- B field region (× into page) ---
+  var fx0 = L.fieldX0, fy0 = L.marginT, fx1 = W - L.marginR, fy1 = L.entryY + 4;
+  ctx.fillStyle = 'rgba(74,160,255,0.05)';
+  ctx.fillRect(fx0, fy0, fx1 - fx0, fy1 - fy0);
+  ctx.setLineDash([4,4]); ctx.strokeStyle = 'rgba(143,184,224,0.4)'; ctx.lineWidth = 1;
+  ctx.strokeRect(fx0, fy0, fx1 - fx0, fy1 - fy0); ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(150,200,255,0.45)'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  var nx = 6, ny = 4;
+  for (var i = 0; i < nx; i++) for (var j = 0; j < ny; j++) {
+    var mx = fx0 + (fx1 - fx0) * (0.1 + 0.8 * i / (nx - 1));
+    var my = fy0 + (fy1 - fy0) * (0.12 + 0.7 * j / (ny - 1));
+    ctx.fillText('×', mx, my);
+  }
+  ctx.fillStyle = '#a8d4ff'; ctx.font = '10px "Roboto Mono",monospace';
+  ctx.fillText('B = ' + p.B.toFixed(2) + ' T  (奥向き ⊗)', (fx0 + fx1) / 2, fy0 + 14);
+
+  // --- Source ---
   ctx.fillStyle = 'rgba(74,198,255,0.18)';
-  ctx.strokeStyle = 'rgba(180,220,255,0.85)';
-  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = 'rgba(180,220,255,0.85)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.rect(L.srcX - 9, L.entryY - 14, 18, 28); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '9px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('源', L.srcX, L.entryY - 20);
+
+  // --- Accelerating gap (plates) ---
+  ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.rect(x0, srcCy - 22, srcW, 40);
-  ctx.fill();
+  ctx.moveTo(L.gapX - 8, L.entryY - 18); ctx.lineTo(L.gapX - 8, L.entryY + 18);
+  ctx.moveTo(L.gapX + 8, L.entryY - 18); ctx.lineTo(L.gapX + 8, L.entryY + 18);
   ctx.stroke();
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('イオン源', srcCx, srcCy + 32);
+  ctx.fillStyle = '#FFD166'; ctx.font = '9px "Roboto Mono",monospace';
+  ctx.fillText('V=' + p.V.toFixed(0), L.gapX, L.entryY + 30);
 
-  // Accelerator plates (after source)
-  var accX0 = x0 + srcW + 14;
-  var accW = Math.min(70, areaW * 0.10);
-  ctx.strokeStyle = '#FFD166';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.moveTo(accX0, srcCy - 28);
-  ctx.lineTo(accX0, srcCy + 28);
-  ctx.moveTo(accX0 + accW, srcCy - 28);
-  ctx.lineTo(accX0 + accW, srcCy + 28);
-  ctx.stroke();
-  ctx.fillStyle = '#FFD166';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.fillText('+', accX0, srcCy - 32);
-  ctx.fillText('−', accX0 + accW, srcCy - 32);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.fillText('V = ' + p.V.toFixed(0) + ' V', accX0 + accW / 2, srcCy + 44);
-
-  // straight path between accelerator exit and magnetic sector entry
-  var entryX = accX0 + accW + 14;
-  var entryY = srcCy;
-  var sectorX0 = entryX + 8;
-  ctx.strokeStyle = 'rgba(120,200,255,0.65)';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(accX0 + accW, entryY);
-  ctx.lineTo(sectorX0, entryY);
-  ctx.stroke();
-
-  // Magnetic sector area (right side): semi-circular region from entryY upward to top
-  var sectorW = (x0 + areaW) - sectorX0 - 20;
-  var sectorH = areaH - 60;
-  // Draw sector boundary
-  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1.2;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.rect(sectorX0, y0 + 10, sectorW, sectorH);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Field markers (× = into page)
-  ctx.fillStyle = 'rgba(180,220,255,0.5)';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  var nx = 5, ny = 3;
-  for (var i = 0; i < nx; i++) {
-    for (var j = 0; j < ny; j++) {
-      var fx = sectorX0 + sectorW * (0.15 + 0.7 * (i / (nx - 1)));
-      var fy = y0 + 30 + (sectorH - 50) * (j / (ny - 1));
-      ctx.fillText('×', fx, fy);
-    }
-  }
-  ctx.fillStyle = '#a8d4ff';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.fillText('B = ' + p.B.toFixed(2) + ' T (into page)', sectorX0 + sectorW * 0.5, y0 + sectorH + 28);
-
-  // Compute radii in pixels for three masses: light (m/4), current m, heavy (m*2.5)
-  // Scale: choose pixel scale so current radius spans about 60% of sector width
-  var v_cur = speed(p.q, p.V, p.m);
-  var r_cur_m = radius(p.m, v_cur, p.q, p.B);
-  // Light and heavy reference masses (relative to current)
-  var m_light = p.m * 0.4;
-  var m_heavy = p.m * 2.0;
-  var v_light = speed(p.q, p.V, m_light);
-  var v_heavy = speed(p.q, p.V, m_heavy);
-  var r_light = radius(m_light, v_light, p.q, p.B);
-  var r_heavy = radius(m_heavy, v_heavy, p.q, p.B);
-
-  var pixPerM_target = (sectorW * 0.55) / Math.max(r_cur_m, 1e-9);
-  // But don't let the heavy ion blow out of the area; bound by what fits
-  var pixPerM_max = (sectorW * 0.90) / Math.max(r_heavy, 1e-9);
-  var pixPerM = Math.min(pixPerM_target, pixPerM_max);
-  // Don't go too small either
-  if (!isFinite(pixPerM) || pixPerM <= 0) pixPerM = 100;
-
-  // Center of circular arcs: the ions enter at (sectorX0, entryY) moving rightward (+x).
-  // With B into page (−z), q>0 gets force F = qv×B → for v in +x, B in −z, F = q*(v×B) where +x × -z = +y... let's just visualize as upward arc (counter-clockwise from beam's perspective).
-  // The arc center is perpendicular to velocity: directly above entry point at distance r.
-  // So center is (sectorX0, entryY - r_px). Arc goes from angle -pi/2 (at entry) curving up and to the right.
-  function drawArc(r_m, color, lw, label, labelOffset) {
-    var rPx = r_m * pixPerM;
-    if (!isFinite(rPx) || rPx <= 0) return;
-    var cx = sectorX0;
-    var cy = entryY - rPx;
-    // Compute end angle so arc stays inside the sector area
-    // The arc center is (cx, cy). At angle = -pi/2 from center, we are at entry.
-    // Going counter-clockwise (increasing angle from -pi/2 up to ~ 0 means reaching top-right at (cx + rPx, cy))
-    // For larger angles up to pi/2, we'd come back. We want to clip when we leave the sector.
-    var maxAng = Math.PI / 2; // full quarter
-    // limit by right edge: cx + rPx*cos(theta) <= sectorX0 + sectorW
-    // where theta = startAngle + dAng, startAngle=-pi/2 so position is (cx + rPx*cos(theta), cy + rPx*sin(theta))
-    // Solve cos(theta) <= sectorW / rPx (since rPx*cos(theta) <= sectorW)
-    var maxCos = (sectorW - 2) / rPx;
-    if (maxCos < 1) {
-      var thetaLimit = Math.acos(Math.max(-1, Math.min(1, maxCos)));
-      maxAng = -Math.PI / 2 + (Math.PI / 2 + thetaLimit); // remap
-      // safer: angle of intersection with x = sectorX0 + sectorW
-      // x = cx + rPx*cos(theta) = sectorX0 + sectorW
-      // cos(theta) = sectorW / rPx
-      // theta = acos(sectorW/rPx) (positive)
-      // we draw from -pi/2 (entry, bottom of circle) going CCW
-      // So angle goes from -pi/2 up to (something)
-      var thetaEnd = -Math.acos(Math.max(-1, Math.min(1, (sectorW - 2) / rPx)));
-      // Actually if center is above entry by rPx, entry angle is -pi/2 (bottom of circle from center perspective).
-      // Going up-right, theta increases towards 0 (right side of circle) then to pi/2 (top).
-      // So end theta where x-position reaches right edge:
-      var dx = (sectorW - 2);
-      var cosT = dx / rPx;
-      if (cosT >= 1) {
-        // doesn't reach the right edge within physically meaningful range
-        maxAng = Math.PI / 2; // draw quarter
-      } else if (cosT <= -1) {
-        maxAng = Math.PI;
-      } else {
-        // The path: starting at theta=-pi/2 (bottom). Going CCW: theta increases.
-        // x = cx + rPx*cos(theta); we want x <= sectorX0 + sectorW
-        // cos(theta) <= (sectorW)/rPx
-        // theta where cos(theta) = sectorW/rPx: theta = ±acos(...)
-        // Path from -pi/2 going CCW reaches theta=0 (x=cx+rPx, max x position).
-        // If sectorW/rPx < 1, the circle exits through the right boundary at some theta between -pi/2 and 0.
-        // x increases as theta goes from -pi/2 to 0, so cos(theta) increases from 0 to 1.
-        // We exit when cos(theta) = sectorW/rPx. theta = -acos(sectorW/rPx) (between -pi/2 and 0).
-        // (Note: negative root because we're below the horizontal.)
-        var thetaExit = -Math.acos(cosT);
-        // Path length in angle from -pi/2 to thetaExit:
-        maxAng = thetaExit - (-Math.PI / 2);
-      }
-    }
-    // also limit by top boundary
-    var topY = y0 + 10;
-    // y = cy + rPx*sin(theta). For theta in [-pi/2, 0], sin in [-1, 0], so y in [cy - rPx, cy]
-    // y must be >= topY: cy + rPx*sin(theta) >= topY
-    // sin(theta) >= (topY - cy)/rPx
-    // If topY > cy - rPx, then there is a constraint
-    var sinLow = (topY - cy) / rPx;
-    if (sinLow > -1 && sinLow < 0) {
-      var thetaTop = Math.asin(sinLow); // in [-pi/2, 0]
-      // The path from -pi/2 going CCW reaches sinLow at theta=thetaTop (since sin increases)
-      var maxAngTop = thetaTop - (-Math.PI / 2);
-      if (maxAngTop < maxAng) maxAng = maxAngTop;
-    }
-
-    // Draw arc
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lw;
+  // --- Velocity selector (E×B) marker if on ---
+  if (selectorOn) {
+    ctx.strokeStyle = 'rgba(0,230,180,0.8)'; ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.arc(cx, cy, rPx, -Math.PI / 2, -Math.PI / 2 + maxAng, false);
+    ctx.moveTo(L.entryX - 6, L.entryY - 16); ctx.lineTo(L.entryX - 6, L.entryY + 16);
     ctx.stroke();
-    // Endpoint dot
-    var endTheta = -Math.PI / 2 + maxAng;
-    var ex = cx + rPx * Math.cos(endTheta);
-    var ey = cy + rPx * Math.sin(endTheta);
-    ctx.fillStyle = color;
+    ctx.fillStyle = 'rgba(0,230,180,0.9)'; ctx.font = '9px "Roboto Mono",monospace';
+    ctx.fillText('E×B', L.entryX - 6, L.entryY - 22);
+  }
+
+  // --- Detector plate along the +x axis where arcs land (y = entryY, x from entryX..) ---
+  ctx.strokeStyle = 'rgba(200,220,250,0.55)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(L.entryX, L.entryY + 2); ctx.lineTo(fx1 - 2, L.entryY + 2); ctx.stroke();
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'right';
+  ctx.fillText('検出器面', fx1 - 4, L.entryY + 16);
+
+  // --- Draw each ion: full faint arc + trail up to prog + dot ---
+  ctx.textAlign = 'left';
+  ions.forEach(function(io){
+    var rPx = io.r * L.pix;
+    var cx = L.entryX, cy = L.entryY - rPx;
+    // faint full predicted arc
+    ctx.strokeStyle = io.color.replace('#','rgba(') ;
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = io.color; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, rPx, -Math.PI/2, Math.PI/2, false); ctx.stroke();
+    ctx.globalAlpha = 1;
+    // landing spot marker on detector
+    var landX = cx + 2 * rPx;
+    ctx.fillStyle = io.color; ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.arc(landX, L.entryY, 3, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+
+    // trail (solid) up to current progress
+    ctx.strokeStyle = io.color; ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-    // Label
-    if (label) {
-      ctx.font = '10px "Roboto Mono",monospace';
-      ctx.textAlign = 'left';
-      ctx.fillStyle = color;
-      ctx.fillText(label, ex + 6, ey + (labelOffset || 4));
+    var steps = 60, drew = false;
+    for (var k = 0; k <= steps; k++) {
+      var pr = simProg * k / steps;
+      var s = ionState(io, L, pr);
+      if (!drew){ ctx.moveTo(s.x, s.y); drew = true; } else ctx.lineTo(s.x, s.y);
+    }
+    ctx.stroke();
+    // current dot
+    var cs = ionState(io, L, simProg);
+    ctx.fillStyle = io.color;
+    ctx.beginPath(); ctx.arc(cs.x, cs.y, 4.5, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1; ctx.stroke();
+  });
+
+  // --- Lorentz-force annotation on the selected ion while in field ---
+  var sel = selectedIon();
+  if (sel) {
+    var cs = ionState(sel, L, simProg);
+    if (cs.inField && simProg < 0.98) {
+      // velocity tangent & inward force arrow
+      var rPx = sel.r * L.pix, cx = L.entryX, cy = L.entryY - rPx;
+      var fx = (cx - cs.x), fy = (cy - cs.y); // toward center
+      var fl = Math.hypot(fx, fy) || 1; fx = fx / fl * 26; fy = fy / fl * 26;
+      drawArrow(ctx, cs.x, cs.y, cs.x + fx, cs.y + fy, '#ff5252', 2);
+      // velocity (tangent, CCW)
+      var vx = Math.cos(cs.ang + Math.PI/2), vy = Math.sin(cs.ang + Math.PI/2);
+      drawArrow(ctx, cs.x, cs.y, cs.x + vx*28, cs.y + vy*28, '#ffd54a', 2);
+      drawAnnotation(ctx, 'F = qv×B (向心)', cs.x, cs.y - 26, '#ff5252');
+    } else if (simProg >= 0.98) {
+      drawAnnotation(ctx, '着地 2r=' + fmtRadius(2*sel.r), L.entryX + 2*sel.r*L.pix, L.entryY - 8, sel.color);
     }
   }
-  drawArc(r_light, 'rgba(120,200,255,0.85)', 1.8, '軽 (' + (p.m_u * 0.4).toFixed(0) + ' u)', -4);
-  drawArc(r_heavy, 'rgba(255,120,120,0.85)', 1.8, '重 (' + (p.m_u * 2.0).toFixed(0) + ' u)', 10);
-  drawArc(r_cur_m, '#FFD166', 2.4, '現在 (' + p.m_u.toFixed(0) + ' u)', 4);
 
-  // Detector (right edge)
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.fillRect(sectorX0 + sectorW - 8, y0 + 14, 6, sectorH - 6);
-  ctx.strokeStyle = 'rgba(200,220,250,0.6)';
-  ctx.lineWidth = 1.2;
-  ctx.strokeRect(sectorX0 + sectorW - 8, y0 + 14, 6, sectorH - 6);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText('検出器', sectorX0 + sectorW - 12, y0 + sectorH + 26);
-
-  // Readouts (top-left)
-  ctx.fillStyle = 'rgba(207,227,247,0.85)';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('z = ' + p.z.toFixed(0) + ',  m = ' + p.m_u.toFixed(0) + ' u', x0 + 4, y0 + 14);
-  ctx.fillText('V = ' + p.V.toFixed(0) + ' V,  B = ' + p.B.toFixed(2) + ' T', x0 + 4, y0 + 28);
-  ctx.fillText('v = ' + fmtSpeed(v_cur) + ',  r = ' + fmtRadius(r_cur_m), x0 + 4, y0 + 42);
+  // --- top-left readout strip ---
+  ctx.fillStyle = 'rgba(207,227,247,0.9)'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  if (sel) {
+    ctx.fillText('選択 ' + sel.name + ': v=' + fmtSpeed(sel.v) + '  r=' + fmtRadius(sel.r) + '  m/q=' + fmtMQ(sel.m_u, sel.z), 12, 26);
+  }
 }
 
-function drawRChart(p) {
-  var ctx = rCtx, W = __novaCanvasCssW(rCanvas), H = __novaCanvasCssH(rCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 56, my = 30;
-  var gx0 = mx, gx1 = W - 14, gy0 = H - my, gy1 = my + 4;
+function drawArrow(ctx, x0, y0, x1, y1, color, w) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  var a = Math.atan2(y1 - y0, x1 - x0), h = 6 + w;
+  ctx.beginPath(); ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - h*Math.cos(a - 0.4), y1 - h*Math.sin(a - 0.4));
+  ctx.lineTo(x1 - h*Math.cos(a + 0.4), y1 - h*Math.sin(a + 0.4));
+  ctx.closePath(); ctx.fill();
+}
+function drawAnnotation(ctx, text, x, y, color) {
+  ctx.font = 'bold 10px "Roboto Mono",monospace';
+  var w = ctx.measureText(text).width;
+  ctx.fillStyle = 'rgba(10,22,40,0.85)';
+  ctx.fillRect(x - w/2 - 5, y - 13, w + 10, 16);
+  ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.strokeRect(x - w/2 - 5, y - 13, w + 10, 16);
+  ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.fillText(text, x, y - 1); ctx.textAlign = 'left';
+}
+
+// ----- Spectrum (detector hit histogram) -----
+function recordHits(p) {
+  ions.forEach(function(io){
+    spectrumHits.push({ x2r_mm: 2 * io.r * 1000, color: io.color, label: fmtMQ(io.m_u, io.z), m_u: io.m_u, z: io.z });
+  });
+  if (spectrumHits.length > 400) spectrumHits = spectrumHits.slice(-400);
+}
+
+function drawSpectrum(p) {
+  var ctx = rCtx, W = __cssW(rCanvas), H = __cssH(rCanvas);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
+  var mL = 46, mR = 16, mT = 22, mB = 34;
+  var gx0 = mL, gx1 = W - mR, gy0 = H - mB, gy1 = mT;
   var gw = gx1 - gx0, gh = gy0 - gy1;
 
-  // X axis: m/z in u/e, from 1 to 250 linear
-  var xMin = 1, xMax = 250;
-  // Y axis: r in mm. Compute max r at m/z=xMax with current V, B.
-  // r = (1/B)*sqrt(2*m*V/q) = (1/B)*sqrt(2*(m_u*u)*V/(z*e))
-  // For m/z plotting, r depends on (m/q) = (m_u * u) / (z * e) = (m/z) * (u/e)
-  // r = (1/B)*sqrt(2*V*(m/q)) where (m/q) = (m/z in u/e) * (u/e) [SI: kg/C]
-  // (u/e) = 1.6605e-27 / 1.602e-19 = 1.0364e-8 kg/C
+  // x-axis: 2r in mm. range from 0 to a sensible max (theory at m/z=250 OR current hits)
   var uPerE = U_MASS / E_CHG;
-  var Vval = p.V, Bval = p.B;
-  function rFromMQ(mq_u_per_e) {
-    var mq_SI = mq_u_per_e * uPerE; // kg/C
-    if (Bval <= 0) return 0;
-    return (1 / Bval) * Math.sqrt(2 * Vval * mq_SI); // meters
-  }
-  var rMax_m = rFromMQ(xMax);
-  // mm scaling
-  var yMin = 0;
-  var yMax_mm = Math.max(10, Math.ceil(rMax_m * 1000 / 50) * 50);
+  function r2FromMQ(mq){ return p.B > 0 ? (2/p.B) * Math.sqrt(2 * p.V * mq * uPerE) * 1000 : 0; }
+  var xMax = Math.max(r2FromMQ(250), 50);
+  spectrumHits.forEach(function(h){ if (h.x2r_mm > xMax) xMax = h.x2r_mm * 1.05; });
+  function px(v){ return gx0 + v / xMax * gw; }
 
-  function px(xVal) { return gx0 + (xVal - xMin) / (xMax - xMin) * gw; }
-  function py(yVal_mm) { return gy0 - (yVal_mm - yMin) / (yMax_mm - yMin) * gh; }
-
-  // Gridlines
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.lineWidth = 1;
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  var xticks = [1, 50, 100, 150, 200, 250];
-  for (var i = 0; i < xticks.length; i++) {
-    var xx = px(xticks[i]);
-    ctx.beginPath();
-    ctx.moveTo(xx, gy0); ctx.lineTo(xx, gy1);
-    ctx.stroke();
-    ctx.fillText(xticks[i].toString(), xx, gy0 + 14);
+  // axes & ticks
+  ctx.strokeStyle = 'rgba(143,184,224,0.18)'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#8fb8e0'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  var nt = 5;
+  for (var i = 0; i <= nt; i++) {
+    var xv = xMax * i / nt, xx = px(xv);
+    ctx.beginPath(); ctx.moveTo(xx, gy0); ctx.lineTo(xx, gy1); ctx.stroke();
+    ctx.fillText(xv.toFixed(0), xx, gy0 + 14);
   }
-  ctx.textAlign = 'right';
-  var yStep = yMax_mm / 5;
-  for (var k = 0; k <= 5; k++) {
-    var yv = yMin + yStep * k;
-    var yy = py(yv);
-    ctx.beginPath();
-    ctx.moveTo(gx0, yy); ctx.lineTo(gx1, yy);
-    ctx.stroke();
-    ctx.fillText(yv.toFixed(0), gx0 - 4, yy + 3);
-  }
-  // Axes
   ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx1, gy0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx0, gy1); ctx.stroke();
 
-  // Curve: r vs m/z
-  ctx.strokeStyle = 'rgba(74,198,255,0.95)';
-  ctx.lineWidth = 2.2;
+  // theory curve r vs m/z mapped to (2r_mm on x?) — overlay light reference curve of 2r vs m/z scaled
+  ctx.strokeStyle = 'rgba(74,198,255,0.35)'; ctx.lineWidth = 1.4;
   ctx.beginPath();
   var first = true;
-  var N = 120;
-  for (var n = 0; n <= N; n++) {
-    var mq = xMin + (xMax - xMin) * n / N;
-    var r_m = rFromMQ(mq);
-    var r_mm = r_m * 1000;
-    var X = px(mq), Y = py(Math.min(r_mm, yMax_mm));
-    if (first) { ctx.moveTo(X, Y); first = false; } else ctx.lineTo(X, Y);
+  for (var n = 0; n <= 120; n++) {
+    var mq = 1 + 249 * n / 120;
+    var x2 = r2FromMQ(mq);
+    var X = px(x2), Y = gy0 - (mq / 250) * gh * 0.92;
+    if (first){ ctx.moveTo(X, Y); first = false; } else ctx.lineTo(X, Y);
   }
   ctx.stroke();
 
-  // Current m/z marker
-  var mq_now = p.m_u / p.z;
-  if (mq_now >= xMin && mq_now <= xMax) {
-    var r_now_m = rFromMQ(mq_now);
-    var r_now_mm = r_now_m * 1000;
-    var cxm = px(mq_now), cym = py(Math.min(r_now_mm, yMax_mm));
-    ctx.beginPath();
-    ctx.arc(cxm, cym, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFD166';
-    ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255,209,102,0.55)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(cxm, gy0); ctx.lineTo(cxm, cym); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(gx0, cym); ctx.lineTo(cxm, cym); ctx.stroke();
+  // histogram: bin hits, draw peaks
+  var nbins = Math.max(20, Math.round(gw / 6));
+  var bins = new Array(nbins).fill(0);
+  var binColor = new Array(nbins).fill(null);
+  var binLabel = new Array(nbins).fill('');
+  spectrumHits.forEach(function(h){
+    var bi = Math.min(nbins - 1, Math.max(0, Math.floor(h.x2r_mm / xMax * nbins)));
+    bins[bi]++; binColor[bi] = h.color; binLabel[bi] = h.label;
+  });
+  var maxC = 1; bins.forEach(function(c){ if (c > maxC) maxC = c; });
+  var bw = gw / nbins;
+  for (var b = 0; b < nbins; b++) {
+    if (bins[b] <= 0) continue;
+    var hgt = bins[b] / maxC * gh * 0.9;
+    var bx = gx0 + b * bw;
+    ctx.fillStyle = binColor[b] || '#4ac6ff';
+    ctx.fillRect(bx + 1, gy0 - hgt, Math.max(2, bw - 2), hgt);
+    // label peak with m/q
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '9px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(binLabel[b], bx + bw/2, gy0 - hgt - 4);
   }
 
-  // Axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('m/z (u/e)', (gx0 + gx1) / 2, H - 6);
-  ctx.save();
-  ctx.translate(14, (gy0 + gy1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('r (mm)', 0, 0);
-  ctx.restore();
-
-  // Legend
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  var lx0 = gx1 - 150, ly0 = gy1 + 8;
-  ctx.strokeStyle = 'rgba(74,198,255,0.95)';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath(); ctx.moveTo(lx0, ly0); ctx.lineTo(lx0 + 22, ly0); ctx.stroke();
-  ctx.fillStyle = '#cfe3f7';
-  ctx.fillText('r = (1/B)√(2mV/q)', lx0 + 26, ly0 + 3);
+  // axis labels
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('検出器位置 2r (mm)', (gx0 + gx1) / 2, H - 6);
+  ctx.save(); ctx.translate(12, (gy0 + gy1) / 2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('相対強度', 0, 0); ctx.restore();
+  if (!spectrumHits.length) {
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.textAlign = 'center'; ctx.font = '12px "Roboto Mono",monospace';
+    ctx.fillText('「発射」でイオンが検出器に到達するとピークが蓄積します', (gx0+gx1)/2, (gy0+gy1)/2);
+  }
 }
 
+// ----- readouts -----
+function updateReadouts(p) {
+  var sel = selectedIon();
+  if (!sel) return;
+  el('roV').textContent = fmtSpeed(sel.v);
+  el('roR').textContent = fmtRadius(sel.r);
+  el('roLand').textContent = fmtRadius(2 * sel.r);
+  el('roMQ').textContent = fmtMQ(sel.m_u, sel.z);
+  el('roKE').textContent = fmtKE(sel.q, p.V);
+  var F = sel.q * sel.v * p.B;
+  el('roF').textContent = fmtForce(F);
+  // live position/velocity during flight
+  var W = __cssW(chamberCanvas), H = __cssH(chamberCanvas);
+  var L = chamberLayout(W, H, p);
+  var cs = ionState(sel, L, simProg);
+  // map pixel pos back to physical mm relative to entry
+  var xm = (cs.x - L.entryX) / L.pix * 1000;
+  var ym = (L.entryY - cs.y) / L.pix * 1000;
+  el('roPos').textContent = '(' + xm.toFixed(0) + ', ' + ym.toFixed(0) + ') mm';
+  el('roVel').textContent = simProg < 0.18 ? fmtSpeed(sel.v * cs.vfac) : fmtSpeed(sel.v);
+}
+
+function rebuildLegend() {
+  var html = '';
+  ions.forEach(function(io){
+    html += '<span><i class="swatch" style="background:' + io.color + '"></i>' + io.name +
+            ' (r=' + fmtRadius(io.r) + ')</span>';
+  });
+  el('ionLegend').innerHTML = html;
+}
+
+// ----- compute (static recompute when params change) -----
 function compute() {
   var p = getParams();
   if (!isFinite(p.z) || !isFinite(p.m) || !isFinite(p.V) || !isFinite(p.B)) return;
-  var v   = speed(p.q, p.V, p.m);
-  var r_m = radius(p.m, v, p.q, p.B);
-  document.getElementById('statV_speed').textContent = fmtSpeed(v);
-  document.getElementById('statR').textContent       = fmtRadius(r_m);
-  document.getElementById('statMQ').textContent      = fmtMQ(p.m_u, p.z);
-  document.getElementById('statKE').textContent      = fmtKE(p.q, p.V);
+  ions = buildIons(p);
+  rebuildLegend();
+  resizeCanvases();
   drawChamber(p);
-  drawRChart(p);
+  drawSpectrum(p);
+  updateReadouts(p);
 }
 
-function animationStep() {
-  if (!playing) return;
-  var sl = document.getElementById('slM_amu');
-  var cur = parseFloat(sl.value);
-  if (!isFinite(cur)) cur = 40;
-  cur += sweepDir * 2;
-  if (cur >= 250) { cur = 250; sweepDir = -1; }
-  if (cur <= 1)   { cur = 1;   sweepDir = 1;  }
-  sl.value = cur;
-  updateSlider(sl, 'slM_amuVal', 0, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
-}
-
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> m をスイープ';
-    if (animId) cancelAnimationFrame(animId);
+// ----- animation -----
+function loop(ts) {
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dt = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  simProg += dt * 0.6 * speedMult;  // ~1.7s flight at 1x
+  var p = getParams();
+  if (simProg >= 1) {
+    simProg = 1;
+    drawChamber(p); updateReadouts(p);
+    recordHits(p);
+    drawSpectrum(p);
+    stopPlay();
+    return;
   }
+  drawChamber(p); updateReadouts(p);
+  animId = requestAnimationFrame(loop);
+}
+
+function startPlay() {
+  if (REDUCED) {
+    // static representative frame: show completed flight + record hits once
+    simProg = 1;
+    var p = getParams();
+    drawChamber(p); updateReadouts(p);
+    if (!spectrumHits.length) { recordHits(p); }
+    drawSpectrum(p);
+    return;
+  }
+  playing = true; lastTs = 0;
+  el('playBtn').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+  el('launchBtn').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay() {
+  playing = false;
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+  el('playBtn').innerHTML = '<i class="fas fa-play"></i> 発射';
+  el('launchBtn').innerHTML = '<i class="fas fa-bolt"></i> 発射';
+}
+function togglePlay() { playing ? stopPlay() : startPlay(); }
+
+function launch() {
+  var p = getParams();
+  ions = buildIons(p);
+  rebuildLegend();
+  simProg = 0;
+  startPlay();
+}
+function replay() {
+  stopPlay();
+  simProg = 0;
+  compute();
+  startPlay();
+}
+
+function setSpeed(s) {
+  speedMult = s;
+  document.querySelectorAll('.speed-btn').forEach(function(b){
+    b.classList.toggle('active', parseFloat(b.dataset.speed) === s);
+  });
+}
+
+function toggleSelector() {
+  selectorOn = !selectorOn;
+  var btn = el('selToggle');
+  btn.classList.toggle('active', selectorOn);
+  btn.innerHTML = selectorOn ? '<i class="fas fa-filter"></i> ON' : '<i class="fas fa-filter"></i> OFF';
+  compute();
+}
+
+window.__scenario = 'neon';
+function setPreset(name) {
+  stopPlay();
+  window.__scenario = name;
+  ['psNeon','psUranium','psSelector','psSingle'].forEach(function(id){ el(id).classList.remove('active'); });
+  var defs = { slZ:1, slM_amu:40, slV:2000, slB:0.50 };
+  if (name === 'neon') {
+    defs = { slZ:1, slM_amu:20, slV:1000, slB:0.10 };
+    el('psNeon').classList.add('active'); selectorOn = false;
+  } else if (name === 'uranium') {
+    defs = { slZ:1, slM_amu:235, slV:1000, slB:0.10 };
+    el('psUranium').classList.add('active'); selectorOn = false;
+  } else if (name === 'selector') {
+    defs = { slZ:1, slM_amu:40, slV:2000, slB:0.50 };
+    el('psSelector').classList.add('active'); selectorOn = true;
+    window.__scenario = 'free';
+  } else if (name === 'single') {
+    defs = { slZ:1, slM_amu:40, slV:2000, slB:0.50 };
+    el('psSingle').classList.add('active'); selectorOn = false;
+  }
+  el('slZ').value = defs.slZ; el('slM_amu').value = defs.slM_amu;
+  el('slV').value = defs.slV; el('slB').value = defs.slB;
+  syncSelToggle();
+  updateSlider(el('slZ'),'slZVal',0,''); updateSlider(el('slM_amu'),'slM_amuVal',0,'');
+  updateSlider(el('slV'),'slVVal',0,''); updateSlider(el('slB'),'slBVal',2,'');
+  spectrumHits = [];
+  simProg = 0;
+  compute();
+  startPlay();
+}
+
+function syncSelToggle() {
+  var btn = el('selToggle');
+  btn.classList.toggle('active', selectorOn);
+  btn.innerHTML = selectorOn ? '<i class="fas fa-filter"></i> ON' : '<i class="fas fa-filter"></i> OFF';
 }
 
 function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> m をスイープ';
-  var defs = { slZ: 1, slM_amu: 40, slV: 2000, slB: 0.50 };
-  Object.keys(defs).forEach(function(id){
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slZ'),     'slZVal',     0, '');
-  updateSlider(document.getElementById('slM_amu'), 'slM_amuVal', 0, '');
-  updateSlider(document.getElementById('slV'),     'slVVal',     0, '');
-  updateSlider(document.getElementById('slB'),     'slBVal',     2, '');
-  compute();
+  stopPlay();
+  window.__scenario = 'neon';
+  selectorOn = false;
+  spectrumHits = [];
+  simProg = 0;
+  setPreset('neon');
 }
 
-window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
+window.addEventListener('resize', function(){ resizeCanvases(); var p = getParams(); drawChamber(p); drawSpectrum(p); });
 
+chamberCanvas.addEventListener('keydown', function(e){
+  if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); togglePlay(); }
+});
+
+// init: start on neon isotope scenario
+window.__scenario = 'neon';
+el('slZ').value = 1; el('slM_amu').value = 20; el('slV').value = 1000; el('slB').value = 0.10;
+updateSlider(el('slZ'),'slZVal',0,''); updateSlider(el('slM_amu'),'slM_amuVal',0,'');
+updateSlider(el('slV'),'slVVal',0,''); updateSlider(el('slB'),'slBVal',2,'');
 resizeCanvases();
 compute();
+if (REDUCED) { startPlay(); }
 </script>
 
 <section class="explanation">
@@ -748,6 +892,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="mass-spectrometer.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -803,14 +950,14 @@ compute();
 <ol>
 <li>イオン電荷数z（1～3価）をスライダーで設定。一般的にシングルチャージ(z=1)から開始</li>
 <li>イオン質量をAMU単位で入力。例：Na⁺=23 amu、Ca²⁺=40 amu</li>
-<li>加速電圧V（100～5000 V）を設定。高電圧ほど速度上昇</li>
-<li>磁束密度B（0.1～1.5 T）を調整。磁場強度が円軌道半径に反比例</li>
+<li>加速電圧V（100～10000 V）を設定。高電圧ほど速度上昇</li>
+<li>磁束密度B（0.05～2.00 T）を調整。磁場強度が円軌道半径に反比例</li>
 <li>計算ボタン実行で加速後速度v、円軌道半径r、m/q比を自動算出</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>磁場セクター型質量分析装置でNa⁺イオン分析：質量m=23 amu(3.82×10⁻²⁶ kg)、z=1価、加速電圧V=1000 V、磁束密度B=0.8 T の場合、加速後速度v≈914 m/s、円軌道半径r=0.0958 m(≈95.8 mm)、質量電荷比m/q=3.82×10⁻⁷ kg/C、運動エネルギーKE≈15.4 eV となります。同条件でCa²⁺(m=40 amu、z=2)なら r=0.0484 m で異なる軌道に分離。</p>
+<p>磁場セクター型質量分析装置でNa⁺イオン分析：質量m=23 u、z=1価、加速電圧V=1000 V、磁束密度B=0.8 T の場合、加速後速度v=√(2qV/m)≒91,593 m/s（≒91.6 km/s）、円軌道半径r=mv/(qB)≒27.3 mm、質量電荷比m/q=23.0 u/e、運動エネルギーKE=qV=1000 eV となります。同条件でCa²⁺(m=40 u、z=2)なら r≒25.5 mm となり、異なる軌道に分離します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -819,9 +966,19 @@ compute();
 <li>加速電圧5 kVを超える場合、イオン放射化学処理が必要。安全管理区画で運用</li>
 <li>磁束密度1.2 T以上では永久磁石の温度ドリフト(±10⁻⁴/℃)を補正。鉄心飽和を避ける</li>
 <li>複数価イオン(z=2,3)が混在する場合、同一質量でも軌道分離。質量スペクトルに複数ピーク出現</li>
-<li>検出器到達時間τ=2πr/v を計算。飛行時間測定でさらに精度向上(TOF-MS併用)</li>
+<li>磁場セクターを半周する到達時間は τ=πr/v（半円弧）。本ツールは表示しないが TOF-MS 併用で飛行時間測定の精度を補える</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

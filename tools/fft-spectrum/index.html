@@ -122,14 +122,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "FFTスペクトル解析シミュレーター",
       "description": "最大5つの正弦波成分を合成してFFTスペクトルを可視化。窓関数・SNR・サンプリング周波数・FFT点数を調整し、スペクトルリーク・THD・周波数分解能をリアルタイム解析。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/fft-spectrum.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -149,7 +149,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
           "name": "FFT窓関数（Hanning/矩形/Hamming）はどう選べばよいですか？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "用途によって異なります。①矩形窓（Rectangular）：信号がウィンドウ内で完全に収まる場合（インパルス応答、定常正弦波のコヒーレント測定）に使用。スペクトルリーク最大。②Hanning窓：振動・騒音の一般的なスペクトル解析に最も多く使用。リーク低減と振幅精度のバランスが良い。③Hamming窓：HanningよりサイドローブをやdB低減。通信信号処理に多用。CAE振動解析ではHanning窓がデフォルトです。"
+            "text": "用途によって異なります。①矩形窓（Rectangular）：信号がウィンドウ内で完全に収まる場合（インパルス応答、定常正弦波のコヒーレント測定）に使用。スペクトルリーク最大。②Hanning窓：振動・騒音の一般的なスペクトル解析に最も多く使用。リーク低減と振幅精度のバランスが良い。③Hamming窓：Hanningよりサイドローブを約41dB低減。通信信号処理に多用。CAE振動解析ではHanning窓がデフォルトです。"
           }
         },{
           "@type": "Question",
@@ -163,7 +163,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
           "name": "THD（全高調波歪み）はどのように計算しますか？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "THDは基本波に対する高調波歪みの比率で、THD = √(V₂² + V₃² + V₄² + ...) / V₁ × 100[%] で表されます。このシミュレーターでは入力した各成分の振幅から基本波（最大振幅成分）を特定し、残りを高調波と見なしてTHDを計算します。アンプ・電源・モータ制御の波形品質評価に使用されます。"
+            "text": "THDは基本波に対する高調波歪みの比率で、THD = √(V₂² + V₃² + V₄² + ...) / V₁ × 100[%] で表されます。このシミュレーターでは入力した各成分の振幅から第1成分を基本波とみなし、残りを高調波と見なしてTHDを計算します。アンプ・電源・モータ制御の波形品質評価に使用されます。"
           }
         },{
           "@type": "Question",
@@ -265,7 +265,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4816359281?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816359281.09._SCMZZZZZZ_.jpg" alt="電気回路の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電気回路 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -485,13 +493,15 @@ function compute(){
 
   // FFT
   const windowed = applyWindow([...noisy], windowType);
+  const winSum = applyWindow(new Array(N).fill(1), windowType).reduce((a, b) => a + b, 0);
   const re = [...windowed];
   const im = new Array(N).fill(0);
   fft(re, im);
 
   const mag = [];
   for (let k = 0; k <= N / 2; k++){
-    mag.push(Math.sqrt(re[k] * re[k] + im[k] * im[k]) / N);
+    const scale = (k === 0 || k === N / 2) ? 1 : 2;
+    mag.push(scale * Math.sqrt(re[k] * re[k] + im[k] * im[k]) / winSum);
   }// dB spectrum
   const refAmp = 1.0;
   const dBSpec = mag.map(m => m > 0 ? 20 * Math.log10(m / refAmp) : -100);
@@ -625,7 +635,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">窓関数はなぜ必要ですか？また、代表的な窓の選び方は？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">窓関数は信号を切り出す際のスペクトルリーク（本来ない周波数成分が現れる現象）を低減します。ハニング窓は汎用的、ブラックマン窓はサイドローブ抑制に優れ、矩形窓は振幅精度が高いがリークしやすいです。</div>
+    <div class="faq-a">窓関数は信号を切り出す際のスペクトルリーク（本来ない周波数成分が現れる現象）を低減します。ハニング窓は汎用的、矩形窓は振幅精度が高いがリークしやすいです。ブラックマン窓はこのUIでは未搭載です。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">ノイズを加えるとスペクトルがどう変化しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -648,11 +658,14 @@ compute();
 <div class="fblock">
 <p>FFT解析を始めたばかりの頃、僕も含めて多くの人がハマる落とし穴があるんだ。まず一つ目は「<strong>サンプリング周波数は高いほど分解能が上がる</strong>」という誤解。実は分解能 $\Delta f$ は $f_s / N$ だから、$f_s$ だけ上げても分解能は悪化する（$\Delta f$ が大きくなる）。例えば、$f_s=1$kHz、$N=1024$なら $\Delta f \approx 0.98$Hzだけど、$f_s$を2kHzにすると $\Delta f \approx 1.95$Hzになってしまう。分解能を上げたいなら、$N$を大きくするか、$f_s$を下げる必要があるんだ。ただし、$f_s$はナイキスト周波数（$f_s/2$）より高い信号成分を捉えられないから、計測対象の最大周波数の2倍以上は確保しなきゃいけない。このバランスが実務のキモだよ。</p>
 <p>二つ目は「<strong>窓関数を使えば全て解決</strong>」という過信。Hanning窓は確かに便利だけど、振幅が小さく見えるから補正係数（例えば実効値なら約1.63）を掛けて真の振幅を推定する必要がある。それに、窓をかけると時間分解能が落ちる側面もある。例えば、衝撃的な過渡現象を捉えたい時は、むしろ矩形窓の方がタイミングを正確に捉えられる場合があるんだ。「何でもHanning」ではなく、現象の性格に合わせて選ぶのがプロの技だね。</p>
-<p>最後に、<strong>「FFT点数Nは2のべき乗じゃなきゃダメ」</strong>という思い込み。確かに計算効率は最高になるけど、最近のライブラリやハードウェアでは任意点数でも十分速い。むしろ、必要な周波数分解能 $\Delta f$ と手持ちのデータ長から逆算して $N$ を決める思考が大事。データが8000点しかなくても、分解能を1Hzにしたければ $f_s=8000$Hzに設定すればいい。このシミュレーターで、$N$を512や1000など2のべき乗以外に変えて結果がどう変わるか試してみるといいよ。</p>
+<p>最後に、<strong>「FFT点数Nは2のべき乗じゃなきゃダメ」</strong>という思い込み。このツールはN=256/512/1024など2のべき乗のみ対応している。必要な周波数分解能 $\Delta f$ と手持ちのデータ長から逆算して、用意されたNとサンプリング周波数を選ぶことが大事だよ。</p>
 
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fft-spectrum.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -699,16 +712,26 @@ compute();
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>最大5つの正弦波成分について周波数（Hz）と振幅（V）を入力。例：第1波1000Hz・2V、第2波3000Hz・0.5V</li><li>サンプリング周波数fsを設定（推奨：測定対象の最高周波数の2倍以上。例：騒音計測で20kHzまで対象なら最小40kHz選択）</li><li>FFT点数Nを選択して周波数分解能Δf=fs/Nを確認。例：fs=10kHz・N=1024点で約9.77Hz分解能</li><li>窓関数をHanning（一般的）・矩形（周波数分解能重視）・Hamming（スペクトルリーク低減）から選択</li><li>SNRを設定（0～100dB）してノイズ影響をシミュレート。測定環境を反映した値を入力</li><li>「解析実行」をクリック。スペクトル波形、THD（高調波歪率）、支配周波数が即座に表示</li></ol>
+<ol><li>最大5つの正弦波成分について周波数（Hz）と振幅（V）を入力。例：第1波100Hz・2V、第2波200Hz・1V</li><li>サンプリング周波数fsを設定（推奨：測定対象の最高周波数の2倍以上。例：5kHz成分まで対象ならfs=10kHzを選択）</li><li>FFT点数Nを選択して周波数分解能Δf=fs/Nを確認。例：fs=10kHz・N=1024点で約9.77Hz分解能</li><li>窓関数をHanning（一般的）・矩形（周波数分解能重視）・Hamming（スペクトルリーク低減）から選択</li><li>SNRを設定（10～80dB）してノイズ影響をシミュレート。測定環境を反映した値を入力</li><li>各入力変更に応じてリアルタイムにスペクトル波形、THD（高調波歪率）、支配周波数が更新されます</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>モーター振動測析ケース：基本周波数1500Hz・振幅3mV、3倍高調波4500Hz・振幅0.6mV、5倍高調波7500Hz・振幅0.3mVを合成。サンプリング周波数fs=20kHz、FFT点数N=2048、Hanning窓、SNR=60dBで実行。結果：支配周波数1500Hz、RMS振幅≈2.2mV、THD≈18.2%、周波数分解能Δf≈9.77Hz。スペクトルリーク最小化され、隣接周波数との分離確認可能。</p>
+<p>モーター振動解析ケース：基本周波数100Hz・振幅3V、3倍成分300Hz・振幅0.6V、5倍成分500Hz・振幅0.3Vを合成。サンプリング周波数fs=2000Hz、FFT点数N=1024、Hanning窓、SNR=60dBで実行。結果：支配周波数99.6Hz、RMS振幅≈2.173V、THD≈22.4%、周波数分解能Δf=1.953Hz。ピークはビン格子上で離散化されるため、入力100Hzに最も近い99.6Hzとして表示されます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol><li>サンプリング周波数がナイキスト周波数（fs/2）より低い測定成分を入力するとエイリアシングが発生。例：fs=10kHzで8kHz成分を測定不可、2kHzに見えてしまう</li><li>FFT点数が少ないと周波数分解能が低下。接近した周波数（例：1000Hzと1010Hz）を区別するにはN≥10000推奨</li><li>窓関数選択は目的で決定：スペクトルリーク抑制重視ならHanning（サイドローブ-32dB）、周波数精度重視なら矩形窓（分解能最高だがリーク大）</li><li>THD値が30%超過の場合、機械系統の故障兆候の可能性。詳細な時間領域波形確認を追加実施</li><li>実測値の妥当性確認：モーター音の基本周波数は回転数×極数÷60で事前計算し、シミュレーション結果と照合</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4816359281?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816359281.09._SCMZZZZZZ_.jpg" alt="電気回路の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電気回路 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

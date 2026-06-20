@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ラングミュア吸着等温線シミュレーター",
       "description": "圧力・温度・吸着熱・前指数因子から、ラングミュア吸着等温線の被覆率 θ と平衡定数 K(T) をリアルタイムに計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/langmuir-adsorption.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Langmuir 等温線による被覆率 θ の計算","温度・吸着熱からの平衡定数 K(T) の評価","ヘンリー域・遷移域・飽和域の自動判定","複数温度での等温線比較表示"],
       "keywords": "ラングミュア吸着,吸着等温線,被覆率,平衡定数,化学吸着,物理吸着,BET,触媒,表面化学",
       "datePublished": "2026-05-16",
@@ -169,17 +169,34 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">K(T) = K_0·exp(|ΔH_ads|/(R·T))。気体定数 R = 8.314 J/(mol·K)。ΔH_ads は発熱（負）と仮定し、|ΔH_ads| を入力します。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4759820477?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4759820477.09._SCMZZZZZZ_.jpg" alt="化学工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">化学工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-calculator"></i> ライブ計算結果</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statTheta">—</div><div class="sl">被覆率 θ</div></div>
+        <div class="stat-card"><div class="sv" id="statMono">—</div><div class="sl">単分子層充填率</div></div>
         <div class="stat-card"><div class="sv" id="statK">—</div><div class="sl">平衡定数 K(T)</div></div>
         <div class="stat-card"><div class="sv" id="statP50">—</div><div class="sl">半飽和圧 p_50 = 1/K</div></div>
+        <div class="stat-card"><div class="sv" id="statNocc">—</div><div class="sl">吸着分子数 / 全サイト</div></div>
         <div class="stat-card"><div class="sv" id="statRegime">—</div><div class="sl">吸着域</div></div>
       </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-atom"></i> 表面吸着アニメーション（サイト充填と動的平衡）</div>
+      <canvas id="cvSurf" width="600" height="360"></canvas>
+      <p class="canvas-hint">気体分子が空きサイトに吸着・脱離を繰り返し、圧力 p を上げるとサイトが埋まり単分子層が飽和（θ→1）。緑＝占有サイト、灰＝空きサイト。</p>
     </div>
 
     <div class="chart-card">
@@ -205,10 +222,19 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Langmuir Adsorption Isotherm Simulator ==========
+(function(){
+"use strict";
+// ========== Langmuir Adsorption Isotherm Simulator (v2) ==========
 var R = 8.314; // J/(mol·K)
 var cvEl = document.getElementById('cv');
 var ctx = cvEl.getContext('2d');
+
+function regimeLabel(Kp) {
+  if (Kp < 0.1) return 'ヘンリー域';
+  if (Kp < 10) return '遷移域';
+  return '飽和近域';
+}
+var REGIME_TXT = { sat: '飽和（単分子層）', tr: '遷移域', henry: 'ヘンリー域' };
 
 function getParams() {
   var p = parseFloat(document.getElementById('slP').value);
@@ -228,12 +254,6 @@ function Keq(K0, dHkJ, T) {
 function thetaOf(K, p) {
   var x = K * p;
   return x / (1 + x);
-}
-
-function regimeLabel(Kp) {
-  if (Kp < 0.1) return 'ヘンリー域';
-  if (Kp < 10) return '遷移域';
-  return '飽和近域';
 }
 
 function fmtK(K) {
@@ -413,6 +433,9 @@ function drawIsothermPanel(yOff, panelH, W, isCurrent, P) {
   }
 }
 
+var TOTAL_SITES = 60; // sites shown in the animation grid (also used for "occupied / total")
+var curTheta = 0;     // latest fractional coverage, drives the animation
+
 function compute() {
   var P = getParams();
   if (!isFinite(P.p) || !isFinite(P.T) || P.T <= 0) return;
@@ -420,9 +443,13 @@ function compute() {
   var Kp = K * P.p;
   var theta = thetaOf(K, P.p);
   var p50 = (K > 0) ? 1 / K : Infinity;
+  curTheta = theta;
   document.getElementById('statTheta').textContent = theta.toFixed(3);
+  document.getElementById('statMono').textContent = (theta * 100).toFixed(1) + ' %';
   document.getElementById('statK').textContent = fmtK(K) + ' 1/kPa';
   document.getElementById('statP50').textContent = fmtP(p50) + ' kPa';
+  document.getElementById('statNocc').textContent =
+    Math.round(theta * TOTAL_SITES) + ' / ' + TOTAL_SITES;
   document.getElementById('statRegime').textContent = regimeLabel(Kp);
   drawAll(P);
 }
@@ -438,11 +465,160 @@ function resetParams() {
   updateSlider(document.getElementById('slK0'), 'slK0Val', 7, '');
   compute();
 }
+window.resetParams = resetParams;
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+/* ===================== Surface adsorption animation ===================== */
+var surfEl = document.getElementById('cvSurf');
+var sctx = surfEl.getContext('2d');
+var COLS = 12, ROWS = 5;                 // 60 sites
+var sites = [];                          // {occ:bool, anim:0..1 fill progress}
+var gasMol = [];                         // free molecules drifting above {x,y,vx,vy}
+var sCssW = 600, sCssH = 360;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+(function initSites(){
+  for (var i = 0; i < COLS * ROWS; i++) sites.push({ occ: false, anim: 0 });
+  for (var g = 0; g < 26; g++) gasMol.push({ x: Math.random(), y: Math.random() * 0.55, vx: (Math.random()-0.5)*0.004, vy: (Math.random()-0.5)*0.004 });
+})();
+
+function sizeSurf(){
+  var w = Math.max(280, Math.min(surfEl.parentElement.clientWidth - 40, 900));
+  var h = Math.round(w * 0.58);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  sCssW = w; sCssH = h;
+  surfEl.style.width = w + 'px';
+  surfEl.style.height = h + 'px';
+  surfEl.width = Math.round(w * dpr);
+  surfEl.height = Math.round(h * dpr);
+  sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// Make the number of occupied sites track θ; flip a few sites per frame (dynamic equilibrium)
+function relaxSites(){
+  var target = Math.round(curTheta * sites.length);
+  var occ = 0, i;
+  for (i = 0; i < sites.length; i++) if (sites[i].occ) occ++;
+  // churn: randomly desorb one occupied + adsorb one empty to show equilibrium exchange
+  if (occ > 0 && Math.random() < 0.45){
+    var oi = []; for (i=0;i<sites.length;i++) if (sites[i].occ) oi.push(i);
+    var ei = []; for (i=0;i<sites.length;i++) if (!sites[i].occ) ei.push(i);
+    if (oi.length && ei.length){
+      sites[oi[(Math.random()*oi.length)|0]].occ = false;
+      sites[ei[(Math.random()*ei.length)|0]].occ = true;
+    }
+  }
+  // drive occupancy toward target
+  if (occ < target){
+    var emp = []; for (i=0;i<sites.length;i++) if (!sites[i].occ) emp.push(i);
+    for (var n = 0; n < Math.min(2, target - occ) && emp.length; n++){
+      var k = (Math.random()*emp.length)|0; sites[emp[k]].occ = true; emp.splice(k,1);
+    }
+  } else if (occ > target){
+    var ful = []; for (i=0;i<sites.length;i++) if (sites[i].occ) ful.push(i);
+    for (var m = 0; m < Math.min(2, occ - target) && ful.length; m++){
+      var j = (Math.random()*ful.length)|0; sites[ful[j]].occ = false; ful.splice(j,1);
+    }
+  }
+}
+
+function drawSurface(){
+  var W = sCssW, H = sCssH;
+  sctx.fillStyle = '#0a1929'; sctx.fillRect(0,0,W,H);
+
+  var marginX = 28, surfTop = H * 0.62, siteW = (W - 2*marginX) / COLS;
+  var gasTop = 14, gasBot = surfTop - 18;
+
+  // gas-phase molecules drifting above the surface (density scales with pressure)
+  if (!reduceMotion){
+    for (var g = 0; g < gasMol.length; g++){
+      var m = gasMol[g];
+      m.x += m.vx; m.y += m.vy;
+      if (m.x < 0 || m.x > 1){ m.vx *= -1; m.x = Math.max(0, Math.min(1, m.x)); }
+      if (m.y < 0 || m.y > 1){ m.vy *= -1; m.y = Math.max(0, Math.min(1, m.y)); }
+    }
+  }
+  // show roughly proportional to log pressure so it reads as "denser gas → more adsorption"
+  var pVal = parseFloat(document.getElementById('slP').value) || 1;
+  var gasShown = Math.max(6, Math.min(gasMol.length, Math.round(6 + 20 * (Math.log10(pVal) + 2) / 5)));
+  for (var gg = 0; gg < gasShown; gg++){
+    var mm = gasMol[gg];
+    var gx = marginX + mm.x * (W - 2*marginX);
+    var gy = gasTop + mm.y * (gasBot - gasTop);
+    sctx.beginPath(); sctx.arc(gx, gy, 3.2, 0, 7);
+    sctx.fillStyle = 'rgba(0,180,216,0.75)'; sctx.fill();
+  }
+
+  // substrate slab
+  sctx.fillStyle = '#16324f';
+  sctx.fillRect(marginX, surfTop, W - 2*marginX, H - surfTop - 10);
+  sctx.strokeStyle = 'rgba(143,184,224,0.5)'; sctx.lineWidth = 1.5;
+  sctx.strokeRect(marginX, surfTop, W - 2*marginX, H - surfTop - 10);
+
+  // sites: empty = open ring on slab; occupied = filled molecule sitting on the site
+  for (var r = 0; r < ROWS; r++){
+    for (var c = 0; c < COLS; c++){
+      var idx = r * COLS + c;
+      var s = sites[idx];
+      // ease fill animation
+      var goal = s.occ ? 1 : 0;
+      s.anim += (goal - s.anim) * (reduceMotion ? 1 : 0.25);
+      var cx = marginX + (c + 0.5) * siteW;
+      var sy = surfTop + 14 + r * ((H - surfTop - 24) / ROWS);
+      // site socket
+      sctx.beginPath(); sctx.arc(cx, sy, 6.5, 0, 7);
+      sctx.fillStyle = 'rgba(143,184,224,0.18)';
+      sctx.fill();
+      sctx.strokeStyle = 'rgba(143,184,224,0.55)'; sctx.lineWidth = 1; sctx.stroke();
+      // adsorbed molecule (sits slightly above the socket)
+      if (s.anim > 0.02){
+        var my = sy - 8 * s.anim;
+        sctx.beginPath(); sctx.arc(cx, my, 5.2, 0, 7);
+        sctx.fillStyle = 'rgba(46,204,113,' + (0.55 + 0.45*s.anim) + ')';
+        sctx.fill();
+        sctx.strokeStyle = 'rgba(255,255,255,0.6)'; sctx.lineWidth = 1; sctx.stroke();
+        // adsorption bond
+        sctx.strokeStyle = 'rgba(46,204,113,0.5)'; sctx.lineWidth = 1.2;
+        sctx.beginPath(); sctx.moveTo(cx, my + 4); sctx.lineTo(cx, sy + 3); sctx.stroke();
+      }
+    }
+  }
+
+  // coverage bar + readout overlay
+  var occN = 0; for (var z = 0; z < sites.length; z++) if (sites[z].occ) occN++;
+  sctx.fillStyle = '#cfe3f7'; sctx.font = '12px "Roboto Mono",monospace'; sctx.textAlign = 'left';
+  sctx.fillText('θ = ' + curTheta.toFixed(3) + '  (占有 ' + occN + ' / ' + sites.length + ')', marginX, 12);
+  // monolayer-fill bar at right
+  var barX = W - marginX - 12, barY0 = gasTop, barY1 = surfTop - 22, barH = barY1 - barY0;
+  sctx.strokeStyle = 'rgba(143,184,224,0.5)'; sctx.lineWidth = 1;
+  sctx.strokeRect(barX, barY0, 10, barH);
+  sctx.fillStyle = 'rgba(46,204,113,0.8)';
+  sctx.fillRect(barX, barY1 - barH * curTheta, 10, barH * curTheta);
+  sctx.fillStyle = 'rgba(143,184,224,0.7)'; sctx.textAlign = 'right'; sctx.font = '9px "Roboto Mono",monospace';
+  sctx.fillText('θ=1', barX - 3, barY0 + 7);
+  sctx.fillText('θ=0', barX - 3, barY1);
+  sctx.textAlign = 'left';
+}
+
+function frame(){
+  if (!reduceMotion) relaxSites();
+  drawSurface();
+  if (!reduceMotion) requestAnimationFrame(frame);
+}
+
+window.addEventListener('resize', function () { resizeCanvas(); sizeSurf(); compute(); });
 
 resizeCanvas();
+sizeSurf();
 compute();
+if (reduceMotion){
+  // single static frame: set sites to match θ exactly, no churn
+  var staticTarget = Math.round(curTheta * sites.length);
+  for (var si = 0; si < sites.length; si++){ sites[si].occ = si < staticTarget; sites[si].anim = sites[si].occ ? 1 : 0; }
+  drawSurface();
+} else {
+  requestAnimationFrame(frame);
+}
+})();
 </script>
 
 <section class="explanation">
@@ -510,6 +686,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="langmuir-adsorption.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -563,15 +742,15 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>圧力スライダー（slP）を0〜100 kPaの範囲で調整し、等温線上での被覆率θの変化を観察します</li>
-<li>温度スライダー（slT）を250〜400 Kで変動させ、アレニウス式K(T)=K₀exp(ΔH_ads/RT)に従う平衡定数の温度依存性を確認します</li>
-<li>吸着熱ΔH_ads（slDH）を-80〜-20 kJ/molで設定し、発熱吸着度合いと被覆率曲線の勾配変化を比較分析します</li>
-<li>計算結果の被覆率θ、平衡定数K(T)、半飽和圧p₅₀=1/Kを読取り、ラングミュア等温線θ=Kp/(1+Kp)の理論と実験を照合します</li>
+<li>圧力スライダー（slP）を0.01〜1000 kPaの範囲で調整し、等温線上での被覆率θの変化を観察します</li>
+<li>温度スライダー（slT）を200〜800 Kで変動させ、ファントホッフ型 K(T)=K₀exp(|ΔH_ads|/RT) に従う平衡定数の温度依存性を確認します</li>
+<li>吸着熱 |ΔH_ads|（slDH）を5〜80 kJ/mol（発熱の絶対値）で設定し、吸着の強さと被覆率曲線の立ち上がりを比較します</li>
+<li>計算結果の被覆率θ、平衡定数K(T)、半飽和圧p₅₀=1/Kを読取り、ラングミュア等温線θ=Kp/(1+Kp)の理論を確認します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>活性炭への窒素吸着を想定：初期条件としてK₀=0.05 Pa⁻¹、ΔH_ads=-35 kJ/mol、T=298 Kを設定。圧力p=50 kPaにおいて、K(298K)≈0.082 Pa⁻¹となり、θ=0.082×50/(1+0.082×50)≈0.80、すなわち被覆率80%。温度を350 Kに上げるとK値は約0.045 Pa⁻¹に低下し、同圧力でθ≈0.69に減少します。半飽和圧p₅₀=1/0.082≈12.2 kPaから、この条件では低圧域で急速に吸着が進行することが判明します。</p>
+<p>初期設定（圧力 p=10 kPa、温度 T=298 K、吸着熱 |ΔH_ads|=25 kJ/mol、前指数因子 K₀=1×10⁻⁵ 1/kPa）での計算例です。平衡定数は K(298 K)=K₀·exp(|ΔH|/RT)≈0.241 1/kPa、被覆率は θ=Kp/(1+Kp)=0.241×10/(1+0.241×10)≈0.707（70.7%）、半飽和圧は p₅₀=1/K≈4.15 kPa で、Kp≈2.41 のため「遷移域」と判定されます。温度を400 K に上げると K は約0.0184 1/kPa まで下がり、同じ10 kPa での被覆率は約0.155 に低下します（発熱吸着の温度依存性）。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -582,6 +761,16 @@ compute();
 <li>温度範囲250〜400 K外での外挿使用は、アレニウス式の妥当性喪失により誤差が急増するため避ける</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4759820477?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4759820477.09._SCMZZZZZZ_.jpg" alt="化学工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">化学工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

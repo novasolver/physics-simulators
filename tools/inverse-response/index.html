@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "逆応答シミュレーター",
       "description": "右半平面零点（RHP zero）を含むプロセスG(s)=K(-Tz·s+1)/((T1·s+1)(T2·s+1))のステップ応答とPI制御の閉ループ挙動をリアルタイムに計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/inverse-response.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["RHP零点を持つプロセスの解析的ステップ応答","反転深さ・反転時刻・整定時間の自動計算","PI制御による閉ループ応答との比較","通常の1次応答（灰色破線）との対比"],
       "keywords": "逆応答,RHP zero,右半平面零点,非最小位相,PI制御,プロセス制御,沸騰水型原子炉,ボイラドラム",
       "datePublished": "2026-05-16",
@@ -169,6 +169,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">PI制御ゲインは K_c = 0.3, T_i = 5 s に固定。シミュレーション時間 0〜30 s、刻み dt = 0.05 s。T_1 ≈ T_2 のときは近接極の数値処理が入ります。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -183,9 +192,13 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 開ループステップ応答 y_ol(t)</div>
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 開ループステップ応答 y_ol(t)（リアルタイム）</div>
       <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">赤＝RHP零点を含む応答 y_ol(t)／灰色破線＝同じゲインの1次応答 K(1−e^(−t/T_1))／黄点＝反転時刻 t*・負ピーク y_min</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+        <button type="button" class="btn" id="btnPlay" onclick="irToggle()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button type="button" class="btn secondary" onclick="irReplay()"><i class="fas fa-redo"></i> 最初から</button>
+      </div>
+      <p class="canvas-hint">出力（赤）はステップ直後に<strong>目標と逆向き（下）へ</strong>動き、その後 K へ整定します。これが右半平面零点の指紋です。灰色破線＝零点なしの1次応答 K(1−e^(−t/T_1))／青破線・緑破線＝逆応答を合成する「速い負経路」「遅い正経路」／黄点＝負ピーク y_min・反転時刻 t*。</p>
     </div>
 
     <div class="chart-card">
@@ -212,11 +225,21 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Inverse Response (RHP zero) Simulator ==========
+/* ========== Inverse Response (RHP zero) Simulator — v2 live ========== */
+(function(){
+"use strict";
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
 var clCanvas = document.getElementById('clCanvas');
 var clCtx = clCanvas.getContext('2d');
+
+var LBL = {
+  trace:'— y_ol(t)（RHP零点）', ref:'-- K(1−e^(−t/T1))',
+  fast:'·· 速い負経路', slow:'·· 遅い正経路',
+  wrongWay:'逆向き（目標と反対）', recover:'反転して整定へ', settled:'整定 y→K',
+  zeroNote:'RHP零点 → 初期傾き<0', cl:'— y_cl(t)  (PI: Kc=0.3, Ti=5)', target:'-- r(t) = 1',
+  play:'再生', pause:'一時停止'
+};
 
 // PI controller fixed gains
 var KC = 0.3, TI = 5.0;
@@ -293,19 +316,33 @@ function simulatePI(p) {
   return { ts: ts, ys: ys };
 }
 
-// Build open-loop sample arrays
+// Build open-loop sample arrays + the two competing component step responses.
+// y(t) = K + A1 e^{-t/T1} + A2 e^{-t/T2}; split into two proper step responses
+// cFast(t)=sA(1-e^{-t/Tf}) (fast, wrong-way) and cSlow(t)=sB(1-e^{-t/Ts}) (slow, correct),
+// with cFast+cSlow == y(t) exactly. sA=-A1, sB=-A2 (verified in node).
 function sampleOpen(p) {
+  var K = p.K, Tz = p.Tz, T1 = p.T1, T2 = p.T2;
+  if (Math.abs(T1 - T2) < 1e-4) T2 = T1 + 1e-4;
+  var d = T2 - T1;
+  var A1 = K * (T1 + Tz) / d;       // coeff of e^{-t/T1}
+  var A2 = -K * (T2 + Tz) / d;      // coeff of e^{-t/T2}
+  var sA = -A1, Ta = T1;            // fast/wrong-way path (T1 is usually faster)
+  var sB = -A2, Tb = T2;            // slow/correct path
   var N = Math.floor(TMAX / DT) + 1;
   var ts = new Float64Array(N);
   var ys = new Float64Array(N);
   var yr = new Float64Array(N);
+  var cf = new Float64Array(N);
+  var cs = new Float64Array(N);
   for (var i = 0; i < N; i++) {
     var t = i * DT;
     ts[i] = t;
     ys[i] = yOpen(t, p);
     yr[i] = yFirstOrder(t, p);
+    cf[i] = sA * (1 - Math.exp(-t / Ta));
+    cs[i] = sB * (1 - Math.exp(-t / Tb));
   }
-  return { ts: ts, ys: ys, yr: yr };
+  return { ts: ts, ys: ys, yr: yr, cf: cf, cs: cs };
 }
 
 // Compute stat values from open-loop samples
@@ -384,67 +421,98 @@ function drawAxes(c, cx, x0, x1, y0, y1, ymin, ymax, xmax, yLabel) {
   cx.fillText(yLabel, x0 + 4, y1 + 4);
 }
 
-function drawOpen(p, data, st) {
+// Animated open-loop renderer. Traces every curve up to time tNow so the
+// wrong-way initial dip is drawn out in real time. tNow===Infinity => full static frame.
+function drawOpenFrame(p, data, st, tNow) {
   var c = cv, cx = ctx, W = __novaCanvasCssW(c), H = __novaCanvasCssH(c);
   var mx = 52, my = 28;
   var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
-  // y-range
   var ymax = Math.max(p.K * 1.15, 0.5);
-  var ymin = Math.min(st.ymin * 1.2, -0.05);
+  var ymin = Math.min(st.ymin * 1.25, -0.08);
   drawAxes(c, cx, x0, x1, y0, y1, ymin, ymax, TMAX, 'y');
-  function px(t) { return x0 + t / TMAX * (x1 - x0); }
+  function px(t) { return x0 + Math.min(t, TMAX) / TMAX * (x1 - x0); }
   function py(y) { return y0 - (y - ymin) / (ymax - ymin) * (y0 - y1); }
-  // K horizontal line (final value)
+  function pyc(y) { var v = py(y); return v < y1 ? y1 : (v > y0 ? y0 : v); } // clamped
+
+  var yz = py(0); // baseline
+  // shaded "wrong-way" zone below baseline (where the output is going the wrong way)
+  cx.fillStyle = 'rgba(231,76,60,0.10)';
+  cx.fillRect(x0, yz, x1 - x0, y0 - yz);
+  cx.fillStyle = 'rgba(231,76,60,0.45)';
+  cx.font = '11px "Roboto Mono",monospace'; cx.textAlign = 'left';
+  cx.fillText('y < 0 : ' + LBL.wrongWay, x0 + 6, y0 - 6);
+
+  // K steady-state line
   cx.strokeStyle = 'rgba(143,184,224,0.5)';
   cx.setLineDash([6, 4]);
   cx.beginPath(); cx.moveTo(x0, py(p.K)); cx.lineTo(x1, py(p.K)); cx.stroke();
   cx.setLineDash([]);
-  cx.fillStyle = 'rgba(143,184,224,0.85)';
-  cx.textAlign = 'right';
+  cx.fillStyle = 'rgba(143,184,224,0.85)'; cx.textAlign = 'right';
   cx.fillText('y = K = ' + p.K.toFixed(1), x1 - 4, py(p.K) - 4);
-  // reference 1st-order (gray dashed)
-  cx.strokeStyle = 'rgba(180,200,220,0.55)';
-  cx.lineWidth = 1.5;
-  cx.setLineDash([5, 4]);
-  cx.beginPath();
-  for (var i = 0; i < data.ts.length; i++) {
-    var X = px(data.ts[i]), Y = py(data.yr[i]);
-    if (i === 0) cx.moveTo(X, Y); else cx.lineTo(X, Y);
+
+  function traceTo(arr, useY, color, width, dash, clamp) {
+    cx.strokeStyle = color; cx.lineWidth = width;
+    if (dash) cx.setLineDash(dash); else cx.setLineDash([]);
+    cx.beginPath(); var started = false;
+    for (var i = 0; i < data.ts.length; i++) {
+      if (data.ts[i] > tNow) break;
+      var X = px(data.ts[i]); var Y = clamp ? pyc(useY[i]) : py(useY[i]);
+      if (!started) { cx.moveTo(X, Y); started = true; } else cx.lineTo(X, Y);
+    }
+    cx.stroke(); cx.setLineDash([]);
   }
-  cx.stroke();
-  cx.setLineDash([]);
-  // inverse response curve (red)
-  cx.strokeStyle = '#e74c3c';
-  cx.lineWidth = 2.5;
-  cx.beginPath();
-  for (var j = 0; j < data.ts.length; j++) {
-    var X2 = px(data.ts[j]), Y2 = py(data.ys[j]);
-    if (j === 0) cx.moveTo(X2, Y2); else cx.lineTo(X2, Y2);
+
+  // competing components (faint, clamped to plot area)
+  traceTo(data.cf, data.cf, 'rgba(66,165,245,0.45)', 1.4, [4, 3], true);  // fast negative path
+  traceTo(data.cs, data.cs, 'rgba(46,204,113,0.45)', 1.4, [4, 3], true);  // slow positive path
+  // plain first-order reference (gray dashed)
+  traceTo(data.yr, data.yr, 'rgba(180,200,220,0.55)', 1.5, [5, 4], false);
+  // the inverse response itself (red, bold)
+  traceTo(data.ys, data.ys, '#e74c3c', 2.6, null, false);
+
+  // moving dot at current time
+  var idx = Math.max(0, Math.min(data.ts.length - 1, Math.round(Math.min(tNow, TMAX) / DT)));
+  var cx0 = px(data.ts[idx]), cy0 = py(data.ys[idx]);
+  cx.beginPath(); cx.arc(cx0, cy0, 5.5, 0, Math.PI * 2);
+  cx.fillStyle = '#fff'; cx.fill();
+  cx.lineWidth = 2; cx.strokeStyle = '#e74c3c'; cx.stroke();
+
+  // live annotation tied to phase
+  var note = data.ys[idx] < -1e-3 ? LBL.wrongWay
+           : (Math.abs(data.ys[idx] - p.K) < 0.05 * Math.abs(p.K) ? LBL.settled : LBL.recover);
+  cx.font = 'bold 11px "Roboto Mono",monospace';
+  var nw = cx.measureText(note).width;
+  var bx = Math.min(Math.max(cx0 - nw / 2 - 5, x0), x1 - nw - 10), by = cy0 - 24;
+  cx.fillStyle = 'rgba(10,25,41,0.85)'; cx.fillRect(bx, by, nw + 10, 16);
+  cx.strokeStyle = '#ffd54a'; cx.lineWidth = 1; cx.strokeRect(bx, by, nw + 10, 16);
+  cx.fillStyle = '#ffd54a'; cx.textAlign = 'left'; cx.fillText(note, bx + 5, by + 12);
+
+  // negative-peak marker (once reached)
+  if (st.ymin < 0 && tNow >= st.tmin) {
+    cx.beginPath(); cx.arc(px(st.tmin), py(st.ymin), 5, 0, Math.PI * 2);
+    cx.fillStyle = '#FFD166'; cx.shadowColor = '#FFD166'; cx.shadowBlur = 8; cx.fill(); cx.shadowBlur = 0;
   }
-  cx.stroke();
-  // marker for negative peak
-  if (st.ymin < 0) {
-    cx.beginPath();
-    cx.arc(px(st.tmin), py(st.ymin), 5, 0, Math.PI * 2);
-    cx.fillStyle = '#FFD166';
-    cx.shadowColor = '#FFD166'; cx.shadowBlur = 8;
-    cx.fill();
-    cx.shadowBlur = 0;
+  // reversal-time marker (once reached)
+  if (isFinite(st.treverse) && tNow >= st.treverse) {
+    cx.beginPath(); cx.arc(px(st.treverse), py(0), 4, 0, Math.PI * 2);
+    cx.fillStyle = '#FFD166'; cx.fill();
   }
-  // marker for reversal time
-  if (isFinite(st.treverse)) {
-    cx.beginPath();
-    cx.arc(px(st.treverse), py(0), 4, 0, Math.PI * 2);
-    cx.fillStyle = '#FFD166';
-    cx.fill();
-  }
+
+  // RHP-zero callout near the origin
+  cx.fillStyle = 'rgba(231,76,60,0.9)'; cx.font = '11px "Roboto Mono",monospace'; cx.textAlign = 'left';
+  cx.fillText(LBL.zeroNote, x0 + 6, y1 + 50);
+
   // legend
-  cx.font = '12px "Roboto Mono",monospace';
+  cx.font = '12px "Roboto Mono",monospace'; cx.textAlign = 'left';
+  cx.fillStyle = '#e74c3c'; cx.fillText(LBL.trace, x0 + 6, y1 + 18);
+  cx.fillStyle = 'rgba(180,200,220,0.9)'; cx.fillText(LBL.ref, x0 + 6, y1 + 34);
+  cx.fillStyle = 'rgba(66,165,245,0.9)'; cx.fillText(LBL.fast, x1 - 130, y1 + 18);
+  cx.fillStyle = 'rgba(46,204,113,0.9)'; cx.fillText(LBL.slow, x1 - 130, y1 + 34);
+
+  // time badge
+  cx.fillStyle = 'rgba(255,255,255,0.75)'; cx.font = 'bold 12px "Roboto Mono",monospace'; cx.textAlign = 'right';
+  cx.fillText('t = ' + Math.min(tNow, TMAX).toFixed(2) + ' s', x1, my - 8);
   cx.textAlign = 'left';
-  cx.fillStyle = '#e74c3c';
-  cx.fillText('— y_ol(t)（右半平面零点）', x0 + 6, y1 + 18);
-  cx.fillStyle = 'rgba(180,200,220,0.9)';
-  cx.fillText('-- K(1−e^(−t/T1))', x0 + 6, y1 + 34);
 }
 
 function drawClosed(p, sim) {
@@ -488,17 +556,74 @@ function drawClosed(p, sim) {
   cx.fillText('-- r(t) = 1', x0 + 6, y1 + 34);
 }
 
+/* ===== live stat readout for a given time (never '—' while running) ===== */
+function setStats(p, st) {
+  document.getElementById('statYmin').textContent = fmt(st.ymin, 3);
+  document.getElementById('statTreverse').textContent = isFinite(st.treverse) ? fmt(st.treverse, 2) + ' s' : '0.00 s';
+  document.getElementById('statYfinal').textContent = fmt(p.K, 2);
+  document.getElementById('statTs').textContent = isFinite(st.ts5) ? fmt(st.ts5, 1) + ' s' : '0.0 s';
+}
+
+/* ===== animation state ===== */
+var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+var anim = { p: null, data: null, st: null, t: 0, last: 0, playing: false, id: null };
+var ANIM_SPEED = 3.0; // sim-seconds per real-second of trace
+
+function frame(ts) {
+  if (!anim.playing) { anim.id = null; return; }
+  if (!anim.last) anim.last = ts;
+  var dt = Math.min(0.05, (ts - anim.last) / 1000);
+  anim.last = ts;
+  anim.t += dt * ANIM_SPEED;
+  if (anim.t >= TMAX) {
+    anim.t = TMAX;
+    drawOpenFrame(anim.p, anim.data, anim.st, anim.t);
+    // brief hold then loop
+    anim.playing = false; anim.id = null;
+    setTimeout(function () { if (!anim.playing && anim.p) irReplay(); }, 1400);
+    return;
+  }
+  drawOpenFrame(anim.p, anim.data, anim.st, anim.t);
+  anim.id = requestAnimationFrame(frame);
+}
+function startAnim() {
+  if (REDUCED) { drawOpenFrame(anim.p, anim.data, anim.st, TMAX); return; }
+  anim.playing = true; anim.last = 0;
+  setPlayBtn(true);
+  if (!anim.id) anim.id = requestAnimationFrame(frame);
+}
+function stopAnim() {
+  anim.playing = false;
+  if (anim.id) { cancelAnimationFrame(anim.id); anim.id = null; }
+  setPlayBtn(false);
+}
+function setPlayBtn(playing) {
+  var b = document.getElementById('btnPlay');
+  if (!b) return;
+  b.innerHTML = playing ? '<i class="fas fa-pause"></i> ' + LBL.pause : '<i class="fas fa-play"></i> ' + LBL.play;
+}
+function irToggle() {
+  if (REDUCED) return;
+  if (anim.playing) stopAnim();
+  else { if (anim.t >= TMAX) anim.t = 0; startAnim(); }
+}
+function irReplay() {
+  anim.t = 0;
+  if (REDUCED) { drawOpenFrame(anim.p, anim.data, anim.st, TMAX); return; }
+  startAnim();
+}
+
 function compute() {
   var p = getParams();
   if (!isFinite(p.K) || !isFinite(p.Tz) || !isFinite(p.T1) || !isFinite(p.T2)) return;
   var data = sampleOpen(p);
   var st = statsOpen(data.ts, data.ys, p);
-  // populate stat cards
-  document.getElementById('statYmin').textContent = fmt(st.ymin, 3);
-  document.getElementById('statTreverse').textContent = isFinite(st.treverse) ? fmt(st.treverse, 2) + ' s' : '—';
-  document.getElementById('statYfinal').textContent = fmt(p.K, 2);
-  document.getElementById('statTs').textContent = isFinite(st.ts5) ? fmt(st.ts5, 1) + ' s' : '—';
-  drawOpen(p, data, st);
+  setStats(p, st);
+  anim.p = p; anim.data = data; anim.st = st;
+  // (re)start the trace from t=0 whenever parameters change
+  anim.t = 0;
+  if (REDUCED) { stopAnim(); drawOpenFrame(p, data, st, TMAX); }
+  else startAnim();
   var sim = simulatePI(p);
   drawClosed(p, sim);
 }
@@ -515,10 +640,20 @@ function resetParams() {
   compute();
 }
 
-window.addEventListener('resize', function () { resizeCanvases(); compute(); });
+window.addEventListener('resize', function () {
+  resizeCanvases();
+  if (anim.p) { drawOpenFrame(anim.p, anim.data, anim.st, anim.t || TMAX); drawClosed(anim.p, simulatePI(anim.p)); }
+});
+
+// expose handlers used by inline attributes
+window.compute = compute;
+window.resetParams = resetParams;
+window.irToggle = irToggle;
+window.irReplay = irReplay;
 
 resizeCanvases();
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -586,6 +721,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="inverse-response.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -640,13 +778,13 @@ compute();
 <h3>使い方ガイド</h3>
 <ol>
 <li>スライダー「ゲイン K」(0.5～5.0)でプロセス静的ゲインを設定。化学反応器の濃度制御では K=2.0 mol/L/%CV が標準。</li>
-<li>「RHP零点時定数 Tz」(0.1～2.0 s)を調整。蒸留塔のリボイラー熱入力制御では Tz=0.8～1.2 s が典型値。負のピーク振幅が増加する非最小位相特性を観察。</li>
-<li>「一次遅れ時定数 T1、T2」(0.2～3.0 s)を入力。反応釜では T1=1.5 s(内容物)、T2=0.3 s(計測遅延)のように配置し、反転ピーク y_min と整定時間 t_s の変化を確認。</li>
+<li>「RHP零点時定数 Tz」(0.1～5.0 s)を調整。蒸留塔のリボイラー熱入力制御では Tz=0.8～1.2 s が典型値。負のピーク振幅が増加する非最小位相特性を観察。</li>
+<li>「第1極時定数 T1・第2極時定数 T2」(0.1～10 s)を入力。反応釜では T1=2.0 s(内容物)、T2=3.0 s(計測遅延)のように配置し、反転ピーク y_min と整定時間 t_s の変化を確認。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>液液抽出プロセス(K=1.5、Tz=0.6 s、T1=2.0 s、T2=0.4 s)のステップ応答シミュレーション：有機相流量を10%増加させると、RHP零点により初期段階で y_min≈-0.35(負反転ピーク、t*≈0.9 s)が発生。その後 y(∞)=1.5に収束し、5%整定時間は t_s≈6.8 s。従来型一次遅れ(Tz=∞)比較では負反転がなく、同じゲインでも制御応答性が大きく異なる。</p>
+<p>液液抽出プロセス(K=1.5、Tz=0.6 s、T1=2.0 s、T2=0.4 s)のステップ応答シミュレーション：RHP零点により初期段階で y_min≈-0.16(負反転ピーク、t*≈0.8 s)が発生。その後 y(∞)=1.5に収束し、5%整定時間は t_s≈7.0 s。零点を持たない通常の一次遅れには負反転がなく、同じゲインでも制御応答性が大きく異なる。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -656,6 +794,16 @@ compute();
 <li>整定時間 t_s の延長は T1・T2増加時に顕著。熱応答の遅い蒸発濃縮装置では T1=5.0 s を超え、フィードバック応答より前給制御併用を検討。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

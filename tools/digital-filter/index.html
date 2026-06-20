@@ -124,18 +124,18 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "デジタルフィルター設計ツール（IIR/FIR）",
       "description": "Butterworth・Chebyshev Type I・移動平均FIRフィルターを設計し、周波数応答（振幅・位相）をリアルタイム可視化。フィルター係数・群遅延・阻止帯域減衰量を自動計算。テスト信号へのフィルター適用前後を時間領域で比較表示。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/digital-filter.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
-        "ローパス・ハイパス・バンドパス・バンドストップフィルター設計",
+        "ローパス・ハイパス・移動平均FIRフィルター設計",
         "Butterworth・Chebyshev Type I・移動平均FIRの設計手法",
         "正規化周波数による周波数応答（振幅dB・位相）のリアルタイム描画",
         "フィルター係数（b, a）の表示",
@@ -220,8 +220,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <select id="filterType" onchange="compute()">
         <option value="lowpass">ローパス (Low-pass)</option>
         <option value="highpass">ハイパス (High-pass)</option>
-        <option value="bandpass">バンドパス (Band-pass)</option>
-        <option value="bandstop">バンドストップ (Band-stop)</option>
+        <option value="bandpass" disabled>バンドパス (Band-pass)</option>
+        <option value="bandstop" disabled>バンドストップ (Band-stop)</option>
       </select>
     </div>
 
@@ -282,7 +282,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="btn-group">
       <button class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="振動工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">振動工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -519,6 +527,9 @@ function applyFilter(b, a, x){
 
 function designFilter(){
   const ftype = document.getElementById('filterType').value;
+  if (ftype === 'bandpass' || ftype === 'bandstop') {
+    throw new Error('Band-pass/band-stop are disabled until a validated IIR band transform is implemented');
+  }
   const method = document.getElementById('designMethod').value;
   const N = parseInt(document.getElementById('order').value);
   const fc = parseFloat(document.getElementById('fc').value);
@@ -539,6 +550,7 @@ function designFilter(){
       b = bl.map((v, i) => v * (i % 2 === 0 ? 1 : -1));
       a = al.map((v, i) => v * (i % 2 === 0 ? 1 : -1));
     }else if (ftype === 'bandpass'){
+      throw new Error('Band-pass is disabled until a validated IIR band transform is implemented');
       const fcL = Math.min(fc, fc2), fcH = Math.max(fc, fc2);
       const fcM = (fcL + fcH) / 2;
       const bw = (fcH - fcL) / 2;
@@ -548,6 +560,7 @@ function designFilter(){
       a = al.map((v, i) => v * 2 * Math.cos(2 * Math.PI * fcM * i));
       b[0] = bl[0]; a[0] = al[0];
     }else{ // bandstop: HP + LP combined
+      throw new Error('Band-stop is disabled until a validated IIR band transform is implemented');
       const fcL = Math.min(fc, fc2), fcH = Math.max(fc, fc2);
       const { b: blp, a: alp }= analogToDigital(poles, [], fcL);
       const{ b: bhpBase, a: ahpBase }= analogToDigital(poles, [], 0.5 - fcH);
@@ -599,7 +612,7 @@ function compute(){
   }// Group delay (numerical derivative of phase)
   let gdAtFc = 0;
   for (let i = 1; i < freqs.length - 1; i++){
-    const gd = -(phases[i + 1] - phases[i - 1]) / (freqs[i + 1] - freqs[i - 1]);
+    const gd = -(phases[i + 1] - phases[i - 1]) / (2 * Math.PI * (freqs[i + 1] - freqs[i - 1]));
     if (Math.abs(freqs[i] - fc) < 0.5 / nPts * 3) gdAtFc = gd;
   }const phaseDelayAtFc = Math.abs(fc) > 1e-6 ? -phaseAtFc / (2 * Math.PI * fc) : 0;
 
@@ -790,6 +803,9 @@ window.addEventListener('load', () => {
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="digital-filter.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -844,7 +860,7 @@ window.addEventListener('load', () => {
 <h3>使い方ガイド</h3>
 <ol>
 <li>サンプリング周波数fsを設定（例：48kHz、オーディオ信号処理）</li>
-<li>カットオフ周波数fcを入力（例：1kHz低域フィルター、または帯域フィルターの場合はfc2も指定）</li>
+<li>カットオフ周波数fcを入力（例：ローパスまたはハイパス）。帯域フィルターは検証済み変換を実装するまで無効です</li>
 <li>フィルター種別（Butterworth、Chebyshev I型、FIR移動平均）とフィルター次数を選択</li>
 <li>「設計実行」をクリックすると周波数応答曲線、阻止帯域減衰量、群遅延がリアルタイム表示</li>
 <li>フィルター係数をcsv形式で出力し、組込みシステムやDSPプロセッサへ実装</li>
@@ -852,7 +868,7 @@ window.addEventListener('load', () => {
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>産業用振動計測システムでfs=10kHz、fc=500Hzの4次Butterworthローパスフィルター設計時：-3dB周波数は500Hz、阻止帯域（2fc=1kHz）での減衰量は-96dB、群遅延は0.4msamp（40サンプル）となります。一方、オーディオマスタリング用途でfs=44.1kHz、fc1=80Hz、fc2=15kHz、6次Chebyshev帯域フィルター設計では、阻止帯域リップル0.5dB、位相遅延@fc=68μsecが自動計算されます。</p>
+<p>デフォルトのfs=1000 Hz、fc=0.1、4次Butterworthローパスでは、-3dB周波数は99.936 Hz、2fcでの減衰量は-28.680 dB、群遅延は5.915サンプルです。高域を残したい場合はハイパス、線形位相に近い簡易平滑が必要な場合はFIR移動平均を選択してください。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -862,6 +878,16 @@ window.addEventListener('load', () => {
 <li>フィルター次数が高いほど遮断特性は急峻だが群遅延が増加；制御系統では群遅延が安定性を損なう場合があり、制御遅延時間と位相マージンの設計値確認が重要</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="振動工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">振動工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

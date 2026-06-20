@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "コプレーナ導波路 (CPW) シミュレーター",
       "description": "中心線幅・ギャップ・比誘電率・周波数から、コプレーナ導波路 (CPW) の特性インピーダンス Z_0・実効誘電率・実効波長をリアルタイムに計算・可視化する RF 設計教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/coplanar-waveguide.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["W・G・εr・f から CPW 特性インピーダンスを計算","Wheeler/Hilberg 楕円積分近似による Z_0","実効誘電率と実効波長 λ_g の表示","Z_0 vs W/G カーブと 50Ω 目標ライン","CPW 断面図の可視化"],
       "keywords": "コプレーナ導波路,CPW,特性インピーダンス,RF設計,マイクロ波,PCB,伝送線路,Wheeler,Hilberg",
       "datePublished": "2026-05-17",
@@ -77,7 +77,7 @@
         {
           "@type": "Question",
           "name": "CPW で 50Ω を実現する一般的な寸法はどれくらいですか？",
-          "acceptedAnswer": {"@type": "Answer", "text": "FR-4 (ε_r ≈ 4.3) を仮定して 50Ω を狙うとき、形状係数 k ≈ 0.6 程度、つまり W : G ≈ 3 : 1 程度の比が目安です。例えば W = 0.6 mm, G = 0.1 mm や W = 1.0 mm, G = 0.17 mm 程度がよく使われます。本ツールのスライダーで εr や W/G を動かし、Z_0 が 50Ω に近づく組み合わせを試してみてください。低誘電率 (Rogers, テフロン等) では同じ Z_0 を得るのに W が広くなり、加工性が上がります。"}
+          "acceptedAnswer": {"@type": "Answer", "text": "FR-4 (ε_r = 4.3) で50Ωを狙う場合、このモデルでは形状係数 k≈0.81、つまり W:G≈8.5:1 が目安です。例えば W=0.85mm、G=0.10mm では k=0.810、Z_0≈50.0Ω になります。低誘電率材では同じZ_0を得るための寸法比が変わるため、スライダーで確認してください。"}
         }
       ]
     },{
@@ -100,8 +100,18 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#cv,#curveCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#cv,#curveCanvas,#waveCv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:5px 11px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){ .preset-btn{transition:none} }
 </style>
 </head>
 <body>
@@ -130,6 +140,17 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 <div class="main">
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="cpwPreset('target50')">50Ω ターゲット</button>
+        <button type="button" class="preset-btn" onclick="cpwPreset('wide')">広ギャップ</button>
+        <button type="button" class="preset-btn" onclick="cpwPreset('narrow')">狭ギャップ</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
 
     <div class="param-group">
       <div class="param-label">
@@ -169,23 +190,53 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">無限厚誘電体・薄い完全導体を仮定した Wheeler/Hilberg 近似 (空気側無し、両側グラウンドが十分広い CPW)。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-      <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statK">—</div><div class="sl">形状係数 k = W/(W+2G)</div></div>
-        <div class="stat-card"><div class="sv" id="statEpsEff">—</div><div class="sl">実効誘電率 ε_eff</div></div>
-        <div class="stat-card"><div class="sv" id="statZ0">—</div><div class="sl">特性インピーダンス Z_0</div></div>
-        <div class="stat-card"><div class="sv" id="statLambda">—</div><div class="sl">実効波長 λ_g (at f)</div></div>
+      <div class="chart-title"><i class="fas fa-wave-square"></i> CPW 断面図 — 電気力線と伝搬波のリアルタイム可視化</div>
+      <canvas id="cv" tabindex="0" role="img" aria-label="コプレーナ導波路の断面アニメーション。中心導体からギャップを越えて両側グラウンドへ伸びる電気力線と、線路上を伝搬する信号波を表示します。"></canvas>
+      <p class="canvas-hint">上：中心線 W (黄)・ギャップ G・両側グラウンド (灰)／下：誘電体基板 ε_r／弧：電気力線 (本数=電界の強さ・極性は信号電圧で振動)／上端の波：位相速度 v_p = c/√ε_eff で伝搬する信号</p>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="cpwTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="cpwReset()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn" type="button" onclick="cpwPreset('target50')">50Ω</button>
+          <button class="preset-btn" type="button" onclick="cpwPreset('wide')">広G</button>
+          <button class="preset-btn" type="button" onclick="cpwPreset('narrow')">狭G</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#FFD166"></i>中心導体（信号）</span>
+        <span><i class="swatch" style="background:#9aa6b3"></i>グラウンド</span>
+        <span><i class="swatch" style="background:#ff7a7a"></i>E 力線（+→−）</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>伝搬波 v_p</span>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-layer-group"></i> CPW 断面図</div>
-      <canvas id="cv"></canvas>
-      <p class="canvas-hint">上：中心線 W (黄)・ギャップ G・両側グラウンド (灰)／下：誘電体基板 ε_r／曲線：電気力線のイメージ</p>
+      <div class="chart-title"><i class="fas fa-calculator"></i> ライブ計算結果</div>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="sv" id="statZ0">—</div><div class="sl">特性インピーダンス Z_0</div></div>
+        <div class="stat-card"><div class="sv" id="statEpsEff">—</div><div class="sl">実効誘電率 ε_eff</div></div>
+        <div class="stat-card"><div class="sv" id="statVp">—</div><div class="sl">信号速度 v_p = c/√ε_eff</div></div>
+        <div class="stat-card"><div class="sv" id="statLambda">—</div><div class="sl">実効波長 λ_g (at f)</div></div>
+      </div>
+      <div class="stat-cards" style="margin-top:12px">
+        <div class="stat-card"><div class="sv" id="statK">—</div><div class="sl">形状係数 k = W/(W+2G)</div></div>
+        <div class="stat-card"><div class="sv" id="statW">—</div><div class="sl">中心線幅 W</div></div>
+        <div class="stat-card"><div class="sv" id="statG">—</div><div class="sl">ギャップ G</div></div>
+        <div class="stat-card"><div class="sv" id="statF">—</div><div class="sl">周波数 f</div></div>
+      </div>
     </div>
 
     <div class="chart-card">
@@ -212,30 +263,38 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Coplanar Waveguide (CPW) Simulator ==========
+/* ========== Coplanar Waveguide (CPW) v2 Simulator ========== */
+(function(){
+"use strict";
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
 var curveCanvas = document.getElementById('curveCanvas');
 var curveCtx = curveCanvas.getContext('2d');
 
 var C_LIGHT = 299792458; // m/s
+var TXT = {
+  sub: '誘電体 ε_r = ', gnd: 'GND', play: '<i class="fas fa-play"></i> 再生',
+  pause: '<i class="fas fa-pause"></i> 一時停止',
+  up: '電圧 +：力線が外向き', down: '電圧 −：力線が内向き', zero: '電圧 0：力線が最も疎'
+};
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function getParams() {
-  var W = parseFloat(document.getElementById('slW').value);   // mm
-  var G = parseFloat(document.getElementById('slG').value);   // mm
-  var er = parseFloat(document.getElementById('slEr').value); // -
-  var f = parseFloat(document.getElementById('slF').value);   // GHz
-  return { W: W, G: G, er: er, f: f };
+function readParams(){
+  return {
+    W: parseFloat(document.getElementById('slW').value),
+    G: parseFloat(document.getElementById('slG').value),
+    er: parseFloat(document.getElementById('slEr').value),
+    f: parseFloat(document.getElementById('slF').value)
+  };
 }
 
-// Hilberg's closed-form for K(k)/K(k')
-function ellipticRatio(k) {
-  // k in (0,1). Returns K(k)/K(k')
+/* Hilberg closed-form K(k)/K(k') */
+function ellipticRatio(k){
   if (k <= 0) return 0;
   if (k >= 1) k = 0.999999999;
   var kp = Math.sqrt(1 - k * k);
-  var THRESH = 1 / Math.SQRT2; // 0.7071...
-  if (k <= THRESH) {
+  var THRESH = 1 / Math.SQRT2;
+  if (k <= THRESH){
     var sqkp = Math.sqrt(kp);
     return Math.PI / Math.log(2 * (1 + sqkp) / (1 - sqkp));
   } else {
@@ -244,137 +303,168 @@ function ellipticRatio(k) {
   }
 }
 
-function computeAll(p) {
+function computeAll(p){
   var k = p.W / (p.W + 2 * p.G);
-  var ratio_k = ellipticRatio(k);          // K(k)/K(k')
-  var ratio_kp = 1 / ratio_k;              // K(k')/K(k)
+  var ratio_k = ellipticRatio(k);
+  var ratio_kp = 1 / ratio_k;
   var epsEff = (p.er + 1) / 2;
   var Z0 = (30 * Math.PI / Math.sqrt(epsEff)) * ratio_kp;
-  var lam_g_m = C_LIGHT / (p.f * 1e9 * Math.sqrt(epsEff));
-  var lam_g_mm = lam_g_m * 1000;
-  return { k: k, epsEff: epsEff, Z0: Z0, lambda: lam_g_mm };
+  var vp = C_LIGHT / Math.sqrt(epsEff);                 // m/s
+  var lam_g_mm = (vp / (p.f * 1e9)) * 1000;             // mm
+  return { k: k, epsEff: epsEff, Z0: Z0, vp: vp, lambda: lam_g_mm };
 }
 
-function fmt(v, n) {
-  if (!isFinite(v)) return '—';
-  return v.toFixed(n);
-}
+function fmt(v, n){ if (!isFinite(v)) return '—'; return v.toFixed(n); }
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
+function cssW(c){ return parseFloat(c.dataset.cssW) || c.width / Math.min(window.devicePixelRatio || 1, 2.5); }
+function cssH(c){ return parseFloat(c.dataset.cssH) || c.height / Math.min(window.devicePixelRatio || 1, 2.5); }
 
-function resizeCanvases() {
-  [cv, curveCanvas].forEach(function (c) {
-    var w = Math.max(280, Math.min(c.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    c.style.width = __novaW + 'px';
-    c.style.height = __novaH + 'px';
-    c.width = Math.round(__novaW * __novaDpr);
-    c.height = Math.round(__novaH * __novaDpr);
-    c.dataset.cssW = String(__novaW);
-    c.dataset.cssH = String(__novaH);
-    var __novaCtx = c.getContext && c.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  });
+function sizeCanvas(c, ratio){
+  var w = Math.max(280, Math.min(c.parentElement.clientWidth - 40, 900));
+  var h = Math.round(w * ratio);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  c.style.width = w + 'px';
+  c.style.height = h + 'px';
+  c.width = Math.round(w * dpr);
+  c.height = Math.round(h * dpr);
+  c.dataset.cssW = String(w);
+  c.dataset.cssH = String(h);
+  var cx = c.getContext('2d');
+  if (cx) cx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
+function resizeCanvases(){ sizeCanvas(cv, 0.52); sizeCanvas(curveCanvas, 0.5); }
 
-function drawCross(p, R) {
-  var W = __novaCanvasCssW(cv), H = __novaCanvasCssH(cv);
+/* ---- animated cross-section: live E-field + propagating wave ---- */
+function drawCross(p, R, phase){
+  var W = cssW(cv), H = cssH(cv);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
-  // Layout: top half air, bottom half substrate
-  var midY = H * 0.55;
+
+  // signal voltage on the strip oscillates -> drives E-field density/polarity
+  var volt = Math.sin(phase);                  // -1..1
+  var amp = Math.abs(volt);
+
+  // wave band along the top (propagating signal travelling at v_p)
+  var bandTop = 6, bandH = 26;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, bandTop, W, bandH); ctx.clip();
+  for (var wx = 0; wx <= W; wx += 2){
+    var ph = (wx / W) * Math.PI * 4 - phase;   // travelling to +x
+    var s = Math.sin(ph);
+    var inten = (s + 1) / 2;
+    ctx.fillStyle = 'rgba(0,180,216,' + (0.10 + 0.55 * inten).toFixed(3) + ')';
+    ctx.fillRect(wx, bandTop, 2, bandH);
+  }
+  ctx.restore();
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  for (var wx2 = 0; wx2 <= W; wx2 += 3){
+    var yy = bandTop + bandH / 2 - Math.sin((wx2 / W) * Math.PI * 4 - phase) * (bandH * 0.36);
+    if (wx2 === 0) ctx.moveTo(wx2, yy); else ctx.lineTo(wx2, yy);
+  }
+  ctx.stroke();
+  ctx.fillStyle = '#7fdcef'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('信号 →  v_p = ' + (R.vp / 1e8).toFixed(2) + '×10⁸ m/s', 8, bandTop + bandH + 12);
+
+  var midY = H * 0.62;
   // substrate
   ctx.fillStyle = 'rgba(80,160,80,0.22)';
   ctx.fillRect(0, midY, W, H - midY);
-  ctx.strokeStyle = 'rgba(80,160,80,0.6)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(80,160,80,0.6)'; ctx.lineWidth = 1;
   ctx.strokeRect(0, midY, W, H - midY);
-  ctx.fillStyle = '#6a9';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('誘電体  ε_r = ' + p.er.toFixed(1), 8, midY + 18);
-  // scale: fit (W + 2G + 2*ground) into 80% of canvas width
-  var totalMM = p.W + 2 * p.G + 2 * Math.max(p.W, p.G) * 2; // include ground extents
+  ctx.fillStyle = '#6a9'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText(TXT.sub + p.er.toFixed(1), 8, midY + 18);
+
+  // geometry layout (scale invariant — visualizes k)
+  var totalMM = p.W + 2 * p.G + 2 * Math.max(p.W, p.G) * 2;
   var scale = (W * 0.85) / totalMM;
   var cxPix = W * 0.5;
   var sW = p.W * scale;
   var sG = p.G * scale;
   var groundExt = (W * 0.85 - sW - 2 * sG) / 2;
-  var stripTh = Math.max(6, H * 0.06);
-  var stripY = midY - stripTh; // sits right on top of substrate
-  // left ground
+  var stripTh = Math.max(6, H * 0.055);
+  var stripY = midY - stripTh;
   var leftGndX = cxPix - sW / 2 - sG - groundExt;
+  var rightGndX = cxPix + sW / 2 + sG;
+
+  // ground conductors
   ctx.fillStyle = '#9aa6b3';
   ctx.fillRect(leftGndX, stripY, groundExt, stripTh);
-  // right ground
-  var rightGndX = cxPix + sW / 2 + sG;
   ctx.fillRect(rightGndX, stripY, groundExt, stripTh);
-  // center strip
-  ctx.fillStyle = '#FFD166';
+  // center strip glows with signal polarity
+  var glow = volt >= 0
+    ? 'rgba(255,209,102,' + (0.55 + 0.45 * amp).toFixed(3) + ')'
+    : 'rgba(120,160,255,' + (0.55 + 0.45 * amp).toFixed(3) + ')';
+  ctx.fillStyle = glow;
   ctx.fillRect(cxPix - sW / 2, stripY, sW, stripTh);
-  // E-field arcs (signal -> ground)
-  ctx.strokeStyle = 'rgba(255,200,80,0.5)';
-  ctx.lineWidth = 1;
-  var nArcs = 4;
-  for (var i = 1; i <= nArcs; i++) {
-    var t = i / (nArcs + 1);
-    var sx = cxPix - sW / 2 + sW * (0.5 - 0.4 * t);
-    var ex = cxPix - sW / 2 - sG - groundExt * 0.4 * t;
-    var rad = (sx - ex) / 2;
-    var midx = (sx + ex) / 2;
-    ctx.beginPath();
-    ctx.arc(midx, stripY, rad, Math.PI, 0, true);
-    ctx.stroke();
-    // mirror right
-    var sx2 = cxPix + sW / 2 - sW * (0.5 - 0.4 * t);
-    var ex2 = cxPix + sW / 2 + sG + groundExt * 0.4 * t;
-    var rad2 = (ex2 - sx2) / 2;
-    var midx2 = (sx2 + ex2) / 2;
-    ctx.beginPath();
-    ctx.arc(midx2, stripY, rad2, Math.PI, 0, true);
-    ctx.stroke();
+  ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 1;
+  ctx.strokeRect(cxPix - sW / 2, stripY, sW, stripTh);
+
+  // E-field arcs: number/opacity track field strength (|V|); polarity sets direction
+  // stronger field as k rises (strip closer to ground) AND as |volt| rises
+  var baseArcs = 3 + Math.round(R.k * 6);                 // 3..9
+  var nArcs = Math.max(1, Math.round(baseArcs * (0.35 + 0.65 * amp)));
+  var col = volt >= 0 ? '255,122,122' : '122,170,255';
+  for (var side = -1; side <= 1; side += 2){
+    for (var i = 1; i <= nArcs; i++){
+      var t = i / (nArcs + 1);
+      var sx = cxPix + side * (sW / 2 - sW * (0.5 - 0.4 * t));
+      var ex = cxPix + side * (sW / 2 + sG + groundExt * (0.15 + 0.5 * t));
+      var rad = Math.abs(sx - ex) / 2;
+      var midx = (sx + ex) / 2;
+      var op = (0.22 + 0.6 * amp) * (1 - 0.4 * t);
+      ctx.strokeStyle = 'rgba(' + col + ',' + op.toFixed(3) + ')';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.arc(midx, stripY, rad, Math.PI, 0, true);
+      ctx.stroke();
+      // arrowhead at ground end shows direction (+: strip->gnd, -: gnd->strip)
+      var ax = volt >= 0 ? ex : sx;
+      var dir = side * (volt >= 0 ? 1 : -1);
+      ctx.fillStyle = 'rgba(' + col + ',' + op.toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.moveTo(ax, stripY);
+      ctx.lineTo(ax - dir * 4, stripY - 4);
+      ctx.lineTo(ax - dir * 4, stripY + 4);
+      ctx.closePath(); ctx.fill();
+    }
   }
+
   // dimension labels
-  ctx.fillStyle = '#FFD166';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
+  ctx.fillStyle = '#FFD166'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
   ctx.fillText('W = ' + p.W.toFixed(2) + ' mm', cxPix, stripY - 8);
   ctx.fillStyle = '#cfe3f7';
   ctx.fillText('G', cxPix - sW / 2 - sG / 2, stripY - 8);
   ctx.fillText('G', cxPix + sW / 2 + sG / 2, stripY - 8);
-  ctx.fillStyle = '#9aa6b3';
-  ctx.textAlign = 'left';
-  ctx.fillText('GND', leftGndX + 4, stripY + stripTh / 2 + 4);
+  ctx.fillStyle = '#9aa6b3'; ctx.textAlign = 'left';
+  ctx.fillText(TXT.gnd, leftGndX + 4, stripY + stripTh / 2 + 4);
   ctx.textAlign = 'right';
-  ctx.fillText('GND', rightGndX + groundExt - 4, stripY + stripTh / 2 + 4);
+  ctx.fillText(TXT.gnd, rightGndX + groundExt - 4, stripY + stripTh / 2 + 4);
+
   // result overlay
-  ctx.fillStyle = '#00B4D8';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText('Z_0 = ' + R.Z0.toFixed(1) + ' Ω', W - 8, 18);
-  ctx.fillText('ε_eff = ' + R.epsEff.toFixed(2), W - 8, 34);
-  ctx.fillText('k = ' + R.k.toFixed(3), W - 8, 50);
+  ctx.fillStyle = '#00B4D8'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'right';
+  ctx.fillText('Z_0 = ' + R.Z0.toFixed(1) + ' Ω', W - 8, bandTop + 12);
+  ctx.fillText('ε_eff = ' + R.epsEff.toFixed(2), W - 8, bandTop + 28);
+
+  // live annotation
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.font = 'bold 11px "Noto Sans JP",sans-serif'; ctx.textAlign = 'center';
+  var note = amp < 0.18 ? TXT.zero : (volt >= 0 ? TXT.up : TXT.down);
+  ctx.fillText(note, cxPix, midY + 18);
+  ctx.textAlign = 'left';
 }
 
-function drawCurve(p, R) {
-  var W = __novaCanvasCssW(curveCanvas), H = __novaCanvasCssH(curveCanvas);
+function drawCurve(p, R){
+  var W = cssW(curveCanvas), H = cssH(curveCanvas);
   curveCtx.fillStyle = '#0a1929';
   curveCtx.fillRect(0, 0, W, H);
   var mx = 50, my = 28;
   var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
   var gw = x1 - x0, gh = y0 - y1;
-  // generate Z0(k) for current er, k in 0.05..0.95
   var N = 120;
   var zmax = 0, zmin = 1e9;
   var pts = [];
-  for (var i = 0; i <= N; i++) {
+  for (var i = 0; i <= N; i++){
     var k = 0.05 + (0.95 - 0.05) * i / N;
     var ratio = ellipticRatio(k);
     var z = (30 * Math.PI / Math.sqrt((p.er + 1) / 2)) / ratio;
@@ -384,84 +474,137 @@ function drawCurve(p, R) {
   }
   var yhi = Math.min(Math.max(zmax * 1.1, 120), 400);
   var ylo = Math.max(0, zmin * 0.5);
-  function px(k) { return x0 + (k - 0.05) / 0.9 * gw; }
-  function py(z) { return y0 - (z - ylo) / (yhi - ylo) * gh; }
-  // axes
-  curveCtx.strokeStyle = 'rgba(143,184,224,0.5)';
-  curveCtx.lineWidth = 1;
+  function px(k){ return x0 + (k - 0.05) / 0.9 * gw; }
+  function py(z){ return y0 - (z - ylo) / (yhi - ylo) * gh; }
+  curveCtx.strokeStyle = 'rgba(143,184,224,0.5)'; curveCtx.lineWidth = 1;
   curveCtx.beginPath(); curveCtx.moveTo(x0, y0); curveCtx.lineTo(x1, y0); curveCtx.stroke();
   curveCtx.beginPath(); curveCtx.moveTo(x0, y0); curveCtx.lineTo(x0, y1); curveCtx.stroke();
-  // 50 Ohm target
-  if (50 >= ylo && 50 <= yhi) {
+  if (50 >= ylo && 50 <= yhi){
     curveCtx.strokeStyle = 'rgba(231,76,60,0.7)';
-    curveCtx.setLineDash([6, 4]);
-    curveCtx.lineWidth = 1.5;
+    curveCtx.setLineDash([6, 4]); curveCtx.lineWidth = 1.5;
     curveCtx.beginPath(); curveCtx.moveTo(x0, py(50)); curveCtx.lineTo(x1, py(50)); curveCtx.stroke();
     curveCtx.setLineDash([]);
-    curveCtx.fillStyle = 'rgba(231,76,60,0.9)';
-    curveCtx.font = '11px "Roboto Mono",monospace';
-    curveCtx.textAlign = 'left';
+    curveCtx.fillStyle = 'rgba(231,76,60,0.9)'; curveCtx.font = '11px "Roboto Mono",monospace'; curveCtx.textAlign = 'left';
     curveCtx.fillText('50 Ω', x0 + 4, py(50) - 4);
   }
-  // curve
   curveCtx.beginPath();
-  for (var j = 0; j <= N; j++) {
+  for (var j = 0; j <= N; j++){
     var xx = px(pts[j].k), yy = py(pts[j].z);
     if (j === 0) curveCtx.moveTo(xx, yy); else curveCtx.lineTo(xx, yy);
   }
-  curveCtx.strokeStyle = '#00B4D8';
-  curveCtx.lineWidth = 2.5;
-  curveCtx.stroke();
-  // current point
+  curveCtx.strokeStyle = '#00B4D8'; curveCtx.lineWidth = 2.5; curveCtx.stroke();
   var cpx = px(R.k), cpy = py(Math.max(ylo, Math.min(yhi, R.Z0)));
-  curveCtx.strokeStyle = 'rgba(255,209,102,0.6)';
-  curveCtx.lineWidth = 1;
+  curveCtx.strokeStyle = 'rgba(255,209,102,0.6)'; curveCtx.lineWidth = 1;
   curveCtx.beginPath(); curveCtx.moveTo(cpx, y0); curveCtx.lineTo(cpx, cpy); curveCtx.stroke();
   curveCtx.beginPath(); curveCtx.arc(cpx, cpy, 5, 0, Math.PI * 2);
-  curveCtx.fillStyle = '#FFD166';
-  curveCtx.fill();
-  // axis labels
-  curveCtx.fillStyle = '#cfe3f7';
-  curveCtx.font = '11px "Roboto Mono",monospace';
-  curveCtx.textAlign = 'left';
+  curveCtx.fillStyle = '#FFD166'; curveCtx.fill();
+  curveCtx.fillStyle = '#cfe3f7'; curveCtx.font = '11px "Roboto Mono",monospace'; curveCtx.textAlign = 'left';
   curveCtx.fillText('k = 0.05', x0, y0 + 14);
-  curveCtx.textAlign = 'right';
-  curveCtx.fillText('k = 0.95', x1, y0 + 14);
-  curveCtx.textAlign = 'left';
-  curveCtx.fillText('Z_0 (Ω)', x0 + 4, y1 + 4);
+  curveCtx.textAlign = 'right'; curveCtx.fillText('k = 0.95', x1, y0 + 14);
+  curveCtx.textAlign = 'left'; curveCtx.fillText('Z_0 (Ω)', x0 + 4, y1 + 4);
   curveCtx.fillText(yhi.toFixed(0), x0 - 28, y1 + 10);
   curveCtx.fillText(ylo.toFixed(0), x0 - 28, y0 + 4);
 }
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.W) || !isFinite(p.G) || !isFinite(p.er) || !isFinite(p.f)) return;
-  if (p.W <= 0 || p.G <= 0 || p.er < 1 || p.f <= 0) return;
-  var R = computeAll(p);
-  document.getElementById('statK').textContent = fmt(R.k, 3);
-  document.getElementById('statEpsEff').textContent = fmt(R.epsEff, 2);
-  document.getElementById('statZ0').textContent = fmt(R.Z0, 1) + ' Ω';
-  document.getElementById('statLambda').textContent = fmt(R.lambda, 1) + ' mm';
-  drawCross(p, R);
-  drawCurve(p, R);
+/* ---- state & live stats ---- */
+var curP = null, curR = null, phase = 0, playing = !reduceMotion, rafId = null, lastTs = 0;
+
+function updateStats(){
+  if (!curR) return;
+  document.getElementById('statZ0').textContent = fmt(curR.Z0, 1) + ' Ω';
+  document.getElementById('statEpsEff').textContent = fmt(curR.epsEff, 2);
+  document.getElementById('statVp').textContent = fmt(curR.vp / 1e8, 2) + '×10⁸ m/s';
+  document.getElementById('statLambda').textContent = fmt(curR.lambda, 1) + ' mm';
+  document.getElementById('statK').textContent = fmt(curR.k, 3);
+  document.getElementById('statW').textContent = fmt(curP.W, 2) + ' mm';
+  document.getElementById('statG').textContent = fmt(curP.G, 2) + ' mm';
+  document.getElementById('statF').textContent = fmt(curP.f, 1) + ' GHz';
 }
 
-function resetParams() {
+function compute(){
+  var p = readParams();
+  if (!isFinite(p.W) || !isFinite(p.G) || !isFinite(p.er) || !isFinite(p.f)) return;
+  if (p.W <= 0 || p.G <= 0 || p.er < 1 || p.f <= 0) return;
+  curP = p; curR = computeAll(p);
+  updateStats();
+  drawCurve(p, curR);
+  drawCross(p, curR, phase);
+}
+window.compute = compute;   // sliders call compute()
+
+function frame(ts){
+  if (!playing){ rafId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dt = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  phase += dt * 3.2;                  // angular speed of signal oscillation
+  if (curP && curR) drawCross(curP, curR, phase);
+  rafId = requestAnimationFrame(frame);
+}
+function startAnim(){
+  if (reduceMotion || playing && rafId) return;
+  playing = true; lastTs = 0;
+  document.getElementById('btnPlay').innerHTML = TXT.pause;
+  if (!rafId) rafId = requestAnimationFrame(frame);
+}
+function stopAnim(){
+  playing = false;
+  if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+  document.getElementById('btnPlay').innerHTML = TXT.play;
+}
+function togglePlay(){ playing ? stopAnim() : startAnim(); }
+function resetAnim(){
+  phase = 0;
+  if (curP && curR) drawCross(curP, curR, phase);
+  if (!reduceMotion) startAnim();
+}
+window.cpwTogglePlay = togglePlay;
+window.cpwReset = resetAnim;
+
+function preset(name){
+  var P = {
+    target50: { W: 0.85, G: 0.10, er: 4.3, f: 5.0 },
+    wide:     { W: 1.50, G: 1.20, er: 4.3, f: 5.0 },
+    narrow:   { W: 1.20, G: 0.10, er: 4.3, f: 5.0 }
+  }[name];
+  if (!P) return;
+  document.getElementById('slW').value = P.W;
+  document.getElementById('slG').value = P.G;
+  document.getElementById('slEr').value = P.er;
+  document.getElementById('slF').value = P.f;
+  syncToNum('slW','slWVal'); updateSlider(document.getElementById('slW'),'slWVal',2,'');
+  syncToNum('slG','slGVal'); updateSlider(document.getElementById('slG'),'slGVal',2,'');
+  syncToNum('slEr','slErVal'); updateSlider(document.getElementById('slEr'),'slErVal',1,'');
+  syncToNum('slF','slFVal'); updateSlider(document.getElementById('slF'),'slFVal',1,'');
+  compute();
+}
+window.cpwPreset = preset;
+
+function resetParams(){
   var defs = { slW: 0.50, slG: 0.30, slEr: 4.3, slF: 5.0 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
+  Object.keys(defs).forEach(function(id){ document.getElementById(id).value = defs[id]; });
   updateSlider(document.getElementById('slW'), 'slWVal', 2, '');
   updateSlider(document.getElementById('slG'), 'slGVal', 2, '');
   updateSlider(document.getElementById('slEr'), 'slErVal', 1, '');
   updateSlider(document.getElementById('slF'), 'slFVal', 1, '');
   compute();
 }
+window.resetParams = resetParams;
 
-window.addEventListener('resize', function () { resizeCanvases(); compute(); });
+cv.addEventListener('keydown', function(e){
+  if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); togglePlay(); }
+});
+window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
 
 resizeCanvases();
 compute();
+if (reduceMotion){
+  document.getElementById('btnPlay').innerHTML = TXT.play;
+  playing = false;
+} else {
+  rafId = requestAnimationFrame(frame);
+}
+})();
 </script>
 
 <section class="explanation">
@@ -483,7 +626,7 @@ compute();
       <div class="bub">本当だ！W を 1mm にして G を 0.6mm にしても、デフォルトと同じ Z_0 が出る。スケールが効かないんですね。</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">そうそう。だから実務では、まず使える基板の最小ライン幅やプロセスから決まる制約 (例えば W ≥ 0.1mm、G ≥ 0.075mm 等) の中で、目標 k を作る。デフォルト値 (W=0.5, G=0.3, εr=4.3) だと k≈0.45 で Z_0≈78Ω だね。50Ω 狙いなら k をもっと上げる、つまり W : G の比をもっと W 寄り (例えば 3:1 や 4:1) にする必要がある。試しに W=0.6, G=0.1 にしてみると 50Ω に近づくよ。</div>
+      <div class="bub">そうそう。だから実務では、まず使える基板の最小ライン幅やプロセス制約の中で目標 k を作る。デフォルト値 (W=0.5, G=0.3, εr=4.3) だと k≈0.455 で Z_0≈78Ω だね。50Ω狙いなら k≈0.81、W:G≈8.5:1 が目安。試しに W=0.85mm, G=0.10mm にすると Z_0≈50.0Ω になるよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">あと「実効波長 λ_g」って何ですか？周波数を上げたら短くなりますよね。</div>
@@ -528,6 +671,9 @@ compute();
     <p>最後に、<strong>「形状係数 k だけ合わせれば実機でも理論通りに動く」という誤解</strong>に注意が必要です。理論式は形状・誘電率の幾何モデルから Z_0 を出しますが、実機では (1) 導体表面粗さによる損失増加、(2) フォトリソやエッチングによる寸法ばらつき (±5〜10μm)、(3) はんだレジストの誘電率影響、(4) ボンディングワイヤやコネクタの不連続、などが重なります。FR-4 のような低グレード基板では ε_r 自体が ±0.3 程度ばらつき、Z_0 が ±5Ω 振れることも珍しくありません。本ツールでナイーブな目標寸法を決めたら、テストクーポンで実測 → TDR や VNA で確認 → 補正、というループを必ず回してください。</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="coplanar-waveguide.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -582,26 +728,36 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>中心線幅 W (slWVal) をマイクロメートル単位で設定します。一般的な 50Ω CPW では W = 2～5 mm が目安です。</li>
-<li>ギャップ G (slGVal) をマイクロメートル単位で入力します。狭いギャップほど高インピーダンス化します（例：G = 0.5～2 mm）。</li>
-<li>基板の比誘電率 ε_r (slErVal) を選択します。FR-4 = 4.5、アルミナ = 9.8、シリコン = 11.7 が標準値です。</li>
-<li>動作周波数 f (slFVal) をギガヘルツ単位で入力します。実効波長 λ_g が周波数に応じて自動計算されます。</li>
+<li>中心線幅 W をmm単位で設定します。入力欄とスライダーの単位はいずれもmmです。</li>
+<li>ギャップ G もmm単位で入力します。このモデルではGを狭くしてkを上げるほどZ_0は低くなります。</li>
+<li>基板の比誘電率 ε_r を選択します。デフォルトのFR-4は4.3、アルミナは約9.8、シリコンは約11.7です。</li>
+<li>動作周波数 f をGHz単位で入力します。Z_0とε_effはこの簡略モデルでは周波数に依存せず、λ_gだけが周波数で変わります。</li>
 <li>シミュレーターが Wheeler/Hilberg 楕円積分近似を用いて特性インピーダンス Z_0、実効誘電率 ε_eff、形状係数 k を リアルタイム計算します。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>基板 FR-4（ε_r = 4.5、厚さ 1.6 mm）上に CPW を設計する場合：中心線幅 W = 3.0 mm、ギャップ G = 0.5 mm と設定すると、形状係数 k = 3.0/(3.0+2×0.5) = 0.75 となり、実効誘電率 ε_eff ≈ 3.2、特性インピーダンス Z_0 ≈ 50 Ω が得られます。周波数 f = 2.4 GHz での実効波長は λ_g ≈ 48.5 mm となり、λ_g/4 ビアパッチ設計の寸法決定に活用できます。</p>
+<p>FR-4（ε_r = 4.3）で W = 3.0mm、G = 0.5mm、f = 2.4GHz とすると、形状係数 k = 3.0/(3.0+2×0.5) = 0.750、実効誘電率 ε_eff = 2.65、特性インピーダンス Z_0 ≈ 54.7Ω、実効波長 λ_g ≈ 76.7mm です。50Ωを狙う例として W = 0.85mm、G = 0.10mm では k = 0.810、Z_0 ≈ 50.0Ω になります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>50Ω 標準設計では多くの場合 G = (W+2G)/4 関係を満たす必要があります。例えば W = 2.5 mm の場合、G ≈ 0.83 mm で目標インピーダンスに到達します。</li>
-<li>周波数が高くなると分散効果で実効誘電率が低下し、実効波長が短縮します。10 GHz 帯では 2.4 GHz 基準からの波長変化を設計に反映してください。</li>
+<li>50Ω標準設計は k≈0.81（W:G≈8.5:1）が目安です。例えば W=0.85mm、G=0.10mm で Z_0≈50.0Ω になります。</li>
+<li>この簡略モデルのZ_0とε_effは周波数非依存です。周波数を変えると λ_g = c/(f√ε_eff) だけが変化します。</li>
 <li>基板厚みの影響は本シミュレーターの近似モデルに限定されます。厚み > 2 mm の場合は厳密なフルウェーブ解析（HFSS等）の補検証を推奨します。</li>
 <li>金属表面粗度・導電率損失は含まれていません。実装時は伝送損失測定で補正係数を確認してください。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

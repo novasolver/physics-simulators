@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "誘導電動機シミュレーター",
       "description": "三相誘導電動機シミュレーターで等価回路パラメータから T-N 曲線・効率・力率をリアルタイム計算。最大トルク・始動トルク・同期速度（ns=120f/p）を自動算出する電気機器解析ツール。",
       "url": "https://novasolver.jp/tools/electrical-motor-ac.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["同期速度・すべりの計算","T-N曲線（トルク-速度特性）","最大トルク・始動トルクの自動算出","効率・力率 vs すべりグラフ","極数・周波数切り替え"],
       "keywords": "誘導電動機,トルク速度特性,等価回路,すべり,最大トルク,効率,CAEシミュレーター,三相モーター",
       "datePublished": "2026-04-09",
@@ -201,10 +201,36 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-magnet"></i> 回転磁界とすべり（ライブ）</div>
+    <canvas id="acHero" height="300" style="width:100%;background:#0a1628;border-radius:8px;display:block" role="img" aria-label="回転磁界ベクトルと回転子のアニメーション。磁界が同期速度で回り、回転子がわずかに遅れて回る様子を表示します。"></canvas>
+    <div class="stat-cards" style="margin-top:12px;">
+      <div class="stat-card"><div class="sv" id="sv_nsL">— rpm</div><div class="sl">同期速度 ns（磁界）</div></div>
+      <div class="stat-card"><div class="sv" id="sv_nrL">— rpm</div><div class="sl">回転子速度 nr</div></div>
+      <div class="stat-card"><div class="sv" id="sv_slipL">— %</div><div class="sl">すべり s</div></div>
+      <div class="stat-card"><div class="sv" id="sv_torqL">— N·m</div><div class="sl">発生トルク T</div></div>
+    </div>
+    <div class="param-group" style="margin-top:12px;">
+      <div class="param-label"><span class="param-name">負荷（すべり s）</span><span class="param-value"><span id="acSlipVal">3.0</span> %</span></div>
+      <input type="range" id="acSlip" min="0.2" max="20" step="0.1" value="3" oninput="acOnSlip()" aria-label="負荷すべり パーセント">
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">負荷が増えるとすべりが大きくなり、回転子が磁界からさらに遅れます。磁界（黄）と回転子（青）のズレが「すべり」です。</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="preset-btn" type="button" onclick="acTogglePlay()" id="acPlayBtn"><i class="fas fa-pause"></i> 一時停止</button>
+    </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="sv_ns">— rpm</div><div class="sl">同期速度 ns</div></div>
@@ -350,6 +376,201 @@ function getParams(){
 update();
 </script>
 
+<script>
+/* ===== v2 hero: rotating magnetic field + squirrel-cage rotor with visible slip ===== */
+(function(){
+  "use strict";
+  const cv = document.getElementById('acHero');
+  if(!cv) return;
+  const cx = cv.getContext('2d');
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playing = !reduced;
+  let cssW=0, cssH=0;
+  let fieldAng=0, rotorAng=0, lastTs=0;
+
+  function el(id){ return document.getElementById(id); }
+  function acSlip(){ return parseFloat(el('acSlip').value)/100; }
+
+  function getMotor(){
+    // read the page's main controls
+    const p = parseInt(el('poles').value);
+    const f = parseFloat(el('freq').value);
+    const ns = 120*f/p;                 // synchronous speed rpm
+    return { p, f, ns };
+  }
+
+  function resize(){
+    const rect = cv.parentElement.getBoundingClientRect();
+    cssW = Math.max(260, Math.floor(rect.width - 44));
+    cssH = 300;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = cssW + 'px';
+    cv.style.height = cssH + 'px';
+    cv.width = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    cx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function arrow(x0,y0,x1,y1,color,w){
+    cx.strokeStyle=color; cx.fillStyle=color; cx.lineWidth=w;
+    cx.beginPath(); cx.moveTo(x0,y0); cx.lineTo(x1,y1); cx.stroke();
+    const a=Math.atan2(y1-y0,x1-x0), h=7+w;
+    cx.beginPath(); cx.moveTo(x1,y1);
+    cx.lineTo(x1-h*Math.cos(a-0.4), y1-h*Math.sin(a-0.4));
+    cx.lineTo(x1-h*Math.cos(a+0.4), y1-h*Math.sin(a+0.4));
+    cx.closePath(); cx.fill();
+  }
+
+  function draw(){
+    resize();
+    const W=cssW, H=cssH;
+    cx.clearRect(0,0,W,H);
+    cx.fillStyle='#0a1628'; cx.fillRect(0,0,W,H);
+
+    // --- left: stator/rotor cross-section ---
+    const cxc = Math.min(W*0.32, 150);
+    const cyc = H/2;
+    const Rstator = Math.min(cxc-18, cyc-24, 110);
+    const Rbore = Rstator*0.72;
+    const Rrotor = Rstator*0.60;
+
+    // stator iron annulus
+    cx.beginPath(); cx.arc(cxc,cyc,Rstator,0,7); cx.strokeStyle='rgba(255,255,255,0.18)'; cx.lineWidth=2; cx.stroke();
+    cx.beginPath(); cx.arc(cxc,cyc,Rbore,0,7); cx.strokeStyle='rgba(255,255,255,0.12)'; cx.lineWidth=1.5; cx.stroke();
+
+    // 3-phase stator windings (6 slots, colored by phase)
+    const phases=['#e74c3c','#e74c3c','#2ecc71','#2ecc71','#3498db','#3498db'];
+    for(let i=0;i<6;i++){
+      const a=i/6*2*Math.PI - Math.PI/2;
+      const sx=cxc+Math.cos(a)*(Rstator*0.86), sy=cyc+Math.sin(a)*(Rstator*0.86);
+      cx.beginPath(); cx.arc(sx,sy,5,0,7); cx.fillStyle=phases[i]; cx.globalAlpha=0.85; cx.fill(); cx.globalAlpha=1;
+    }
+    // phase legend labels A B C
+    cx.font='10px Roboto Mono'; cx.textAlign='center'; cx.fillStyle='#e74c3c';
+    cx.fillText('A', cxc+Math.cos(-Math.PI/2)*(Rstator*0.86), cyc+Math.sin(-Math.PI/2)*(Rstator*0.86)-9);
+
+    // rotating magnetic field vector (yellow) - sweeps at synchronous speed
+    const fx=cxc+Math.cos(fieldAng)*Rbore*0.96, fy=cyc+Math.sin(fieldAng)*Rbore*0.96;
+    arrow(cxc,cyc,fx,fy,'#ffd54a',3.2);
+    cx.fillStyle='#ffd54a'; cx.font='bold 10px Noto Sans JP'; cx.textAlign='center';
+    cx.fillText('B（磁界）', fx, fy + (Math.sin(fieldAng)>0?14:-6));
+
+    // squirrel-cage rotor body
+    cx.beginPath(); cx.arc(cxc,cyc,Rrotor,0,7);
+    const g=cx.createRadialGradient(cxc-6,cyc-6,4,cxc,cyc,Rrotor);
+    g.addColorStop(0,'#1b3a5c'); g.addColorStop(1,'#0e2238');
+    cx.fillStyle=g; cx.fill(); cx.strokeStyle='rgba(74,163,255,0.6)'; cx.lineWidth=1.5; cx.stroke();
+    // rotor bars (rotate with rotor)
+    cx.strokeStyle='rgba(120,180,240,0.45)'; cx.lineWidth=2;
+    for(let i=0;i<12;i++){
+      const a=rotorAng + i/12*2*Math.PI;
+      cx.beginPath();
+      cx.moveTo(cxc+Math.cos(a)*Rrotor*0.55, cyc+Math.sin(a)*Rrotor*0.55);
+      cx.lineTo(cxc+Math.cos(a)*Rrotor*0.92, cyc+Math.sin(a)*Rrotor*0.92);
+      cx.stroke();
+    }
+    // rotor reference marker (blue) shows rotor angle, lags the field
+    const rx=cxc+Math.cos(rotorAng)*Rrotor*0.92, ry=cyc+Math.sin(rotorAng)*Rrotor*0.92;
+    arrow(cxc,cyc,rx,ry,'#4aa3ff',2.6);
+    cx.fillStyle='#4aa3ff'; cx.font='bold 10px Noto Sans JP'; cx.textAlign='center';
+    cx.fillText('回転子', rx, ry + (Math.sin(rotorAng)>0?14:-6));
+
+    // slip wedge between field and rotor
+    cx.beginPath(); cx.moveTo(cxc,cyc);
+    cx.arc(cxc,cyc,Rrotor*0.40, rotorAng, fieldAng);
+    cx.closePath(); cx.fillStyle='rgba(255,213,74,0.18)'; cx.fill();
+
+    // --- right: torque-speed mini curve with operating point ---
+    const m=getMotor();
+    const s=acSlip();
+    const prm = (typeof getParams==='function') ? getParams() : null;
+    const px0 = Math.min(W*0.50, cxc+Rstator+30);
+    const px1 = W-18, py0 = 36, py1 = H-30;
+    // axes
+    cx.strokeStyle='rgba(255,255,255,0.25)'; cx.lineWidth=1;
+    cx.beginPath(); cx.moveTo(px0,py0); cx.lineTo(px0,py1); cx.lineTo(px1,py1); cx.stroke();
+    cx.fillStyle='rgba(255,255,255,0.55)'; cx.font='10px Noto Sans JP'; cx.textAlign='left';
+    cx.fillText('トルク T', px0+2, py0-6);
+    cx.textAlign='right'; cx.fillText('速度 n →', px1, py1+16);
+
+    if(prm && typeof computeTorque==='function'){
+      // curve: x = rotor speed fraction n/ns (0..1), torque
+      const N=80; let tmax=1e-6; const pts=[];
+      for(let i=0;i<=N;i++){
+        const ss=0.001+(1-0.001)*(1-i/N); // i=0 -> s=1 (n=0), i=N -> s~0 (n=ns)
+        const t=computeTorque(ss,prm);
+        const nf=1-ss; // n/ns
+        if(t>tmax) tmax=t;
+        pts.push({nf,t});
+      }
+      cx.strokeStyle='#00B4D8'; cx.lineWidth=2; cx.beginPath();
+      pts.forEach((p,i)=>{
+        const X=px0+p.nf*(px1-px0);
+        const Y=py1-(p.t/tmax)*(py1-py0)*0.92;
+        if(i===0) cx.moveTo(X,Y); else cx.lineTo(X,Y);
+      });
+      cx.stroke();
+      // operating point at current slip
+      const Top=computeTorque(s,prm);
+      const opnf=1-s;
+      const opX=px0+opnf*(px1-px0);
+      const opY=py1-(Top/tmax)*(py1-py0)*0.92;
+      cx.beginPath(); cx.arc(opX,opY,5,0,7); cx.fillStyle='#ffd54a'; cx.fill();
+      cx.strokeStyle='#fff'; cx.lineWidth=1.5; cx.stroke();
+      cx.strokeStyle='rgba(255,213,74,0.4)'; cx.setLineDash([3,3]); cx.lineWidth=1;
+      cx.beginPath(); cx.moveTo(opX,opY); cx.lineTo(opX,py1); cx.stroke(); cx.setLineDash([]);
+      cx.fillStyle='#ffd54a'; cx.font='bold 10px Roboto Mono'; cx.textAlign='center';
+      cx.fillText(Top.toFixed(0)+' N·m', opX, opY-8);
+
+      // live numbers
+      const nr = m.ns*(1-s);
+      el('sv_nsL').textContent = m.ns.toFixed(0)+' rpm';
+      el('sv_nrL').textContent = nr.toFixed(0)+' rpm';
+      el('sv_slipL').textContent = (s*100).toFixed(1)+' %';
+      el('sv_torqL').textContent = Top.toFixed(1)+' N·m';
+    }
+  }
+
+  let raf=null;
+  function frame(ts){
+    if(!lastTs) lastTs=ts;
+    let dt=(ts-lastTs)/1000; lastTs=ts;
+    if(dt>0.05) dt=0.05;
+    const m=getMotor();
+    const s=acSlip();
+    // angular speeds (rad/s on screen, scaled so motion is visible)
+    const scale=0.0016;                 // visual scale of rpm -> rad/s on canvas
+    const wField=m.ns*scale*2*Math.PI;
+    const wRotor=m.ns*(1-s)*scale*2*Math.PI;
+    if(playing){
+      fieldAng += wField*dt;
+      rotorAng += wRotor*dt;
+    }
+    draw();
+    raf=requestAnimationFrame(frame);
+  }
+
+  window.acOnSlip=function(){
+    el('acSlipVal').textContent = parseFloat(el('acSlip').value).toFixed(1);
+    const sl=el('acSlip');
+    const pct=(sl.value-sl.min)/(sl.max-sl.min)*100; sl.style.setProperty('--pct',pct+'%');
+    if(reduced) draw();
+  };
+  window.acTogglePlay=function(){
+    playing=!playing;
+    const b=el('acPlayBtn');
+    b.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+  };
+
+  // keep hero in sync when main controls change
+  ['poles','freq'].forEach(id=>{ const e=el(id); if(e) e.addEventListener('change',()=>{ if(reduced) draw(); }); });
+
+  window.acOnSlip();
+  if(reduced){ draw(); }
+  else { raf=requestAnimationFrame(frame); }
+})();
+</script>
+
 <section class="explanation">
   <h2>誘導電動機の特性曲線とは</h2>
   <div class="chat">
@@ -407,6 +628,9 @@ update();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="electrical-motor-ac.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -460,14 +684,14 @@ update();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>モータ仕様を入力：定格電圧(r1v)、周波数(r1)、極数を設定して同期速度ns=120f/pを自動計算</li>
-<li>等価回路パラメータ入力：一次抵抗R1(r1)、二次抵抗R2(r2)、一次漏れリアクタンスX1(x1)、二次漏れリアクタンスX2(x2)をΩ単位で入力</li>
-<li>励磁インダクタンスXm(x2v)を設定後、シミュレーション実行ボタンでトルク-速度曲線と始動トルク・最大トルクを自動算出</li>
+<li>極数（select 極数）と周波数（select 周波数：50/60Hz）を選ぶと同期速度 ns=120f/p が自動計算されます</li>
+<li>等価回路パラメータを入力：固定子抵抗R₁、回転子抵抗R₂、固定子リアクタンスX₁、回転子リアクタンスX₂、励磁リアクタンスXm、電源電圧V₁（相）をスライダーまたは数値で設定します</li>
+<li>入力を変えると T-N曲線・効率/力率グラフ・始動トルク・最大トルク・最大トルクすべりがリアルタイムに再計算されます（実行ボタンはありません）</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>4極3相200V 50Hz誘導電動機：R1=2.5Ω、R2=2.8Ω、X1=3.2Ω、X2=3.2Ω、Xm=95Ωの場合、同期速度ns=1500rpm、始動トルク≒95Nmで計算。最大トルク(breakdown torque)は最大トルクすべり sm=(R2+√(R2²+X1+X2)²)/(X1+X2) で決定され、20kW級モータでは約150Nm付近に発生。定格運転時(s≒0.04)の効率は92%、力率は0.88程度</p>
+<p>4極3相200V（相電圧）50Hz誘導電動機：R1=2.5Ω、R2=2.8Ω、X1=3.2Ω、X2=3.2Ω、Xm=95Ωの場合、同期速度 ns=120·50/4=1500rpm、始動トルク（すべり1）は本ツールで約53N·m と計算されます。最大トルクは最大トルクすべり s_max=R2/√(R1²+(X1+X2)²)≈0.41 で発生し、約51N·m となります。R2 を大きくすると s_max が増え（始動トルクが大きい高すべり側へ移動）、漏れリアクタンス X1+X2 を大きくすると最大トルク自体が下がります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -477,6 +701,16 @@ update();
 <li>高すべり領域(s>0.3)では二次銅損が急増し、放熱許容に注意；連続定格との相違を確認してから運転特性判定</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

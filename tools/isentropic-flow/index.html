@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "等エントロピー流れ計算機",
       "description": "マッハ数・比熱比から等エントロピー流れ関係と垂直衝撃波特性をリアルタイム計算。",
       "url": "https://novasolver.jp/tools/isentropic-flow.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["等エントロピー流れ関係（T/T0, P/P0, ρ/ρ0, A/A*）","垂直衝撃波・斜め衝撃波特性","ラバルノズル模式図"],
       "keywords": "等エントロピー流れ,マッハ数,圧縮性流体,衝撃波,ラバルノズル,CAE,流体解析",
       "datePublished": "2026-04-08",
@@ -143,28 +143,35 @@ canvas{width:100%;border-radius:8px;display:block}.viz-tabs{display:flex;gap:8px
         <option value="normal">垂直衝撃波</option>
       </select>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
-      <div class="stat-card"><div class="sv" id="st-TT0">—</div><div class="sl">T/T₀ 温度比</div></div>
-      <div class="stat-card"><div class="sv" id="st-PP0">—</div><div class="sl">P/P₀ 圧力比</div></div>
-      <div class="stat-card"><div class="sv" id="st-AA">—</div><div class="sl">A/A* 面積比</div></div>
+      <div class="stat-card"><div class="sv" id="st-TT0">0.0000</div><div class="sl">T/T₀ 温度比</div></div>
+      <div class="stat-card"><div class="sv" id="st-PP0">0.0000</div><div class="sl">P/P₀ 圧力比</div></div>
+      <div class="stat-card"><div class="sv" id="st-RR">0.0000</div><div class="sl">ρ/ρ₀ 密度比</div></div>
+      <div class="stat-card"><div class="sv" id="st-AA">0.000</div><div class="sl">A/A* 面積比</div></div>
       <div class="stat-card"><div class="sv" id="st-M2">—</div><div class="sl">M₂ 衝撃波後</div></div>
     </div>
     </div>
 
-    <div class="viz-tabs">
-      <button class="viz-tab active" onclick="showTab('chart')">流れ関係チャート</button>
-      <button class="viz-tab" onclick="showTab('nozzle')">ノズル模式図</button>
-    </div>
-    <div id="tab-chart">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 流れ</div><canvas id="flowChart"></canvas></div>
-    </div>
-    <div id="tab-nozzle">
-      <canvas id="nozzleCanvas" height="320"></canvas>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-wave-square"></i> 等エントロピー関係の可視化 — マッハ数を掃引</div>
+      <canvas id="isenCanvas" height="440" tabindex="0" role="img" aria-label="等エントロピー流れの property ratio 曲線とマッハ掃引アニメーション"></canvas>
+      <div class="play-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+        <button class="btn" type="button" id="btnSweep" onclick="window.__isen.toggleSweep()"><i class="fas fa-play"></i> 掃引</button>
+        <button class="btn secondary" type="button" onclick="window.__isen.resetSweep()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <span style="font-size:.72rem;color:var(--muted);margin-left:auto">曲線上のマーカーが亜音速→超音速へ動き、比が下がります</span>
+      </div>
     </div>
 <div class="chart-card" style="margin-top:16px">
 <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
@@ -181,156 +188,229 @@ canvas{width:100%;border-radius:8px;display:block}.viz-tabs{display:flex;gap:8px
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
-function isentropic(M, g) {
-  const t = 1 / (1 + (g-1)/2 * M*M);
-  const p = Math.pow(t, g/(g-1));
-  const rho = Math.pow(t, 1/(g-1));
-  const exp = (g+1)/(2*(g-1));
-  const aa = (1/M) * Math.pow((2/(g+1)) * (1 + (g-1)/2 * M*M), exp);
-  return {T:t, P:p, rho:rho, A:aa};
-}function normalShock(M1, g){
-  if (M1 <= 1) return null;
-  const M2sq = (M1*M1 + 2/(g-1)) / (2*g/(g-1)*M1*M1 - 1);
-  const M2 = Math.sqrt(M2sq);
-  const P2P1 = (2*g*M1*M1 - (g-1)) / (g+1);
-  return {M2:M2, P2P1:P2P1};
-}const ctx = document.getElementById('flowChart').getContext('2d');
-let chart, currentTab = 'chart';
+(function(){
+"use strict";
+var LBL = {
+  sweep:'掃引', pause:'一時停止', title:'マッハ数を掃引',
+  parcel:'気流パーセル', sonic:'音速 M=1', subsonic:'亜音速', supersonic:'超音速',
+  area:'面積比 A/A*（最小は M=1）', ratios:'状態量比'
+};
+var canvas = document.getElementById('isenCanvas');
+if(!canvas){return;}
+var ctx = canvas.getContext('2d');
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function buildChart(g){
-  const machs = [];
-  const TT=[], PP=[], rhorho=[], AA=[];
-  for (let m=0.01; m<=5; m+=0.05) {
-    machs.push(m.toFixed(2));
-    const r = isentropic(m, g);
-    TT.push(r.T.toFixed(4));
-    PP.push(r.P.toFixed(4));
-    rhorho.push(r.rho.toFixed(4));
-    AA.push(Math.min(r.A, 10).toFixed(4));
-  }if (chart) chart.destroy();
-  chart = new Chart(ctx,{
-    type:'line',
-    data:{
-      labels:machs,
-      datasets:[
-        {label:'T/T₀', data:TT, borderColor:'#FF6B6B', borderWidth:2, pointRadius:0, tension:0.3},{label:'P/P₀', data:PP, borderColor:'#007BFF', borderWidth:2, pointRadius:0, tension:0.3},{label:'ρ/ρ₀', data:rhorho, borderColor:'#00B4D8', borderWidth:2, pointRadius:0, tension:0.3},{label:'A/A* (÷10 for M<1)', data:AA, borderColor:'#FFC107', borderWidth:2, pointRadius:0, tension:0.3}
-      ]
-    },
-    options:{
-      responsive:true,animation:false,
-      animation:{duration:300},
-      plugins:{legend:{position:'top',labels:{font:{size:11}}}},
-      scales:{
-        x:{ title:{display:true,text:'マッハ数 M'},ticks:{maxTicksLimit:10}},
-        y:{title:{display:true,text:'流れ関係比'},min:0,max:1.1}
-      }
+function el(id){return document.getElementById(id);}
+function num(id){var e=el(id);return e?parseFloat(e.value):NaN;}
+
+function isen(M,g){
+  var t0 = 1 + (g-1)/2*M*M;          // T0/T
+  var TT = 1/t0;                       // T/T0
+  var PP = Math.pow(TT, g/(g-1));      // P/P0
+  var RR = Math.pow(TT, 1/(g-1));      // rho/rho0
+  var exp = (g+1)/(2*(g-1));
+  var AA = (1/M)*Math.pow((2/(g+1))*t0, exp); // A/A*
+  return {TT:TT, PP:PP, RR:RR, AA:AA};
+}
+function normalShockM2(M1,g){
+  if(M1<=1) return null;
+  var M2sq = (M1*M1 + 2/(g-1)) / (2*g/(g-1)*M1*M1 - 1);
+  return Math.sqrt(M2sq);
+}
+
+var MMAX = 5;
+var sweepM = 0.05;     // current swept Mach
+var sweeping = false;
+var animId = null;
+var lastTs = 0;
+
+/* ---- HiDPI ---- */
+var cssW=0, cssH=440;
+function resize(){
+  var rect = canvas.parentElement.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width - 44));
+  cssH = 440;
+  var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  canvas.style.width = cssW+'px';
+  canvas.style.height = cssH+'px';
+  canvas.width = Math.round(cssW*dpr);
+  canvas.height = Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+/* curve color, parcel color ramp from hot(low M) to cold(high M) */
+function lerp(a,b,t){return a+(b-a)*t;}
+function parcelColor(TT){
+  // TT in (0,1]; near 1 hot/red, near 0 cold/blue
+  var t = Math.max(0,Math.min(1,TT));
+  var r = Math.round(lerp(70,255,t));
+  var gC = Math.round(lerp(120,90,t));
+  var b = Math.round(lerp(230,70,t));
+  return 'rgb('+r+','+gC+','+b+')';
+}
+
+function syncStats(M,g){
+  var r = isen(M,g);
+  var set=function(id,v){var e=el(id);if(e)e.textContent=v;};
+  set('st-TT0', r.TT.toFixed(4));
+  set('st-PP0', r.PP.toFixed(4));
+  set('st-RR',  r.RR.toFixed(4));
+  set('st-AA',  r.AA.toFixed(3));
+  var st = el('shock-type');
+  var m2 = (st && st.value==='normal') ? normalShockM2(M,g) : null;
+  set('st-M2', m2 ? m2.toFixed(4) : '—');
+}
+
+function render(){
+  resize();
+  var W=cssW, H=cssH, g=num('gamma');
+  if(isNaN(g)) g=1.4;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+
+  // layout: top plot = ratios+area vs M, bottom band = parcel
+  var padL=46, padR=18, padT=24;
+  var plotH = H*0.62;
+  var plotB = padT+plotH;       // y of M-axis baseline (ratio=0)
+  var pw = W-padL-padR;
+
+  // transforms
+  function tx(M){return padL + (M/MMAX)*pw;}
+  function tyR(v){return plotB - v*plotH; }            // ratio 0..1.1 region; we clamp draw to 1
+  // area ratio scaled to its own axis on right (0..6 -> plot height), log-ish min at M=1
+  var AMAX = 6;
+  function tyA(a){return plotB - (Math.min(a,AMAX)/AMAX)*plotH;}
+
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1; ctx.font='10px Roboto Mono';
+  ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.4)';
+  for(var i=0;i<=5;i++){
+    var yv=i/5; var y=tyR(yv);
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+    ctx.fillText(yv.toFixed(1), padL-5, y+3);
+  }
+  ctx.textAlign='center';
+  for(var k=0;k<=5;k++){
+    var Mv=MMAX*k/5; var x=tx(Mv);
+    ctx.strokeStyle='rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,plotB); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.4)';
+    ctx.fillText(Mv.toFixed(0), x, plotB+14);
+  }
+  // M=1 sonic line
+  ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.setLineDash([4,4]); ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.moveTo(tx(1),padT); ctx.lineTo(tx(1),plotB); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='10px Noto Sans JP'; ctx.textAlign='center';
+  ctx.fillText(LBL.sonic, tx(1), padT-8 < 12 ? 12 : padT+10);
+
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='11px Noto Sans JP';
+  ctx.fillText('マッハ数 M', (padL+W-padR)/2, plotB+28);
+
+  // draw curves
+  function curve(fn, color, dashed){
+    ctx.strokeStyle=color; ctx.lineWidth=2.4; if(dashed)ctx.setLineDash([6,4]);
+    ctx.beginPath(); var first=true;
+    for(var M=0.05;M<=MMAX+1e-9;M+=0.025){
+      var v=fn(M); if(v===null||!isFinite(v))continue;
+      var x=tx(M); var y=v.y;
+      if(first){ctx.moveTo(x,y);first=false;}else ctx.lineTo(x,y);
     }
-  });
-}function drawNozzle(M, g){
-  const cv = document.getElementById('nozzleCanvas');
-  const ctx2 = cv.getContext('2d');
-  cv.width = cv.offsetWidth || 700;
-  const W = cv.width, H = 320;
-  ctx2.clearRect(0,0,W,H);
-
-  const steps = 100;
-  const pad = 40;
-  const cx = W/2;
-  const throatY = H/2;
-  const maxR = H*0.38;
-  const minR = H*0.12;
-
-  // nozzle profile
-  ctx2.beginPath();
-  const topPts=[], botPts=[];
-  for (let i=0; i<=steps; i++) {
-    const x = pad + (W-2*pad)*i/steps;
-    const t = (i/steps - 0.5)*2; // -1 to 1
-    const r = minR + (maxR-minR)*t*t;
-    topPts.push({x, y: throatY - r});
-    botPts.push({x, y: throatY + r});
-  }ctx2.strokeStyle='#007BFF';
-  ctx2.lineWidth=2;
-  ctx2.beginPath();
-  topPts.forEach((p,i)=>i===0?ctx2.moveTo(p.x,p.y):ctx2.lineTo(p.x,p.y));
-  ctx2.stroke();
-  ctx2.beginPath();
-  botPts.forEach((p,i)=>i===0?ctx2.moveTo(p.x,p.y):ctx2.lineTo(p.x,p.y));
-  ctx2.stroke();
-
-  // fill between
-  ctx2.beginPath();
-  topPts.forEach((p,i)=>i===0?ctx2.moveTo(p.x,p.y):ctx2.lineTo(p.x,p.y));
-  botPts.slice().reverse().forEach(p=>ctx2.lineTo(p.x,p.y));
-  ctx2.closePath();
-  ctx2.fillStyle='rgba(0,123,255,0.07)';
-  ctx2.fill();
-
-  // throat line
-  ctx2.setLineDash([4,4]);
-  ctx2.strokeStyle='rgba(255,255,255,0.5)';
-  ctx2.beginPath();
-  ctx2.moveTo(W/2, throatY-minR-10);
-  ctx2.lineTo(W/2, throatY+minR+10);
-  ctx2.stroke();
-  ctx2.setLineDash([]);
-
-  // Mach distribution
-  const res = isentropic(M, g);
-  ctx2.fillStyle='rgba(255,193,7,0.9)';
-  ctx2.font='bold 13px Roboto Mono,monospace';
-  ctx2.fillText(`M = ${parseFloat(document.getElementById('mach').value).toFixed(2)}`, 20, 30);
-  ctx2.fillStyle='rgba(0,180,216,0.9)';
-  ctx2.fillText(`T/T₀ = ${res.T.toFixed(4)}`, 20, 50);
-  ctx2.fillText(`P/P₀ = ${res.P.toFixed(4)}`, 20, 70);
-  ctx2.fillStyle='#fff';
-  ctx2.font='12px Noto Sans JP,sans-serif';
-  ctx2.fillText('スロート (M=1)', W/2-40, throatY-minR-16);
-
-  const shock = document.getElementById('shock-type').value;
-  if (shock === 'normal' && M > 1){
-    const sx = W*0.72;
-    ctx2.strokeStyle='rgba(255,100,100,0.9)';
-    ctx2.lineWidth=3;
-    ctx2.beginPath();
-    ctx2.moveTo(sx, throatY-maxR*0.7);
-    ctx2.lineTo(sx, throatY+maxR*0.7);
-    ctx2.stroke();
-    ctx2.fillStyle='rgba(255,100,100,0.9)';
-    ctx2.font='11px sans-serif';
-    ctx2.fillText('垂直衝撃波', sx+6, throatY-maxR*0.5);
-    ctx2.lineWidth=2;
+    ctx.stroke(); ctx.setLineDash([]);
   }
-}function update(){
-  const g = parseFloat(document.getElementById('gamma').value);
-  const M = parseFloat(document.getElementById('mach').value);
-  const r = isentropic(M, g);
-  document.getElementById('st-TT0').textContent = r.T.toFixed(4);
-  document.getElementById('st-PP0').textContent = r.P.toFixed(4);
-  document.getElementById('st-AA').textContent = r.A.toFixed(3);
+  curve(function(M){var r=isen(M,g);return {y:tyR(r.TT)};}, '#FF6B6B');
+  curve(function(M){var r=isen(M,g);return {y:tyR(r.PP)};}, '#4aa3ff');
+  curve(function(M){var r=isen(M,g);return {y:tyR(r.RR)};}, '#00d4a0');
+  curve(function(M){var r=isen(M,g);return {y:tyA(r.AA)};}, '#FFC107', true);
 
-  const shock = document.getElementById('shock-type').value;
-  if (shock === 'normal' && M > 1) {
-    const s = normalShock(M, g);
-    document.getElementById('st-M2').textContent = s.M2.toFixed(4);
-  }else{
-    document.getElementById('st-M2').textContent = '—';
-  }
+  // legend
+  ctx.font='11px Noto Sans JP'; ctx.textAlign='left';
+  var lx=padL+6, ly=padT+12;
+  function leg(c,t,dash){ctx.fillStyle=c;ctx.fillRect(lx,ly-7,14,3);ctx.fillStyle='rgba(255,255,255,0.85)';ctx.fillText(t,lx+20,ly-2);lx+=20+ctx.measureText(t).width+16;}
+  leg('#FF6B6B','T/T₀');leg('#4aa3ff','P/P₀');leg('#00d4a0','ρ/ρ₀');leg('#FFC107','A/A*');
 
-  buildChart(g);
-  drawNozzle(M, g);
-}function showTab(t){
-  currentTab = t;
-  document.getElementById('tab-chart').style.display = t==='chart'?'block':'none';
-  document.getElementById('tab-nozzle').style.display = t==='nozzle'?'block':'none';
-  document.querySelectorAll('.viz-tab').forEach((el,i)=>el.classList.toggle('active',i===(t==='chart'?0:1)));
-  if (t==='nozzle') {
-    const g = parseFloat(document.getElementById('gamma').value);
-    const M = parseFloat(document.getElementById('mach').value);
-    drawNozzle(M, g);
-  }
-}['gamma','mach','shock-type'].forEach(id=>document.getElementById(id).addEventListener('input',update));
-update();
+  // current swept Mach marker
+  var M = sweepM;
+  var r = isen(M,g);
+  var mx = tx(M);
+  ctx.strokeStyle='rgba(255,213,74,0.5)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(mx,padT); ctx.lineTo(mx,plotB); ctx.stroke();
+  function dot(y,c){ctx.beginPath();ctx.arc(mx,y,4.5,0,7);ctx.fillStyle=c;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke();}
+  dot(tyR(r.TT),'#FF6B6B'); dot(tyR(r.PP),'#4aa3ff'); dot(tyR(r.RR),'#00d4a0'); dot(tyA(r.AA),'#FFC107');
+
+  // ===== parcel band (gas accelerating) =====
+  var bandT = plotB+34;
+  var bandH = H-bandT-10;
+  var bandCY = bandT+bandH/2;
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='left';
+  ctx.fillText(LBL.parcel+' — '+(M<1?LBL.subsonic:LBL.supersonic)+' M='+M.toFixed(2), padL, bandT-4);
+  // track
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(padL, bandCY); ctx.lineTo(W-padR, bandCY); ctx.stroke();
+  // parcel position = follows mach across band; size ~ density, color ~ temperature
+  var px = padL + (M/MMAX)*(W-padL-padR);
+  var rad = 7 + 20*r.RR;          // denser => bigger
+  var pc = parcelColor(r.TT);
+  var grd = ctx.createRadialGradient(px-rad*0.3, bandCY-rad*0.3, 1, px, bandCY, rad);
+  grd.addColorStop(0,'#ffffff'); grd.addColorStop(1, pc);
+  ctx.beginPath(); ctx.arc(px, bandCY, rad, 0, 7); ctx.fillStyle=grd; ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1; ctx.stroke();
+  // velocity arrow
+  var aw = 10+18*M;
+  ctx.strokeStyle='rgba(255,213,74,0.9)'; ctx.lineWidth=2.4;
+  ctx.beginPath(); ctx.moveTo(px+rad+3, bandCY); ctx.lineTo(px+rad+3+aw, bandCY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px+rad+3+aw,bandCY); ctx.lineTo(px+rad+3+aw-6,bandCY-4); ctx.lineTo(px+rad+3+aw-6,bandCY+4); ctx.closePath();
+  ctx.fillStyle='rgba(255,213,74,0.9)'; ctx.fill();
+
+  syncStats(M,g);
+}
+
+/* sweep loop */
+function loop(ts){
+  if(!sweeping){animId=null;return;}
+  if(!lastTs)lastTs=ts;
+  var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+  sweepM += dt*0.9;          // sweep speed (M per sec)
+  if(sweepM>MMAX){sweepM=0.05;}
+  // keep slider in sync so controls reflect sweep
+  var mEl=el('mach'); if(mEl){mEl.value=sweepM.toFixed(2); var mn=el('machValNum'); if(mn)mn.value=sweepM.toFixed(2);}
+  render();
+  animId=requestAnimationFrame(loop);
+}
+function startSweep(){
+  if(reduce)return;
+  sweeping=true; lastTs=0;
+  var b=el('btnSweep'); if(b)b.innerHTML='<i class="fas fa-pause"></i> '+LBL.pause;
+  if(!animId)animId=requestAnimationFrame(loop);
+}
+function stopSweep(){
+  sweeping=false;
+  if(animId){cancelAnimationFrame(animId);animId=null;}
+  var b=el('btnSweep'); if(b)b.innerHTML='<i class="fas fa-play"></i> '+LBL.sweep;
+}
+function toggleSweep(){ sweeping?stopSweep():startSweep(); }
+function resetSweep(){ stopSweep(); sweepM = num('mach')||0.05; render(); }
+
+window.__isen = { toggleSweep:toggleSweep, resetSweep:resetSweep };
+
+/* manual control: when user changes sliders, stop sweep & follow input */
+function onParam(){
+  stopSweep();
+  var m=num('mach'); if(!isNaN(m)) sweepM=m;
+  render();
+}
+['gamma','mach','shock-type','gamValNum','machValNum'].forEach(function(id){
+  var e=el(id); if(e) e.addEventListener('input', onParam);
+});
+canvas.addEventListener('keydown',function(e){
+  if(e.key===' '||e.key==='Enter'){e.preventDefault();toggleSweep();}
+});
+window.addEventListener('resize', render);
+
+// init
+sweepM = num('mach')||2.0;
+render();
+if(!reduce){ startSweep(); }
+})();
 </script>
 
 <section class="explanation">
@@ -391,6 +471,9 @@ update();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="isentropic-flow.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -433,6 +516,16 @@ update();
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

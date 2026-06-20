@@ -43,14 +43,14 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "DCモーター速度トルク特性シミュレーター",
       "description": "DCモーターの速度トルク特性・効率・起動電流をリアルタイムシミュレーション。分巻・直巻・永久磁石・BLDC対応。界磁弱め・回生制動オーバーレイ表示。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/motor-drives.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true
     },{
@@ -251,9 +251,21 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="sel-btn" onclick="setBrake('regen',this)">回生</button>
       <button class="sel-btn" onclick="setBrake('dynamic',this)">発電制動</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-bolt"></i> ライブ可視化 — 回転子と動作点</div>
+      <canvas id="v2HeroCanvas" height="340" role="img" aria-label="DCモーターの回転子が動作速度で回転し、速度トルク特性線上を動作点が移動する様子のアニメーション"></canvas>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:8px;line-height:1.5">負荷トルク $T_L$ を上げると回転子が遅くなり、動作点が特性線を下にすべり、電機子電流が増加します。電圧 $V_a$・抵抗 $R_a$ を変えると線全体が動きます。</div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -520,6 +532,191 @@ function setMotor(t, btn){
 compute();
 </script>
 
+<script>
+/* === V2 hero animation: spinning rotor + sliding operating point (DC motor speed-torque) === */
+(function(){
+  "use strict";
+  var L = {
+    rotor:'回転子', spd:'速度', cur:'電流 Ia', noLoad:'無負荷速度',
+    stall:'停動', op:'動作点', torque:'トルク T', speedAx:'速度 n [rpm]',
+    emf:'逆起電力 E', motorT:'モータートルク = 負荷トルク'
+  };
+  var canvas = document.getElementById('v2HeroCanvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var rotorAngle = 0, cssW = 0, cssH = 340, lastTs = 0;
+
+  function num(id){ var e = document.getElementById(id); return e ? parseFloat(e.value) : NaN; }
+  function isSeries(){ return typeof motorType !== 'undefined' && motorType === 'series'; }
+
+  function model(){
+    var Va = num('vaSlider'), Ra = num('raSlider'), Ke = num('keSlider'), TL = num('tlSlider');
+    if (!isFinite(Va)||!isFinite(Ra)||!isFinite(Ke)||!isFinite(TL)) return null;
+    var Ke_si = Ke * 60 / (2*Math.PI);   // V/(rad/s)
+    var Kt = Ke_si;                       // SI: Kt = Ke
+    var w0 = Va / Ke_si;                  // rad/s, no-load
+    var rpm0 = w0 * 60 / (2*Math.PI);
+    var Ts = Kt * Va / Ra;                // stall torque
+    var Istart = Va / Ra;
+    var TLc = Math.min(TL, Ts*0.999);     // clamp load to within curve
+    var opT, opI, wop;
+    if (isSeries()){
+      opI = Math.sqrt(Math.max(0, TLc/(Kt*0.01+0.001)));
+      wop = Math.max(0, (Va - opI*Ra)/Ke_si);
+      opT = TLc;
+    } else {
+      opI = TLc / Kt;
+      wop = Math.max(0, (Va - opI*Ra)/Ke_si);
+      opT = TLc;
+    }
+    var rpmOp = wop * 60 / (2*Math.PI);
+    var E = Ke_si * wop;                   // back-EMF
+    var Pout = opT * wop;
+    var Pin = Va * opI;
+    var eff = Pin > 0 ? Math.min(99, Pout/Pin*100) : 0;
+    return { Va:Va, Ra:Ra, Ke_si:Ke_si, Kt:Kt, w0:w0, rpm0:rpm0, Ts:Ts, Istart:Istart,
+             opT:opT, opI:opI, wop:wop, rpmOp:rpmOp, E:E, Pout:Pout, eff:eff };
+  }
+
+  function setTxt(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; }
+  function pushStats(m){
+    setTxt('statNoLoad', m.rpm0.toFixed(0));
+    setTxt('statStall', m.Ts.toFixed(2));
+    setTxt('statOpSpeed', m.rpmOp.toFixed(0));
+    setTxt('statStartI', m.Istart.toFixed(1));
+    setTxt('statEff', m.eff.toFixed(1));
+    setTxt('statPower', m.Pout.toFixed(1));
+  }
+
+  function resize(){
+    var rect = canvas.parentElement.getBoundingClientRect();
+    cssW = Math.max(280, Math.floor(rect.width - 44));
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawArrow(x0,y0,x1,y1,color,w){
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w;
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+    var a=Math.atan2(y1-y0,x1-x0), h=6+w;
+    ctx.beginPath(); ctx.moveTo(x1,y1);
+    ctx.lineTo(x1-h*Math.cos(a-0.4), y1-h*Math.sin(a-0.4));
+    ctx.lineTo(x1-h*Math.cos(a+0.4), y1-h*Math.sin(a+0.4));
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawMotor(m, cx, cy, R){
+    // housing
+    ctx.fillStyle='#10243f'; ctx.strokeStyle='rgba(0,180,216,.5)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(cx,cy,R+10,0,7); ctx.fill(); ctx.stroke();
+    // stator poles (N/S) top & bottom
+    ctx.fillStyle='rgba(0,123,255,.25)';
+    ctx.beginPath(); ctx.arc(cx,cy-R-2,12,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy+R+2,12,0,7); ctx.fill();
+    // rotor disc
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(rotorAngle);
+    var g = ctx.createRadialGradient(-R*0.3,-R*0.3,2,0,0,R);
+    g.addColorStop(0,'#ffe49a'); g.addColorStop(1,'#e08e2a');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.fill();
+    // armature bars (windings) — current intensity → color
+    var iFrac = Math.max(0, Math.min(1, m.opI / Math.max(m.Istart,1e-6)));
+    var barCol = 'rgba('+Math.round(225+30*iFrac)+','+Math.round(120-90*iFrac)+',60,'+(0.55+0.4*iFrac)+')';
+    for (var k=0;k<8;k++){
+      var a = k*Math.PI/4;
+      ctx.strokeStyle=barCol; ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*R*0.35, Math.sin(a)*R*0.35);
+      ctx.lineTo(Math.cos(a)*R*0.92, Math.sin(a)*R*0.92);
+      ctx.stroke();
+    }
+    ctx.fillStyle='#0a1628'; ctx.beginPath(); ctx.arc(0,0,R*0.18,0,7); ctx.fill();
+    // shaft marker
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(R*0.85,0); ctx.stroke();
+    ctx.restore();
+    // torque arrow (curved, magnitude ∝ opT)
+    var tFrac = Math.max(0.15, Math.min(1, m.opT / Math.max(m.Ts,1e-6)));
+    ctx.strokeStyle='#00b894'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(cx,cy,R+22, -1.1, -1.1 + 2.0*tFrac); ctx.stroke();
+    var ea = -1.1 + 2.0*tFrac;
+    drawArrow(cx+(R+22)*Math.cos(ea-0.05), cy+(R+22)*Math.sin(ea-0.05),
+              cx+(R+22)*Math.cos(ea), cy+(R+22)*Math.sin(ea), '#00b894', 2);
+    // labels
+    ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText(L.rotor, cx, cy+R+30);
+    ctx.fillStyle='#00b894'; ctx.fillText(L.torque, cx, cy-R-22);
+  }
+
+  function drawCurve(m, x0, y0, w, h){
+    // axes
+    ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y0-h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0+w, y0); ctx.stroke();
+    var Tmax = Math.max(m.Ts, 1e-6), Nmax = Math.max(m.rpm0, 1);
+    function px(T){ return x0 + (T/Tmax)*w; }
+    function py(n){ return y0 - (n/Nmax)*h; }
+    // characteristic line: (0, rpm0) -> (Ts, 0)
+    ctx.strokeStyle='#007BFF'; ctx.lineWidth=2.6;
+    ctx.beginPath(); ctx.moveTo(px(0), py(m.rpm0)); ctx.lineTo(px(m.Ts), py(0)); ctx.stroke();
+    // endpoints
+    ctx.fillStyle='#00B4D8'; ctx.beginPath(); ctx.arc(px(0), py(m.rpm0), 4, 0, 7); ctx.fill();
+    ctx.fillStyle='#e17055'; ctx.beginPath(); ctx.arc(px(m.Ts), py(0), 4, 0, 7); ctx.fill();
+    // load line (vertical at opT)
+    ctx.strokeStyle='rgba(255,213,74,.5)'; ctx.setLineDash([4,4]); ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(px(m.opT), y0); ctx.lineTo(px(m.opT), py(m.rpmOp)); ctx.stroke();
+    ctx.setLineDash([]);
+    // operating point
+    var ox = px(m.opT), oy = py(m.rpmOp);
+    ctx.fillStyle='#ffd54a'; ctx.beginPath(); ctx.arc(ox, oy, 6, 0, 7); ctx.fill();
+    ctx.strokeStyle='rgba(10,22,40,.8)'; ctx.lineWidth=1.5; ctx.stroke();
+    // labels
+    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='10px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText(L.noLoad, px(0)+6, py(m.rpm0)+2);
+    ctx.textAlign='right'; ctx.fillText(L.stall, px(m.Ts)-2, py(0)-6);
+    ctx.fillStyle='#ffd54a'; ctx.textAlign='center';
+    ctx.fillText(L.op, ox, oy-10);
+    ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='11px Noto Sans JP';
+    ctx.fillText(L.speedAx, x0-2, y0-h-6);
+    ctx.textAlign='right'; ctx.fillText(L.torque, x0+w, y0+16);
+  }
+
+  function frame(ts){
+    resize();
+    var W = cssW, H = cssH;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+    var m = model();
+    if (!m){ requestAnimationFrame(frame); return; }
+    pushStats(m);
+    // advance rotor by operating speed
+    if (!reduce){
+      var dt = lastTs ? Math.min(0.05, (ts-lastTs)/1000) : 0.016;
+      lastTs = ts;
+      var wview = (m.rpmOp/Math.max(m.rpm0,1)) * 6.0; // visual rad/s, scaled
+      rotorAngle += wview * dt;
+    }
+    // layout: motor left, curve right
+    var motorR = Math.min(70, Math.max(46, W*0.13));
+    var cx = Math.max(motorR+30, W*0.20), cy = H*0.5;
+    drawMotor(m, cx, cy, motorR);
+    var gx = cx + motorR + 50;
+    var cw = W - gx - 24, ch = H - 70;
+    if (cw > 120) drawCurve(m, gx, H-30, cw, ch);
+    // live readout strip
+    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText(L.spd+' '+m.rpmOp.toFixed(0)+' rpm   '+L.cur+' '+m.opI.toFixed(1)+' A   '+L.emf+' '+m.E.toFixed(1)+' V', 12, 18);
+    if (!reduce) requestAnimationFrame(frame);
+  }
+
+  if (reduce){ requestAnimationFrame(frame); }
+  else { requestAnimationFrame(frame); }
+})();
+</script>
+
 <section class="explanation">
   <h2>DCモーターの速度トルク特性とは</h2>
   <div class="chat">
@@ -580,6 +777,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="motor-drives.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -633,15 +833,15 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>供給電圧(Va)を0～300Vの範囲で設定し、モーターの駆動条件を決定します</li>
-<li>電機子抵抗(Ra)は銅損計算に影響するため、実測値または仕様書から入力してください(DC直巻モーターは0.5～2.0Ω、小型永久磁石モーターは5～15Ω程度)</li>
-<li>トルク定数(Ke)と逆起電力定数(La)を順次設定し、シミュレータの無負荷速度・停動トルク・起動電流をリアルタイム確認します</li>
+<li>供給電圧(Va)を12～800Vの範囲で設定し、モーターの駆動条件を決定します</li>
+<li>電機子抵抗(Ra)は銅損計算に影響するため、実測値または仕様書から入力してください(本ツールのRa範囲は0.01～10Ω。DC直巻モーターは0.5～2.0Ω程度)</li>
+<li>逆起電力定数(Ke、V/rpm)とインダクタンス(La、mH)を順次設定し、シミュレータの無負荷速度・停動トルク・起動電流をリアルタイム確認します</li>
 <li>負荷トルクを段階的に増加させながら動作点の軌跡を観察し、効率ピークと回転速度の関係を分析します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>車両用DC直巻モーター(Pm=5kW)をシミュレートする場合、Va=48V、Ra=0.8Ω、Ke=0.12N·m/A、La=0.12V·s/radと設定します。無負荷時の計算式より無負荷速度=(48-0)/(0.12)≒400rpm、停動トルク=0.12×(48/0.8)=7.2N·mとなります。30N·mの負荷を印加すると動作速度は約280rpmまで低下し、銅損I²Ra=25×0.8=20W、出力P=30×280×2π/60≒879Wで効率は約81%です。電気的時定数τ=La/Ra=0.12/0.8=0.15msとなり、高速応答性を確認できます。</p>
+<p>PM DCモーターをシミュレートする場合、Va=48V、Ra=0.8Ω、Ke=0.010V/rpm、La=5.0mHと設定します。SI換算 K_e=K_T=Ke×60/(2π)≒0.0955V·s/rad より、無負荷速度=Va/K_e≒4,800rpm、停動トルク=K_T×Va/Ra≒5.73N·mとなります。負荷トルク1.0N·mを印加すると動作速度は約3,962rpmまで低下し、出力P=T×ω≒415W、効率は計算結果パネルで確認できます。電気的時定数τ=La/Ra=0.005/0.8≒6.25msとなり、過渡応答が確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -652,6 +852,16 @@ compute();
 <li>電動パワーステアリングでは、Ke感度が高すぎると制御が不安定化するため、シミュレーターでゲイン余裕を0.5Keで試算し安定性を確保します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

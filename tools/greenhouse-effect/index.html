@@ -34,7 +34,7 @@ MathJax = { tex: { inlineMath: [['$','$']] }, options: { skipHtmlTags: ['script'
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "温室効果・地球温暖化シミュレーター",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Any",
@@ -214,7 +214,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div id="temp-badge" class="temp-badge">+15.0°C（現在）</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -239,6 +247,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="stat-label">大気吸収率 ε</div>
         <div class="stat-value" id="eps-val">0.77</div>
         <div class="stat-unit">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">実効放射温度 Te</div>
+        <div class="stat-value" id="te-val">-18.3</div>
+        <div class="stat-unit">°C</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">外向き赤外 OLR</div>
+        <div class="stat-value" id="olr-val">239</div>
+        <div class="stat-unit">W/m²</div>
       </div>
     </div>
     </div>
@@ -329,6 +347,10 @@ $T_e = \left(\frac{S(1-\alpha)}{4\sigma}\right)^{1/4}$<br>
 
 
 <script>
+(function(){
+'use strict';
+const SIGMA = 5.67e-8;
+const S_CONST = 1361;
 let activeTab = 0;
 let tempChart = null, gasChart = null;
 
@@ -339,224 +361,298 @@ const scenarios = [
   { co2: 1100, ch4: 3500, n2o: 435, albedo: 0.32, name: 'SSP5-8.5' }
 ];
 
+const elv = id => document.getElementById(id);
+
 function setScenario(i) {
   document.querySelectorAll('.scenario-btn').forEach((b,j) => b.classList.toggle('active', i===j));
   const s = scenarios[i];
-  document.getElementById('co2-slider').value = s.co2;
-  document.getElementById('ch4-slider').value = s.ch4;
-  document.getElementById('n2o-slider').value = s.n2o;
-  document.getElementById('albedo-slider').value = s.albedo;
+  elv('co2-slider').value = s.co2; elv('co2Num').value = s.co2;
+  elv('ch4-slider').value = s.ch4; elv('ch4Num').value = s.ch4;
+  elv('n2o-slider').value = s.n2o; elv('n2oNum').value = s.n2o;
+  elv('albedo-slider').value = s.albedo; elv('albedoNum').value = s.albedo;
   update();
 }
+window.setScenario = setScenario;
 
 function switchTab(i) {
   activeTab = i;
   document.querySelectorAll('.tab-btn').forEach((b,j) => b.classList.toggle('active', i===j));
   ['tab0','tab1','tab2'].forEach((id,j) => {
-    document.getElementById(id).style.display = i===j ? '' : 'none';
+    const e = elv(id); if (e) e.style.display = i===j ? '' : 'none';
   });
   update();
 }
+window.switchTab = switchTab;
 
+// ===== Physics: zero-D radiative energy balance =====
 function calcTemp(co2, ch4, n2o, albedo) {
-  const S = 1361; // solar constant W/m²
-  const sigma = 5.67e-8;
   const co2_0 = 280, ch4_0 = 722, n2o_0 = 270;
-
-  // Radiative forcing (IPCC AR5 simplified)
   const RF_co2 = 5.35 * Math.log(co2 / co2_0);
   const RF_ch4 = 0.036 * (Math.sqrt(ch4) - Math.sqrt(ch4_0));
   const RF_n2o = 0.12 * (Math.sqrt(n2o) - Math.sqrt(n2o_0));
   const RF_total = RF_co2 + RF_ch4 + RF_n2o;
 
-  // Effective emissivity from forcing
-  // Base emissivity at pre-industrial state (T≈288K, -18°C without GHG → +15°C with)
-  const eps_base = 0.74;
-  const dEps = RF_total / (sigma * 4 * Math.pow(288, 3));
-  const eps = Math.min(0.99, eps_base + dEps);
+  const eps_base = 0.7591;        // present-day baseline emissivity
+  const dEps = RF_total * 0.00739;
+  const eps = Math.min(0.995, Math.max(0.0, eps_base + dEps));
 
-  // Simple energy balance: T = Te / (1 - eps/2)^(1/4)
-  const Te = Math.pow(S * (1 - albedo) / (4 * sigma), 0.25);
+  // Effective (no-greenhouse) temperature
+  const Te = Math.pow(S_CONST * (1 - albedo) / (4 * SIGMA), 0.25);
+  // Single-layer greenhouse: Ts = Te / (1 - eps/2)^(1/4); ε=1 → Ts=Te·2^0.25
   const T = Te / Math.pow(1 - eps / 2, 0.25);
-
-  return { T: T - 273.15, RF: RF_total, eps, RF_co2, RF_ch4, RF_n2o };
+  const OLR = S_CONST * (1 - albedo) / 4; // outgoing longwave at TOA = absorbed shortwave (equilibrium)
+  return { T: T - 273.15, Te: Te - 273.15, RF: RF_total, eps, OLR, RF_co2, RF_ch4, RF_n2o };
 }
 
-function update() {
-  const co2 = parseFloat(document.getElementById('co2-slider').value);
-  const ch4 = parseFloat(document.getElementById('ch4-slider').value);
-  const n2o = parseFloat(document.getElementById('n2o-slider').value);
-  const albedo = parseFloat(document.getElementById('albedo-slider').value);
+// shared model state read by the animation loop
+const M = { co2:421, ch4:1900, n2o:335, albedo:0.30, res:null };
 
-  const res = calcTemp(co2, ch4, n2o, albedo);
+function update() {
+  M.co2 = parseFloat(elv('co2-slider').value);
+  M.ch4 = parseFloat(elv('ch4-slider').value);
+  M.n2o = parseFloat(elv('n2o-slider').value);
+  M.albedo = parseFloat(elv('albedo-slider').value);
+
+  const res = calcTemp(M.co2, M.ch4, M.n2o, M.albedo);
+  M.res = res;
   const res0 = calcTemp(280, 722, 270, 0.30);
   const dT = res.T - res0.T;
 
-  document.getElementById('temp-val').textContent = res.T.toFixed(1);
-  document.getElementById('dt-val').textContent = (dT >= 0 ? '+' : '') + dT.toFixed(2);
-  document.getElementById('rf-val').textContent = (res.RF >= 0 ? '+' : '') + res.RF.toFixed(2);
-  document.getElementById('eps-val').textContent = res.eps.toFixed(3);
+  elv('temp-val').textContent = res.T.toFixed(1);
+  elv('dt-val').textContent = (dT >= 0 ? '+' : '') + dT.toFixed(2);
+  elv('rf-val').textContent = (res.RF >= 0 ? '+' : '') + res.RF.toFixed(2);
+  elv('eps-val').textContent = res.eps.toFixed(3);
+  if (elv('te-val')) elv('te-val').textContent = res.Te.toFixed(1);
+  if (elv('olr-val')) elv('olr-val').textContent = res.OLR.toFixed(0);
 
-  const badge = document.getElementById('temp-badge');
+  const badge = elv('temp-badge');
   if (dT < 0) { badge.style.background = '#BDE0FF'; badge.style.color = '#001F3F'; badge.textContent = `${res.T.toFixed(1)}°C (ΔT ${dT.toFixed(1)}°C)`; }
   else if (dT < 1.5) { badge.style.background = '#D5F5E3'; badge.style.color = '#1a5c2e'; badge.textContent = `${res.T.toFixed(1)}°C (ΔT +${dT.toFixed(1)}°C)`; }
   else if (dT < 2) { badge.style.background = '#FEF9E7'; badge.style.color = '#9a6000'; badge.textContent = `⚠️ ${res.T.toFixed(1)}°C (ΔT +${dT.toFixed(1)}°C — 1.5℃超過)`; }
   else { badge.style.background = '#FDEDEC'; badge.style.color = '#7b241c'; badge.textContent = `🔥 ${res.T.toFixed(1)}°C (ΔT +${dT.toFixed(1)}°C — 2℃超過)`; }
 
-  if (activeTab === 0) drawEnergy(co2, ch4, n2o, albedo, res);
-  else if (activeTab === 1) drawTempChart();
-  else drawGasChart(res);
+  if (activeTab === 1) drawTempChart();
+  else if (activeTab === 2) drawGasChart(res);
+  // tab0 is rendered continuously by the animation loop
+}
+window.update = update;
+
+/* ============================================================
+   V2 HERO: live planetary energy-balance photon animation
+   ☀️ shortwave in → surface → IR up → GHG absorb & re-emit ↓
+   ============================================================ */
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas = elv('energy-canvas');
+const ctx = canvas ? canvas.getContext('2d') : null;
+let cssW = 560, cssH = 300, animId = null, lastTs = 0;
+
+// layout (in CSS px)
+const SKY_TOP = 6, ATM_TOP = 66, ATM_BOT = 168, SURF = 210;
+
+function resizeCanvas(){
+  if (!canvas) return;
+  const W = (canvas.parentElement && canvas.parentElement.clientWidth) || 560;
+  cssW = Math.max(280, W);
+  cssH = 300;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas.dataset.cssW = String(cssW);
+  canvas.dataset.cssH = String(cssH);
+  if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function drawEnergy(co2, ch4, n2o, albedo, res) {
-  const canvas = document.getElementById('energy-canvas');
-  const W = canvas.parentElement.clientWidth || 560;
-  var __novaW = W;
-  var __novaH = 300;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, W, 300);
+// photon pools
+let solar = [], reflected = [], irUp = [], irDown = [], toSpace = [];
+function mkPhoton(x, y, vy, kind){ return { x, y, vy, vx:(Math.random()-0.5)*0.25, kind, life:0 }; }
 
-  // Sky gradient
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, 180);
-  skyGrad.addColorStop(0, '#001F3F');
-  skyGrad.addColorStop(1, '#87CEEB');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, W, 200);
-
-  // Ground
-  const groundGrad = ctx.createLinearGradient(0, 200, 0, 300);
-  groundGrad.addColorStop(0, '#2d6a4f');
-  groundGrad.addColorStop(1, '#1a3a2a');
-  ctx.fillStyle = groundGrad;
-  ctx.fillRect(0, 200, W, 100);
-
-  // Atmosphere layer
-  const atmoAlpha = Math.min(0.7, res.eps * 0.8);
-  ctx.fillStyle = `rgba(144,238,144,${atmoAlpha * 0.5})`;
-  ctx.fillRect(0, 60, W, 100);
-  ctx.strokeStyle = 'rgba(100,200,100,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([6, 4]);
-  ctx.strokeRect(0, 60, W, 100);
-  ctx.setLineDash([]);
-
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.font = '11px Noto Sans JP, sans-serif';
-  ctx.fillText(`大気層 ε=${res.eps.toFixed(3)}  CO₂=${co2}ppm`, 10, 78);
-
-  // Solar arrow (incoming)
-  drawArrow(ctx, 50, 5, 50, 200, '#FFD700', `☀️ 太陽S(1-α)=${((1361*(1-albedo)/4)).toFixed(0)}W/m²`);
-
-  // Reflected
-  drawArrow(ctx, 80, 200, 80, 5, '#FFD700', `↑反射 α=${albedo}`, true);
-
-  // IR from ground up
-  drawArrow(ctx, W/2, 200, W/2, 60, '#FF6B6B', `地表放射`);
-
-  // IR back down (greenhouse)
-  drawArrow(ctx, W/2+30, 160, W/2+30, 200, '#FF9966', `大気↓再放射 ε=${(res.eps*0.5).toFixed(2)}`);
-
-  // IR to space
-  drawArrow(ctx, W-60, 60, W-60, 5, '#FF6B6B', `宇宙へ`, true);
-
-  // Temperature label
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 14px Roboto Mono, monospace';
-  ctx.fillText(`T = ${res.T.toFixed(1)}°C`, W - 110, 230);
-  ctx.font = '11px Noto Sans JP';
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.fillText(`RF = ${res.RF >= 0 ? '+' : ''}${res.RF.toFixed(2)} W/m²`, W - 110, 248);
-}
-
-function drawArrow(ctx, x1, y1, x2, y2, color, label, rightLabel) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-  const angle = Math.atan2(y2 - y1, x2 - x1);
-  const hs = 8;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - hs * Math.cos(angle - 0.4), y2 - hs * Math.sin(angle - 0.4));
-  ctx.lineTo(x2 - hs * Math.cos(angle + 0.4), y2 - hs * Math.sin(angle + 0.4));
-  ctx.closePath();
-  ctx.fill();
-  if (label) {
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = '10px Noto Sans JP, sans-serif';
-    ctx.fillText(label, rightLabel ? x1 + 6 : x1 + 6, (y1 + y2) / 2 - 4);
+function spawn(){
+  if (!M.res) return;
+  const W = cssW, eps = M.res.eps, alb = M.albedo;
+  // incoming solar rate scales mildly; reflection fraction = albedo
+  if (Math.random() < 0.55){
+    const x = 30 + Math.random()*(W*0.42);
+    if (Math.random() < alb) reflected.push(mkPhoton(x, SKY_TOP, 1, 'sun'));
+    else solar.push(mkPhoton(x, SKY_TOP, 1, 'sun'));
+  }
+  // surface emits IR upward (rate tied to warmth)
+  if (Math.random() < 0.6){
+    const x = W*0.40 + Math.random()*(W*0.52);
+    irUp.push(mkPhoton(x, SURF, -1, 'ir'));
   }
 }
+
+function step(dt){
+  const W = cssW, eps = M.res ? M.res.eps : 0.77;
+  const sp = 70; // px/s base
+  // solar shortwave: falls to surface, then becomes IR up
+  solar.forEach(p => { p.y += p.vy*sp*dt; p.x += p.vx; });
+  solar = solar.filter(p => {
+    if (p.y >= SURF){ // absorbed at surface → re-emit as IR up
+      irUp.push(mkPhoton(p.x, SURF, -1, 'ir'));
+      return false;
+    }
+    return true;
+  });
+  // reflected shortwave: goes back up to space
+  reflected.forEach(p => { p.y -= sp*dt; p.x += p.vx; });
+  reflected = reflected.filter(p => p.y > SKY_TOP-4);
+  // IR up: when crossing atmosphere band, fraction eps is absorbed & re-emitted (half down)
+  irUp.forEach(p => { p.y += p.vy*sp*dt; p.x += p.vx; });
+  irUp = irUp.filter(p => {
+    if (p.y <= ATM_BOT && !p.tagged){
+      p.tagged = 1;
+      if (Math.random() < eps){
+        // absorbed by greenhouse gases, half re-emitted downward (back-radiation)
+        if (Math.random() < 0.5) irDown.push(mkPhoton(p.x, ATM_TOP+ (ATM_BOT-ATM_TOP)*0.5, 1, 'back'));
+        else toSpace.push(mkPhoton(p.x, ATM_TOP, -1, 'ir'));
+        return false; // remove the original upward photon (it was absorbed)
+      }
+    }
+    if (p.y <= ATM_TOP){ toSpace.push(mkPhoton(p.x, ATM_TOP, -1, 'ir')); return false; }
+    return true;
+  });
+  // back-radiation: travels down to surface (warms it)
+  irDown.forEach(p => { p.y += sp*dt; p.x += p.vx; });
+  irDown = irDown.filter(p => p.y < SURF);
+  // escaping IR to space
+  toSpace.forEach(p => { p.y -= sp*dt; p.x += p.vx; });
+  toSpace = toSpace.filter(p => p.y > SKY_TOP-4);
+  // cap pools
+  const cap = a => a.length > 240 ? a.slice(a.length-240) : a;
+  solar=cap(solar); reflected=cap(reflected); irUp=cap(irUp); irDown=cap(irDown); toSpace=cap(toSpace);
+}
+
+function dot(x, y, color, r){
+  ctx.beginPath(); ctx.arc(x, y, r||2.4, 0, 6.2832);
+  ctx.fillStyle = color; ctx.fill();
+}
+
+function drawScene(){
+  if (!ctx) return;
+  const W = cssW, eps = M.res ? M.res.eps : 0.77, res = M.res;
+  ctx.clearRect(0, 0, W, cssH);
+
+  // sky
+  const sky = ctx.createLinearGradient(0,0,0,SURF);
+  sky.addColorStop(0,'#001a33'); sky.addColorStop(1,'#1a5a8a');
+  ctx.fillStyle = sky; ctx.fillRect(0,0,W,SURF);
+  // surface (warms with temperature)
+  const warm = res ? Math.max(0, Math.min(1, (res.T+20)/60)) : 0.5;
+  const g = ctx.createLinearGradient(0,SURF,0,cssH);
+  g.addColorStop(0, `rgb(${Math.round(60+warm*120)},${Math.round(120-warm*40)},${Math.round(80-warm*40)})`);
+  g.addColorStop(1,'#16302a');
+  ctx.fillStyle = g; ctx.fillRect(0,SURF,W,cssH-SURF);
+
+  // greenhouse layer — opacity grows with eps (more GHG = denser)
+  ctx.fillStyle = `rgba(120,200,140,${0.10 + eps*0.32})`;
+  ctx.fillRect(0, ATM_TOP, W, ATM_BOT-ATM_TOP);
+  ctx.strokeStyle = 'rgba(150,230,170,0.55)'; ctx.lineWidth = 1.2; ctx.setLineDash([6,4]);
+  ctx.strokeRect(0.5, ATM_TOP, W-1, ATM_BOT-ATM_TOP); ctx.setLineDash([]);
+
+  // GHG molecules scattered in the band (count ~ eps)
+  const nMol = Math.round(6 + eps*26);
+  ctx.fillStyle = 'rgba(40,120,70,0.55)';
+  for (let i=0;i<nMol;i++){
+    const mx = (i*97.13 % (W-20))+10;
+    const my = ATM_TOP + 12 + ((i*53.7) % (ATM_BOT-ATM_TOP-22));
+    ctx.beginPath(); ctx.arc(mx, my, 3.2, 0, 6.2832); ctx.fill();
+  }
+
+  // photons
+  solar.forEach(p => dot(p.x,p.y,'#FFD54A',2.6));
+  reflected.forEach(p => dot(p.x,p.y,'#FFE9A0',2.2));
+  irUp.forEach(p => dot(p.x,p.y,'#FF6B6B',2.6));
+  toSpace.forEach(p => dot(p.x,p.y,'#FF8E72',2.4));
+  irDown.forEach(p => dot(p.x,p.y,'#FFA552',2.8));
+
+  // labels
+  ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.font = '11px "Noto Sans JP", sans-serif'; ctx.textAlign='left';
+  ctx.fillText('☀ 太陽光（短波）', 8, 20);
+  ctx.fillStyle = 'rgba(180,255,200,0.95)';
+  ctx.fillText(`温室効果ガス層  ε=${eps.toFixed(3)}  CO₂=${M.co2}ppm`, 8, ATM_TOP-6);
+  ctx.fillStyle = 'rgba(255,180,120,0.95)';
+  ctx.fillText('↓ 逆放射（再放射された赤外）', W*0.40, ATM_BOT+18);
+  ctx.fillStyle = 'rgba(255,120,120,0.95)';
+  ctx.fillText('↑ 地表赤外放射', W*0.40, SURF-8);
+
+  // live readout box
+  if (res){
+    ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(W-150, ATM_BOT+8, 142, 56);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px "Roboto Mono", monospace';
+    ctx.fillText(`T = ${res.T.toFixed(1)}°C`, W-142, ATM_BOT+28);
+    ctx.font = '11px "Roboto Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(`Te = ${res.Te.toFixed(1)}°C`, W-142, ATM_BOT+44);
+    ctx.fillText(`ΔTgh = +${(res.T-res.Te).toFixed(1)}°C`, W-142, ATM_BOT+58);
+  }
+  ctx.textAlign='left';
+}
+
+function loop(ts){
+  if (activeTab !== 0){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min(0.05, (ts - lastTs)/1000); lastTs = ts;
+  spawn();
+  step(dt);
+  drawScene();
+  animId = requestAnimationFrame(loop);
+}
+function startAnim(){
+  if (activeTab !== 0 || !ctx) return;
+  if (reduceMotion){ // single static frame
+    for (let k=0;k<60;k++){ spawn(); step(0.05); }
+    drawScene();
+    return;
+  }
+  if (!animId){ lastTs = 0; animId = requestAnimationFrame(loop); }
+}
+
+// rebind switchTab to manage the animation lifecycle
+const _switchTab = switchTab;
+window.switchTab = function(i){
+  _switchTab(i);
+  if (i === 0) startAnim();
+  else if (animId){ cancelAnimationFrame(animId); animId = null; }
+};
+switchTab = window.switchTab;
 
 function drawTempChart() {
-  const ctx = document.getElementById('temp-chart').getContext('2d');
-  const albedo = parseFloat(document.getElementById('albedo-slider').value);
-  const ch4 = parseFloat(document.getElementById('ch4-slider').value);
-  const n2o = parseFloat(document.getElementById('n2o-slider').value);
-  const co2Now = parseFloat(document.getElementById('co2-slider').value);
-
+  const ce = elv('temp-chart'); if (!ce) return;
+  const c = ce.getContext('2d');
   const co2s = [], temps = [];
-  for (let c = 180; c <= 1200; c += 10) {
-    co2s.push(c);
-    temps.push(calcTemp(c, ch4, n2o, albedo).T);
-  }
+  for (let v = 180; v <= 1200; v += 10) { co2s.push(v); temps.push(calcTemp(v, M.ch4, M.n2o, M.albedo).T); }
   if (tempChart) tempChart.destroy();
-  tempChart = new Chart(ctx, {
+  tempChart = new Chart(c, {
     type: 'line',
-    data: {
-      labels: co2s,
-      datasets: [
-        { label: '地球平均気温 (°C)', data: temps, borderColor: '#e74c3c', borderWidth: 2, pointRadius: 0, fill: false },
-        { label: '現在のCO₂', data: co2s.map(c => c === Math.round(co2Now / 10) * 10 ? calcTemp(co2Now, ch4, n2o, albedo).T : null), borderColor: '#007BFF', borderWidth: 2, pointRadius: 6, showLine: false, borderDash: [] }
-      ]
-    },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      scales: {
-        x: { title: { display: true, text: 'CO₂濃度 (ppm)' }, ticks: { maxTicksLimit: 10, callback: (v, i) => co2s[i] } },
-        y: { title: { display: true, text: '気温 (°C)' } }
-      },
-      plugins: { legend: { position: 'top' } }
-    }
+    data: { labels: co2s, datasets: [
+      { label: '地球平均気温 (°C)', data: temps, borderColor: '#e74c3c', borderWidth: 2, pointRadius: 0, fill: false },
+      { label: '現在のCO₂', data: co2s.map(v => v === Math.round(M.co2/10)*10 ? calcTemp(M.co2, M.ch4, M.n2o, M.albedo).T : null), borderColor: '#007BFF', borderWidth: 2, pointRadius: 6, showLine: false }
+    ]},
+    options: { responsive: true, animation: false, maintainAspectRatio: false, resizeDelay:100,
+      scales: { x:{ title:{display:true,text:'CO₂濃度 (ppm)'}, ticks:{maxTicksLimit:10, callback:(v,i)=>co2s[i]} }, y:{ title:{display:true,text:'気温 (°C)'} } },
+      plugins: { legend:{ position:'top' } } }
   });
 }
 
 function drawGasChart(res) {
-  const ctx = document.getElementById('gas-chart').getContext('2d');
+  const ce = elv('gas-chart'); if (!ce) return;
+  const c = ce.getContext('2d');
   if (gasChart) gasChart.destroy();
-  gasChart = new Chart(ctx, {
+  gasChart = new Chart(c, {
     type: 'bar',
-    data: {
-      labels: ['CO₂', 'CH₄', 'N₂O', '合計'],
-      datasets: [{
-        label: '放射強制力 (W/m²)',
-        data: [res.RF_co2, res.RF_ch4, res.RF_n2o, res.RF],
-        backgroundColor: ['#e74c3c', '#f39c12', '#3498db', '#2ecc71'],
-        borderRadius: 6
-      }]
-    },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      scales: { y: { title: { display: true, text: 'W/m²' } } },
-      plugins: { legend: { display: false } }
-    }
+    data: { labels: ['CO₂','CH₄','N₂O','合計'], datasets: [{ label:'放射強制力 (W/m²)',
+      data:[res.RF_co2, res.RF_ch4, res.RF_n2o, res.RF],
+      backgroundColor:['#e74c3c','#f39c12','#3498db','#2ecc71'], borderRadius:6 }] },
+    options: { responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:100,
+      scales:{ y:{ title:{display:true,text:'W/m²'} } }, plugins:{ legend:{display:false} } }
   });
 }
 
-window.addEventListener('load', () => setScenario(1));
-window.addEventListener('resize', () => { if (activeTab === 0) update(); });
+window.addEventListener('load', () => { resizeCanvas(); setScenario(1); startAnim(); });
+window.addEventListener('resize', () => { if (activeTab === 0) resizeCanvas(); });
+})();
 </script>
 <script src="/tools/related-tools.js" defer></script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>
@@ -587,6 +683,9 @@ window.addEventListener('resize', () => { if (activeTab === 0) update(); });
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="greenhouse-effect.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -650,7 +749,7 @@ window.addEventListener('resize', () => { if (activeTab === 0) update(); });
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>CO₂濃度415ppm、CH₄濃度1900ppb、N₂O濃度332ppbの現在値でシミュレーション実行時、放射強制力は約3.8W/m²となり、気温上昇は産業革命前比で約1.1Kを示します。CO₂を560ppmに増加させると放射強制力は4.9W/m²に上昇し、気温偏差は1.5Kに達します。アルベドを0.30から0.29に低下（氷床融解を仮定）させると、同一ガス濃度で気温上昇が約0.2K追加される正のフィードバック効果を確認できます。</p>
+<p>CO₂濃度415ppm、CH₄濃度1900ppb、N₂O濃度332ppbでシミュレーション実行時、放射強制力は約2.9W/m²となり、気温上昇は産業革命前比で約1.3Kを示します。CO₂を560ppmに増加させると放射強制力は約4.5W/m²に上昇し、気温偏差は約2.0Kに達します。アルベドを0.30から0.29に低下（氷床融解を仮定）させると、同一ガス濃度で気温上昇が追加される正のフィードバック効果を確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -661,6 +760,16 @@ window.addEventListener('resize', () => { if (activeTab === 0) update(); });
 <li>1000年以上の長期予測には気候モデルの構造不確実性が増大するため、5～10年スパンでのシナリオ検証に限定すべきです</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

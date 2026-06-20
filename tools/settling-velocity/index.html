@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "終端沈降速度シミュレーター",
       "description": "球形粒子が流体中を重力沈降する終端速度を、Reynolds 数域（Stokes・中間・Newton）別に反復計算するシミュレーター。粒子径・密度・粘度を変えて、抗力係数の遷移と沈降挙動の違いを可視化できます。",
       "url": "https://novasolver.jp/tools/settling-velocity.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["球形粒子の終端沈降速度を反復計算","Stokes・中間・Newton 域の自動判定","等粒径理論線と現在点の可視化","抗力係数 C_D と Reynolds 数の表示"],
       "keywords": "終端速度,沈降速度,Stokes則,Newton則,抗力係数,Reynolds数,粒子,流体力学",
       "datePublished": "2026-05-16",
@@ -172,6 +172,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">重力加速度 g = 9.81 m/s²。反復は最大 20 回、|ΔU/U|&lt;1e−4 で収束判定。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -452,6 +461,388 @@ resizeCanvas();
 compute();
 </script>
 
+<style>
+.hero-live{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.hero-ro{background:linear-gradient(135deg,#0a1929,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.hero-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.15}
+.hero-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.hero-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.hero-live{grid-template-columns:repeat(3,1fr)}}
+.hero-play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.hero-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.hero-legend span{display:inline-flex;align-items:center;gap:5px}
+.hero-legend i.sw{width:16px;height:3px;border-radius:2px;display:inline-block}
+#heroCv{background:#06121f;border-radius:8px;display:block;width:100%}
+#heroCv:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+</style>
+
+<div class="main" style="margin-top:0;padding-top:0">
+  <div class="viz-panel" style="grid-column:1 / -1">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-arrow-down-long"></i> 沈降アニメーション — 静止から終端速度への加速と力のつり合い</div>
+
+      <div class="hero-live">
+        <div class="hero-ro accent"><div class="rv" id="hrV">0.0</div><div class="rl">現在速度 v [mm/s]</div></div>
+        <div class="hero-ro"><div class="rv" id="hrVt">—</div><div class="rl">終端速度 v_t [mm/s]</div></div>
+        <div class="hero-ro"><div class="rv" id="hrRe">—</div><div class="rl">Reynolds 数 Re</div></div>
+        <div class="hero-ro"><div class="rv" id="hrCd">—</div><div class="rl">抗力係数 C_D</div></div>
+        <div class="hero-ro"><div class="rv" id="hrReg">—</div><div class="rl">流れ域</div></div>
+      </div>
+
+      <canvas id="heroCv" width="900" height="460" tabindex="0" role="img" aria-label="流体中を落下する球のアニメーション。重力・浮力・抗力のベクトルと速度-時間グラフを表示します。"></canvas>
+
+      <div class="hero-play-row">
+        <button class="btn" type="button" id="hrPlay" onclick="heroToggle()"><i class="fas fa-play"></i> 再生</button>
+        <button class="btn secondary" type="button" onclick="heroReset()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn hr-speed" type="button" data-sp="0.25" onclick="heroSpeed(0.25)">0.25×</button>
+          <button class="preset-btn hr-speed active" type="button" data-sp="1" onclick="heroSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn hr-speed" type="button" data-sp="4" onclick="heroSpeed(4)">4×</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+        <button class="preset-btn" type="button" onclick="heroPreset('stokes')">Stokes域 微小粒子</button>
+        <button class="preset-btn" type="button" onclick="heroPreset('newton')">大粒子 Newton域</button>
+        <button class="preset-btn" type="button" onclick="heroPreset('dense')">高密度粒子</button>
+        <button class="preset-btn" type="button" onclick="heroPreset('viscous')">高粘度流体</button>
+      </div>
+
+      <div class="hero-legend">
+        <span><i class="sw" style="background:#ff5252"></i>重力 W</span>
+        <span><i class="sw" style="background:#4aa3ff"></i>浮力 F_b</span>
+        <span><i class="sw" style="background:#2ecc71"></i>抗力 F_d</span>
+        <span><i class="sw" style="background:#ffd54a"></i>v–t 軌跡</span>
+      </div>
+      <p class="canvas-hint">左：流体中を静止から落下する球。速度が上がると抗力（緑・上向き）が増し、重力（赤）−浮力（青）とつり合った瞬間に加速が止まり終端速度に達します。右：速度の時間変化（破線＝終端速度 v_t）。粒子径・密度・粘度を変えると終端速度と接近の速さが変わります。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var GH = 9.81;
+  var cvH = document.getElementById('heroCv');
+  if(!cvH) return;
+  var cx = cvH.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function hN(id){ var e=document.getElementById(id); return e?parseFloat(e.value):NaN; }
+  function hCd(Re){
+    if(Re<=0) return 1e9;
+    if(Re<0.1) return 24/Re;
+    if(Re<1000) return (24/Re)*(1+0.15*Math.pow(Re,0.687));
+    if(Re<2e5) return 0.44;
+    return 0.44;
+  }
+  function hRegime(Re){
+    if(!isFinite(Re)||Re<=0) return '—';
+    if(Re<0.1) return 'Stokes';
+    if(Re<1000) return '中間';
+    if(Re<2e5) return 'Newton';
+    return '超臨界';
+  }
+  // terminal velocity (magnitude) for current params, iterative
+  function hSolveVt(D,rhoP,rhoF,mu){
+    var absDR=Math.abs(rhoP-rhoF);
+    if(D<=0||rhoF<=0||mu<=0||absDR<=0) return {U:0,Re:0,Cd:0};
+    var U=GH*D*D*absDR/(18*mu);
+    var Re=rhoF*U*D/mu;
+    if(Re<0.1) return {U:U,Re:Re,Cd:hCd(Re)};
+    for(var i=0;i<40;i++){
+      var Cd=hCd(Re);
+      var Un=Math.sqrt(4*GH*D*absDR/(3*rhoF*Cd));
+      if(!isFinite(Un)||Un<=0) break;
+      var rel=Math.abs(Un-U)/Math.max(U,1e-12);
+      U=Un; Re=rhoF*U*D/mu;
+      if(rel<1e-5) break;
+    }
+    return {U:U,Re:Re,Cd:hCd(Re)};
+  }
+  // instantaneous drag force given speed v
+  function hDragForce(v,D,rhoF,mu){
+    if(v<=0) return 0;
+    var r=D/2, A=Math.PI*r*r;
+    var Re=rhoF*v*D/mu;
+    var Cd=hCd(Re);
+    return 0.5*Cd*rhoF*v*v*A;
+  }
+
+  var p = {D:1e-3, rhoP:2500, rhoF:1000, mu:0.001};
+  function readParams(){
+    var Dmm=hN('slD'), rhoP=hN('slRhoP'), rhoF=hN('slRhoF'), mu=hN('slMu');
+    if(isFinite(Dmm)) p.D=Dmm*1e-3;
+    if(isFinite(rhoP)) p.rhoP=rhoP;
+    if(isFinite(rhoF)) p.rhoF=rhoF;
+    if(isFinite(mu)) p.mu=mu;
+  }
+
+  var t=0, v=0, depth=0;          // sim time, current speed (m/s), settled depth (m)
+  var trace=[];                   // {t,v}
+  var playing=false, animId=null, lastTs=0, speed=1;
+  var vt=0, sgn=1, tau=1;         // terminal speed, direction, time const guess
+
+  function recompute(){
+    readParams();
+    var sol=hSolveVt(p.D,p.rhoP,p.rhoF,p.mu);
+    vt=sol.U;
+    sgn=(p.rhoP-p.rhoF)>=0?1:-1;
+    // characteristic time scale for the v-t window (Stokes tau = (rho_p)*d^2/(18 mu) order)
+    var massEff=(p.rhoP)*(Math.PI/6)*Math.pow(p.D,3);
+    tau = vt>0 ? Math.max(vt/GH, 1e-4) : 1e-3; // simple v_t/g acceleration time
+    // approximate settling time window to reach ~99% terminal
+    updateReadouts(0);
+  }
+
+  function step(dt){
+    // physics: m dv/dt = W - Fb - Fd(v)   (per unit, use accelerations)
+    var absDR=Math.abs(p.rhoP-p.rhoF);
+    var r=p.D/2, vol=(4/3)*Math.PI*r*r*r;
+    var mp=p.rhoP*vol;
+    if(mp<=0){ return; }
+    var Wnet=absDR*vol*GH;             // net driving force (gravity - buoyancy)
+    var speedAbs=Math.abs(v);
+    var Fd=hDragForce(speedAbs,p.D,p.rhoF,p.mu);
+    var a=(Wnet - Fd)/mp;             // along settling direction
+    // sub-step for stability with stiff small particles
+    var sub=Math.max(1,Math.ceil(dt/0.0008));
+    var h=dt/sub;
+    for(var i=0;i<sub;i++){
+      var fd=hDragForce(Math.abs(v),p.D,p.rhoF,p.mu);
+      var ai=(Wnet - fd)/mp;
+      v += ai*h;
+      if(v<0) v=0;
+      depth += v*h;
+    }
+    t += dt;
+    trace.push({t:t,v:v});
+    if(trace.length>2000) trace.shift();
+  }
+
+  function updateReadouts(){
+    var vMM=v*1000, vtMM=vt*1000;
+    document.getElementById('hrV').textContent = vMM>=1000? (vMM/1000).toFixed(2)+'e3' : vMM.toFixed(vMM<10?2:1);
+    document.getElementById('hrVt').textContent = vtMM>=1000? (vtMM/1000).toFixed(2)+'e3' : (vtMM>0?vtMM.toFixed(vtMM<10?2:1):'—');
+    var Re=p.rhoF*Math.abs(v)*p.D/p.mu;
+    document.getElementById('hrRe').textContent = (Re>0&&isFinite(Re))? (Re<0.01?Re.toExponential(1):Re.toFixed(Re<10?2:0)) : (v>0?'0':'—');
+    var Cd=hCd(Math.max(Re,1e-9));
+    document.getElementById('hrCd').textContent = (isFinite(Cd)&&v>0)? (Cd>=100?Cd.toExponential(1):Cd.toFixed(2)) : '—';
+    var Reterm=p.rhoF*vt*p.D/p.mu;
+    document.getElementById('hrReg').textContent = hRegime(Reterm);
+  }
+
+  // ---- HiDPI ----
+  var cssW=0, cssH=0;
+  function resize(){
+    var rect=cvH.parentElement.getBoundingClientRect();
+    cssW=Math.max(280, Math.floor(rect.width-44));
+    cssH=Math.min(480, Math.round(cssW*0.5));
+    if(cssH<300) cssH=300;
+    var dpr=Math.min(window.devicePixelRatio||1, 2.5);
+    cvH.style.width=cssW+'px';
+    cvH.style.height=cssH+'px';
+    cvH.width=Math.round(cssW*dpr);
+    cvH.height=Math.round(cssH*dpr);
+    cx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function arrow(x0,y0,x1,y1,color,w){
+    cx.strokeStyle=color; cx.fillStyle=color; cx.lineWidth=w;
+    cx.beginPath(); cx.moveTo(x0,y0); cx.lineTo(x1,y1); cx.stroke();
+    var ang=Math.atan2(y1-y0,x1-x0), h=6+w;
+    cx.beginPath(); cx.moveTo(x1,y1);
+    cx.lineTo(x1-h*Math.cos(ang-0.4), y1-h*Math.sin(ang-0.4));
+    cx.lineTo(x1-h*Math.cos(ang+0.4), y1-h*Math.sin(ang+0.4));
+    cx.closePath(); cx.fill();
+  }
+
+  function render(){
+    resize();
+    var W=cssW, H=cssH;
+    cx.clearRect(0,0,W,H);
+    cx.fillStyle='#06121f'; cx.fillRect(0,0,W,H);
+
+    var splitX=Math.round(W*0.42);
+    // ---- left: falling column ----
+    var colL=14, colR=splitX-14, colT=14, colB=H-14;
+    // fluid
+    cx.fillStyle='rgba(30,90,150,0.22)';
+    cx.fillRect(colL,colT,colR-colL,colB-colT);
+    cx.strokeStyle='rgba(120,180,230,0.35)'; cx.lineWidth=1;
+    cx.strokeRect(colL,colT,colR-colL,colB-colT);
+    // surface label
+    cx.fillStyle='rgba(160,200,240,0.7)'; cx.font='11px Noto Sans JP'; cx.textAlign='left';
+    cx.fillText('流体', colL+6, colT+16);
+
+    // ball position: map settled depth to fraction of column travel based on a nominal window
+    var travel=colB-colT-46;
+    var nominalDepth = Math.max(vt*1.6, 1e-4)*1.0; // depth at which ball reaches near bottom (scaled by ~1.6 settle window)
+    var frac = nominalDepth>0 ? Math.min(depth/nominalDepth,1) : 0;
+    var bx=(colL+colR)/2;
+    var by=colT+24 + frac*travel;
+    var rad=Math.max(7, Math.min(22, 7+Math.log10(p.D/1e-4+1)*6));
+
+    // trailing bubbles/streak
+    cx.strokeStyle='rgba(0,180,216,0.25)'; cx.lineWidth=2;
+    cx.beginPath(); cx.moveTo(bx, colT+24); cx.lineTo(bx, by); cx.stroke();
+
+    // ball
+    var g=cx.createRadialGradient(bx-rad*0.3,by-rad*0.3,rad*0.2,bx,by,rad);
+    g.addColorStop(0,'#fff'); g.addColorStop(1, sgn>0?'#c08a3e':'#3ea0c0');
+    cx.beginPath(); cx.arc(bx,by,rad,0,7); cx.fillStyle=g; cx.fill();
+    cx.strokeStyle='rgba(255,255,255,0.6)'; cx.lineWidth=1; cx.stroke();
+
+    // ---- force vectors (scaled to net weight) ----
+    var absDR=Math.abs(p.rhoP-p.rhoF);
+    var r3=p.D/2, vol=(4/3)*Math.PI*r3*r3*r3;
+    var W_g=p.rhoP*vol*GH;
+    var F_b=p.rhoF*vol*GH;
+    var F_d=hDragForce(Math.abs(v),p.D,p.rhoF,p.mu);
+    var ref=Math.max(W_g, 1e-12);
+    var maxLen=Math.min(travel*0.42, 90);
+    function sc(f){ return Math.max(0, Math.min(1, f/ref))*maxLen; }
+    // gravity (down, red)
+    arrow(bx+rad+10, by, bx+rad+10, by+sc(W_g), '#ff5252', 3);
+    // buoyancy (up, blue)
+    arrow(bx-rad-10, by, bx-rad-10, by-sc(F_b), '#4aa3ff', 3);
+    // drag (up, green) — grows with speed
+    arrow(bx, by-rad-4, bx, by-rad-4-sc(F_d), '#2ecc71', 3);
+    cx.font='10px Roboto Mono'; cx.textAlign='center';
+    cx.fillStyle='#ff5252'; cx.fillText('W', bx+rad+10, by+sc(W_g)+12);
+    cx.fillStyle='#4aa3ff'; cx.fillText('F_b', bx-rad-10, by-sc(F_b)-4);
+    cx.fillStyle='#2ecc71'; cx.fillText('F_d', bx+14, by-rad-8-sc(F_d));
+
+    // balance annotation
+    var atTerminal = vt>0 && Math.abs(v-vt)/vt < 0.02 && t>0;
+    if(atTerminal){
+      cx.fillStyle='rgba(255,213,74,0.95)'; cx.font='bold 12px Noto Sans JP'; cx.textAlign='center';
+      cx.fillText('力がつり合い → 終端速度', (colL+colR)/2, colB-8);
+    }
+
+    // ---- right: v-t trace ----
+    var gx0=splitX+44, gx1=W-16, gy0=H-30, gy1=20;
+    var gw=gx1-gx0, gh=gy0-gy1;
+    cx.strokeStyle='rgba(255,255,255,0.12)'; cx.lineWidth=1;
+    cx.strokeRect(gx0,gy1,gw,gh);
+    // axes labels
+    cx.fillStyle='rgba(255,255,255,0.6)'; cx.font='10px Roboto Mono';
+    cx.textAlign='left'; cx.fillText('v [mm/s]', gx0, gy1-7);
+    cx.textAlign='right'; cx.fillText('t [s]', gx1, gy0+14);
+
+    var tMax=Math.max(t*1.1, tau*6, 0.001);
+    var vMax=Math.max(vt*1.25, v*1.1, 1e-9);
+    function tx(tt){ return gx0 + Math.min(tt/tMax,1)*gw; }
+    function ty(vv){ return gy0 - Math.min(vv/vMax,1)*gh; }
+    // terminal line
+    if(vt>0){
+      cx.strokeStyle='rgba(255,213,74,0.6)'; cx.setLineDash([5,4]); cx.lineWidth=1.4;
+      cx.beginPath(); cx.moveTo(gx0,ty(vt)); cx.lineTo(gx1,ty(vt)); cx.stroke();
+      cx.setLineDash([]);
+      cx.fillStyle='rgba(255,213,74,0.85)'; cx.textAlign='left'; cx.font='10px Roboto Mono';
+      cx.fillText('v_t', gx0+4, ty(vt)-4);
+    }
+    // trace
+    if(trace.length>1){
+      cx.strokeStyle='#ffd54a'; cx.lineWidth=2; cx.beginPath();
+      for(var i=0;i<trace.length;i++){
+        var X=tx(trace[i].t), Y=ty(trace[i].v);
+        if(i===0) cx.moveTo(X,Y); else cx.lineTo(X,Y);
+      }
+      cx.stroke();
+      // live marker
+      var lx=tx(t), ly=ty(v);
+      cx.beginPath(); cx.arc(lx,ly,4,0,7); cx.fillStyle='#fff'; cx.fill();
+      cx.strokeStyle='#ffd54a'; cx.lineWidth=1.5; cx.stroke();
+    }
+    // time stamp
+    cx.fillStyle='rgba(255,255,255,0.7)'; cx.font='bold 11px Roboto Mono'; cx.textAlign='right';
+    cx.fillText('t = '+t.toFixed(2)+' s', gx1-4, gy1+12);
+    cx.textAlign='left';
+
+    updateReadouts();
+  }
+
+  function loop(ts){
+    if(!playing){ animId=null; return; }
+    if(!lastTs) lastTs=ts;
+    var dtReal=Math.min(0.05,(ts-lastTs)/1000);
+    lastTs=ts;
+    // scale sim dt so the approach is visible; clamp
+    var simDt=dtReal*speed*Math.max(tau*2, 0.05)*4;
+    simDt=Math.min(simDt, 0.4);
+    step(simDt);
+    render();
+    // auto-stop when settled near terminal and reached bottom region
+    if(vt>0 && Math.abs(v-vt)/vt<0.005 && t>tau*4){
+      // keep running a moment then stop
+      if(t>tau*8){ stop(); return; }
+    }
+    animId=requestAnimationFrame(loop);
+  }
+  function start(){
+    if(reduce){ // static frame: jump to terminal
+      recompute(); v=vt; t=tau*5; trace=[]; for(var i=0;i<=40;i++){var tt=i/40*t; trace.push({t:tt,v:vt*(1-Math.exp(-tt/Math.max(tau,1e-3)))});} render(); return;
+    }
+    playing=true; lastTs=0;
+    document.getElementById('hrPlay').innerHTML='<i class="fas fa-pause"></i> 一時停止';
+    if(!animId) animId=requestAnimationFrame(loop);
+  }
+  function stop(){
+    playing=false;
+    if(animId){ cancelAnimationFrame(animId); animId=null; }
+    document.getElementById('hrPlay').innerHTML='<i class="fas fa-play"></i> 再生';
+  }
+  window.heroToggle=function(){ playing?stop():start(); };
+  window.heroReset=function(){ stop(); t=0; v=0; depth=0; trace=[]; recompute(); render(); };
+  window.heroSpeed=function(s){
+    speed=s;
+    var bs=document.querySelectorAll('.hr-speed');
+    for(var i=0;i<bs.length;i++){
+      var a=parseFloat(bs[i].dataset.sp)===s;
+      bs[i].classList.toggle('active',a);
+      bs[i].style.borderColor=a?'var(--accent)':'';
+      bs[i].style.color=a?'var(--accent)':'';
+    }
+  };
+  function setS(id,valId,val,dec){
+    var e=document.getElementById(id); if(!e) return;
+    e.value=val;
+    if(typeof updateSlider==='function'){ try{ updateSlider(e,valId,dec,''); }catch(err){} }
+    var nv=document.getElementById(valId); if(nv) nv.value=val;
+  }
+  window.heroPreset=function(name){
+    var P={
+      stokes: {D:0.02, rhoP:2650, rhoF:1000, mu:0.001},
+      newton: {D:20,   rhoP:2650, rhoF:1000, mu:0.001},
+      dense:  {D:2,    rhoP:11340,rhoF:1000, mu:0.001},
+      viscous:{D:5,    rhoP:7850, rhoF:1260, mu:1.0}
+    }[name];
+    if(!P) return;
+    setS('slD','slDVal',P.D,3);
+    setS('slRhoP','slRhoPVal',P.rhoP,0);
+    setS('slRhoF','slRhoFVal',P.rhoF,0);
+    setS('slMu','slMuVal',P.mu,5);
+    if(typeof compute==='function'){ try{ compute(); }catch(err){} }
+    window.heroReset();
+    start();
+  };
+
+  // keep hero in sync when calculator sliders change
+  ['slD','slRhoP','slRhoF','slMu'].forEach(function(id){
+    var e=document.getElementById(id);
+    if(e) e.addEventListener('input', function(){ recompute(); if(!playing) render(); });
+  });
+  cvH.addEventListener('keydown', function(e){
+    if(e.key===' '||e.key==='Enter'){ e.preventDefault(); window.heroToggle(); }
+  });
+  window.addEventListener('resize', function(){ render(); });
+
+  recompute();
+  render();
+})();
+</script>
+
 <section class="explanation">
   <h2>終端沈降速度シミュレーターとは</h2>
   <div class="chat">
@@ -510,6 +901,9 @@ compute();
     <p>最後に、<strong>「終端速度は瞬時に達成される」と思い込む</strong>点に注意が必要です。実際には粒子が静止状態から U_t の 99% に達するまでに有限の時間と距離が必要で、Stokes 域の小さな粒子（μm オーダー）では数ミリ秒、Newton 域の大粒子（cm オーダー）では数秒かかります。沈殿池や落下塔の設計では、粒子が U_t に到達する加速距離が無視できない場合があり、特に短い容器では助走区間の補正が必要になります。</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="settling-velocity.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -571,7 +965,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>石英粒子（ρ_p=2650 kg/m³）が水中（ρ_f=1000 kg/m³、μ=1.0 mPa・s）で沈降する場合：粒子径d=100 μm時、終端速度U_t≈0.98 mm/s、Re_t≈0.098となりStokes域（Re&lt;0.1）に該当し抗力係数C_D≈24/Re_t≈245となります。一方d=1 mmでは終端速度U_t≈98 mm/s、Re_t≈98でNewton域に遷移しC_D≈0.47となり、抗力則が24/Reから√(4gd/3C_D)へ切り替わります</p>
+<p>石英粒子（ρ_p=2650 kg/m³）が水中（ρ_f=1000 kg/m³、μ=1.0 mPa・s）で沈降する場合：粒子径d=100 μm時、終端速度U_t≈7.97 mm/s、Re_t≈0.80となり、すでにStokes域（Re&lt;0.1）を外れた中間域で抗力係数C_D≈34です。一方d=1 mmでは終端速度U_t≈155 mm/s、Re_t≈155でなお中間域（Newton域はRe≥1000）であり、C_D≈0.90となります。本ツールはStokes初期推定からRe→C_D→U_tを反復し、域に応じた抗力則を自動選択します</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -581,6 +975,16 @@ compute();
 <li>温度変化による粘度の指数関数的な変化（例：水は10℃で1.31 mPa・s、30℃で0.80 mPa・s）が終端速度に大きく影響するため、環境条件の設定を正確に行ってください</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

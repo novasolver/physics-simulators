@@ -124,19 +124,19 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ソレノイド・コイル設計計算機",
       "description": "コイルジオメトリ・巻き線径・コア材質を設定してインダクタンス・磁界強度・コイル抵抗・蓄積エネルギーをリアルタイム計算。軸方向磁界分布グラフとコイル断面図を表示。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/solenoid-coil.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
         "単層・多層コイルのインダクタンス計算",
-        "軸方向磁界分布のBiot-Savart数値積分",
+        "軸方向磁界分布の有限長ソレノイド閉形式計算",
         "コア材質（空気・鉄・フェライト）の透磁率設定",
         "コイル抵抗・蓄積エネルギー・時定数の自動計算",
         "コイル断面図および磁力線のCanvas描画",
@@ -158,7 +158,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
           "name": "コイル中心の磁界強度はどう求めますか？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "無限長ソレノイドの近似では B₀ = μ₀μᵣNI/l です。有限長ソレノイドの軸上任意点の厳密解は Biot-Savart則の積分で B(z) = (μ₀μᵣNI/2l)·[cos θ₁ − cos θ₂] となります。θ₁、θ₂はコイル両端からの角度です。このツールではN本の円形ループをBiot-Savart則で数値積分して軸上分布を計算します。"
+            "text": "無限長ソレノイド近似では B₀ = μ₀μᵣNI/l です。有限長ソレノイドの軸上任意点は閉形式の Biot-Savart 積分で B(z)=(μ₀μᵣNI/2l)·[cosθ₁−cosθ₂] と計算します。このページの軸方向分布は、N本のループを逐次数値積分するのではなく、この有限長ソレノイド式を直接評価しています。"
           }
         },{
           "@type": "Question",
@@ -301,7 +301,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="btn-group">
       <button class="btn secondary" onclick="resetTool()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -409,27 +417,27 @@ function updateCore(){
   drawBChart(pViz, B0);
   drawCross(pViz);
 }function bioSavartAxis(z, D, l, N, I, muR){
-  // finite solenoid: B(z) = mu0*muR*n*I/2 * (cos(theta1)-cos(theta2))
-  // where theta1,2 are angles from ends
+  // finite solenoid axial field; positive inside the coil
   const R = D/2;
   const n = N/l;
-  const z1 = -l/2 - z;
-  const z2 =  l/2 - z;
-  const cos1 = -z1 / Math.sqrt(z1*z1 + R*R);
-  const cos2 = -z2 / Math.sqrt(z2*z2 + R*R);
-  return MU0 * muR * n * I / 2 * (cos2 - cos1);
-}function drawBChart(p, B0){
+  const cos1 = (z + l/2) / Math.sqrt((z + l/2)*(z + l/2) + R*R);
+  const cos2 = (z - l/2) / Math.sqrt((z - l/2)*(z - l/2) + R*R);
+  return MU0 * muR * n * I / 2 * (cos1 - cos2);
+}
+function drawBChart(p, B0){
   const {D, l, N, I, muR}= p;
   const nPts = 100;
   const zMin = -l * 1.5, zMax = l * 1.5;
-  const labels = [], data = [];
+  const labels = [], rawData = [];
   for (let i = 0; i <= nPts; i++){
     const z = zMin + (zMax - zMin) * i / nPts;
     labels.push((z*1000).toFixed(1));
-    const Bz = bioSavartAxis(z, D, l, N, I, muR);
-    data.push(Bz >= 1 ? Bz : Bz*1e3);
+    rawData.push(bioSavartAxis(z, D, l, N, I, muR));
   }
-  const unit = B0 >= 1 ? 'T' : 'mT';
+  const maxAbs = rawData.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  const unit = maxAbs >= 1 ? 'T' : 'mT';
+  const factor = unit === 'T' ? 1 : 1e3;
+  const data = rawData.map(v => v * factor);
 
   const ctx2 = document.getElementById('chartCanvas').getContext('2d');
   if (bChart) bChart.destroy();
@@ -635,6 +643,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="solenoid-coil.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -696,17 +707,28 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>フェライトコア（μᵣ=2500）、内径D=10mm、外径D=15mm、長さl=50mm、巻数N=500回、線径d=0.5mmの設計例：インダクタンスL≈12.5mH、中心磁界B₀≈0.628T（励磁電流1A時）、巻線抵抗R≈8.4Ω、蓄積エネルギーU≈6.25mJ（1A電流時）、時定数τ≈1.49ms。空芯の同一形状ではL≈5.0μH、B₀≈2.51×10⁻⁴Tとなり、コア挿入で約2500倍のインダクタンス向上が実現されます</p>
+<p>低μフェライトコア（μᵣ=50）、コイル径D=10mm、長さl=50mm、巻数N=500回、線径d=0.5mm、励磁電流I=1Aの設計例：インダクタンスL≈24.67mH、中心磁界B₀≈0.628T、巻線抵抗R≈1.34Ω、蓄積エネルギーU≈12.34mJ、時定数τ≈18.36ms。空芯の同一形状ではL≈493.5μH、B₀≈12.57mTとなり、飽和しにくい範囲で約50倍のインダクタンス向上が得られます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>長ソレノイド近似（l≫D）が成立するのはアスペクト比l/D≧5の場合のみ。l/D＜2では端部効果が顕著で、ビオ・サバール積分による詳細解析が必須です</li>
-<li>フェライトコアは温度係数が大きく、50℃上昇でμᵣが5～10%低下します。医療機器や高周波アプリケーションではキュリー温度確認が重要です</li>
-<li>巻線面積占有率（fill factor）は理想値80%ですが、実装では60～70%に設定し、圧縮応力やスペーサー厚みを確保してください</li>
-<li>スキン効果により高周波域ではf＞f_c=ρ/(π·μ₀·μᵣ·r²)で実効抵抗が増加。銅線r=0.25mmの場合、フェライトコア使用時f_c≈850Hzとなります</li>
+<li>長ソレノイド近似（l≫D）は l/D が大きい場合に有効です。l/D<3では端部効果が大きいため、軸方向磁界分布グラフを確認してください。</li>
+<li>フェライトコアは温度係数が大きく、50℃上昇でμᵣが5〜10%低下します。医療機器や高周波用途ではキュリー温度確認が重要です。</li>
+<li>巻線占積率（fill factor）は理論値80%でも、実装では60〜70%に設定し、熱膨張やスペーサー厚みを見込んでください。</li>
+<li>スキン効果は導体（銅、μᵣ≈1）の表皮深さで評価します。銅線r=0.25mmではδ≈3rを目安にf_c≈8kHz（δ=rなら約68kHz）で、コアの透磁率とは切り離して考えます。</li>
+<li>計算上のB₀が約2Tを超える場合は、線形μᵣの仮定から外れてコア飽和が支配的になるため、B-H曲線で確認してください。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

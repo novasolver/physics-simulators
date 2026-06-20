@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "差動ペアインピーダンス計算機",
       "description": "表面マイクロストリップ差動ペアの差動インピーダンス Z_diff と奇モード・偶モードを、線幅・線間・基板厚・誘電率からリアルタイムに計算する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/differential-pair-impedance.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["線幅・線間・基板厚・比誘電率からの差動インピーダンス計算","奇モード・偶モード Z_odd / Z_even の同時表示","USB 90Ω・HDMI/SATA/Ethernet 100Ω との目標差の可視化","S/H 比に対する Z_diff カーブの表示"],
       "keywords": "差動ペア,差動インピーダンス,USB,HDMI,PCIe,Ethernet,奇モード,偶モード,マイクロストリップ,IPC-2141,PCB",
       "datePublished": "2026-05-17",
@@ -173,6 +173,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット (FR4)</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">IPC-2141A 簡略式（銅厚 T=0、表面マイクロストリップ）を使用しています。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -414,7 +423,18 @@ function draw(p, Z0, Zdiff) {
 function compute() {
   var p = getParams();
   if (!isFinite(p.W) || !isFinite(p.S) || !isFinite(p.H) || !isFinite(p.er) ||
-      p.W <= 0 || p.H <= 0 || p.er <= 1) return;
+      p.W <= 0 || p.S <= 0 || p.H <= 0 || p.er <= 1) return;
+  var lnArg = 5.98 * p.H / (0.8 * p.W);
+  if (lnArg <= 1) {
+    var msg = '適用範囲外（W/H過大）';
+    ['statZ0','statZdiff','statZodd','statZeven'].forEach(function(id){ document.getElementById(id).textContent = msg; });
+    var canvas = document.getElementById('viz');
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,__novaCanvasCssW(canvas),__novaCanvasCssH(canvas));
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(msg, __novaCanvasCssW(canvas)/2, __novaCanvasCssH(canvas)/2);
+    return;
+  }
   var Z0 = singleZ0(p.W, p.H, p.er);
   var k = couplingFactor(p.S, p.H);
   var Zdiff = 2 * Z0 * (1 - k);
@@ -428,13 +448,11 @@ function compute() {
 }
 
 function presetUSB() {
-  // USB 2.0/3.x target: W=0.20, S=0.15, H=0.13, er=4.3 → Z_diff ~ 90Ω
-  var defs = { slW: 0.20, slS: 0.15, slH: 0.13, slEr: 4.3 };
+  var defs = { slW: 0.22, slS: 0.15, slH: 0.13, slEr: 4.3 };
   applyDefs(defs);
 }
 function presetHDMI() {
-  // HDMI 100Ω: W=0.20, S=0.20, H=0.20, er=4.3 → already close to 100; tweak slightly
-  var defs = { slW: 0.18, slS: 0.25, slH: 0.20, slEr: 4.3 };
+  var defs = { slW: 0.30, slS: 0.25, slH: 0.20, slEr: 4.3 };
   applyDefs(defs);
 }
 function resetParams() {
@@ -517,11 +535,14 @@ compute();
 
   <h2>よくある誤解と注意点</h2>
   <div class="fblock">
-    <p>最も多い誤解は、<strong>「Z_diff = 2 × 単線 Z_0 と単純計算してよい」</strong>と考えてしまうことです。実際には2本の線が近づくほど結合容量が増えて Z_diff は単純な2倍より下がります。本ツールでも S/H = 0.2 のとき Z_diff は単線2倍の約 80% にまで下がっているのが下のカーブから読み取れます。USB の D+/D− や HDMI の TMDS ペアのように線間が線幅と同じオーダーで配線される場合、この結合補正を無視すると 15〜20% も計算がずれます。「単線で 50Ω 作ったから 2 本並べれば差動 100Ω」では実装後に痛い目を見ます。</p>
+    <p>最も多い誤解は、<strong>「Z_diff = 2 × 単線 Z_0 と単純計算してよい」</strong>と考えてしまうことです。実際には2本の線が近づくほど結合容量が増えて Z_diff は単純な2倍より下がります。本ツールでも S/H = 0.2 のとき Z_diff は単線2倍の約 60% にまで下がっているのが下のカーブから読み取れます。USB の D+/D− や HDMI の TMDS ペアのように線間が線幅と同じオーダーで配線される場合、この結合補正を無視すると 15〜20% も計算がずれます。「単線で 50Ω 作ったから 2 本並べれば差動 100Ω」では実装後に痛い目を見ます。</p>
     <p>次に多いのが、<strong>「ペアの片側だけを GND から離す（非対称配線をする）」</strong>ミスです。差動配線は対称性が命で、片方の線だけが他の信号やGND境界に近づくと、奇モードと偶モードが分離しにくくなり、差動モードからコモンモードへの変換が起きて EMI（放射ノイズ）と SI（信号品質）の両方が悪化します。両線間は常に等距離・等条件で配線し、層変更時のビアもペア対称で打つこと、隣接ペアからは最低でも 3W ルール（W = 線幅）以上離すことが基本です。本ツールはあくまで対称な差動ペアを前提とした計算であり、非対称配線は別解析が必要です。</p>
     <p>最後に、<strong>「シミュレーターの計算値で量産発注してしまう」</strong>のは危険です。本ツールは IPC-2141 簡略式に基づく ±5〜10% 程度の見積もりであり、銅厚・基板の表面粗さ・ガラスクロスの織り方・ソルダレジストの被覆・温湿度などは考慮していません。実務では、(1) 本ツールで W/S/H/ε_r の初期値を決め、(2) 基板メーカーの公式インピーダンス計算（Polar Si9000 等）でスタックアップを確定し、(3) 試作基板でテストクーポンを使った TDR 測定で実測校正、という3段階の流れが基本です。本ツールは設計の最初の段階——どの寸法レンジで攻めるかの「肌感覚」を掴むための道具と捉えてください。</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="differential-pair-impedance.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -574,26 +595,31 @@ compute();
 <!-- codex-static-related-tools:end -->
 
 <div class="howto-card howto-guide">
-<h3>使い方ガイド</h3>
-<ol>
-<li>線幅（W）をマイクロメートル単位で設定します。USB 2.0 高速信号の場合、一般的に 0.15～0.25 mm が目安です</li>
-<li>線間距離（S）を入力します。差動ペアの間隔で、100Ω 目標時は W と同等か若干狭めに設定（例：0.1～0.2 mm）</li>
-<li>基板厚さ（H）と比誘電率（Er）を入力後、リアルタイム計算される Z_diff・Z_odd・Z_even の値を確認し、目標インピーダンスとの差分を調整します</li>
-</ol>
+<h3>使い方</h3>
+<p>線幅W、間隔S、基板厚H、誘電率εrをmm単位で入力すると、単線Z0、差動インピーダンス、奇モード/偶モードの概算値がリアルタイムに更新されます。</p>
 </div>
 <div class="howto-card howto-example">
-<h3>具体的な計算例</h3>
-<p>HDMI 差動ペア設計例：線幅 W=0.2 mm、線間距離 S=0.15 mm、FR-4 基板厚 H=0.2 mm、Er=4.0 の場合、差動インピーダンス Z_diff は約 98Ω となります。同一条件で奇モード Z_odd≈67Ω、偶モード Z_even≈142Ω が算出され、100Ω 目標に対し -2Ω の補正が必要と判定されます。PCIe Gen 3（100Ω 差動）配線では、H=0.15 mm、Er=3.8、W=0.18 mm で Z_diff=100Ω±2Ω の精度達成例が実績です</p>
+<h3>計算例</h3>
+<p>W=0.20 mm、S=0.15 mm、H=0.20 mm、εr=4.0では、Z0≈75.2 Ω、Zdiff≈115.3 Ω、Zodd≈57.7 Ω、Zeven≈92.8 Ωです。100 Ωへ近づけるには、Wを広げる、またはHやSを調整して結合と単線インピーダンスのバランスを取ります。</p>
 </div>
 <div class="howto-card howto-notes">
-<h3>実務での注意点</h3>
-<ol>
-<li>コア基板と銅厚の影響：実測基板厚は公称値より ±0.05 mm 変動しやすく、H パラメータは VNA で検証後の補正値を使用します</li>
-<li>ビア配置による挿入損失：差動ペア間にビアを密集させるとモード変換が増加するため、信号側と戻り側で対称配置を厳守します</li>
-<li>USB 3.0 以上や DisplayPort では反射係数 Γ &lt;-20 dB を満たすため、計算値から±3Ω のトレランスを持たせた基板手配が必須です</li>
-<li>高周波シミュレーション（HFSS・Q3D）で層構造（銅厚 35μm）の影響を検証し、単線 Z_0 から Z_diff・Z_even への変換精度を確認します</li>
-</ol>
+<h3>注意点</h3>
+<ul>
+<li>この式は外層マイクロストリップの近似です。内層ストリップライン、ソルダーレジスト、銅厚補正、製造公差は別途考慮してください。</li>
+<li>W/Hが大きすぎる場合は近似式の対数項が無効になるため、適用範囲外として表示します。</li>
+<li>最終設計では基板メーカーのスタックアップと2D/3Dフィールドソルバーで確認してください。</li>
+</ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -42,14 +42,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "根軌跡法・制御系設計ツール",
       "description": "根軌跡法による制御系設計ツール。開ループ極・零点を設定してゲインKを変化させた閉ループ極の軌跡をリアルタイム描画。漸近線・安定余裕・ステップ応答を自動計算。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/root-locus.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true
     },{
@@ -145,6 +145,28 @@ canvas{max-width:100%}/* mobile-compact */
 
 }.explanation{max-width:1200px;margin:0 auto;padding:40px 24px 60px}.explanation h2{font-size:19px;font-weight:700;color:var(--accent);margin:24px 0 10px;border-left:3px solid var(--accent);padding-left:12px}.explanation p{font-size:15px;line-height:1.8;color:var(--text);margin-bottom:12px}.fblock{background:rgba(0,123,255,.04);border:1px solid rgba(0,123,255,.15);border-radius:8px;padding:16px 20px;margin:14px 0;overflow-x:auto}.fblock p{margin-bottom:8px;font-size:14px;color:var(--text)}.chat{background:rgba(0,123,255,.04);border:1px solid rgba(0,123,255,.1);border-radius:12px;padding:16px;margin:20px 0}.cmsg{display:flex;gap:10px;margin-bottom:12px;align-items:flex-start}.cmsg .ico{font-size:22px;flex-shrink:0}.cmsg .bub{background:var(--card);border-radius:8px;padding:10px 14px;font-size:14px;line-height:1.7;color:var(--text);border:1px solid var(--border)}.cmsg.st .bub{border-left:3px solid var(--accent2)}.cmsg.pr .bub{border-left:3px solid #f59e0b}
 
+/* Root-locus hero animation */
+.rl-hero-wrap{position:relative}
+.rl-hero-readout{position:absolute;top:8px;right:10px;display:flex;gap:8px;align-items:center;font-family:'Roboto Mono',monospace;font-size:.8rem;background:rgba(10,22,40,.72);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:4px 10px;color:#cfe3ff;backdrop-filter:blur(2px)}
+.rl-hero-readout b{color:#ffd700}
+.rl-rstab{font-weight:700;padding:1px 8px;border-radius:10px;font-size:.72rem}
+.rl-rstab.ok{background:rgba(0,184,148,.25);color:#5be8c2}
+.rl-rstab.marg{background:rgba(255,165,0,.25);color:#ffc36b}
+.rl-rstab.bad{background:rgba(255,77,77,.28);color:#ff9a9a}
+.rl-hero-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
+.rl-hs{background:rgba(0,123,255,.06);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center}
+.rl-hs span{display:block;font-family:'Roboto Mono',monospace;font-size:.92rem;font-weight:700;color:var(--accent)}
+.rl-hs small{display:block;font-size:.6rem;color:var(--muted);margin-top:2px;line-height:1.2}
+.rl-hero-ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.rl-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+.rl-btn:hover{filter:brightness(1.08)}
+.rl-krange,.rl-speed{display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--muted);flex:1;min-width:140px}
+.rl-krange input,.rl-speed input{flex:1}
+.rl-hero-note{margin-top:10px;font-size:.78rem;line-height:1.6;color:var(--muted);background:rgba(0,180,216,.05);border:1px solid rgba(0,180,216,.18);border-radius:8px;padding:8px 12px}
+.rl-hero-note strong{color:var(--orange)}
+@media(max-width:600px){.rl-hero-stats{grid-template-columns:repeat(3,1fr)}.rl-hs span{font-size:.8rem}}
+@media (prefers-reduced-motion: reduce){.rl-btn i{animation:none}}
+
 /* Collapsible theory-box / cae-note */
 details.theory-box>summary,details.cae-note>summary{list-style:none;cursor:pointer;user-select:none;-webkit-user-select:none;}
 details.theory-box>summary::-webkit-details-marker,details.cae-note>summary::-webkit-details-marker{display:none;}
@@ -226,6 +248,30 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
   </div>
 <div class="viz-panel">
+    <div class="chart-card" id="heroCard">
+      <div class="chart-title"><i class="fas fa-circle-nodes"></i> 根軌跡アニメーション — ゲインKと閉ループ極の運動</div>
+      <div class="rl-hero-wrap">
+        <canvas id="rlocusHeroCanvas" class="diagram" height="360" role="img" aria-label="ゲインKを掃引したときに閉ループ極がs平面上の根軌跡に沿って動く様子と、それに連動するステップ応答のアニメーション"></canvas>
+        <div class="rl-hero-readout" id="rlHeroReadout" aria-live="polite">
+          <span class="rl-rk">K = <b id="rlK">0.0</b></span>
+          <span class="rl-rstab" id="rlStab">安定</span>
+        </div>
+      </div>
+      <div class="rl-hero-stats">
+        <div class="rl-hs"><span id="rlHsPole">—</span><small>支配極</small></div>
+        <div class="rl-hs"><span id="rlHsZeta">—</span><small>制振比 ζ</small></div>
+        <div class="rl-hs"><span id="rlHsWn">—</span><small>ωn [rad/s]</small></div>
+        <div class="rl-hs"><span id="rlHsOs">—</span><small>オーバーシュート %</small></div>
+        <div class="rl-hs"><span id="rlHsKcrit">—</span><small>限界ゲイン K_crit</small></div>
+      </div>
+      <div class="rl-hero-ctrl">
+        <button class="btn rl-btn" type="button" id="rlPlay" aria-label="再生／一時停止"><i class="fas fa-play"></i> 再生</button>
+        <button class="btn rl-btn" type="button" id="rlReset" aria-label="最初から"><i class="fas fa-rotate-left"></i> リセット</button>
+        <label class="rl-krange">K <input type="range" id="rlKSlider" min="0" max="100" step="0.1" value="0" aria-label="ゲインK スクラブ"></label>
+        <label class="rl-speed">速度 <input type="range" id="rlSpeed" min="0.25" max="3" step="0.25" value="1" aria-label="アニメーション速度"></label>
+      </div>
+      <div class="rl-hero-note"><i class="fas fa-lightbulb"></i> Kを上げると閉ループ極（●）が開ループ極（×）から軌跡に沿って移動。虚軸を越えて右半平面に入ると<strong>不安定</strong>。下のステップ応答が緩慢→俊敏→振動的→発散へ連動して変化します。</div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -391,9 +437,8 @@ function evalOL(s_re, s_im, poles, zeros){
   // For current K, find dominant closed-loop poles (approx by angle condition)
   // Find operating point approximation
   const clPoles = findClosedLoopPoles(poles, zeros, K);
-  let domPole = clPoles.reduce((best, p) => (best === null || Math.abs(p.re) < Math.abs(best.re)) ? p : best, null);
-  // Find most negative real (dominant)
-  domPole = clPoles.filter(p => p.re < 0).sort((a,b) => b.re - a.re)[0] || clPoles[0];
+  // Dominant pole = the one closest to (or beyond) the jw axis = largest real part
+  let domPole = clPoles.slice().sort((a, b) => b.re - a.re)[0] || null;
 
   let zeta = 1, wn = 1, os = 0, ts = 4;
   if (domPole){
@@ -417,44 +462,84 @@ function evalOL(s_re, s_im, poles, zeros){
   cs.className = 'stat-card ' + (K < Kcrit || Kcrit < 0 ? 'ok' : 'warn');
 
   updateStepChart(zeta, wn, K);
-}function findClosedLoopPoles(poles, zeros, K){
-  // For 2-pole system: characteristic polynomial s^2 + (p1+p2)s + p1*p2 + K = 0
-  if (poles.length === 2 && zeros.length === 0) {
-    const a = poles[0].re + poles[1].re; // negative sum
-    const b = poles[0].re * poles[1].re - poles[0].im * poles[1].im + K;
-    const disc = a * a - 4 * b;
-    if (disc >= 0) {
-      return [
-        { re: (-a + Math.sqrt(disc)) / 2, im: 0 },{ re: (-a - Math.sqrt(disc)) / 2, im: 0 }
-      ];
-    }else{
-      return [
-        { re: -a / 2, im: Math.sqrt(-disc) / 2 },{ re: -a / 2, im: -Math.sqrt(-disc) / 2 }
-      ];
+}// Build polynomial coefficients (descending, complex [re,im]) from its roots
+function polyFromRoots(roots){
+  let c = [[1, 0]];
+  for (const r of roots){
+    const nc = Array.from({ length: c.length + 1 }, () => [0, 0]);
+    for (let i = 0; i < c.length; i++){
+      nc[i][0] += c[i][0]; nc[i][1] += c[i][1];
+      nc[i + 1][0] -= c[i][0] * r.re - c[i][1] * r.im;
+      nc[i + 1][1] -= c[i][0] * r.im + c[i][1] * r.re;
     }
-  }// For 3-pole system: rough approximation
-  if (poles.length === 3 && zeros.length === 0){
-    const sumRe = poles.reduce((s,p) => s + p.re, 0);
-    const wn_approx = Math.pow(K + Math.abs(poles[0].re * poles[1].re * poles[2].re), 1/3);
-    const zeta_approx = -sumRe / (2 * wn_approx) / poles.length;
-    return [
-      { re: -zeta_approx * wn_approx, im: wn_approx * Math.sqrt(Math.max(0,1-zeta_approx*zeta_approx)) },{ re: -zeta_approx * wn_approx, im: -wn_approx * Math.sqrt(Math.max(0,1-zeta_approx*zeta_approx)) },{ re: sumRe + 2*zeta_approx*wn_approx, im: 0 }
-    ];
-  }// Generic: return pole + perturbation
-  return poles.map(p => ({ re: p.re - K * 0.1, im: p.im }));
-}function estimateCriticalK(poles, zeros){
-  // Routh-Hurwitz for 2-pole: always stable if poles in LHP → ∞
-  if (poles.length === 2 && zeros.length === 0 && poles.every(p => p.re < 0)) return -1;
-  if (poles.length === 3 && zeros.length === 0) {
-    // char poly: s^3 + (p1+p2+p3)s^2 + (p1p2+p1p3+p2p3)s + p1p2p3 + K
-    const a1 = -(poles[0].re + poles[1].re + poles[2].re);
-    const a2 = poles[0].re*poles[1].re + poles[0].re*poles[2].re + poles[1].re*poles[2].re;
-    const a3 = -poles[0].re*poles[1].re*poles[2].re;
-    // Routh: K_crit = a1*a2 - a3 (when Routh criterion on s^1 row = 0)
-    const Kcrit = a1 * a2 - a3;
-    return Math.max(0, Kcrit);
+    c = nc;
   }
-  return -1; // ∞
+  return c;
+}// All roots of a complex-coefficient polynomial (Durand-Kerner iteration)
+function polyRoots(c){
+  const n = c.length - 1;
+  if (n < 1) return [];
+  const l = c[0], lm = l[0] * l[0] + l[1] * l[1];
+  if (lm < 1e-300) return [];
+  const a = c.map(co => [(co[0] * l[0] + co[1] * l[1]) / lm, (co[1] * l[0] - co[0] * l[1]) / lm]);
+  const ev = z => {
+    let re = 0, im = 0;
+    for (const co of a){
+      const nre = re * z[0] - im * z[1] + co[0];
+      const nim = re * z[1] + im * z[0] + co[1];
+      re = nre; im = nim;
+    }
+    return [re, im];
+  };
+  const rs = [];
+  for (let i = 0; i < n; i++){
+    const th = 2 * Math.PI * i / n;
+    rs.push([0.4 + 1.3 * Math.cos(th), 0.3 + 0.9 * Math.sin(th)]);
+  }
+  for (let it = 0; it < 160; it++){
+    let moved = 0;
+    for (let i = 0; i < n; i++){
+      const num = ev(rs[i]);
+      let den = [1, 0];
+      for (let j = 0; j < n; j++){
+        if (j === i) continue;
+        const d = [rs[i][0] - rs[j][0], rs[i][1] - rs[j][1]];
+        den = [den[0] * d[0] - den[1] * d[1], den[0] * d[1] + den[1] * d[0]];
+      }
+      const m2 = den[0] * den[0] + den[1] * den[1] || 1e-12;
+      const q = [(num[0] * den[0] + num[1] * den[1]) / m2, (num[1] * den[0] - num[0] * den[1]) / m2];
+      rs[i] = [rs[i][0] - q[0], rs[i][1] - q[1]];
+      moved = Math.max(moved, Math.abs(q[0]) + Math.abs(q[1]));
+    }
+    if (moved < 1e-10) break;
+  }
+  return rs.map(z => ({ re: z[0], im: Math.abs(z[1]) < 1e-7 ? 0 : z[1] }));
+}function findClosedLoopPoles(poles, zeros, K){
+  // Exact: 1 + K*N(s)/D(s) = 0  ->  D(s) + K*N(s) = 0, solved for any n<=4, m<=3
+  const D = polyFromRoots(poles);
+  const N = polyFromRoots(zeros);
+  const off = D.length - N.length;
+  if (off < 0) return poles.map(p => ({ re: p.re, im: p.im })); // improper system: keep open-loop
+  const c = D.map(x => x.slice());
+  for (let i = 0; i < N.length; i++){
+    c[off + i][0] += K * N[i][0];
+    c[off + i][1] += K * N[i][1];
+  }
+  return polyRoots(c);
+}function estimateCriticalK(poles, zeros){
+  // Smallest K > 0 where a closed-loop pole reaches Re(s) >= 0 (scan + bisection on exact roots)
+  const maxRe = K => findClosedLoopPoles(poles, zeros, K).reduce((m, p) => Math.max(m, p.re), -1e9);
+  let lo = 0, hi = -1, K = 0.01;
+  while (K <= 2000){
+    if (maxRe(K) >= 0){ hi = K; break; }
+    lo = K; K *= 1.6;
+  }
+  if (hi < 0) return -1; // stable over the whole scanned range -> treat as infinite margin
+  for (let i = 0; i < 60; i++){
+    const mid = (lo + hi) / 2;
+    if (maxRe(mid) >= 0) hi = mid; else lo = mid;
+  }
+  return (lo + hi) / 2;
 }function drawRootLocus(poles, zeros, K_current, centroid, asymptotes){
   const canvas = document.getElementById('rlocusCanvas');
   const W = canvas.offsetWidth || canvas.clientWidth || canvas.parentElement.clientWidth;
@@ -596,6 +681,251 @@ __novaHiDpiCanvas(canvas, W, __novaH1, ctx);
 compute();
 </script>
 
+<script>
+/* === Root-locus animated hero (v2) — reuses global getPoles/getZeros/findClosedLoopPoles/estimateCriticalK === */
+(function(){
+  var canvas = document.getElementById('rlocusHeroCanvas');
+  if (!canvas || typeof findClosedLoopPoles !== 'function') return;
+  var ctx = canvas.getContext('2d');
+  var I18N = {
+    stable:'安定', marginal:'限界', unstable:'不安定',
+    legPole:'× 開ループ極', legZero:'○ 開ループ零点', legCL:'● 閉ループ極',
+    sPlane:'s 平面（根軌跡）', step:'ステップ応答 y(t)', kcritInf:'∞'
+  };
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var KMAX = 100;                 // sweep ceiling
+  var state = { K:0, playing:false, speed:1, last:0, raf:0, cache:null, cacheKey:'' };
+
+  var elPlay  = document.getElementById('rlPlay');
+  var elReset = document.getElementById('rlReset');
+  var elKsl   = document.getElementById('rlKSlider');
+  var elSpd   = document.getElementById('rlSpeed');
+  var elK     = document.getElementById('rlK');
+  var elStab  = document.getElementById('rlStab');
+  var elPole  = document.getElementById('rlHsPole');
+  var elZeta  = document.getElementById('rlHsZeta');
+  var elWn    = document.getElementById('rlHsWn');
+  var elOs    = document.getElementById('rlHsOs');
+  var elKcrit = document.getElementById('rlHsKcrit');
+
+  function cfgKey(poles, zeros){
+    return poles.map(function(p){return p.re+','+p.im;}).join(';')+'|'+zeros.map(function(z){return z.re+','+z.im;}).join(';');
+  }
+  function getCfg(){
+    var poles = getPoles(), zeros = getZeros();
+    var key = cfgKey(poles, zeros);
+    if (key !== state.cacheKey){
+      // Precompute the locus branch points + critical gain once per configuration.
+      var branches = traceBranches(poles, zeros);
+      var kc = estimateCriticalK(poles, zeros);
+      state.cache = { poles:poles, zeros:zeros, branches:branches, kcrit:kc };
+      state.cacheKey = key;
+    }
+    return state.cache;
+  }
+  // Trace each root-locus branch by nearest-neighbour continuation across K.
+  function traceBranches(poles, zeros){
+    var n = poles.length;
+    if (!n) return [];
+    var STEPS = 240, KTOP = 160;
+    var branches = [];
+    for (var i=0;i<n;i++) branches.push([{re:poles[i].re, im:poles[i].im}]);
+    var prev = poles.map(function(p){return {re:p.re, im:p.im};});
+    for (var s=1;s<=STEPS;s++){
+      var Ki = KTOP*s/STEPS;
+      var cl = findClosedLoopPoles(poles, zeros, Ki);
+      if (!cl || !cl.length) break;
+      var used = new Array(cl.length).fill(false);
+      for (var b=0;b<n;b++){
+        var best=-1, bd=1e18;
+        for (var c=0;c<cl.length;c++){
+          if (used[c]) continue;
+          var d=(cl[c].re-prev[b].re)*(cl[c].re-prev[b].re)+(cl[c].im-prev[b].im)*(cl[c].im-prev[b].im);
+          if (d<bd){bd=d;best=c;}
+        }
+        if (best>=0){ used[best]=true; branches[b].push({re:cl[best].re, im:cl[best].im}); prev[b]={re:cl[best].re, im:cl[best].im}; }
+      }
+    }
+    return branches;
+  }
+  function dominant(cl){
+    var d=null;
+    for (var i=0;i<cl.length;i++){ if (!d || cl[i].re>d.re) d=cl[i]; }
+    return d;
+  }
+  // Analytic underdamped/overdamped step response sample at time t.
+  function stepY(zeta, wn, t){
+    if (wn<=0) return 1;
+    if (zeta>=1){ return 1 - Math.exp(-wn*t)*(1+wn*t); }
+    if (zeta>0){ var wd=wn*Math.sqrt(1-zeta*zeta); return 1 - Math.exp(-zeta*wn*t)*(Math.cos(wd*t)+zeta/Math.sqrt(1-zeta*zeta)*Math.sin(wd*t)); }
+    if (zeta>-0.0001) return 1 - Math.cos(wn*t);
+    // unstable: growing oscillation
+    var wdN=wn*Math.sqrt(Math.max(0,1-zeta*zeta));
+    return 1 - Math.exp(-zeta*wn*t)*Math.cos(wdN*t);
+  }
+
+  function draw(){
+    var cfg = getCfg();
+    var poles = cfg.poles, zeros = cfg.zeros;
+    var W = canvas.clientWidth || canvas.parentElement.clientWidth || 600;
+    var H = 360;
+    __novaHiDpiCanvas(canvas, W, H, ctx);
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+    // layout: s-plane on top, step strip on bottom
+    var stripH = 92, planeH = H - stripH;
+    var cx = W*0.5, cy = planeH*0.5;
+    var scale = Math.min(W/16, planeH/9, 34);
+
+    // grid + axes
+    ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1;
+    for (var gx=-9;gx<=9;gx++){ ctx.beginPath(); ctx.moveTo(cx+gx*scale,0); ctx.lineTo(cx+gx*scale,planeH); ctx.stroke(); }
+    for (var gy=-5;gy<=5;gy++){ ctx.beginPath(); ctx.moveTo(0,cy+gy*scale); ctx.lineTo(W,cy+gy*scale); ctx.stroke(); }
+    // RHP shading
+    ctx.fillStyle='rgba(255,77,77,.06)'; ctx.fillRect(cx,0,W-cx,planeH);
+    ctx.strokeStyle='rgba(255,255,255,.32)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(W,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,planeH); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.4)'; ctx.font='10px Roboto Mono,monospace';
+    ctx.fillText('jω', cx+4, 12); ctx.fillText('σ', W-14, cy-4);
+
+    // locus branches
+    var br = cfg.branches;
+    for (var bi=0;bi<br.length;bi++){
+      ctx.beginPath();
+      ctx.strokeStyle = 'hsla('+((bi*55+200)%360)+',80%,66%,0.65)'; ctx.lineWidth=1.6;
+      for (var pi=0;pi<br[bi].length;pi++){
+        var X=cx+br[bi][pi].re*scale, Y=cy-br[bi][pi].im*scale;
+        if (pi===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+      }
+      ctx.stroke();
+    }
+    // open-loop poles ×
+    ctx.strokeStyle='#ff4d4d'; ctx.lineWidth=2.4;
+    for (var p=0;p<poles.length;p++){
+      var Px=cx+poles[p].re*scale, Py=cy-poles[p].im*scale;
+      ctx.beginPath(); ctx.moveTo(Px-7,Py-7); ctx.lineTo(Px+7,Py+7); ctx.moveTo(Px+7,Py-7); ctx.lineTo(Px-7,Py+7); ctx.stroke();
+    }
+    // open-loop zeros ○
+    ctx.strokeStyle='#00b894'; ctx.lineWidth=2;
+    for (var z=0;z<zeros.length;z++){
+      ctx.beginPath(); ctx.arc(cx+zeros[z].re*scale, cy-zeros[z].im*scale, 6, 0, 6.2832); ctx.stroke();
+    }
+    // current closed-loop poles (animated markers)
+    var cl = findClosedLoopPoles(poles, zeros, state.K);
+    var maxRe = -1e9, dom = dominant(cl);
+    for (var ci=0;ci<cl.length;ci++) if (cl[ci].re>maxRe) maxRe=cl[ci].re;
+    var unstable = maxRe > 1e-4, marginal = Math.abs(maxRe) <= 1e-2;
+    ctx.fillStyle = unstable ? '#ff5d5d' : '#ffd700';
+    for (var k=0;k<cl.length;k++){
+      var Mx=cx+cl[k].re*scale, My=cy-cl[k].im*scale;
+      ctx.beginPath(); ctx.arc(Mx,My,5.5,0,6.2832); ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.4; ctx.stroke();
+      // glow
+      ctx.beginPath(); ctx.arc(Mx,My,10,0,6.2832); ctx.strokeStyle=unstable?'rgba(255,93,93,.35)':'rgba(255,215,0,.35)'; ctx.lineWidth=2; ctx.stroke();
+    }
+
+    // legend
+    ctx.font='11px Noto Sans JP,sans-serif';
+    ctx.fillStyle='#ff4d4d'; ctx.fillText(I18N.legPole, 12, 18);
+    ctx.fillStyle='#00b894'; ctx.fillText(I18N.legZero, 12, 33);
+    ctx.fillStyle='#ffd700'; ctx.fillText(I18N.legCL, 12, 48);
+
+    // ---- step response strip ----
+    var sy0 = planeH + 6, sH = stripH - 12;
+    ctx.fillStyle='rgba(255,255,255,.04)'; ctx.fillRect(0, sy0, W, sH);
+    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
+    var yBase = sy0 + sH*0.78;            // y=0 line
+    var yOne  = sy0 + sH*0.30;            // y=1 target line
+    ctx.beginPath(); ctx.moveTo(0,yOne); ctx.lineTo(W,yOne); ctx.stroke();
+    ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(170,170,170,.5)';
+    ctx.beginPath(); ctx.moveTo(0,yOne); ctx.lineTo(W,yOne); ctx.stroke(); ctx.setLineDash([]);
+
+    var zeta=1, wn=1, os=0;
+    if (dom){
+      wn=Math.sqrt(dom.re*dom.re+dom.im*dom.im);
+      zeta = wn>0 ? -dom.re/wn : 1;
+      os = (zeta<1 && zeta>0) ? Math.exp(-Math.PI*zeta/Math.sqrt(1-zeta*zeta))*100 : 0;
+    }
+    var tMax = (zeta>0 && wn>0) ? Math.min(24, 10/(zeta*wn+0.12)) : 14;
+    ctx.beginPath();
+    ctx.strokeStyle = unstable ? '#ff6b6b' : '#39b6ff'; ctx.lineWidth=2;
+    for (var sx=0;sx<=W;sx+=2){
+      var t = tMax*sx/W;
+      var y = stepY(zeta, wn, t);
+      y = Math.max(-1.4, Math.min(2.4, y));
+      var Y = yBase - (y)*(yBase-yOne);   // map y=0->yBase, y=1->yOne
+      if (sx===0) ctx.moveTo(sx,Y); else ctx.lineTo(sx,Y);
+    }
+    ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.45)'; ctx.font='10px Roboto Mono,monospace';
+    ctx.fillText(I18N.step, 10, sy0+12);
+
+    // readouts
+    elK.textContent = state.K.toFixed(1);
+    var cls = unstable ? 'bad' : (marginal ? 'marg' : 'ok');
+    elStab.className = 'rl-rstab '+cls;
+    elStab.textContent = unstable ? I18N.unstable : (marginal ? I18N.marginal : I18N.stable);
+    elPole.textContent = dom ? (dom.re.toFixed(2)+(dom.im?('±j'+Math.abs(dom.im).toFixed(2)):'')) : '—';
+    elZeta.textContent = dom ? Math.max(-9,Math.min(9,zeta)).toFixed(3) : '—';
+    elWn.textContent = dom ? wn.toFixed(2) : '—';
+    elOs.textContent = (zeta>0 && zeta<1) ? os.toFixed(1) : (unstable?'∞':'0.0');
+    elKcrit.textContent = (cfg.kcrit>0) ? cfg.kcrit.toFixed(2) : I18N.kcritInf;
+  }
+
+  function setK(k, fromUser){
+    state.K = Math.max(0, Math.min(KMAX, k));
+    if (elKsl && !fromUser) elKsl.value = state.K;
+    draw();
+  }
+  function loop(ts){
+    if (!state.playing){ state.raf=0; return; }
+    if (!state.last) state.last = ts;
+    var dt = (ts - state.last)/1000; state.last = ts;
+    // sweep ~ KMAX over ~12s at speed 1
+    state.K += dt * (KMAX/12) * state.speed;
+    if (state.K >= KMAX){ state.K = KMAX; stop(); }
+    if (elKsl) elKsl.value = state.K;
+    draw();
+    if (state.playing) state.raf = requestAnimationFrame(loop);
+  }
+  function play(){
+    if (state.playing) return;
+    if (state.K >= KMAX) state.K = 0;
+    state.playing = true; state.last = 0;
+    elPlay.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    state.raf = requestAnimationFrame(loop);
+  }
+  function stop(){
+    state.playing = false;
+    if (state.raf) cancelAnimationFrame(state.raf), state.raf=0;
+    elPlay.innerHTML = '<i class="fas fa-play"></i> 再生';
+  }
+  function toggle(){ state.playing ? stop() : play(); }
+
+  elPlay.addEventListener('click', toggle);
+  elReset.addEventListener('click', function(){ stop(); setK(0); });
+  elKsl.addEventListener('input', function(){ stop(); setK(parseFloat(elKsl.value), true); });
+  elSpd.addEventListener('input', function(){ state.speed = parseFloat(elSpd.value)||1; });
+  elPlay.addEventListener('keydown', function(e){ if (e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(); } });
+
+  // recompute branches when calculator inputs change
+  document.querySelectorAll('#poleInputs input, #zeroInputs input, [onclick^="setPreset"]').forEach(function(el){
+    el.addEventListener('change', function(){ state.cacheKey=''; draw(); });
+    if (el.tagName==='BUTTON') el.addEventListener('click', function(){ setTimeout(function(){ state.cacheKey=''; draw(); }, 0); });
+  });
+  window.addEventListener('resize', function(){ draw(); });
+
+  // initial render (static frame if reduced motion)
+  setK(0);
+  if (reduce){
+    // show a representative non-zero gain frame instead of animating
+    setK(Math.min(20, KMAX*0.2));
+  }
+})();
+</script>
+
 <section class="explanation">
   <h2>根軌跡法・制御系設計ツールとは</h2>
   <div class="chat">
@@ -712,13 +1042,13 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>産業用DC速度制御系で開ループ極をp1=-2, p2=-8, p3=-15, p4=-0.5に設定した場合、K=3.5時点で支配極は-0.8±j2.1となり、制振比ζ=0.35、固有振動数ωn=2.24 rad/s、オーバーシュート15.3%、整定時間（±2%基準）Ts=4.2秒が計算されます。限界ゲインはK_crit=8.7で、この値を超えると根軌跡が右半平面に進入し不安定化します</p>
+<p>産業用DC速度制御系で開ループ極をp1=-1, p2=-2, p3=-4（零点なし）に設定した場合、K=20時点で支配極は-0.82±j2.13となり、制振比ζ=0.358、固有振動数ωn=2.29 rad/s、オーバーシュート30.0%、整定時間（±2%基準）Ts=4.89秒が計算されます。限界ゲインはK_crit≈90で、この値を超えると根軌跡が右半平面に進入し不安定化します</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol><li>複雑な高次系（5次以上）では根軌跡の交差点が重根となり、詳細な局所安定性判定にはナイキスト線図の併用が必要です</li><li>むだ時間を含む制御系（例：搬送ベルト速度制御τ=0.15秒）では根軌跡法が直接適用できず、Pade近似によるモデル化が先行条件になります</li><li>制振比ζ>0.7で設計するとオーバーシュートは5%以下に抑制できますが、整定時間が延伸するため応答速度との両立が困難になります</li><li>磁気軸受やロボット関節など複数の可制御軸がある場合、各軸の支配極が異なるため軸間干渉を考慮した多変数ゲイン設定が必須です</li></ol>
 </div>
-<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+<div class="howto-card"><h3>準拠規格・前提条件</h3><p><strong>準拠/参考：</strong>古典制御 Evans 根軌跡。特性方程式 \(1+K\,G(s)H(s)=0\)。漸近線重心 \(\sigma_a=(\sum p_i-\sum z_j)/(n-m)\)、漸近線角度 \((2k+1)\,180^\circ/(n-m)\)、角度条件 \(\angle G(s)H(s)=\pm180^\circ\)。</p><p><strong>モデルの前提：</strong>LTI・有理伝達関数・実係数（複素極は共役対）。負帰還・比例ゲインK≥0の標準軌跡。むだ時間・非線形・離散化は対象外。</p><p><strong>適用範囲・限界：</strong>教育・解析用。検証例 極 −1,−2,−4（零点なし）で σ_a=−2.33、漸近線角 60°/180°/300° と本ツールが一致。閉ループ極はs平面走査による近似で、高次系では数値根確定に解析ソルバ併用を推奨。</p></div><footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
   <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">

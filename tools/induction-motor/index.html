@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "三相誘導電動機シミュレーター",
       "description": "三相誘導電動機の等価回路パラメータからトルク-速度特性・効率・力率・電流をリアルタイム計算。Y-Δ始動・インバータ制御対応。",
       "url": "https://novasolver.jp/tools/induction-motor.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["等価回路パラメータによるトルク-速度特性計算","効率・力率・電流の負荷特性","Y-Δ始動・ソフトスタータ・VFD比較","回転磁界アニメーション"],
       "keywords": "誘導電動機,三相モーター,トルク速度特性,等価回路,すべり,同期速度,インバータ,CAEシミュレーター",
       "datePublished": "2026-04-08",
@@ -131,6 +131,22 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 additions ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.62);margin-top:3px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+.live-ro.warn .rv{color:#ff8a65}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}
+.speed-btn{padding:4px 9px;font-size:0.74rem}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:0.7rem;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:16px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){input[type=range]::-webkit-slider-thumb{transition:none}}
+/* end v2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/induction-motor.html">
@@ -160,91 +176,106 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 <div class="main">
   <div class="panel">
-    <div class="panel-title">プリセット</div>
+    <div class="panel-title"><i class="fas fa-bolt"></i> プリセット</div>
     <div class="btn-group">
-      <button class="preset-btn active" onclick="loadPreset('4p60hz')">4P 60Hz 480V</button>
-      <button class="preset-btn" onclick="loadPreset('4p50hz')">4P 50Hz 400V</button>
-      <button class="preset-btn" onclick="loadPreset('6p50hz')">6P 50Hz</button>
+      <button class="preset-btn active" data-preset="noload" onclick="IM.preset('noload')">無負荷 s≈0</button>
+      <button class="preset-btn" data-preset="rated" onclick="IM.preset('rated')">定格負荷</button>
+      <button class="preset-btn" data-preset="breakdown" onclick="IM.preset('breakdown')">最大トルク近傍</button>
+      <button class="preset-btn" data-preset="vfd" onclick="IM.preset('vfd')">VFD 低周波数</button>
     </div>
     <div class="divider"></div>
-    <div class="panel-title">電動機パラメータ</div>
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> 電源・極数</div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">固定子抵抗 R₁ (Ω)</span><div class="num-wrap"><input type="number" class="num-input" id="vR1Num" value="0.5" min="0.05" max="5" step="0.05" oninput="syncFromNum('sR1','vR1Num')"><span class="num-unit">Ω</span></div></div>
-      <input type="range" id="sR1" min="0.05" max="5" step="0.05" value="0.5" oninput="syncToNum('sR1','vR1Num');updateSlider(this);compute()">
+      <div class="param-label"><span class="param-name">供給周波数 f</span><span class="param-value"><span id="fVal">60</span> Hz</span></div>
+      <input type="range" id="sFreq" min="10" max="120" step="1" value="60" oninput="IM.onParam()" aria-label="供給周波数 f ヘルツ">
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">固定子漏れリアクタンス X₁ (Ω)</span><div class="num-wrap"><input type="number" class="num-input" id="vX1Num" value="1.0" min="0.1" max="10" step="0.1" oninput="syncFromNum('sX1','vX1Num')"><span class="num-unit">Ω</span></div></div>
-      <input type="range" id="sX1" min="0.1" max="10" step="0.1" value="1.0" oninput="syncToNum('sX1','vX1Num');updateSlider(this);compute()">
+      <div class="param-label"><span class="param-name">極数 p</span><span class="param-value"><span id="pVal">4</span></span></div>
+      <input type="range" id="sPoles" min="2" max="12" step="2" value="4" oninput="IM.onParam()" aria-label="極数 p">
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">励磁リアクタンス Xₘ (Ω)</span><div class="num-wrap"><input type="number" class="num-input" id="vXmNum" value="30" min="5" max="100" step="1" oninput="syncFromNum('sXm','vXmNum')"><span class="num-unit">Ω</span></div></div>
-      <input type="range" id="sXm" min="5" max="100" step="1" value="30" oninput="syncToNum('sXm','vXmNum');updateSlider(this);compute()">
-    </div>
-    <div class="param-group">
-      <div class="param-label"><span class="param-name">二次抵抗 R₂' (Ω)</span><div class="num-wrap"><input type="number" class="num-input" id="vR2Num" value="0.4" min="0.05" max="5" step="0.05" oninput="syncFromNum('sR2','vR2Num')"><span class="num-unit">Ω</span></div></div>
-      <input type="range" id="sR2" min="0.05" max="5" step="0.05" value="0.4" oninput="syncToNum('sR2','vR2Num');updateSlider(this);compute()">
-    </div>
-    <div class="param-group">
-      <div class="param-label"><span class="param-name">二次漏れリアクタンス X₂' (Ω)</span><div class="num-wrap"><input type="number" class="num-input" id="vX2Num" value="1.0" min="0.1" max="10" step="0.1" oninput="syncFromNum('sX2','vX2Num')"><span class="num-unit">Ω</span></div></div>
-      <input type="range" id="sX2" min="0.1" max="10" step="0.1" value="1.0" oninput="syncToNum('sX2','vX2Num');updateSlider(this);compute()">
+      <div class="param-label"><span class="param-name">相電圧 V₁</span><span class="param-value"><span id="vVal">277</span> V</span></div>
+      <input type="range" id="sV1" min="100" max="500" step="5" value="277" oninput="IM.onParam()" aria-label="相電圧 V1 ボルト">
     </div>
     <div class="divider"></div>
-    <div class="panel-title">電源・極数</div>
+    <div class="panel-title"><i class="fas fa-gears"></i> 負荷・回転子</div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">電源電圧 V₁ (V, 相電圧)</span><div class="num-wrap"><input type="number" class="num-input" id="vV1Num" value="277" min="100" max="500" step="5" oninput="syncFromNum('sV1','vV1Num')"><span class="num-unit">V</span></div></div>
-      <input type="range" id="sV1" min="100" max="500" step="5" value="277" oninput="syncToNum('sV1','vV1Num');updateSlider(this);compute()">
+      <div class="param-label"><span class="param-name">負荷トルク T<sub>L</sub></span><span class="param-value"><span id="tlVal">40</span> N·m</span></div>
+      <input type="range" id="sLoad" min="0" max="220" step="1" value="40" oninput="IM.onParam()" aria-label="負荷トルク N・m">
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">周波数 f (Hz)</span><div class="num-wrap"><input type="number" class="num-input" id="vFreqNum" value="60" min="40" max="120" step="5" oninput="syncFromNum('sFreq','vFreqNum')"><span class="num-unit">Hz</span></div></div>
-      <input type="range" id="sFreq" min="40" max="120" step="5" value="60" oninput="syncToNum('sFreq','vFreqNum');updateSlider(this);compute()">
-    </div>
-    <div class="param-group">
-      <div class="param-label"><span class="param-name">極数 P</span><div class="num-wrap"><input type="number" class="num-input" id="vPolesNum" value="4" min="2" max="12" step="2" oninput="syncFromNum('sPoles','vPolesNum')"><span class="num-unit"></span></div></div>
-      <input type="range" id="sPoles" min="2" max="12" step="2" value="4" oninput="syncToNum('sPoles','vPolesNum');updateSlider(this);compute()">
+      <div class="param-label"><span class="param-name">回転子抵抗 R₂'</span><span class="param-value"><span id="r2Val">0.40</span> Ω</span></div>
+      <input type="range" id="sR2" min="0.05" max="3" step="0.05" value="0.4" oninput="IM.onParam()" aria-label="回転子抵抗 R2 オーム">
     </div>
     <div class="divider"></div>
-    <div class="select-group">
-      <label>始動方式</label>
-      <select id="startMethod" onchange="compute()">
-        <option value="dol">直入れ起動 (DOL)</option>
-        <option value="yd">Y-Δ 始動</option>
-        <option value="soft">ソフトスタータ (50%V)</option>
-        <option value="vfd">インバータ (VFD)</option>
-      </select>
+    <div class="panel-title"><i class="fas fa-microchip"></i> 等価回路（固定子・漏れ）</div>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">固定子抵抗 R₁</span><span class="param-value"><span id="r1Val">0.50</span> Ω</span></div>
+      <input type="range" id="sR1" min="0.05" max="3" step="0.05" value="0.5" oninput="IM.onParam()" aria-label="固定子抵抗 R1 オーム">
+    </div>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">漏れリアクタンス X₁+X₂'</span><span class="param-value"><span id="xVal">2.0</span> Ω</span></div>
+      <input type="range" id="sX" min="0.2" max="12" step="0.1" value="2.0" oninput="IM.onParam()" aria-label="合計漏れリアクタンス オーム">
     </div>
     <div class="divider"></div>
-    <div class="panel-title">計算結果</div>
+    <div class="play-row">
+      <button class="btn" type="button" id="btnPlay" onclick="IM.togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+      <button class="btn secondary" type="button" onclick="IM.reset()"><i class="fas fa-redo"></i> リセット</button>
+      <div style="display:flex;gap:4px;margin-left:auto">
+        <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="IM.setSpeed(0.5)">0.5×</button>
+        <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="IM.setSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+        <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="IM.setSpeed(2)">2×</button>
+      </div>
+    </div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-    <div class="stat-cards">
-      <div class="stat-card"><div class="sv" id="rsync">1800</div><div class="sl">同期速度 (rpm)</div></div>
-      <div class="stat-card"><div class="sv" id="rTst">—</div><div class="sl">起動トルク (N·m)</div></div>
-      <div class="stat-card"><div class="sv" id="rTmax">—</div><div class="sl">最大トルク (N·m)</div></div>
-      <div class="stat-card"><div class="sv" id="rEff">—</div><div class="sl">定格効率 (%)</div></div>
-    </div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro"><div class="rv" id="roNs">1800</div><div class="rl">同期速度 nₛ [rpm]</div></div>
+        <div class="live-ro accent"><div class="rv" id="roNr">1746</div><div class="rl">回転子速度 nᵣ [rpm]</div></div>
+        <div class="live-ro warn"><div class="rv" id="roSlip">3.0</div><div class="rl">すべり s [%]</div></div>
+        <div class="live-ro"><div class="rv" id="roFr">1.8</div><div class="rl">回転子周波数 s·f [Hz]</div></div>
+        <div class="live-ro"><div class="rv" id="roT">—</div><div class="rl">トルク T [N·m]</div></div>
+        <div class="live-ro"><div class="rv" id="roI">—</div><div class="rl">一次電流 I [A]</div></div>
+        <div class="live-ro"><div class="rv" id="roPf">—</div><div class="rl">力率 cosφ</div></div>
+        <div class="live-ro"><div class="rv" id="roEff">—</div><div class="rl">効率 η [%]</div></div>
+      </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 回転磁界アニメーション</div><canvas id="animCanvas" class="canvas-anim ux-chartjs-canvas" height="140"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-arrows-spin"></i> 回転磁界とすべり（実時間アニメーション）</div>
+      <canvas id="animCanvas" class="canvas-anim" height="300" tabindex="0" role="img" aria-label="固定子の回転磁界が同期速度で回り、回転子がそれより遅く回るアニメーション。差がすべりです。"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#ffd54a"></i>回転磁界（nₛ）</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>回転子（nᵣ）</span>
+        <span><i class="swatch" style="background:#ff8a65"></i>誘導電流バー</span>
+        <span><i class="swatch" style="background:#00d4a0"></i>トルク方向</span>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> トルク — 速度特性（動作点マーカー）</div><canvas id="chartTorque" height="200"></canvas></div>
     <div class="chart-row">
       <div class="canvas-wrap">
-        <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> トルク — 速度特性</div><canvas id="chartTorque"></canvas></div>
+        <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 効率 & 力率 — すべり</div><canvas id="chartEff" height="200"></canvas></div>
       </div>
       <div class="canvas-wrap">
-        <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 効率 & 力率 — 負荷</div><canvas id="chartEff"></canvas></div>
+        <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 一次電流 — すべり</div><canvas id="chartCurrent" height="200"></canvas></div>
       </div>
     </div>
-    <div class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 電流 — すべり</div><canvas id="chartCurrent"></canvas></div>
-    </div>
-  
-<div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      $T = \dfrac{3}{\omega_s}\cdot \dfrac{V_1^2 \cdot R_2'/s}{(R_1+R_2'/s)^2+(X_1+X_2')^2}$
-      <br><br>すべり $s = (n_s - n)/n_s$，$\omega_s = 2\pi f / (P/2)$
-    
+<div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>同期速度：$n_s = \dfrac{120 f}{p}$　すべり：$s = \dfrac{n_s - n_r}{n_s}$　回転子周波数：$f_r = s\,f$</p>
+      $$T = \dfrac{3}{\omega_s}\cdot \dfrac{V_1^2 \cdot R_2'/s}{(R_1+R_2'/s)^2+(X_1+X_2')^2},\quad \omega_s = \dfrac{2\pi f}{p/2}$$
+      <p style="margin-top:6px;font-size:.8rem;color:var(--muted)">検証：$f=60,\ p=4 \Rightarrow n_s=1800$ rpm。$s=3\% \Rightarrow n_r=1746$ rpm、$f_r=1.8$ Hz。$n_r \to n_s$ でトルク $\to 0$（だから非同期）。$f=50,\ p=2 \Rightarrow n_s=3000$ rpm。</p>
 </div>
 </div>
 </div>
@@ -252,279 +283,346 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
-}
+window.IM_LANG = {
+  torque:'トルク (N·m)', speed:'速度 (rpm)', slip:'すべり s',
+  eff:'効率 (%)', pf:'力率 ×100', current:'一次電流 (A)', op:'動作点',
+  pctYlabel:'% / ×100'
+};
+</script>
+<script>
+/* ===== NovaSolver v2 induction-motor engine (shared, IIFE) ===== */
+var IM = (function(){
+  "use strict";
+  var L = (window.IM_LANG) || {};
+  var charts = {};
+  var dpr = 1;
+  var playing = true, speed = 1, raf = null, lastTs = 0;
+  var fieldAngle = 0, rotorAngle = 0;   // visual angles (rad)
+  var nrDyn = 0;                          // dynamic rotor speed (rpm), eased toward operating point
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
 
+  function el(id){ return document.getElementById(id); }
+  function val(id){ return parseFloat(el(id).value); }
 
-let charts = {};
-let animAngle = 0;
-let animRAF;
+  function setPct(id){
+    var e = el(id); if(!e) return;
+    var mn = parseFloat(e.min), mx = parseFloat(e.max);
+    if (isFinite(mn) && isFinite(mx) && mx>mn)
+      e.style.setProperty('--pct', (((parseFloat(e.value)-mn)/(mx-mn))*100).toFixed(1)+'%');
+  }
 
-function loadPreset(p){
-  const presets = {
-    '4p60hz': {R1:0.5,X1:1.0,Xm:30,R2:0.4,X2:1.0,V1:277,freq:60,poles:4},
-    '4p50hz':{R1:0.6,X1:1.2,Xm:28,R2:0.5,X2:1.2,V1:231,freq:50,poles:4},
-    '6p50hz':{R1:0.8,X1:1.5,Xm:25,R2:0.6,X2:1.5,V1:231,freq:50,poles:6}
-  };
-  const d = presets[p];
-  setSlider('sR1','vR1',d.R1); setSlider('sX1','vX1',d.X1); setSlider('sXm','vXm',d.Xm);
-  setSlider('sR2','vR2',d.R2); setSlider('sX2','vX2',d.X2);
-  setSlider('sV1','vV1',d.V1); setSlider('sFreq','vFreq',d.freq); setSlider('sPoles','vPoles',d.poles);
-  document.querySelectorAll('.preset-btn').forEach((b,i)=>b.classList.toggle('active',['4p60hz','4p50hz','6p50hz'][i]===p));
-  compute();
-}function setSlider(id, valId, val){
-  const el = document.getElementById(id);
-  el.value = val;
-  updateSlider(el, valId, id);
-}function getP(){
-  return {
-    R1: parseFloat(document.getElementById('sR1').value),
-    X1: parseFloat(document.getElementById('sX1').value),
-    Xm: parseFloat(document.getElementById('sXm').value),
-    R2: parseFloat(document.getElementById('sR2').value),
-    X2: parseFloat(document.getElementById('sX2').value),
-    V1: parseFloat(document.getElementById('sV1').value),
-    freq: parseFloat(document.getElementById('sFreq').value),
-    poles: parseFloat(document.getElementById('sPoles').value),
-    method: document.getElementById('startMethod').value
-  };
-}function calcTorque(p, s){
-  if (Math.abs(s) < 1e-6) s = 1e-6;
-  const ws = 2 * Math.PI * p.freq / (p.poles / 2);
-  let V = p.V1;
-  if (p.method === 'yd') V = p.V1 / Math.sqrt(3);
-  if (p.method === 'soft') V = p.V1 * 0.5;
-  const R2s = p.R2 / s;
-  const T = (3 / ws) * V * V * R2s / ((p.R1 + R2s) * (p.R1 + R2s) + (p.X1 + p.X2) * (p.X1 + p.X2));
-  return T;
-}function calcCurrent(p, s){
-  if (Math.abs(s) < 1e-6) s = 1e-6;
-  let V = p.V1;
-  if (p.method === 'yd') V = p.V1 / Math.sqrt(3);
-  if (p.method === 'soft') V = p.V1 * 0.5;
-  const R2s = p.R2 / s;
-  const denom = Math.sqrt((p.R1 + R2s) * (p.R1 + R2s) + (p.X1 + p.X2) * (p.X1 + p.X2));
-  return V / denom;
-}function compute(){
-  const p = getP();
-  const ns = 60 * p.freq / (p.poles / 2);
-  document.getElementById('rsync').textContent = Math.round(ns);
+  function P(){
+    var X = val('sX');
+    return {
+      f: val('sFreq'), poles: val('sPoles'), V: val('sV1'),
+      R1: val('sR1'), R2: val('sR2'),
+      X1: X/2, X2: X/2, Xsum: X,
+      TL: val('sLoad')
+    };
+  }
+  function nsRpm(p){ return 120*p.f/p.poles; }
+  function omegaS(p){ return 2*Math.PI*p.f/(p.poles/2); }
 
-  const slips = [];
-  const torques = [];
-  const speeds = [];
-  const N = 200;
-  for (let i = 0; i <= N; i++) {
-    const s = i / N * 2;
-    slips.push(s);
-    const T = calcTorque(p, s);
-    torques.push(T);
-    speeds.push(ns * (1 - s));
-  }const Tst = calcTorque(p, 1);
-  const Tmax = Math.max(...torques);
-  document.getElementById('rTst').textContent = Tst.toFixed(1);
-  document.getElementById('rTmax').textContent = Tmax.toFixed(1);
+  function torque(p, s){
+    if (Math.abs(s) < 1e-6) s = 1e-6;
+    var ws = omegaS(p);
+    var R2s = p.R2/s;
+    return (3/ws) * p.V*p.V * R2s / ((p.R1+R2s)*(p.R1+R2s) + p.Xsum*p.Xsum);
+  }
+  function current(p, s){
+    if (Math.abs(s) < 1e-6) s = 1e-6;
+    var R2s = p.R2/s;
+    return p.V / Math.sqrt((p.R1+R2s)*(p.R1+R2s) + p.Xsum*p.Xsum);
+  }
+  function pf(p, s){
+    if (Math.abs(s) < 1e-6) s = 1e-6;
+    var R2s = p.R2/s;
+    return (p.R1+R2s) / Math.sqrt((p.R1+R2s)*(p.R1+R2s) + p.Xsum*p.Xsum);
+  }
+  function effAt(p, s){
+    if (s<=0) return 0;
+    var Pm = torque(p,s)*omegaS(p)*(1-s);
+    var Pe = 3*p.V*current(p,s)*pf(p,s);
+    return Pe>0 ? Math.max(0, Math.min(99, Pm/Pe*100)) : 0;
+  }
 
-  // rated slip ~ 0.04, efficiency estimate
-  const sRated = 0.04;
-  const T_rated = calcTorque(p, sRated);
-  const ws = 2 * Math.PI * p.freq / (p.poles / 2);
-  const Pmech = T_rated * ws * (1 - sRated);
-  const I_rated = calcCurrent(p, sRated);
-  const Pelec = 3 * p.V1 * I_rated;
-  const eff = Pelec > 0 ? Math.min(99, (Pmech / Pelec * 100)) : 0;
-  document.getElementById('rEff').textContent = eff.toFixed(1);
-
-  // torque-speed chart
-  updateChart('chartTorque',{
-    type: 'line',
-    data: {
-      labels: speeds.map(v => v.toFixed(0)),
-      datasets: [{
-        label: 'トルク (N·m)',
-        data: speeds.map((sp, i) => ({x: sp, y: torques[i]})),
-        borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.08)',
-        borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3
-      }]
-    },
-    options:{
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      plugins: {legend:{display:false}},
-      scales:{
-        x: { type:'linear', title:{display:true, text:'速度 (rpm)', font:{size:10}},
-             min: -ns*0.05, max: ns*2.05, ticks:{maxTicksLimit:6,font:{size:10}} },
-        y:{ title:{display:true, text:'トルク (N·m)', font:{size:10}},
-             ticks:{maxTicksLimit:5,font:{size:10}} }
-      }
+  // Find the stable operating slip where T(s) == TL on the stable branch (small s up to s_max).
+  function operatingSlip(p){
+    var smax = p.R2/Math.sqrt(p.R1*p.R1 + p.Xsum*p.Xsum);
+    var Tmax = torque(p, smax);
+    if (p.TL <= 0) return 1e-4;
+    if (p.TL >= Tmax) return smax;            // beyond breakdown -> at peak (would stall in reality)
+    // bisection on (0, smax]
+    var lo = 1e-5, hi = smax, mid = 0;
+    for (var i=0;i<60;i++){
+      mid = 0.5*(lo+hi);
+      var t = torque(p, mid);
+      if (t < p.TL) lo = mid; else hi = mid;   // T increases with s on stable branch
     }
-  });
+    return mid;
+  }
 
-  // efficiency and power factor vs load (slip 0→0.1)
-  const loadSlips = Array.from({length:50}, (_,i) => 0.005 + i*0.002);
-  const effs = loadSlips.map(s =>{
-    const T = calcTorque(p, s);
-    const ws2 = 2*Math.PI*p.freq/(p.poles/2);
-    const Pm = T * ws2 * (1-s);
-    const I = calcCurrent(p, s);
-    const Pe = 3 * p.V1 * I;
-    return Pe > 0 ? Math.min(99, Pm/Pe*100) : 0;
-  });
-  const pfs = loadSlips.map(s =>{
-    if (Math.abs(s)<1e-6) s=1e-6;
-    const R2s = p.R2/s;
-    const Z = Math.sqrt((p.R1+R2s)**2+(p.X1+p.X2)**2);
-    return (p.R1+R2s)/Z;
-  });
+  function fmt(x, d){ return (isFinite(x)? x.toFixed(d) : '—'); }
 
-  updateChart('chartEff',{
-    type: 'line',
-    data: {
-      labels: loadSlips,
-      datasets: [
-        {label:'効率 (%)', data: effs, borderColor:'#007BFF', borderWidth:2, pointRadius:0, yAxisID:'y', tension:0.3},{label:'力率', data: pfs.map(v=>v*100), borderColor:'#00B4D8', borderWidth:2, pointRadius:0, yAxisID:'y', tension:0.3, borderDash:[4,3]}
-      ]
-    },
-    options:{
-      responsive:true,animation:false, maintainAspectRatio:false,resizeDelay:100,
-      plugins:{legend:{labels:{font:{size:10},boxWidth:12}}},
-      scales:{
-        x:{ type:'linear',title:{display:true,text:'すべり s',font:{size:10}}, ticks:{maxTicksLimit:5,font:{size:10}}},
-        y:{title:{display:true,text:'% / ×100',font:{size:10}}, ticks:{maxTicksLimit:5,font:{size:10}}, min:0,max:100}
-      }
+  function updateReadouts(p){
+    var ns = nsRpm(p);
+    var s = operatingSlip(p);
+    var nr = ns*(1-s);
+    el('roNs').textContent = Math.round(ns);
+    el('roNr').textContent = Math.round(nrDyn);
+    el('roSlip').textContent = fmt(s*100, 1);
+    el('roFr').textContent = fmt(s*p.f, 2);
+    el('roT').textContent = fmt(torque(p,s), 1);
+    el('roI').textContent = fmt(current(p,s), 1);
+    el('roPf').textContent = fmt(pf(p,s), 3);
+    el('roEff').textContent = fmt(effAt(p,s), 1);
+    return { ns:ns, s:s, nr:nr };
+  }
+
+  function buildCharts(p){
+    var ns = nsRpm(p);
+    // torque-speed
+    var speeds = [], tq = [];
+    for (var i=0;i<=200;i++){ var s = i/200; speeds.push(ns*(1-s)); tq.push(torque(p,s)); }
+    var op = operatingSlip(p);
+    var opPoint = [{x: ns*(1-op), y: torque(p,op)}];
+    mk('chartTorque', {
+      type:'line',
+      data:{ datasets:[
+        { label:L.torque||'Torque (N·m)', data: speeds.map(function(sp,i){return {x:sp,y:tq[i]};}),
+          borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,0.08)', borderWidth:2, pointRadius:0, fill:true, tension:0.3 },
+        { label:L.op||'Operating point', data: opPoint, borderColor:'#00d4a0', backgroundColor:'#00d4a0',
+          pointRadius:6, pointHoverRadius:7, showLine:false }
+      ]},
+      options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:120,
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{ type:'linear', title:{display:true,text:L.speed||'Speed (rpm)',font:{size:10}}, min:0, max:ns*1.02, ticks:{maxTicksLimit:6,font:{size:10}} },
+          y:{ title:{display:true,text:L.torque||'Torque (N·m)',font:{size:10}}, ticks:{maxTicksLimit:5,font:{size:10}}, beginAtZero:true }
+        } }
+    });
+    // efficiency & pf vs slip
+    var ls = []; for (var j=0;j<60;j++) ls.push(0.002 + j*0.004);
+    mk('chartEff', {
+      type:'line',
+      data:{ datasets:[
+        { label:L.eff||'Efficiency (%)', data: ls.map(function(s){return {x:s,y:effAt(p,s)};}), borderColor:'#007BFF', borderWidth:2, pointRadius:0, tension:0.3 },
+        { label:L.pf||'PF ×100', data: ls.map(function(s){return {x:s,y:pf(p,s)*100};}), borderColor:'#00B4D8', borderWidth:2, pointRadius:0, tension:0.3, borderDash:[4,3] }
+      ]},
+      options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:120,
+        plugins:{legend:{labels:{font:{size:10},boxWidth:12}}},
+        scales:{
+          x:{ type:'linear', title:{display:true,text:L.slip||'Slip s',font:{size:10}}, ticks:{maxTicksLimit:5,font:{size:10}} },
+          y:{ title:{display:true,text:L.pctYlabel||'% / ×100',font:{size:10}}, min:0, max:100, ticks:{maxTicksLimit:5,font:{size:10}} }
+        } }
+    });
+    // current vs slip
+    var ls2 = []; for (var k=0;k<100;k++) ls2.push(0.01 + k*0.02);
+    mk('chartCurrent', {
+      type:'line',
+      data:{ datasets:[
+        { label:L.current||'Stator current (A)', data: ls2.map(function(s){return {x:s,y:current(p,s)};}), borderColor:'#e17055', borderWidth:2, pointRadius:0, tension:0.3 }
+      ]},
+      options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:120,
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{ type:'linear', title:{display:true,text:L.slip||'Slip s',font:{size:10}}, ticks:{maxTicksLimit:6,font:{size:10}} },
+          y:{ title:{display:true,text:L.current||'Current (A)',font:{size:10}}, ticks:{maxTicksLimit:5,font:{size:10}}, beginAtZero:true }
+        } }
+    });
+  }
+  function mk(id, cfg){
+    var c = el(id); if(!c) return;
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(c, cfg);
+  }
+
+  /* ===== HiDPI animation ===== */
+  function sizeCanvas(c){
+    dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    var cssW = Math.max(260, Math.floor((c.parentElement.clientWidth||c.clientWidth||560) - 0));
+    var cssH = 300;
+    c.style.width = cssW+'px'; c.style.height = cssH+'px';
+    c.width = Math.round(cssW*dpr); c.height = Math.round(cssH*dpr);
+    var ctx = c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+    return { w:cssW, h:cssH, ctx:ctx };
+  }
+
+  function drawArrow(ctx, x0,y0,x1,y1,color,w){
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w;
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+    var a=Math.atan2(y1-y0,x1-x0), h=7+w;
+    ctx.beginPath(); ctx.moveTo(x1,y1);
+    ctx.lineTo(x1-h*Math.cos(a-0.4), y1-h*Math.sin(a-0.4));
+    ctx.lineTo(x1-h*Math.cos(a+0.4), y1-h*Math.sin(a+0.4));
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawScene(info){
+    var c = el('animCanvas'); if(!c) return;
+    var d = sizeCanvas(c); var ctx = d.ctx, W = d.w, H = d.h;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#020d1a'; ctx.fillRect(0,0,W,H);
+    var cx = W*0.5, cy = H*0.5, R = Math.min(W,H)*0.34;
+
+    // stator iron ring + 3-phase coils
+    ctx.strokeStyle='rgba(120,140,180,0.35)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(cx,cy,R*1.32,0,7); ctx.stroke();
+    var phases=[{c:'#4aa3ff',l:'U'},{c:'#00B4D8',l:'V'},{c:'#e17055',l:'W'}];
+    for (var i=0;i<3;i++){
+      var ang = i*Math.PI*2/3 - Math.PI/2;
+      var x1 = cx + R*1.32*Math.cos(ang), y1 = cy + R*1.32*Math.sin(ang);
+      ctx.beginPath(); ctx.arc(x1,y1,9,0,7); ctx.fillStyle=phases[i].c+'33'; ctx.fill();
+      ctx.strokeStyle=phases[i].c; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle=phases[i].c; ctx.font='bold 10px Roboto Mono'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(phases[i].l, x1, y1);
+      // and diametrically opposite return
+      var x2 = cx + R*1.32*Math.cos(ang+Math.PI), y2 = cy + R*1.32*Math.sin(ang+Math.PI);
+      ctx.beginPath(); ctx.arc(x2,y2,9,0,7); ctx.fillStyle=phases[i].c+'22'; ctx.fill();
+      ctx.strokeStyle=phases[i].c; ctx.stroke();
     }
-  });
 
-  // current vs slip
-  const slipArr = Array.from({length:100}, (_,i) => 0.01+i*0.02);
-  const currArr = slipArr.map(s => calcCurrent(p, s));
+    // rotor body
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,7);
+    ctx.fillStyle='#0a1628'; ctx.fill();
+    ctx.strokeStyle='#2a3b55'; ctx.lineWidth=3; ctx.stroke();
 
-  updateChart('chartCurrent',{
-    type: 'line',
-    data: {
-      labels: slipArr,
-      datasets: [{
-        label:'一次電流 (A)',
-        data: currArr,
-        borderColor:'#e17055', borderWidth:2, pointRadius:0, tension:0.3,
-        fill:false
-      }]
-    },
-    options:{
-      responsive:true,animation:false, maintainAspectRatio:false,resizeDelay:100,
-      plugins:{legend:{display:false}},
-      scales:{
-        x:{ type:'linear',title:{display:true,text:'すべり s',font:{size:10}}, ticks:{maxTicksLimit:6,font:{size:10}}},
-        y:{title:{display:true,text:'電流 (A)',font:{size:10}}, ticks:{maxTicksLimit:5,font:{size:10}}}
-      }
+    // rotor bars (squirrel cage) rotating with rotor; induced-current color ~ slip
+    var s = info.s;
+    var barGlow = Math.max(0, Math.min(1, s/0.2));   // brighter bars at higher slip
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(rotorAngle);
+    for (var b=0;b<12;b++){
+      var ba = b*Math.PI/6;
+      var bx = R*0.82*Math.cos(ba), by = R*0.82*Math.sin(ba);
+      ctx.beginPath(); ctx.arc(bx,by,3.2,0,7);
+      var g = Math.round(120+135*barGlow);
+      ctx.fillStyle = 'rgba(255,'+Math.round(160-60*barGlow)+',80,'+(0.35+0.55*barGlow)+')';
+      ctx.fill();
     }
-  });
-}function updateChart(id, cfg){
-  const canvas = document.getElementById(id);
-  if (charts[id]) { charts[id].destroy(); }
-  charts[id] = new Chart(canvas, cfg);
-}function animLoop(){
-  const canvas = document.getElementById('animCanvas');
-  const ctx = canvas.getContext('2d');const __novaDims0 = __novaHiDpiCanvas(canvas, canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height, ctx);
-const W = __novaDims0.w, H = __novaDims0.h;
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = '#020d1a';
-  ctx.fillRect(0,0,W,H);
+    // rotor speed arrow (cyan)
+    drawArrow(ctx, 0,0, R*0.6,0, '#00B4D8', 2.4);
+    ctx.restore();
 
-  const cx = W/2, cy = H/2, r = Math.min(H*0.38, 60);
-  // stator coils
-  const phases = [{color:'#007BFF',label:'U'},{color:'#00B4D8',label:'V'},{color:'#e17055',label:'W'}];
-  phases.forEach((ph, i) =>{
-    const ang = i * Math.PI * 2/3;
-    const x1 = cx + (r+18) * Math.cos(ang);
-    const y1 = cy + (r+18) * Math.sin(ang);
-    ctx.beginPath();
-    ctx.arc(x1, y1, 10, 0, Math.PI*2);
-    ctx.fillStyle = ph.color + '33';
-    ctx.fill();
-    ctx.strokeStyle = ph.color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = ph.color;
-    ctx.font = 'bold 10px Roboto Mono';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(ph.label, x1, y1);
-  });
+    // rotating field vector (yellow) at field angle
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(fieldAngle);
+    drawArrow(ctx, 0,0, R*1.12,0, '#ffd54a', 3.2);
+    ctx.restore();
 
-  // rotor
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI*2);
-  ctx.strokeStyle = '#334';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.fillStyle = '#0a1628';
-  ctx.fill();
+    // torque direction arc (green) — present when slip>0
+    if (s > 1e-3){
+      ctx.strokeStyle='#00d4a0'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(cx,cy,R*0.5, fieldAngle+0.2, fieldAngle+1.1); ctx.stroke();
+      var ta = fieldAngle+1.1;
+      drawArrow(ctx, cx+R*0.5*Math.cos(ta-0.02), cy+R*0.5*Math.sin(ta-0.02),
+                     cx+R*0.5*Math.cos(ta), cy+R*0.5*Math.sin(ta), '#00d4a0', 2);
+    }
 
-  // rotating field arrow
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(animAngle);
-  ctx.beginPath();
-  ctx.moveTo(0,0);
-  ctx.lineTo(r*0.75, 0);
-  ctx.strokeStyle = '#007BFF';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(r*0.75, 0);
-  ctx.lineTo(r*0.75 - 10, -5);
-  ctx.lineTo(r*0.75 - 10, 5);
-  ctx.closePath();
-  ctx.fillStyle = '#007BFF';
-  ctx.fill();
-  ctx.restore();
+    // center hub
+    ctx.beginPath(); ctx.arc(cx,cy,5,0,7); ctx.fillStyle='#cbd5e1'; ctx.fill();
 
-  // rotor arrow (slightly behind)
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(animAngle * 0.94);
-  ctx.beginPath();
-  ctx.moveTo(0,0);
-  ctx.lineTo(r*0.55, 0);
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
+    // overlay text: slip "lapping"
+    ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText('s = '+(s*100).toFixed(1)+' %', 12, 22);
+    ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Roboto Mono';
+    ctx.fillText('nₛ='+Math.round(info.ns)+'  nᵣ='+Math.round(nrDyn)+' rpm', 12, 40);
+  }
 
-  // labels
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.font = '10px Noto Sans JP';
-  ctx.textAlign = 'left';
-  ctx.fillText('● 回転磁界（青）  ● 回転子（水色）', 8, H-8);
+  function step(p, info, dt){
+    // ease dynamic rotor speed toward target operating speed (so load changes visibly slow rotor)
+    var target = info.nr;
+    nrDyn += (target - nrDyn) * Math.min(1, dt*2.5);
+    // visual angular velocities (rad/s) scaled down for viewing
+    var scale = 0.018;
+    var wField = nsRpm(p) * scale;
+    var wRotor = nrDyn * scale;
+    fieldAngle += wField * dt;
+    rotorAngle += wRotor * dt;
+  }
 
-  animAngle += 0.04;
-  animRAF = requestAnimationFrame(animLoop);
-}function resizeAnim(){
-  const canvas = document.getElementById('animCanvas');
-  canvas.width = canvas.offsetWidth;
-}window.addEventListener('load', () =>{
-  resizeAnim();
-  ['sR1','sX1','sXm','sR2','sX2','sV1','sFreq','sPoles'].forEach(id => {
-    const el = document.getElementById(id);
-    const vid = 'v' + id.slice(1);
-    updateSlider(el, vid, id);
-  });
-  compute();
-  animLoop();
-});
-window.addEventListener('resize', () =>{ resizeAnim(); });
+  function frame(ts){
+    if (!lastTs) lastTs = ts;
+    var dt = Math.min(0.05, (ts - lastTs)/1000) * speed;
+    lastTs = ts;
+    var p = P();
+    var info = updateReadouts(p);
+    if (playing && !reduceMotion) step(p, info, dt);
+    drawScene(info);
+    raf = requestAnimationFrame(frame);
+  }
+
+  function recompute(){
+    var p = P();
+    el('fVal').textContent = p.f.toFixed(0);
+    el('pVal').textContent = p.poles.toFixed(0);
+    el('vVal').textContent = p.V.toFixed(0);
+    el('tlVal').textContent = p.TL.toFixed(0);
+    el('r2Val').textContent = p.R2.toFixed(2);
+    el('r1Val').textContent = p.R1.toFixed(2);
+    el('xVal').textContent = p.Xsum.toFixed(1);
+    ['sFreq','sPoles','sV1','sLoad','sR2','sR1','sX'].forEach(setPct);
+    buildCharts(p);
+    updateReadouts(p);
+  }
+
+  function onParam(){ recompute(); }
+
+  function preset(name){
+    var cfg = {
+      noload:   { f:60, poles:4, V:277, TL:2,   R2:0.4,  R1:0.5, X:2.0 },
+      rated:    { f:60, poles:4, V:277, TL:83,  R2:0.4,  R1:0.5, X:2.0 },
+      breakdown:{ f:60, poles:4, V:277, TL:235, R2:0.4,  R1:0.5, X:2.0 },
+      vfd:      { f:30, poles:4, V:139, TL:60,  R2:0.4,  R1:0.5, X:2.0 }
+    }[name];
+    if(!cfg) return;
+    el('sFreq').value=cfg.f; el('sPoles').value=cfg.poles; el('sV1').value=cfg.V;
+    el('sLoad').value=cfg.TL; el('sR2').value=cfg.R2; el('sR1').value=cfg.R1; el('sX').value=cfg.X;
+    document.querySelectorAll('.preset-btn[data-preset]').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-preset')===name);
+    });
+    // snap rotor to new operating speed
+    var p = P(); nrDyn = nsRpm(p)*(1-operatingSlip(p));
+    recompute();
+  }
+
+  function togglePlay(){
+    playing = !playing;
+    var btn = el('btnPlay');
+    btn.innerHTML = playing ? '<i class="fas fa-pause"></i> ' + (L.pause||'一時停止')
+                            : '<i class="fas fa-play"></i> ' + (L.play||'再生');
+    lastTs = 0;
+  }
+  function setSpeed(v){
+    speed = v;
+    document.querySelectorAll('.speed-btn').forEach(function(b){
+      var on = parseFloat(b.getAttribute('data-speed'))===v;
+      b.classList.toggle('active', on);
+      b.style.borderColor = on ? 'var(--accent)' : '';
+      b.style.color = on ? 'var(--accent)' : '';
+    });
+  }
+  function reset(){ preset('rated'); if(!playing) togglePlay(); }
+
+  function init(){
+    if (typeof L.pause==='undefined'){ L.pause='一時停止'; L.play='再生'; }
+    var p = P();
+    nrDyn = nsRpm(p)*(1-operatingSlip(p));
+    recompute();
+    if (reduceMotion){
+      var info = updateReadouts(p); nrDyn = info.nr; drawScene(info);
+      var btn = el('btnPlay'); if(btn) btn.innerHTML='<i class="fas fa-play"></i> '+(L.play||'再生');
+      playing = false;
+    } else {
+      raf = requestAnimationFrame(frame);
+    }
+    window.addEventListener('resize', function(){ var i=updateReadouts(P()); drawScene(i); });
+  }
+
+  if (document.readyState==='loading') window.addEventListener('load', init);
+  else init();
+
+  return { onParam:onParam, preset:preset, togglePlay:togglePlay, setSpeed:setSpeed, reset:reset };
+})();
 </script>
 
 <section class="explanation">
@@ -584,6 +682,9 @@ window.addEventListener('resize', () =>{ resizeAnim(); });
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="induction-motor.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -645,7 +746,7 @@ window.addEventListener('resize', () =>{ resizeAnim(); });
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>4極・60Hz、11kW三相誘導電動機の場合、同期速度は1800rpmです。R1=1.2Ω、X1=2.4Ω、Xm=65Ω、R2=0.8Ωを入力し、定格滑り率3%でシミュレートすると、一次電流は18.5A、効率92.1%、力率0.87を得られます。起動時(s=100%)のトルクは定格の1.8倍、最大トルクは約2.1倍となります</p>
+<p>既定プリセット「4P 60Hz 480V」（相電圧V₁=277V、R1=0.5Ω、X1=1.0Ω、R2'=0.4Ω、X2'=1.0Ω、4極・60Hz）では同期速度は1800rpmです。定格すべり4%でシミュレートすると、一次電流は約25.9A、定格効率は約89.8%となります。起動トルク（s=100%）は約101.6 N·m、最大トルクは約238.3 N·mで、最大トルクは定格点トルク（約106.9 N·m）の約2.2倍です。なお励磁リアクタンスXₘは本ツールの簡易等価回路（トルク・電流計算）では参照していません。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -655,6 +756,16 @@ window.addEventListener('resize', () =>{ resizeAnim(); });
 <li>巻線抵抗R1は温度補正が必要で、80℃運転時は常温値の約1.25倍に増加するため、長時間連続運転下での特性変化を確認してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

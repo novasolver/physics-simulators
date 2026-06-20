@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "レーザー光学設計・ガウシアンビーム計算ツール",
       "description": "ガウシアンビームの伝播特性をリアルタイム計算。レイリー長・発散角・集光スポットサイズをインタラクティブに設計。CO2・Nd:YAG・HeNe・UVレーザー対応。",
       "url": "https://novasolver.jp/tools/laser-optics.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ガウシアンビーム伝播プロファイルの可視化", "レンズによる集光スポットサイズ計算", "M²ビーム品質係数対応", "CO2/Nd:YAG/HeNe/UVプリセット"],
       "keywords": "ガウシアンビーム,レーザー光学,レイリー長,ビームウェスト,発散角,M2,集光,レーザー加工,光学設計",
       "datePublished": "2026-04-08",
@@ -65,7 +65,7 @@
         },{
           "@type": "Question",
           "name": "レイリー長とはどんな意味ですか？",
-          "acceptedAnswer": {"@type": "Answer", "text": "レイリー長zRは、ビーム半径がウェスト半径w0の√2倍になる伝播距離です。zR = πw0²/λ で計算されます。レイリー長が長いほど焦点深度が深く、レーザー加工の許容位置ずれが大きくなります。"}
+          "acceptedAnswer": {"@type": "Answer", "text": "レイリー長zRは、ビーム半径がウェスト半径w0の√2倍になる伝播距離です。zR = πw0²/(M²λ) で計算されます。レイリー長が長いほど焦点深度が深く、レーザー加工の許容位置ずれが大きくなります。"}
         },{
           "@type": "Question",
           "name": "M²ビーム品質係数とは何ですか？",
@@ -123,6 +123,20 @@ details.theory-box[open]>summary h3,details.theory-box[open]>summary h4{margin-b
 details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
+
+/* ===== v2 live beam canvas ===== */
+#beamCanvas{width:100%;display:block;background:#060d1c;border-radius:8px;outline:none}
+#beamCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.beam-scrub-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.beam-scrub-row input[type=range]{flex:1}
+.beam-scrub-z{font-family:'Roboto Mono',monospace;font-size:.78rem;color:var(--accent);min-width:64px;text-align:right}
+.beam-play-btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:.78rem;font-family:inherit;font-weight:600}
+.beam-play-btn:hover{background:#0056b3}
+.beam-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:10px}
+.beam-legend span{display:inline-flex;align-items:center;gap:5px}
+.beam-legend i.bsw{width:18px;height:3px;border-radius:2px;display:inline-block}
+@media (prefers-reduced-motion: reduce){.beam-play-btn{display:none}}
+/* end v2 beam additions */
 
 </style>
 <meta property="og:type" content="article">
@@ -192,7 +206,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="panel-title" style="margin-top:4px">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -223,21 +245,26 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="canvas-wrap">
       <div class="chart-card">
-      <div class="chart-title">ビーム伝播プロファイル w(z) vs 伝播距離</div>
-      <canvas id="chartProp"></canvas>
-    </div>
-    </div>
-    <div class="canvas-wrap">
-      <div class="chart-card">
-      <div class="chart-title">焦点面での強度分布 I(r) (規格化)</div>
-      <canvas id="chartInt"></canvas>
+      <div class="chart-title"><i class="fas fa-wave-square"></i> ガウシアンビーム伝播 — 光がウェストへ集束し双曲線状に発散</div>
+      <canvas id="beamCanvas" tabindex="0" role="img" aria-label="ガウシアンビームがウェストw0へ集束し、レイリー長zRを越えて双曲線状に発散する伝播アニメーション。可動マーカー位置の断面強度分布も表示します。"></canvas>
+      <div class="beam-scrub-row">
+        <span style="font-size:.72rem;color:var(--muted)"><i class="fas fa-arrows-left-right"></i> z</span>
+        <input type="range" id="slZprobe" min="0" max="1000" step="1" value="500" aria-label="観測位置 z スクラバー">
+        <span class="beam-scrub-z" id="probeZlbl">0 mm</span>
+        <button class="beam-play-btn" type="button" id="btnFlow" aria-pressed="true"><i class="fas fa-pause"></i> 光の流れ</button>
+      </div>
+      <div class="beam-legend">
+        <span><i class="bsw" style="background:#00B4D8"></i>w(z) 包絡線</span>
+        <span><i class="bsw" style="background:#ffd54a"></i>ウェスト w₀</span>
+        <span><i class="bsw" style="background:#FF6B35"></i>レイリー長 ±zR</span>
+        <span><i class="bsw" style="background:#28C76F"></i>断面強度 I(r)</span>
+      </div>
     </div>
     </div>
   
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
-</p>
-      <p>$w(z) = w_0 M^2 \sqrt{1 + (z/z_R)^2}$</p>
-      <p>$z_R = \pi w_0^2 / \lambda$</p>
+<p>$w(z) = w_0 \sqrt{1 + (z/z_R)^2}$</p>
+      <p>$z_R = \pi w_0^2 / (M^2\lambda)$</p>
       <p>$\theta = M^2 \lambda / (\pi w_0)$ [rad]</p>
       <p>$I_0 = 2P / (\pi w^2)$</p>
     
@@ -246,125 +273,217 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-const $=id=>document.getElementById(id);
+/* ===== Gaussian beam optics v2 — live propagation animation ===== */
+(function(){
+"use strict";
 const PI=Math.PI;
+const $=function(id){return document.getElementById(id);};
+const T={waist:'ウェスト w₀',zR:'レイリー長 zR',theta:'θ',far:'遠方場 発散 θ',probe:'観測 z',Iprofile:'断面強度 I(r)',lens:'レンズ f',focus:'集光スポット'};
 
-const presets={10600:10600,1064:1064,633:633,355:355};
-$('selPreset').addEventListener('change',function(){
+// presets bind wavelength selector -> wavelength slider+number
+const selPreset=$('selPreset');
+if(selPreset){selPreset.addEventListener('change',function(){
   if(this.value!=='custom'){
-    $('slWl').value=this.value;
-    var _e=$('lblWl');if(_e)_e.textContent=this.value;
+    if($('slWl')) $('slWl').value=this.value;
+    const e=$('lblWlNum')||$('slWlNum'); if(e) e.value=this.value;
     update();
   }
-});
+});}
 
-function calcBeam(lam_nm, w0_um, z_mm, M2, f_mm){
-  const lam=lam_nm*1e-9; // m
-  const w0=w0_um*1e-6;   // m
-  const z=z_mm*1e-3;     // m
-  const f=f_mm*1e-3;     // m
+function calcBeam(lam_nm,w0_um,z_mm,M2,f_mm){
+  const lam=lam_nm*1e-9, w0=w0_um*1e-6, z=z_mm*1e-3, f=f_mm*1e-3;
+  const zR=(PI*w0*w0)/(M2*lam);            // m
+  const wz=w0*Math.sqrt(1+(z/zR)*(z/zR));  // m
+  const theta=M2*lam/(PI*w0);              // rad
+  const I0_wcm2=(2/(PI*w0*w0))*1e-4;       // W/cm² @ 1W at waist
+  const w_lens=wz;
+  const wf=M2*lam*f/(PI*w_lens);           // m focused spot radius
+  return {zR_mm:zR*1000, wz_um:wz*1e6, theta_mrad:theta*1000, I0_wcm2:I0_wcm2, wf_um:wf*1e6, zR_m:zR, theta_rad:theta};
+}
 
-  const zR=(PI*w0*w0)/lam; // m
-  const wz=w0*M2*Math.sqrt(1+(z/zR)*(z/zR)); // m
-  const theta=M2*lam/(PI*w0); // rad
-  const thetaMrad=theta*1000;
-
-  // Peak intensity for 1W at waist
-  const I0_waist=2/(PI*w0*w0); // W/m²
-  const I0_wcm2=I0_waist*1e-4; // W/cm²
-
-  // Focused spot (thin lens, input beam at lens = wz at position z)
-  // If beam waist is at z=0 and lens is placed at z, the spot size wf = M²λf/(πw_in)
-  const w_lens=w0*M2*Math.sqrt(1+(z/zR)*(z/zR));
-  const wf=M2*lam*f/(PI*w_lens); // m
-  const wf_um=wf*1e6;
-
+function getInputs(){
   return {
-    zR_mm: zR*1000,
-    wz_um: wz*1e6,
-    theta_mrad: thetaMrad,
-    I0_wcm2: I0_wcm2,
-    wf_um: wf_um
+    lam:parseFloat($('slWl').value),
+    w0:parseFloat($('slW0').value),
+    z:parseFloat($('slZ').value),
+    M2:parseFloat($('slM2').value),
+    f:parseFloat($('slF').value)
   };
-}const chartProp=new Chart($('chartProp').getContext('2d'),{
-  type:'line',
-  data:{labels:[],datasets:[
-    {label:'w(z) — 上側',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,0.08)',fill:'+1',borderWidth:2,pointRadius:0,tension:.3},{label:'w(z) — 下側（-w）',data:[],borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,0.08)',fill:false,borderWidth:2,pointRadius:0,tension:.3,borderDash:[4,4]},{label:'レイリー長 zR',data:[],borderColor:'#FF6B35',borderWidth:1.5,pointRadius:0,borderDash:[6,3]}
-  ]},
-  options:{responsive:true,maintainAspectRatio:false,resizeDelay:100,animation:false,
-    plugins:{legend:{position:'top',labels:{font:{size:10},filter:item=>item.datasetIndex!==1}}},
-    scales:{
-      x:{ title:{display:true,text:'伝播距離 z (mm)',font:{size:11}},grid:{color:'#f0f0f0'}},
-      y:{title:{display:true,text:'ビーム半径 w (μm)',font:{size:11}},grid:{color:'#f0f0f0'}}
-    }
-  }
-});
+}
 
-const chartInt=new Chart($('chartInt').getContext('2d'),{
-  type:'line',
-  data:{labels:[],datasets:[
-    {label:'強度 I(r)/I₀',data:[],borderColor:'#28C76F',backgroundColor:'rgba(40,199,111,0.1)',fill:true,borderWidth:2,pointRadius:0,tension:.3}
-  ]},
-  options:{responsive:true,maintainAspectRatio:false,resizeDelay:100,animation:false,
-    plugins:{legend:{position:'top',labels:{font:{size:11}}}},
-    scales:{
-      x:{ title:{display:true,text:'半径 r (μm)',font:{size:11}},grid:{color:'#f0f0f0'}},
-      y:{title:{display:true,text:'規格化強度 I/I₀',font:{size:11}},grid:{color:'#f0f0f0'},min:0,max:1}
-    }
-  }
-});
+/* ---- HiDPI canvas ---- */
+const canvas=$('beamCanvas');
+const ctx=canvas?canvas.getContext('2d'):null;
+let cssW=720, cssH=360;
+function resizeCanvas(){
+  if(!canvas) return;
+  const rect=canvas.parentElement.getBoundingClientRect();
+  cssW=Math.max(300,Math.floor(rect.width-44));
+  cssH=Math.round(Math.min(420,Math.max(300,cssW*0.52)));
+  const dpr=Math.min(window.devicePixelRatio||1,2.5);
+  canvas.style.width=cssW+'px';
+  canvas.style.height=cssH+'px';
+  canvas.width=Math.round(cssW*dpr);
+  canvas.height=Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
 
+const REDUCED=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let flowOn=!REDUCED;
+let phase=0;
+
+// view domain: show z from 0 .. zViewMax (mm). Waist sits at zW (mm) inside view.
+function drawBeam(ts){
+  if(!canvas) return;
+  resizeCanvas();
+  const W=cssW,H=cssH;
+  const inp=getInputs();
+  const res=calcBeam(inp.lam,inp.w0,inp.z,inp.M2,inp.f);
+  const zR=res.zR_mm; // mm
+  const w0=inp.w0;     // um
+
+  // horizontal domain: a few Rayleigh ranges so hyperbola + divergence are visible
+  const zViewMax=Math.max(zR*5, inp.z*1.25, 20); // mm
+  const zW=zViewMax*0.30;                          // waist position on screen (mm)
+  const padL=46,padR=20,padT=22,padB=30;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const yc=padT+plotH/2;
+  // beam radius (um) at view-z (mm), waist at zW
+  function wAt(zmm){ const dz=(zmm-zW); return w0*Math.sqrt(1+(dz/zR)*(dz/zR)); }
+  // vertical scale: max envelope over domain
+  let wmax=Math.max(wAt(0),wAt(zViewMax),w0*1.05);
+  const ys=(plotH/2*0.92)/wmax;        // um -> px
+  const xs=plotW/zViewMax;             // mm -> px
+  const X=zmm=>padL+zmm*xs;
+  const Yt=um=>yc-um*ys;
+  const Yb=um=>yc+um*ys;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#060d1c'; ctx.fillRect(0,0,W,H);
+
+  // axes
+  ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(padL,yc); ctx.lineTo(W-padR,yc); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='10px Roboto Mono';
+  ctx.textAlign='left'; ctx.fillText('z (mm)', W-padR-46, H-10);
+  ctx.save(); ctx.translate(13,yc); ctx.rotate(-PI/2); ctx.textAlign='center';
+  ctx.fillText('r (μm)', 0,0); ctx.restore();
+  // z ticks
+  ctx.textAlign='center';
+  for(let i=0;i<=4;i++){ const zz=zViewMax*i/4; ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fillText(zz.toFixed(zz<10?1:0), X(zz), H-12); }
+
+  // divergence asymptotes (far field cone), dashed
+  const farSlope=res.theta_rad*1000; // um per mm
+  ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath();
+  ctx.moveTo(X(zW),Yt(0)); ctx.lineTo(X(zViewMax),Yt(farSlope*(zViewMax-zW)));
+  ctx.moveTo(X(zW),Yb(0)); ctx.lineTo(X(zViewMax),Yb(farSlope*(zViewMax-zW)));
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // envelope w(z) filled
+  ctx.beginPath();
+  ctx.moveTo(X(0),Yt(wAt(0)));
+  for(let i=0;i<=160;i++){ const zz=zViewMax*i/160; ctx.lineTo(X(zz),Yt(wAt(zz))); }
+  for(let i=160;i>=0;i--){ const zz=zViewMax*i/160; ctx.lineTo(X(zz),Yb(wAt(zz))); }
+  ctx.closePath();
+  const grad=ctx.createLinearGradient(0,Yt(wmax),0,Yb(wmax));
+  grad.addColorStop(0,'rgba(0,180,216,0.05)'); grad.addColorStop(0.5,'rgba(0,180,216,0.28)'); grad.addColorStop(1,'rgba(0,180,216,0.05)');
+  ctx.fillStyle=grad; ctx.fill();
+  // envelope outline
+  ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(X(0),Yt(wAt(0)));
+  for(let i=0;i<=160;i++){ const zz=zViewMax*i/160; ctx.lineTo(X(zz),Yt(wAt(zz))); } ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(X(0),Yb(wAt(0)));
+  for(let i=0;i<=160;i++){ const zz=zViewMax*i/160; ctx.lineTo(X(zz),Yb(wAt(zz))); } ctx.stroke();
+
+  // flowing light packets along axis (intensity-shaded gaussian discs)
+  const NP=26;
+  for(let i=0;i<NP;i++){
+    let frac=((i/NP)+phase)%1;
+    const zz=frac*zViewMax;
+    const wpx=wAt(zz)*ys;
+    const cx=X(zz);
+    const g=ctx.createRadialGradient(cx,yc,0,cx,yc,Math.max(2,wpx));
+    g.addColorStop(0,'rgba(255,90,70,0.55)'); g.addColorStop(0.5,'rgba(255,140,40,0.18)'); g.addColorStop(1,'rgba(255,140,40,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.ellipse(cx,yc,Math.max(1.5,wpx*0.32),Math.max(2,wpx),0,0,2*PI); ctx.fill();
+  }
+
+  // waist marker
+  ctx.strokeStyle='#ffd54a'; ctx.lineWidth=1.5; ctx.setLineDash([2,3]);
+  ctx.beginPath(); ctx.moveTo(X(zW),Yt(wmax)); ctx.lineTo(X(zW),Yb(wmax)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#ffd54a'; ctx.font='bold 10px Noto Sans JP'; ctx.textAlign='center';
+  ctx.fillText('w₀='+w0.toFixed(0)+'μm', X(zW), Yt(wmax)-4);
+
+  // Rayleigh range markers at zW ± zR (area doubles, w=√2·w0)
+  ['+','-'].forEach(sgn=>{
+    const zm=zW+(sgn==='+'?zR:-zR);
+    if(zm<0||zm>zViewMax) return;
+    ctx.strokeStyle='#FF6B35'; ctx.lineWidth=1.2; ctx.setLineDash([5,3]);
+    ctx.beginPath(); ctx.moveTo(X(zm),Yt(wAt(zm))); ctx.lineTo(X(zm),Yb(wAt(zm))); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#FF6B35'; ctx.font='9px Roboto Mono'; ctx.textAlign='center';
+    ctx.fillText((sgn==='+'?'+':'−')+'zR', X(zm), Yb(wAt(zm))+12);
+  });
+  // zR annotation
+  ctx.fillStyle='#FF6B35'; ctx.font='bold 10px Noto Sans JP'; ctx.textAlign='left';
+  ctx.fillText('zR='+zR.toFixed(zR<10?2:1)+'mm（面積2倍）', X(zW)+4, Yt(wmax)-4+14);
+
+  // probe plane (movable z) + transverse intensity profile
+  const probe=$('slZprobe');
+  let zp=probe?parseFloat(probe.value)/1000*zViewMax:zViewMax*0.5;
+  const wp=wAt(zp); // um at probe
+  const lblP=$('probeZlbl'); if(lblP) lblP.textContent=(zp).toFixed(zp<10?1:0)+' mm';
+  ctx.strokeStyle='rgba(40,199,111,0.9)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(X(zp),padT); ctx.lineTo(X(zp),H-padB); ctx.stroke();
+  // gaussian I(r) drawn sideways at probe x
+  const amp=Math.min(plotW*0.18, 70);
+  ctx.strokeStyle='#28C76F'; ctx.lineWidth=2; ctx.beginPath();
+  for(let i=0;i<=60;i++){
+    const rr=(i/60*2-1)*wp*2.4;             // um
+    const I=Math.exp(-2*rr*rr/(wp*wp));
+    const px=X(zp)+I*amp;
+    const py=yc - rr*ys;
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  ctx.fillStyle='#28C76F'; ctx.font='9px Roboto Mono'; ctx.textAlign='left';
+  ctx.fillText('I(r) @ w='+wp.toFixed(0)+'μm', X(zp)+4, padT+10);
+
+  if(flowOn){ phase=(phase+0.0016)%1; }
+}
+
+/* ---- stat readouts (never '—') ---- */
 function update(){
-  const lam=parseFloat($('slWl').value);
-  const w0=parseFloat($('slW0').value);
-  const z=parseFloat($('slZ').value);
-  const M2=parseFloat($('slM2').value);
-  const f=parseFloat($('slF').value);
+  const inp=getInputs();
+  // keep optional legacy labels in sync if present
+  const setTxt=(id,v)=>{const e=$(id); if(e) e.textContent=v;};
+  setTxt('lblWl',inp.lam); setTxt('lblW0',inp.w0); setTxt('lblZ',inp.z);
+  setTxt('lblM2',inp.M2.toFixed(1)); setTxt('lblF',inp.f);
+  const res=calcBeam(inp.lam,inp.w0,inp.z,inp.M2,inp.f);
+  setTxt('statZR',res.zR_mm.toFixed(2));
+  setTxt('statWz',res.wz_um.toFixed(1));
+  setTxt('statTheta',res.theta_mrad.toFixed(3));
+  setTxt('statI0',res.I0_wcm2.toExponential(2));
+  setTxt('statSpot',res.wf_um.toFixed(1));
+  if(REDUCED) drawBeam(0); // redraw static frame on param change
+}
 
-  var _e=$('lblWl');if(_e)_e.textContent=lam; var _e=$('lblW0');if(_e)_e.textContent=w0;
-  var _e=$('lblZ');if(_e)_e.textContent=z; var _e=$('lblM2');if(_e)_e.textContent=M2.toFixed(1); var _e=$('lblF');if(_e)_e.textContent=f;
+['slWl','slW0','slZ','slM2','slF'].forEach(function(id){ const e=$(id); if(e) e.addEventListener('input',update); });
+const probe=$('slZprobe'); if(probe) probe.addEventListener('input',function(){ if(REDUCED) drawBeam(0); });
 
-  const res=calcBeam(lam,w0,z,M2,f);
+const btnFlow=$('btnFlow');
+if(btnFlow){ btnFlow.addEventListener('click',function(){
+  flowOn=!flowOn; this.setAttribute('aria-pressed',String(flowOn));
+  this.innerHTML=flowOn?'<i class="fas fa-pause"></i> 光の流れ':'<i class="fas fa-play"></i> 光の流れ';
+});}
 
-  $('statZR').textContent=res.zR_mm.toFixed(2);
-  $('statWz').textContent=res.wz_um.toFixed(1);
-  $('statTheta').textContent=res.theta_mrad.toFixed(3);
-  $('statI0').textContent=res.I0_wcm2.toExponential(2);
-  $('statSpot').textContent=res.wf_um.toFixed(1);
+function loop(ts){ drawBeam(ts); requestAnimationFrame(loop); }
 
-  // Build propagation profile
-  const zMax=Math.max(z*1.5, res.zR_mm*4, 50);
-  const N=100;
-  const labelsP=[], wUp=[], wDown=[], zRline=[];
-  for(let i=0;i<=N;i++){
-    const zi=zMax*i/N;
-    const lam_m=lam*1e-9, w0_m=w0*1e-6;
-    const zR_m=PI*w0_m*w0_m/lam_m;
-    const wzi=w0*M2*Math.sqrt(1+(zi*1e-3/zR_m)*(zi*1e-3/zR_m));
-    labelsP.push(zi.toFixed(1));
-    wUp.push(wzi); wDown.push(-wzi);
-    // Mark Rayleigh range
-    zRline.push(Math.abs(zi*1e-3 - zR_m) < zMax*1e-3/N*1.5 ? 100 : null);
-  }chartProp.data.labels=labelsP;
-  chartProp.data.datasets[0].data=wUp;
-  chartProp.data.datasets[1].data=wDown;
-  chartProp.data.datasets[2].data=zRline;
-  chartProp.update('none');
-
-  // Intensity profile at focus
-  const wfocus=res.wf_um;
-  const rMax=wfocus*2.5;
-  const labelsI=[], iData=[];
-  for(let i=0;i<=80;i++){
-    const r=-rMax + 2*rMax*i/80;
-    labelsI.push(r.toFixed(1));
-    iData.push(Math.exp(-2*r*r/(wfocus*wfocus)));
-  }
-  chartInt.data.labels=labelsI;
-  chartInt.data.datasets[0].data=iData;
-  chartInt.update('none');
-}['slWl','slW0','slZ','slM2','slF'].forEach(id=>$(id).addEventListener('input',update));
 update();
+if(REDUCED){ if(btnFlow) btnFlow.style.display='none'; drawBeam(0); }
+else { requestAnimationFrame(loop); }
+window.addEventListener('resize',function(){ if(REDUCED) drawBeam(0); });
+})();
 </script>
 
 <section class="explanation">
@@ -374,7 +493,7 @@ update();
       <div class="bub">このシミュレーターで「ガウシアンビーム」って何ですか？レーザー光の形が変わるということ？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大まかに言うと、レーザー光の中で最もきれいで理想的な広がり方をする光の形だよ。強度の分布が真ん中が一番強くて、端に行くにつれて滑らかに弱くなる。このシミュレーターの上のグラフで、赤い線がその強度分布を表しているんだ。例えば、ウェスト半径のスライダーを動かすと、その中心の細さが変わって、グラフの山がシャープになったり緩やかになったりするのがわかるよ。</div>
+      <div class="bub">大まかに言うと、レーザー光の中で最もきれいで理想的な広がり方をする光の形だよ。強度の分布が真ん中が一番強くて、端に行くにつれて滑らかに弱くなる。このシミュレーターの緑の線が焦点面での強度分布を表しているんだ。例えば、ウェスト半径のスライダーを動かすと、その中心の細さが変わって、グラフの山がシャープになったり緩やかになったりするのがわかるよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">え、そうなんですか！「レイリー長」って下の伝播グラフに出てくるけど、これが長いと何がいいんですか？</div>
@@ -393,7 +512,7 @@ update();
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">ビームウェスト半径と波長を入力したのに、レイリー長が表示されません。なぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">M²品質係数が未入力または0になっていないかご確認ください。本ツールではM²=1（理想ガウシアンビーム）をデフォルトとしていますが、空欄のまま計算を実行するとエラーになります。数値を入力して再計算してください。</div>
+    <div class="faq-a">M²スライダーの最小値は1で、既定値はM²=1（理想ガウシアンビーム）です。波長・ウェスト半径・伝播距離の数値入力欄が範囲外でないかを確認してください。入力変更時に結果は自動更新されます。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">集光スポットサイズを小さくするには、どのパラメータを変更すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -401,7 +520,7 @@ update();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">強度分布のグラフが表示されません。どうすれば見られますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">ビーム伝播プロファイルのグラフ上で任意のz位置をクリックすると、その位置での断面強度分布が別ウィンドウに表示されます。クリック後、画面下部の「強度分布」タブを選択してご確認ください。</div>
+    <div class="faq-a">強度分布は下側の緑の曲線として常時表示されます。焦点面での正規化強度を自動スケールで描画しており、クリック操作や別ウィンドウ表示はありません。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">実際のレーザーと計算結果がずれる原因は何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -425,6 +544,9 @@ update();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="laser-optics.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -465,16 +587,16 @@ update();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>波長入力フィールド(slWl)で使用レーザーの波長を設定します。CO2レーザー10.6μm、Nd:YAGレーザー1.064μm、HeNeレーザー632.8nm、UVレーザー355nmなどを選択</li>
-<li>ビームウェスト径(slW0)をマイクロメートル単位で入力し、初期集光スポットサイズを決定します</li>
-<li>伝播距離(slZ)をミリメートルまたはメートルで指定し、その距離でのビームパラメータを計算</li>
-<li>ビーム品質係数M²(slM2)を設定します。理想ガウシアンビームはM²=1、実際のレーザーは1以上</li>
+<li>波長入力欄で使用レーザーの波長を設定します。CO2レーザー10.6μm、Nd:YAGレーザー1.064μm、HeNeレーザー633nm、UVレーザー355nmなどを選択</li>
+<li>ビームウェスト半径をマイクロメートル単位で入力し、初期集光スポットサイズを決定します</li>
+<li>伝播距離はmm単位（0〜1000mm）で指定し、その距離でのビームパラメータを計算</li>
+<li>ビーム品質係数M²を設定します。理想ガウシアンビームはM²=1、実際のレーザーは1以上</li>
 <li>各パラメータ変更時にリアルタイムで発散角、レイリー長、任意位置でのビーム半径を自動計算</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>Nd:YAGレーザー加工において波長1.064μm、ビームウェスト径W₀=50μm、M²=1.2で設計した場合、レイリー長ZR≈3.7mmが計算されます。伝播距離Z=100mmでのビーム半径はW(Z)≈680μmとなり、発散角は約17mradです。これに対し同じ条件でCO2レーザー(10.6μm)を使用すると、ビームウェスト径を0.5mm設定時にZR≈37mmが得られ、より長い焦点深度を確保できます。工業用切断では後者の特性が有利に働きます。</p>
+<p>Nd:YAGレーザー加工において波長1064nm、ビームウェスト半径w₀=50μm、M²=1.2で設計した場合、レイリー長zR≈6.15mm、伝播距離z=100mmでのビーム半径w(z)≈814μm、発散半角θ≈8.13mradです。CO2レーザー（10.6μm）でw₀=0.5mm（半径）、M²=1ならzR≈74.1mmとなります。ここでw₀は直径ではなく半径です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -485,6 +607,16 @@ update();
 <li>安全基準確認：計算された最小スポット径からクラス規格(ANSI Z136)を確認し、保護具仕様を決定</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

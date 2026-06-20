@@ -122,14 +122,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "応力-ひずみ曲線・材料非線形モデル",
       "description": "構造用鋼・アルミ合金・チタン・鋳鉄・ゴム・コンクリートの応力-ひずみ曲線をリアルタイム描画。線形弾性・バイリニア・Ramberg-Osgood・べき乗硬化モデルを比較。ヤング率・降伏強度・UTS・靭性を自動計算。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/stress-strain-curve.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -219,7 +219,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <option value="aluminum">アルミニウム合金 (A6061)</option>
         <option value="titanium">チタン合金 (Ti-6Al-4V)</option>
         <option value="castiron">鋳鉄 (FC250)</option>
-        <option value="rubber">ゴム（超弾性）</option>
+        <option value="rubber">低弾性ポリマー（簡易・レンジ内）</option>
         <option value="concrete">コンクリート (Fc30)</option>
         <option value="custom">カスタム</option>
       </select>
@@ -290,7 +290,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -347,7 +355,7 @@ const MATERIALS ={
   aluminum:{ E:70,  sy:270,  su:310,  n:8,   ef:0.12, label:'アルミ合金(A6061)', color:'#e17055' },
   titanium:{ E:114, sy:880,  su:950,  n:12,  ef:0.10, label:'チタン(Ti-6Al-4V)', color:'#00b894' },
   castiron:{ E:170, sy:180,  su:250,  n:20,  ef:0.008,label:'鋳鉄(FC250)',       color:'#636e72' },
-  rubber:{ E:0.01,sy:2,    su:20,   n:1.5, ef:3.0,  label:'ゴム',              color:'#fdcb6e' },
+  rubber:{ E:1,   sy:10,   su:20,   n:1.5, ef:1.0,  label:'低弾性ポリマー(簡易)', color:'#fdcb6e' },
   concrete:{ E:30,  sy:30,   su:35,   n:2,   ef:0.005,label:'コンクリート',      color:'#b2bec3' },
   custom:{ E:200, sy:250,  su:400,  n:5,   ef:0.20, label:'カスタム',          color:'#a29bfe' }
 };
@@ -376,11 +384,17 @@ function getParams(){
   compute();
 }function setSlider(id, val, valId, dec, unit){
   const el = document.getElementById(id);
-  el.value = val;
   const min = parseFloat(el.min), max = parseFloat(el.max);
-  const pct = ((val - min) / (max - min) * 100).toFixed(1);
+  const clamped = Math.max(min, Math.min(max, val));
+  el.value = clamped;
+  const pct = ((clamped - min) / (max - min) * 100).toFixed(1);
   el.style.setProperty('--pct', pct + '%');
-  var _ve=document.getElementById(valId);if(_ve){if(_ve.tagName==='INPUT')_ve.value=parseFloat(val).toFixed(dec) + (unit ? ' ' + unit : '');else _ve.textContent=parseFloat(val).toFixed(dec) + (unit ? ' ' + unit : '');}
+  const ve = document.getElementById(valId);
+  if (ve) {
+    const shown = parseFloat(clamped).toFixed(dec);
+    if (ve.tagName === 'INPUT') ve.value = shown;
+    else ve.textContent = shown + (unit ? ' ' + unit : '');
+  }
 }function computeCurve(p, nPts){
   const { E, sy, su, n, ef, model }= p;
   const E_Pa = E * 1e9, sy_Pa = sy * 1e6, su_Pa = su * 1e6;
@@ -447,14 +461,8 @@ function getParams(){
   document.getElementById('statSy').textContent = p.sy.toFixed(0);
   document.getElementById('statUTS').textContent = p.su.toFixed(0);
   document.getElementById('statEf').textContent = p.ef.toFixed(3);
-  const eps_y = p.sy / (p.E * 1e3); // sy[MPa] / E[GPa] = sy/(E*1000)
-  const resilience = 0.5 * p.sy * eps_y * 1e3; // kJ/m³: 0.5*sy[MPa]*eps_y = MJ/m³ *1000 = kJ/m³ → 0.5*sy*eps_y[MPa] * 1e3 kJ/m³
-  // Actually 0.5*sy[MPa]*eps_y = 0.5*sy*sy/(E*1000) MPa = kJ/m³ scaled
-  const res_kjm3 = (0.5 * p.sy * p.sy) / (p.E * 1e3); // (MPa²/GPa) = MPa²/(1e3 MPa) = MPa/1e3? 
-// let me just use direct: sy^2/(2E) with consistent units
-  // sy [Pa] = sy*1e6, E[Pa]=E*1e9 → sy²/(2E) [Pa] = (sy²e12)/(2*E*1e9) = sy²*1e3/(2E) [Pa] = kPa??
-  // sy²/(2E) with sy in MPa, E in GPa: (MPa²/GPa) = (1e6)²/(1e9) Pa = 1e3 Pa = 1 kJ/m³ * 1
-  const res = (p.sy * p.sy) / (2 * p.E * 1e3); // kJ/m³
+  const eps_y = p.sy / (p.E * 1e3);
+  const res = (p.sy * p.sy) / (2 * p.E); // kJ/m³; 0.5*σy[MPa]*εy is MJ/m³, then ×1000.
   document.getElementById('statRes').textContent = res.toFixed(1);
   const tough = trapArea(pts); // MJ/m³
   document.getElementById('statTough').textContent = tough.toFixed(3);
@@ -589,6 +597,43 @@ compute();
     </div>
 
   </div>
+<h2>応力-ひずみ曲線の各領域と機械的性質</h2>
+<div class="fblock">
+<p>引張試験で得られる応力-ひずみ（$\sigma$-$\varepsilon$）曲線は、材料の力学的特性を凝縮した「材料の指紋」です。延性金属では次の領域が現れます。</p>
+<ul>
+<li><strong>弾性域：</strong>フックの法則 $\sigma = E\varepsilon$ が成り立ち、除荷すると元に戻ります。傾きが<strong>ヤング率 $E$</strong>です。</li>
+<li><strong>降伏点：</strong>塑性変形が始まる応力が<strong>降伏応力 $\sigma_y$</strong>。軟鋼では上降伏点・下降伏点が現れます。</li>
+<li><strong>塑性域（加工硬化）：</strong>変形とともに応力が上昇。最大応力が<strong>引張強さ $\sigma_u$（UTS）</strong>です。</li>
+<li><strong>ネッキング・破断：</strong>UTS以降は局所的にくびれ、<strong>破断ひずみ $\varepsilon_f$（伸び）</strong>で破壊します。</li>
+</ul>
+<p>曲線下の面積は<strong>靭性（破壊までに吸収するエネルギー）</strong>、弾性域の面積は<strong>レジリエンス</strong>を表します。脆性材料（鋳鉄・コンクリート）は降伏域がほとんど無く、弾性的に急に破断します。</p>
+</div>
+
+<h2>0.2%耐力と真応力・真ひずみ</h2>
+<div class="fblock">
+<p><strong>0.2%耐力（offset yield）：</strong>アルミ合金など明確な降伏点を持たない材料では、永久ひずみ0.2%（$\varepsilon=0.002$）に対応する応力を降伏強度とみなします。弾性線を $\varepsilon=0.002$ だけ平行移動し、曲線との交点を読み取ります。</p>
+<p><strong>公称 vs 真応力・真ひずみ：</strong>通常の曲線は元の断面積・標点距離で計算した<strong>公称（engineering）</strong>値です。実際の瞬間断面で評価する<strong>真応力・真ひずみ</strong>は次式で変換します（ネッキング前まで有効）。</p>
+<p style="text-align:center">$\sigma_{true} = \sigma_{nom}(1+\varepsilon_{nom}), \qquad \varepsilon_{true} = \ln(1+\varepsilon_{nom})$</p>
+<p>真応力は公称応力より大きく、真応力-真ひずみ曲線はUTS以降も上昇を続けます。塑性解析やFEMでは真応力-真ひずみを用います。</p>
+</div>
+
+<h2>材料非線形モデルの式</h2>
+<div class="fblock">
+<p>解析では実曲線を数式モデルで近似します。本シミュレーターが対応する代表モデルは次の通りです。</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">モデル</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">式</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">特徴</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">線形弾性</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\sigma = E\varepsilon$</td><td style="border:1px solid #d0d7de;padding:6px 8px">降伏前のみ。最も単純</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">バイリニア（等方硬化）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\sigma=\sigma_y+E_t(\varepsilon-\varepsilon_y)$（降伏後）</td><td style="border:1px solid #d0d7de;padding:6px 8px">2直線近似。接線剛性 $E_t$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">Ramberg-Osgood</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\varepsilon=\dfrac{\sigma}{E}+0.002\left(\dfrac{\sigma}{\sigma_y}\right)^{n}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">滑らかな弾塑性遷移。航空材料で多用</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">べき乗硬化（Hollomon）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\sigma = K\,\varepsilon_p^{\,n}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">塑性域を表現。$n$＝加工硬化指数</td></tr>
+</tbody>
+</table>
+</div>
+<p>加工硬化指数 $n$ が大きいほど均一に伸び（成形性が良く）、UTSと降伏応力の比 $\sigma_u/\sigma_y$ が大きいほど延性的です。プリセットを切り替え、鋼・アルミ・チタン・ゴム状ポリマーの曲線形状の違いを比較できます。</p>
+</div>
+
 <h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
@@ -625,6 +670,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="stress-strain-curve.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -683,6 +731,16 @@ compute();
 <li>複合材料は層方向による異方性を持ち、本モデルの等方性仮定は近似に過ぎません。詳細設計では直交異方性構成則を確認してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

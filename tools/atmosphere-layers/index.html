@@ -38,7 +38,7 @@ MathJax = {
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "大気圏層構造シミュレーター",
       "description": "大気圏層構造シミュレーターで国際標準大気 ISA モデルから高度ごとの気圧・気温・密度・音速をリアルタイム計算する大気科学ツール。対流圏から熱圏までグラフ可視化し、航空・ロケット設計の基礎を学べます。",
       "applicationCategory": "EducationalApplication",
@@ -137,6 +137,20 @@ input[type=range] { width: 100%; accent-color: var(--sky); }
 .canvas-wrap { position: relative; height: 340px; }
 .theory-box { background: #e3f2fd; border-left: 3px solid var(--sky); border-radius: 0 8px 8px 0; padding: 14px; margin-top: 16px; font-size: 0.82rem; line-height: 1.8; }
 .theory-box h4 { font-size: 0.78rem; font-weight: 700; color: var(--sky); margin-bottom: 8px; text-transform: uppercase; }
+#atmCanvas { width: 100%; display: block; }
+.sim-controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.sim-btn { flex: 1 1 auto; padding: 9px 12px; font-size: 0.82rem; font-weight: 700; border: 1px solid var(--border); background: var(--bg); border-radius: 8px; cursor: pointer; transition: all .15s; color: var(--text); }
+.sim-btn:hover { border-color: var(--sky); color: var(--sky); }
+.sim-btn.primary { background: var(--sky); color: #fff; border-color: var(--sky); }
+.sim-btn.primary:hover { background: #0d47a1; color: #fff; }
+.field-unit { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+.preset-label { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 4px 0 8px; }
+.preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.preset-btn { padding: 8px 6px; font-size: 0.76rem; border: 1px solid var(--border); background: var(--bg); border-radius: 8px; cursor: pointer; transition: all .15s; }
+.preset-btn:hover { background: var(--sky); color: #fff; border-color: var(--sky); }
+@media (prefers-reduced-motion: reduce) {
+  .sim-btn, .preset-btn { transition: none; }
+}
 .section { max-width: 1200px; margin: 0 auto; padding: 0 24px 32px; }
 .conv-section { background: var(--card); border-radius: 14px; padding: 28px; box-shadow: 0 2px 16px rgba(0,0,0,.06); border: 1px solid var(--border); }
 .conv-section h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; color: var(--navy); }
@@ -202,14 +216,36 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 <div class="main">
   <div class="panel">
-    <h2>高度設定</h2>
+    <h2 class="panel-title">プローブ上昇シミュレーション</h2>
+
+    <div class="sim-controls">
+      <button id="btn-play" class="sim-btn primary" onclick="togglePlay()"><i class="fas fa-play"></i> 上昇開始</button>
+      <button class="sim-btn" onclick="resetSim()"><i class="fas fa-undo"></i> 最初から</button>
+    </div>
 
     <div class="field">
       <div class="field-header">
-        <label>高度 h</label>
-        <div class="num-wrap"><input type="number" class="num-input" id="h-sliderNum" value="10" min="0" max="80" step="0.5" oninput="syncFromNum('h-slider','h-sliderNum');update()"></div>
+        <label>高度 h（スクラブ）</label>
+        <div class="num-wrap"><input type="number" class="num-input" id="h-sliderNum" value="0" min="0" max="80" step="0.5" oninput="syncFromNum('h-slider','h-sliderNum');scrubTo()"></div>
       </div>
-      <input type="range" id="h-slider" min="0" max="80" step="0.5" value="10" oninput="syncToNum('h-slider','h-sliderNum');update()">
+      <input type="range" id="h-slider" min="0" max="80" step="0.1" value="0" oninput="syncToNum('h-slider','h-sliderNum');scrubTo()">
+    </div>
+
+    <div class="field">
+      <div class="field-header">
+        <label>上昇速度</label>
+        <div class="num-wrap"><input type="number" class="num-input" id="rate-sliderNum" value="3" min="0.5" max="12" step="0.5" oninput="syncFromNum('rate-slider','rate-sliderNum')"></div>
+      </div>
+      <input type="range" id="rate-slider" min="0.5" max="12" step="0.5" value="3" oninput="syncToNum('rate-slider','rate-sliderNum')">
+      <div class="field-unit">km/s（描画用）</div>
+    </div>
+
+    <div class="preset-label">プリセット高度</div>
+    <div class="preset-grid">
+      <button class="preset-btn" onclick="gotoPreset(0)">海面 0 km</button>
+      <button class="preset-btn" onclick="gotoPreset(11)">巡航 11 km</button>
+      <button class="preset-btn" onclick="gotoPreset(8.848)">エベレスト</button>
+      <button class="preset-btn" onclick="gotoPreset(80)">宇宙の縁 80 km</button>
     </div>
 
     <div id="layer-badge" class="layer-badge" style="background:#1565c0;color:#fff;">対流圏（0〜11 km）</div>
@@ -220,11 +256,27 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="unit">hPa</div>
     </div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> ライブ計算結果</div>
     <div class="stats">
+      <div class="stat-card">
+        <div class="s-label">高度</div>
+        <div class="s-value" id="alt-val">— km</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label">現在の層</div>
+        <div class="s-value" id="layer-val" style="font-size:.82rem">—</div>
+      </div>
       <div class="stat-card">
         <div class="s-label">気温</div>
         <div class="s-value" id="t-val">— °C</div>
@@ -241,8 +293,6 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="s-label">地表比（気圧）</div>
         <div class="s-value" id="p-ratio">— %</div>
       </div>
-    </div>
-    <div class="stats">
       <div class="stat-card">
         <div class="s-label">動粘度 ν</div>
         <div class="s-value" id="nu-val">— m²/s</div>
@@ -253,32 +303,24 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
     </div>
     </div>
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('temp')">温度プロファイル</button>
-      <button class="tab-btn" onclick="switchTab('pres')">気圧・密度</button>
-      <button class="tab-btn" onclick="switchTab('canvas')">大気圏図解</button>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-rocket"></i> 大気圏を上昇するプローブ</div>
+      <canvas id="atmCanvas" aria-label="大気圏の各層を上昇するプローブのリアルタイムアニメーション"></canvas>
     </div>
 
-    <div id="tab-temp">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 温度</div><canvas class="ux-chartjs-canvas" id="tempChart"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 温度プロファイル（ISA）</div>
+      <canvas class="ux-chartjs-canvas" id="tempChart"></canvas>
     </div>
-    <div id="tab-pres">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 圧力</div><canvas class="ux-chartjs-canvas" id="presChart"></canvas></div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 気圧・密度プロファイル</div>
+      <canvas class="ux-chartjs-canvas" id="presChart"></canvas>
     </div>
-    <div id="tab-canvas">
-      <div class="canvas-wrap">
-        <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 大気</div><canvas id="atmCanvas"></canvas></div>
-      </div>
-    </div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
-対流圏（0〜11 km）：<br>
-      \(T = 288.15 - 6.5h\) [K]<br>
-      \(p = 101325 \left(\frac{T}{288.15}\right)^{5.256}\) [Pa]<br><br>
-      成層圏等温層（11〜20 km）：<br>
-      \(T = 216.65\) K, \(p = p_{11}e^{-g(h-h_{11})/(RT)}\)<br><br>
-      \(\rho = p/(RT)\), \(a = \sqrt{\gamma RT}\)
-    
+<p>対流圏（0〜11 km、気温減率 \(L=-6.5\) K/km）：<br>
+      \(T = 288.15 - 6.5\,h\) [K]、\(\;p = 101325\left(\frac{T}{288.15}\right)^{-g/(RL)}\) [Pa]</p>
+<p style="margin-top:6px;">成層圏下部の等温層（11〜20 km）：\(T = 216.65\) K、\(\;p = p_{11}\,e^{-g(h-h_{11})/(RT)}\)</p>
+<p style="margin-top:6px;">密度と音速：\(\rho = p/(RT)\)、\(\;a = \sqrt{\gamma RT}\)。ここで \(R=287\) J/(kg·K)、\(g=9.80665\) m/s²、\(\gamma=1.4\)。</p>
 </div>
 </div>
 </div>
@@ -310,7 +352,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     <div class="bubble right">
       <div class="avatar">🎓</div>
-      <div class="bubble-text">主に燃費のため。大気密度が低いと空気抵抗が減る。高度10kmの密度は地表の約25%。摩擦力は密度に比例するので抵抗が大幅に減る。一方、揚力も密度に比例して減るので速度を上げる必要があるが、それでも総合的に燃費が良い。また成層圏は乱気流が少なく飛行が安定する。ジェットエンジンは低温（−50°C付近）で熱効率が向上するメリットもある。</div>
+      <div class="bubble-text">主に燃費のため。大気密度が低いと空気抵抗が減る。高度10kmの密度は地表の約34%（気圧は約26%）。摩擦力は密度に比例するので抵抗が大幅に減る。一方、揚力も密度に比例して減るので速度を上げる必要があるが、それでも総合的に燃費が良い。また成層圏は乱気流が少なく飛行が安定する。ジェットエンジンは低温（−50°C付近）で熱効率が向上するメリットもある。</div>
     </div>
     <div class="bubble">
       <div class="avatar">🙋</div>
@@ -370,6 +412,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 </section>
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="atmosphere-layers.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -421,16 +466,12 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <!-- codex-static-related-tools:end -->
 
 <div class="howto-card howto-guide">
-<h3>使い方ガイド</h3>
-<ol>
-<li>h-sliderで高度を0～84,000mの範囲で設定する。国際標準大気（ISA）モデルに基づき自動計算開始</li>
-<li>h-sliderNumで高度を数値入力（1m単位）することで、対流圏（0～11,000m）・成層圏（11,000～47,000m）・中間圏（47,000～84,000m）の境界を正確に指定可能</li>
-<li>リアルタイムで気圧Pa・気温K・密度kg/m³・音速m/sが計算され、各気象層の物理特性を比較観察できる</li>
-</ol>
+<h3>使い方</h3>
+<ol><li>高度は0〜80 kmの範囲で、スライダーと数値入力のどちらも0.5 km刻みです。</li><li>層境界は getLayerInfo と同じく、対流圏0〜11 km、成層圏11〜47 km、成層圏頂47〜51 km、中間圏51〜80 kmとして表示します。</li><li>表示単位は気圧hPa、気温°C、密度kg/m³、音速m/sです。</li></ol>
 </div>
 <div class="howto-card howto-example">
-<h3>具体的な計算例</h3>
-<p>高度5,000mでの計算：気温288.15K（地上）から気温255.68Kに低下、気圧101,325Paから54,050Paへ減少。密度は1.225kg/m³から0.736kg/m³に変化。音速は340.3m/sから320.5m/sに低下。高度11,000m（対流圏上限）では気温216.65K、気圧22,632Pa、密度0.364kg/m³となり、旅客機の巡航高度での環境条件が確認できる。高度47,000m（成層圏上限）では気温282.45K、気圧868Paで大気密度が極限に近づく</p>
+<h3>計算例</h3>
+<p>高度5 kmでは T=255.65 K（-17.5°C）、p=54,020 Pa（540.2 hPa）です。高度47 km（成層圏頂付近）では T=270.65 K（-2.5°C）、p≈110.9 Pa（約1.11 hPa）となり、大気は非常に希薄です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -440,6 +481,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <li>音速計算結果は気温から導出されるため、大気の実際の湿度・成分を反映していない点に留意。亜音速・超音速飛行の設計では補正係数適用が必須</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -496,243 +547,325 @@ function isaCalc(h_km) {
   return { T, p, rho, a, nu, mfp };
 }
 
+const I18N = {
+  troposphere: '対流圏（0〜11 km）',
+  lowerStrat: '成層圏下部（11〜20 km）',
+  upperStrat: '成層圏上部（20〜47 km）',
+  stratopause: '成層圏頂（47〜51 km）',
+  mesosphere: '中間圏（51〜86 km）',
+  thermosphere: '熱圏（86 km〜）',
+  ground: '地表',
+  tempProfile: '温度プロファイル',
+  currentPoint: '現在地点',
+  tempAxis: '気温 (°C)',
+  altAxis: '高度 (km)',
+  presLabel: '気圧 (hPa)',
+  rhoLabel: '密度 (kg/m³)',
+  play: '上昇開始',
+  pause: '一時停止'
+};
+
 function getLayerInfo(h) {
-  if (h < 11)  return { name: '対流圏（0〜11 km）', color: '#1565c0' };
-  if (h < 20)  return { name: '成層圏下部（11〜20 km）', color: '#7b1fa2' };
-  if (h < 47)  return { name: '成層圏上部（20〜47 km）', color: '#6a1b9a' };
-  if (h < 51)  return { name: '成層圏頂（47〜51 km）', color: '#4a148c' };
-  if (h < 86)  return { name: '中間圏（51〜86 km）', color: '#1a237e' };
-  return { name: '熱圏（86 km〜）', color: '#0d1b5e' };
+  if (h < 11)  return { name: I18N.troposphere,  color: '#1565c0' };
+  if (h < 20)  return { name: I18N.lowerStrat,   color: '#7b1fa2' };
+  if (h < 47)  return { name: I18N.upperStrat,   color: '#6a1b9a' };
+  if (h < 51)  return { name: I18N.stratopause,  color: '#4a148c' };
+  if (h < 86)  return { name: I18N.mesosphere,   color: '#1a237e' };
+  return { name: I18N.thermosphere, color: '#0d1b5e' };
 }
 
 let tempChart = null, presChart = null;
-let currentTab = 'temp';
+let curH = 0;              // current probe altitude (km)
+let playing = false;
+let lastTs = null;
+let rafId = null;
+const MAX_H = 80;
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function update() {
-  const h = parseFloat(document.getElementById('h-slider').value);
+// ---- live readout ----
+function refreshReadout() {
+  const h = curH;
   const { T, p, rho, a, nu, mfp } = isaCalc(h);
   const info = getLayerInfo(h);
 
-  document.getElementById('p-val').textContent = (p / 100).toFixed(2);
-  document.getElementById('t-val').textContent = (T - 273.15).toFixed(1) + ' °C';
-  document.getElementById('rho-val').textContent = rho.toFixed(4) + ' kg/m³';
-  document.getElementById('a-val').textContent = a.toFixed(1) + ' m/s';
-  document.getElementById('p-ratio').textContent = (p / 101325 * 100).toFixed(1) + '%';
-  document.getElementById('nu-val').textContent = nu.toExponential(2) + ' m²/s';
-  document.getElementById('mfp-val').textContent = (mfp * 1e9).toFixed(1) + ' nm';
+  const setTxt = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  setTxt('alt-val', h.toFixed(2) + ' km');
+  setTxt('layer-val', info.name);
+  setTxt('p-val', (p / 100).toFixed(2));
+  setTxt('t-val', (T - 273.15).toFixed(1) + ' °C');
+  setTxt('rho-val', rho.toFixed(4) + ' kg/m³');
+  setTxt('a-val', a.toFixed(1) + ' m/s');
+  setTxt('p-ratio', (p / 101325 * 100).toFixed(1) + '%');
+  setTxt('nu-val', nu.toExponential(2) + ' m²/s');
+  setTxt('mfp-val', (mfp * 1e9).toFixed(1) + ' nm');
 
   const badge = document.getElementById('layer-badge');
-  badge.textContent = info.name;
-  badge.style.background = info.color;
-
-  drawTempChart(h);
-  drawPresChart(h);
-  drawAtmCanvas(h);
+  if (badge) { badge.textContent = info.name; badge.style.background = info.color; }
 }
 
-function buildProfile(maxH = 80) {
+// sync slider/number input from curH (without re-triggering scrub)
+function syncControls() {
+  const s = document.getElementById('h-slider');
+  const n = document.getElementById('h-sliderNum');
+  if (s) s.value = curH.toFixed(1);
+  if (n) n.value = curH.toFixed(1);
+}
+
+// ---- ISA profile cache ----
+let profileCache = null;
+function buildProfile() {
+  if (profileCache) return profileCache;
   const hs = [], Ts = [], ps = [], rhos = [];
-  for (let h = 0; h <= maxH; h += 0.5) {
+  for (let h = 0; h <= MAX_H; h += 0.5) {
     const { T, p, rho } = isaCalc(h);
     hs.push(h.toFixed(1));
     Ts.push((T - 273.15).toFixed(2));
     ps.push((p / 100).toFixed(3));
     rhos.push(rho.toFixed(5));
   }
-  return { hs, Ts, ps, rhos };
+  profileCache = { hs, Ts, ps, rhos };
+  return profileCache;
 }
 
-function drawTempChart(hMark) {
+function buildTempChart() {
   const { hs, Ts } = buildProfile();
-  const currentIdx = Math.round(hMark / 0.5);
-  const markData = hs.map((_, i) => i === currentIdx ? Ts[i] : null);
-
   if (tempChart) tempChart.destroy();
   tempChart = new Chart(document.getElementById('tempChart'), {
     type: 'line',
     data: {
-      labels: Ts,  // temperature as x-axis
       datasets: [
         {
-          label: '温度プロファイル',
+          label: I18N.tempProfile,
           data: hs.map((h, i) => ({ x: parseFloat(Ts[i]), y: parseFloat(h) })),
           borderColor: '#1565c0',
           backgroundColor: 'rgba(21,101,192,0.08)',
-          fill: true,
-          tension: 0.3,
-          pointRadius: 0
+          fill: true, tension: 0.3, pointRadius: 0
         },
         {
-          label: '現在地点',
-          data: [{ x: parseFloat(Ts[currentIdx]), y: hMark }],
-          borderColor: '#ff5722',
-          backgroundColor: '#ff5722',
-          pointRadius: 8,
-          showLine: false
+          label: I18N.currentPoint,
+          data: [{ x: parseFloat(isaCalc(curH).T - 273.15), y: curH }],
+          borderColor: '#ff5722', backgroundColor: '#ff5722',
+          pointRadius: 8, showLine: false
         }
       ]
     },
     options: {
-      responsive: true, animation: false,
-      maintainAspectRatio: false,resizeDelay:100,
+      responsive: true, animation: false, maintainAspectRatio: false, resizeDelay: 100,
       plugins: { legend: { position: 'top' } },
       scales: {
-        x: { title: { display: true, text: '気温 (°C)' } },
-        y: { title: { display: true, text: '高度 (km)' }, min: 0, max: 80 }
+        x: { title: { display: true, text: I18N.tempAxis } },
+        y: { title: { display: true, text: I18N.altAxis }, min: 0, max: MAX_H }
       }
     }
   });
 }
 
-function drawPresChart(hMark) {
+function buildPresChart() {
   const { hs, ps, rhos } = buildProfile();
-  const currentIdx = Math.round(hMark / 0.5);
-
   if (presChart) presChart.destroy();
   presChart = new Chart(document.getElementById('presChart'), {
     type: 'line',
     data: {
       labels: hs,
       datasets: [
-        {
-          label: '気圧 (hPa)',
-          data: ps,
-          borderColor: '#1565c0',
-          fill: false,
-          tension: 0.3,
-          pointRadius: 0,
-          yAxisID: 'y'
-        },
-        {
-          label: '密度 (kg/m³)',
-          data: rhos,
-          borderColor: '#f57c00',
-          fill: false,
-          tension: 0.3,
-          pointRadius: 0,
-          yAxisID: 'y1'
-        }
+        { label: I18N.presLabel, data: ps, borderColor: '#1565c0', fill: false, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
+        { label: I18N.rhoLabel, data: rhos, borderColor: '#f57c00', fill: false, tension: 0.3, pointRadius: 0, yAxisID: 'y1' }
       ]
     },
     options: {
-      responsive: true, animation: false,
-      maintainAspectRatio: false,resizeDelay:100,
+      responsive: true, animation: false, maintainAspectRatio: false, resizeDelay: 100,
       plugins: { legend: { position: 'top' } },
       scales: {
-        x: { title: { display: true, text: '高度 (km)' }, ticks: { maxTicksLimit: 12 } },
-        y: { title: { display: true, text: '気圧 (hPa)' }, position: 'left' },
-        y1: { title: { display: true, text: '密度 (kg/m³)' }, position: 'right', grid: { drawOnChartArea: false } }
+        x: { title: { display: true, text: I18N.altAxis }, ticks: { maxTicksLimit: 12 } },
+        y: { title: { display: true, text: I18N.presLabel }, position: 'left' },
+        y1: { title: { display: true, text: I18N.rhoLabel }, position: 'right', grid: { drawOnChartArea: false } }
       }
     }
   });
 }
 
-function drawAtmCanvas(hMark) {
+// update the moving current-altitude marker on the temp chart
+function updateChartMarker() {
+  if (!tempChart) return;
+  tempChart.data.datasets[1].data = [{ x: parseFloat(isaCalc(curH).T - 273.15), y: curH }];
+  tempChart.update('none');
+}
+
+// ---- atmosphere column animation ----
+function drawAtmCanvas() {
   const canvas = document.getElementById('atmCanvas');
-  const W = Math.max(280, canvas.parentElement.clientWidth - 44);
-  const H = 340;
+  if (!canvas) return;
+  const W = Math.max(280, canvas.parentElement.clientWidth - 4);
+  const H = 380;
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = W + 'px';
-  canvas.style.height = H + 'px';
-  canvas.width = Math.round(W * dpr);
-  canvas.height = Math.round(H * dpr);
-  canvas.dataset.cssW = String(W);
-  canvas.dataset.cssH = String(H);
+  if (canvas.dataset.cssW !== String(W)) {
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.dataset.cssW = String(W);
+  }
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
 
-  // Layer colors (bottom to top)
   const layers = [
-    { name: '対流圏', h0: 0, h1: 11, color: '#1565c0' },
-    { name: '成層圏', h0: 11, h1: 50, color: '#6a1b9a' },
-    { name: '中間圏', h0: 50, h1: 80, color: '#1a237e' },
-    { name: '熱圏', h0: 80, h1: 100, color: '#0a0020' }
+    { name: I18N.troposphere,  h0: 0,  h1: 11,  color: '#1565c0' },
+    { name: I18N.lowerStrat,   h0: 11, h1: 20,  color: '#7b1fa2' },
+    { name: I18N.upperStrat,   h0: 20, h1: 47,  color: '#6a1b9a' },
+    { name: I18N.stratopause,  h0: 47, h1: 51,  color: '#4a148c' },
+    { name: I18N.mesosphere,   h0: 51, h1: 80,  color: '#1a237e' }
   ];
-  const maxH = 100;
-  const padLeft = 60, padRight = 20, padTop = 10, padBottom = 30;
+  const padLeft = 56, padRight = 16, padTop = 14, padBottom = 26;
   const drawH = H - padTop - padBottom;
   const drawW = W - padLeft - padRight;
+  const colW = Math.min(150, drawW * 0.42);
+  const colX = padLeft + 4;
+  function hToY(h) { return padTop + drawH * (1 - h / MAX_H); }
 
-  function hToY(h) { return padTop + drawH * (1 - h / maxH); }
-
-  // Draw layers
+  // banded column (vertical color bands per layer)
   layers.forEach(l => {
-    const y0 = hToY(l.h1);
+    const y0 = hToY(Math.min(l.h1, MAX_H));
     const y1 = hToY(l.h0);
     const grad = ctx.createLinearGradient(0, y0, 0, y1);
     grad.addColorStop(0, l.color);
-    grad.addColorStop(1, l.color + 'aa');
+    grad.addColorStop(1, l.color + 'bb');
     ctx.fillStyle = grad;
-    ctx.fillRect(padLeft, y0, drawW, y1 - y0);
-
-    // Label
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillRect(colX, y0, colW, y1 - y0);
+    // boundary line + label
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.font = '11px Noto Sans JP, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(l.name, padLeft + 4, (y0 + y1) / 2 + 4);
+    ctx.fillText(l.name.replace(/（.*$/, ''), colX + 6, (y0 + y1) / 2 + 4);
   });
 
-  // Y axis
-  ctx.strokeStyle = '#888';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(padLeft, padTop);
-  ctx.lineTo(padLeft, padTop + drawH);
-  ctx.stroke();
+  // tropopause / boundary dashed markers
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+  [11, 20, 47, 51].forEach(hb => {
+    const y = hToY(hb);
+    ctx.beginPath(); ctx.moveTo(colX, y); ctx.lineTo(colX + colW, y); ctx.stroke();
+  });
+  ctx.setLineDash([]);
 
-  // Y ticks
-  ctx.fillStyle = '#555';
-  ctx.font = '10px Roboto Mono, monospace';
-  ctx.textAlign = 'right';
-  for (let h = 0; h <= 100; h += 20) {
+  // Y axis ticks (altitude)
+  ctx.strokeStyle = '#888'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padLeft, padTop); ctx.lineTo(padLeft, padTop + drawH); ctx.stroke();
+  ctx.fillStyle = '#555'; ctx.font = '10px Roboto Mono, monospace'; ctx.textAlign = 'right';
+  for (let h = 0; h <= MAX_H; h += 20) {
     const y = hToY(h);
-    ctx.beginPath();
-    ctx.moveTo(padLeft - 4, y);
-    ctx.lineTo(padLeft, y);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(padLeft - 4, y); ctx.lineTo(padLeft, y); ctx.stroke();
     ctx.fillText(h + 'km', padLeft - 6, y + 3);
   }
 
-  // Current altitude marker
-  const markerY = hToY(hMark);
-  ctx.strokeStyle = '#FFD700';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 3]);
-  ctx.beginPath();
-  ctx.moveTo(padLeft, markerY);
-  ctx.lineTo(padLeft + drawW, markerY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Arrow and label
-  ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 12px Roboto Mono, monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('▶ ' + hMark.toFixed(1) + ' km', padLeft + 4, markerY - 4);
-
-  // Ground
+  // ground
   ctx.fillStyle = '#5d4037';
-  ctx.fillRect(padLeft, hToY(0), drawW, 8);
-  ctx.fillStyle = '#fff';
-  ctx.font = '10px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('地表', padLeft + 4, hToY(0) + 6);
+  ctx.fillRect(colX, hToY(0) - 0, colW, 6);
+  ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(I18N.ground, colX + 4, hToY(0) - 3);
+
+  // probe (rising balloon) at curH
+  const probeX = colX + colW + 36;
+  const probeY = hToY(curH);
+  // current altitude dashed guide
+  ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2; ctx.setLineDash([6, 3]);
+  ctx.beginPath(); ctx.moveTo(colX, probeY); ctx.lineTo(probeX + 14, probeY); ctx.stroke();
+  ctx.setLineDash([]);
+  // balloon
+  ctx.fillStyle = '#ff5722';
+  ctx.beginPath(); ctx.arc(probeX, probeY - 6, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#b71c1c';
+  ctx.beginPath();
+  ctx.moveTo(probeX - 4, probeY); ctx.lineTo(probeX + 4, probeY); ctx.lineTo(probeX, probeY + 6);
+  ctx.closePath(); ctx.fill();
+  // gondola
+  ctx.fillStyle = '#333';
+  ctx.fillRect(probeX - 3, probeY + 6, 6, 5);
+
+  // live label next to probe
+  const { T, p } = isaCalc(curH);
+  ctx.fillStyle = '#FFD700'; ctx.font = 'bold 12px Roboto Mono, monospace'; ctx.textAlign = 'left';
+  ctx.fillText(curH.toFixed(1) + ' km', probeX + 16, probeY - 8);
+  ctx.fillStyle = '#fff'; ctx.font = '10px Roboto Mono, monospace';
+  ctx.fillText((T - 273.15).toFixed(0) + '°C  ' + (p / 100).toFixed(0) + ' hPa', probeX + 16, probeY + 6);
 }
 
-function switchTab(tab) {
-  currentTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  document.getElementById('tab-temp').style.display = tab === 'temp' ? '' : 'none';
-  document.getElementById('tab-pres').style.display = tab === 'pres' ? '' : 'none';
-  document.getElementById('tab-canvas').style.display = tab === 'canvas' ? '' : 'none';
-  if (tab === 'temp') drawTempChart(parseFloat(document.getElementById('h-slider').value));
-  if (tab === 'pres') drawPresChart(parseFloat(document.getElementById('h-slider').value));
-  if (tab === 'canvas') drawAtmCanvas(parseFloat(document.getElementById('h-slider').value));
+// ---- render everything for current state ----
+function renderAll() {
+  syncControls();
+  refreshReadout();
+  drawAtmCanvas();
+  updateChartMarker();
 }
 
-window.addEventListener('load', update);
-window.addEventListener('resize', () => { if (currentTab === 'canvas') drawAtmCanvas(parseFloat(document.getElementById('h-slider').value)); });
+// ---- scrub from slider / number ----
+function scrubTo() {
+  if (playing) stopPlay();
+  const s = document.getElementById('h-slider');
+  curH = Math.max(0, Math.min(MAX_H, parseFloat(s.value) || 0));
+  refreshReadout();
+  drawAtmCanvas();
+  updateChartMarker();
+}
+
+function gotoPreset(h) {
+  if (playing) stopPlay();
+  curH = Math.max(0, Math.min(MAX_H, h));
+  renderAll();
+}
+
+// ---- play / pause / reset ----
+function setPlayBtn() {
+  const b = document.getElementById('btn-play');
+  if (!b) return;
+  b.innerHTML = playing
+    ? '<i class="fas fa-pause"></i> ' + I18N.pause
+    : '<i class="fas fa-play"></i> ' + I18N.play;
+  b.classList.toggle('primary', !playing);
+}
+
+function tick(ts) {
+  if (!playing) return;
+  if (lastTs == null) lastTs = ts;
+  const dt = Math.min(0.1, (ts - lastTs) / 1000);
+  lastTs = ts;
+  const rate = parseFloat((document.getElementById('rate-slider') || {}).value) || 3;
+  curH += rate * dt;
+  if (curH >= MAX_H) { curH = MAX_H; stopPlay(); }
+  renderAll();
+  if (playing) rafId = requestAnimationFrame(tick);
+}
+
+function startPlay() {
+  if (curH >= MAX_H) curH = 0;
+  playing = true; lastTs = null; setPlayBtn();
+  if (prefersReduced) {
+    // no animation: jump to top in steps via setInterval-free single render
+    curH = MAX_H; playing = false; setPlayBtn(); renderAll(); return;
+  }
+  rafId = requestAnimationFrame(tick);
+}
+function stopPlay() {
+  playing = false; setPlayBtn();
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+}
+function togglePlay() { playing ? stopPlay() : startPlay(); }
+
+function resetSim() {
+  stopPlay();
+  curH = 0;
+  renderAll();
+}
+
+window.addEventListener('load', () => {
+  buildTempChart();
+  buildPresChart();
+  curH = parseFloat((document.getElementById('h-slider') || {}).value) || 0;
+  renderAll();
+  setPlayBtn();
+});
+window.addEventListener('resize', () => { drawAtmCanvas(); });
 </script>
 <script src="/tools/related-tools.js" defer></script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>

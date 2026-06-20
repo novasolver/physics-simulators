@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "脱出速度シミュレーター",
       "description": "惑星・衛星の質量と半径から脱出速度をリアルタイム計算し、太陽系天体と比較できる天文学シミュレーター。",
       "url": "https://novasolver.jp/tools/escape-velocity.html",
@@ -50,7 +50,7 @@
       "operatingSystem": "Web Browser",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["質量・半径から脱出速度の計算","太陽系天体プリセット（地球・火星・木星・中性子星など）","シュバルツシルト半径の計算","脱出速度と光速の比較グラフ"],
       "keywords": "脱出速度,第二宇宙速度,重力,惑星,ブラックホール,シュバルツシルト半径,宇宙",
       "datePublished": "2026-04-24",
@@ -164,6 +164,32 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 .param-group{margin-bottom:2px}.field-header{margin-bottom:0}.param-label{margin-bottom:0}.num-wrap{gap:2px}.num-input{width:56px;padding:1px 3px;font-size:.74rem;border-radius:4px}.num-unit{font-size:.68rem;min-width:16px}.param-name{font-size:.71rem}.param-value{font-size:.71rem;padding:1px 5px;min-width:auto}input[type=range]{height:3px;margin:0}select{padding:3px 5px;font-size:.74rem;margin-bottom:2px}.divider{margin:3px 0;opacity:.4}.panel{padding:7px}.panel-title{margin-bottom:4px;font-size:.58rem}.panel{padding:7px}.panel-title{margin-bottom:4px;font-size:.58rem}.divider{margin:3px 0;opacity:.4}
 
 }
+
+/* ===== v2 escape-velocity hero animation ===== */
+#evCanvas{border-radius:8px;background:#060a18;display:block;width:100%;max-width:100%;margin-top:4px}
+#evCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.ev-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+.ev-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.ev-ro .rv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.15}
+.ev-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.ev-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.ev-readouts{grid-template-columns:repeat(3,1fr)}}
+.ev-slider-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.ev-slider-row input[type=range]{flex:1}
+.ev-vlabel{font-family:'Roboto Mono',monospace;font-size:0.8rem;color:var(--accent);min-width:96px;text-align:right;font-weight:600}
+.ev-play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.ev-body-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.ev-scen.active,.ev-body.active{border-color:var(--accent);color:var(--accent);background:rgba(0,123,255,.06);font-weight:600}
+.ev-info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:12px}
+.ev-info{background:rgba(0,123,255,.04);border:1px solid rgba(0,123,255,.12);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.ev-info .il{font-size:0.66rem;color:var(--muted)}
+.ev-info .iv{font-family:'Roboto Mono',monospace;font-size:0.82rem;color:var(--accent);font-weight:600}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:9px 16px;border-radius:8px;cursor:pointer;font-size:0.84rem;font-family:inherit;font-weight:600;transition:background .2s}
+.btn:hover{background:#0056b3}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+@media (prefers-reduced-motion: reduce){.ev-info .iv,.ev-ro .rv{transition:none}}
+/* end v2 escape-velocity additions */
 </style>
 </head>
 <body>
@@ -233,6 +259,54 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-meteor"></i> 軌道アニメーション — 脱出するか、周回するか</div>
+      <div class="ev-readouts">
+        <div class="ev-ro accent"><div class="rv" id="evRoFrac">100%</div><div class="rl">打上げ速度 / v_esc</div></div>
+        <div class="ev-ro"><div class="rv" id="evRoSpd">—</div><div class="rl">現在の速さ [km/s]</div></div>
+        <div class="ev-ro"><div class="rv" id="evRoAlt">—</div><div class="rl">高度 [km]</div></div>
+        <div class="ev-ro"><div class="rv" id="evRoEps">—</div><div class="rl">比軌道エネルギー ε</div></div>
+        <div class="ev-ro"><div class="rv" id="evRoState">—</div><div class="rl">軌道の状態</div></div>
+      </div>
+      <canvas id="evCanvas" height="380" tabindex="0" role="img" aria-label="惑星の周りを飛ぶ探査機の軌道アニメーション。打上げ速度に応じて周回・楕円軌道・脱出を表示します。"></canvas>
+
+      <div class="ev-slider-row">
+        <label class="param-name" for="evVfrac" style="white-space:nowrap"><i class="fas fa-gauge-high"></i> 打上げ速度</label>
+        <input type="range" id="evVfrac" min="0.5" max="1.5" step="0.01" value="1.0" oninput="window.evOnSlider&&window.evOnSlider()" aria-label="打上げ速度（脱出速度に対する割合）">
+        <span class="ev-vlabel" id="evVlabel">1.00 × v_esc</span>
+      </div>
+
+      <div class="ev-play-row">
+        <button class="btn" type="button" id="evBtnPlay" onclick="window.evTogglePlay&&window.evTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="window.evReplay&&window.evReplay()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto;flex-wrap:wrap">
+          <button class="preset-btn ev-scen" type="button" onclick="window.evScenario&&window.evScenario(0.7)">弾道</button>
+          <button class="preset-btn ev-scen" type="button" onclick="window.evScenario&&window.evScenario(0.7072)">円軌道</button>
+          <button class="preset-btn ev-scen" type="button" onclick="window.evScenario&&window.evScenario(0.86)">楕円</button>
+          <button class="preset-btn ev-scen" type="button" onclick="window.evScenario&&window.evScenario(1.02)">脱出</button>
+        </div>
+      </div>
+
+      <div class="ev-body-row">
+        <span style="font-size:.72rem;color:var(--muted);white-space:nowrap">天体:</span>
+        <button class="preset-btn ev-body" type="button" onclick="window.evSetBody&&window.evSetBody('earth')">🌍 地球</button>
+        <button class="preset-btn ev-body" type="button" onclick="window.evSetBody&&window.evSetBody('moon')">🌕 月</button>
+        <button class="preset-btn ev-body" type="button" onclick="window.evSetBody&&window.evSetBody('mars')">🔴 火星</button>
+        <button class="preset-btn ev-body" type="button" onclick="window.evSetBody&&window.evSetBody('jupiter')">🪐 木星</button>
+        <button class="preset-btn ev-body" type="button" onclick="window.evSetBody&&window.evSetBody('sun')">☀️ 太陽</button>
+      </div>
+
+      <div class="ev-info-grid">
+        <div class="ev-info"><span class="il">天体</span><span class="iv" id="evInfoBody">地球</span></div>
+        <div class="ev-info"><span class="il">v_esc = √(2GM/R)</span><span class="iv" id="evInfoVe">11.19 km/s</span></div>
+        <div class="ev-info"><span class="il">v_circ = √(GM/R)</span><span class="iv" id="evInfoVc">7.91 km/s</span></div>
+        <div class="ev-info"><span class="il">表面重力 g</span><span class="iv" id="evInfoG">9.81 m/s²</span></div>
+        <div class="ev-info"><span class="il">遠点 / 近点</span><span class="iv" id="evInfoApo">—</span></div>
+      </div>
+      <p style="font-size:.72rem;color:var(--muted);margin-top:8px;line-height:1.5">
+        速度スライダーを <strong>v_circ (0.707)</strong> → <strong>1.0 (脱出)</strong> へ動かすと、円軌道 → 楕円軌道 → 開いた双曲線へと軌道が「開いて」いく様子が見えます。ε ≥ 0 で重力に束縛されず（脱出）、ε &lt; 0 で束縛（周回）です。
+      </p>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-grid">
       <div class="stat-card">
@@ -254,7 +328,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 天体との脱出速度比較</div><canvas class="ux-chartjs-canvas" id="myChart"></canvas>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> My</div><canvas class="ux-chartjs-canvas" id="myChart"></canvas>
     <p style="font-size:0.75rem;color:var(--muted);text-align:center;margin-top:8px;">
       主要天体との脱出速度比較（km/s）。赤破線は光速（299,792 km/s）
     </p></div>
@@ -443,7 +517,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>地球(M=5.972×10²⁴kg、R=6.371×10⁶m)では脱出速度は11.2km/sと計算されます。中性子星(M=2.8×10³⁰kg、R=1.2×10⁴m)では脱出速度が約2.1×10⁵km/sに達し、光速比(v_e/c)は0.7に接近します。ブラックホール直前(M=10太陽質量、R=29.5km)ではシュバルツシルト半径=87.4kmを超えた領域で事象の地平線が形成され、脱出速度が光速を超過します。</p>
+<p>地球(M=5.972×10²⁴kg、R=6.371×10⁶m)では脱出速度は11.2km/sと計算されます。中性子星(M=2.8×10³⁰kg、R=1.2×10⁴m)では脱出速度が約1.77×10⁵km/sに達し、光速比(v_e/c)は0.59に接近します。質量10太陽質量の天体のシュバルツシルト半径は r_s=2GM/c²≈29.5km で、半径をこの値以下に圧縮すると事象の地平線が形成され、脱出速度が光速を超過します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -465,6 +539,303 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
 </div>
 </footer>
+
+<script>
+/* ===== v2 escape-velocity hero animation (IIFE, ev-prefixed) ===== */
+(function(){
+  "use strict";
+  var cv = document.getElementById('evCanvas');
+  if(!cv) return;
+  var cx = cv.getContext('2d');
+  var EV_G = 6.674e-11;
+  // Bodies: M (kg), R (m). v_esc=sqrt(2GM/R), v_circ=sqrt(GM/R)
+  var BODIES = {
+    earth:   { name:'地球',  M:5.972e24, R:6.371e6 },
+    moon:    { name:'月',    M:7.342e22, R:1.737e6 },
+    mars:    { name:'火星',  M:6.417e23, R:3.390e6 },
+    jupiter: { name:'木星',  M:1.898e27, R:6.9911e7 },
+    sun:     { name:'太陽',  M:1.989e30, R:6.9634e8 }
+  };
+  var curBody = 'earth';
+  var vfrac = 1.0;          // launch speed as fraction of v_esc
+  var playing = true;
+  var animId = null;
+  var lastTs = 0;
+  // simulation state (SI units, planet at origin)
+  var pos = {x:0,y:0}, vel = {x:0,y:0};
+  var trail = [];
+  var maxTrail = 900;
+  var simTime = 0;
+  var escaped = false;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function bodyVals(){
+    var b = BODIES[curBody];
+    var ve = Math.sqrt(2*EV_G*b.M/b.R);
+    var vc = Math.sqrt(EV_G*b.M/b.R);
+    var g = EV_G*b.M/(b.R*b.R);
+    return {b:b, ve:ve, vc:vc, g:g};
+  }
+
+  // Reset projectile: launch tangentially from "north pole" of planet at chosen speed
+  function evReset(){
+    var v = bodyVals();
+    var speed = vfrac * v.ve;
+    // launch position: top of planet, surface
+    pos.x = 0; pos.y = v.b.R;
+    // launch velocity: horizontal (tangential) -> produces orbits/ellipses
+    vel.x = speed; vel.y = 0;
+    trail = [{x:pos.x,y:pos.y}];
+    simTime = 0;
+    escaped = false;
+  }
+
+  // gravitational acceleration at position p (inverse-square toward origin)
+  function accel(p, GM){
+    var r2 = p.x*p.x + p.y*p.y;
+    var r = Math.sqrt(r2);
+    if(r < 1) r = 1;
+    var a = -GM / r2;
+    return { x: a*p.x/r, y: a*p.y/r };
+  }
+
+  // RK4 step on [x,y,vx,vy]
+  function step(dt, GM){
+    function deriv(s){
+      var a = accel({x:s[0],y:s[1]}, GM);
+      return [s[2], s[3], a.x, a.y];
+    }
+    var s = [pos.x,pos.y,vel.x,vel.y];
+    var a = deriv(s);
+    var b = deriv([s[0]+a[0]*dt/2,s[1]+a[1]*dt/2,s[2]+a[2]*dt/2,s[3]+a[3]*dt/2]);
+    var c = deriv([s[0]+b[0]*dt/2,s[1]+b[1]*dt/2,s[2]+b[2]*dt/2,s[3]+b[3]*dt/2]);
+    var d = deriv([s[0]+c[0]*dt,s[1]+c[1]*dt,s[2]+c[2]*dt,s[3]+c[3]*dt]);
+    pos.x += dt/6*(a[0]+2*b[0]+2*c[0]+d[0]);
+    pos.y += dt/6*(a[1]+2*b[1]+2*c[1]+d[1]);
+    vel.x += dt/6*(a[2]+2*b[2]+2*c[2]+d[2]);
+    vel.y += dt/6*(a[3]+2*b[3]+2*c[3]+d[3]);
+    simTime += dt;
+  }
+
+  // view scale: planet radius -> fraction of canvas
+  var cssW=0, cssH=0;
+  function resize(){
+    var rect = cv.parentElement.getBoundingClientRect();
+    cssW = Math.max(280, Math.floor(rect.width - 44));
+    cssH = 380;
+    var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    cv.style.width = cssW+'px'; cv.style.height = cssH+'px';
+    cv.width = Math.round(cssW*dpr); cv.height = Math.round(cssH*dpr);
+    cx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function orbitElements(v){
+    // specific orbital energy eps = v^2/2 - GM/r ; semi-major a = -GM/(2 eps)
+    var GM = EV_G*v.b.M;
+    var r = Math.sqrt(pos.x*pos.x+pos.y*pos.y);
+    var sp = Math.sqrt(vel.x*vel.x+vel.y*vel.y);
+    var eps = sp*sp/2 - GM/r;
+    // specific angular momentum (2D cross product)
+    var h = pos.x*vel.y - pos.y*vel.x;
+    var a = (Math.abs(eps) > 1e-12) ? -GM/(2*eps) : Infinity;
+    var ecc = Math.sqrt(Math.max(0, 1 + 2*eps*h*h/(GM*GM)));
+    var rp = (eps < 0) ? a*(1-ecc) : NaN; // periapsis
+    var ra = (eps < 0) ? a*(1+ecc) : NaN; // apoapsis
+    return {eps:eps, a:a, ecc:ecc, rp:rp, ra:ra, GM:GM, r:r, sp:sp};
+  }
+
+  function fmtKm(m){
+    var km = m/1000;
+    if(Math.abs(km) >= 1e6) return (km/1e6).toFixed(2)+'M';
+    if(Math.abs(km) >= 1e4) return (km/1e3).toFixed(1)+'k';
+    return km.toFixed(0);
+  }
+
+  function updateReadouts(){
+    var v = bodyVals();
+    var oe = orbitElements(v);
+    document.getElementById('evRoFrac').textContent = Math.round(vfrac*100)+'%';
+    document.getElementById('evRoSpd').textContent = (oe.sp/1000).toFixed(2);
+    document.getElementById('evRoAlt').textContent = ((oe.r - v.b.R)/1000).toFixed(0);
+    document.getElementById('evRoEps').textContent = (oe.eps/1e6).toFixed(2);
+    var st, stc;
+    if(oe.eps >= -1e3){ st='脱出 (非束縛)'; stc='#ff7043'; }
+    else if(oe.ecc < 0.02){ st='円軌道'; stc='#4caf50'; }
+    else { st='楕円軌道 (束縛)'; stc='#42a5f5'; }
+    var stEl = document.getElementById('evRoState');
+    stEl.textContent = st; stEl.style.color = stc;
+    // apo/peri info
+    var apo = document.getElementById('evInfoApo');
+    if(oe.eps >= -1e3){
+      apo.textContent = '脱出（戻らない）';
+    } else {
+      apo.textContent = fmtKm(oe.ra - v.b.R)+' / '+fmtKm(Math.max(0,oe.rp - v.b.R))+' km';
+    }
+  }
+
+  function updateBodyInfo(){
+    var v = bodyVals();
+    document.getElementById('evInfoBody').textContent = v.b.name;
+    document.getElementById('evInfoVe').textContent = (v.ve/1000).toFixed(2)+' km/s';
+    document.getElementById('evInfoVc').textContent = (v.vc/1000).toFixed(2)+' km/s';
+    document.getElementById('evInfoG').textContent = v.g.toFixed(2)+' m/s²';
+    document.getElementById('evVlabel').textContent = vfrac.toFixed(2)+' × v_esc';
+    var sl=document.getElementById('evVfrac');
+    var pct=((vfrac-0.5)/(1.5-0.5))*100;
+    sl.style.setProperty('--pct', pct+'%');
+  }
+
+  function draw(){
+    resize();
+    var W=cssW, H=cssH;
+    cx.clearRect(0,0,W,H);
+    cx.fillStyle='#060a18'; cx.fillRect(0,0,W,H);
+    // starfield (static-ish, deterministic)
+    cx.fillStyle='rgba(255,255,255,0.5)';
+    for(var i=0;i<60;i++){
+      var sx=(i*73)%W, sy=(i*131)%H, sz=(i%3===0)?1.4:0.8;
+      cx.globalAlpha=0.25+0.4*((i*37)%10)/10;
+      cx.fillRect(sx,sy,sz,sz);
+    }
+    cx.globalAlpha=1;
+
+    var v = bodyVals();
+    var GM = EV_G*v.b.M;
+    var cxp=W*0.42, cyp=H*0.5;
+    // scale so planet radius is ~ 26px, but allow seeing several R of orbit
+    var Rpx = Math.max(16, Math.min(W,H)*0.07);
+    var scale = Rpx / v.b.R; // m -> px
+
+    // draw planet
+    var grd = cx.createRadialGradient(cxp-Rpx*0.3, cyp-Rpx*0.3, Rpx*0.2, cxp, cyp, Rpx);
+    grd.addColorStop(0,'#5aa9ff'); grd.addColorStop(1,'#10406e');
+    cx.beginPath(); cx.arc(cxp,cyp,Rpx,0,7); cx.fillStyle=grd; cx.fill();
+    cx.strokeStyle='rgba(120,200,255,0.5)'; cx.lineWidth=1; cx.stroke();
+    // body label
+    cx.fillStyle='rgba(255,255,255,0.85)'; cx.font='11px Noto Sans JP'; cx.textAlign='center';
+    cx.fillText(v.b.name, cxp, cyp+Rpx+16);
+
+    // trail
+    cx.beginPath();
+    for(var j=0;j<trail.length;j++){
+      var tx=cxp+trail[j].x*scale, ty=cyp-trail[j].y*scale;
+      if(j===0) cx.moveTo(tx,ty); else cx.lineTo(tx,ty);
+    }
+    var oe = orbitElements(v);
+    cx.strokeStyle = (oe.eps>=-1e3)?'rgba(255,112,67,0.85)':(oe.ecc<0.02?'rgba(76,200,80,0.9)':'rgba(0,180,216,0.9)');
+    cx.lineWidth=1.8; cx.stroke();
+
+    // current projectile
+    var px=cxp+pos.x*scale, py=cyp-pos.y*scale;
+    cx.beginPath(); cx.arc(px,py,4.5,0,7); cx.fillStyle='#ffd54a'; cx.fill();
+    cx.strokeStyle='rgba(255,255,255,0.9)'; cx.lineWidth=1; cx.stroke();
+    // velocity vector
+    var sp=Math.sqrt(vel.x*vel.x+vel.y*vel.y);
+    if(sp>0){
+      var vlen=26;
+      var ux=vel.x/sp, uy=vel.y/sp;
+      cx.beginPath(); cx.moveTo(px,py); cx.lineTo(px+ux*vlen, py-uy*vlen);
+      cx.strokeStyle='#ffd54a'; cx.lineWidth=1.6; cx.stroke();
+    }
+
+    // annotation
+    cx.font='bold 12px Noto Sans JP'; cx.textAlign='left';
+    var note, nc;
+    if(oe.eps>=-1e3){ note='ε ≥ 0 → 脱出（双曲線）'; nc='#ff7043'; }
+    else if(oe.ecc<0.02){ note='ε < 0, e≈0 → 円軌道'; nc='#4caf50'; }
+    else { note='ε < 0 → 楕円軌道（束縛）'; nc='#42a5f5'; }
+    cx.fillStyle=nc; cx.fillText(note, 12, 20);
+    cx.fillStyle='rgba(255,255,255,0.6)'; cx.font='10px Roboto Mono';
+    cx.fillText('v = '+vfrac.toFixed(2)+'·v_esc', 12, 36);
+
+    updateReadouts();
+  }
+
+  function loop(ts){
+    if(!playing){ animId=null; return; }
+    if(!lastTs) lastTs=ts;
+    var dtReal=Math.min(0.05,(ts-lastTs)/1000);
+    lastTs=ts;
+    var v=bodyVals();
+    var GM=EV_G*v.b.M;
+    // physics substeps scaled to orbital period so motion is visible at any body scale
+    var Torb = 2*Math.PI*Math.sqrt(Math.pow(v.b.R*1.2,3)/GM); // rough ref period
+    var simDt = Torb/180;             // sim-seconds advanced per substep
+    var sub = 6;
+    for(var k=0;k<sub;k++){
+      step(simDt, GM);
+      trail.push({x:pos.x,y:pos.y});
+      if(trail.length>maxTrail) trail.shift();
+    }
+    var r=Math.sqrt(pos.x*pos.x+pos.y*pos.y);
+    // collision with planet -> impact (suborbital)
+    if(r < v.b.R*0.999){
+      // landed back: reset to relaunch
+      evReset();
+    }
+    // escaped far away -> reset loop
+    if(r > v.b.R*9){
+      escaped=true;
+      evReset();
+    }
+    draw();
+    animId=requestAnimationFrame(loop);
+  }
+
+  function startPlay(){
+    playing=true; lastTs=0;
+    document.getElementById('evBtnPlay').innerHTML='<i class="fas fa-pause"></i> 一時停止';
+    if(!animId) animId=requestAnimationFrame(loop);
+  }
+  function stopPlay(){
+    playing=false;
+    if(animId){ cancelAnimationFrame(animId); animId=null; }
+    document.getElementById('evBtnPlay').innerHTML='<i class="fas fa-play"></i> 再生';
+  }
+
+  // public handlers (window-scoped for inline onclick)
+  window.evTogglePlay=function(){ playing?stopPlay():startPlay(); };
+  window.evReplay=function(){ evReset(); draw(); if(!playing) startPlay(); };
+  window.evOnSlider=function(){
+    vfrac=parseFloat(document.getElementById('evVfrac').value);
+    updateBodyInfo(); evReset(); draw();
+    document.querySelectorAll('.ev-scen').forEach(function(b){b.classList.remove('active');});
+  };
+  window.evScenario=function(f){
+    vfrac=f;
+    document.getElementById('evVfrac').value=String(f);
+    updateBodyInfo(); evReset(); draw();
+    document.querySelectorAll('.ev-scen').forEach(function(b){b.classList.remove('active');});
+    if(typeof event!=='undefined' && event && event.target) event.target.classList.add('active');
+    if(!playing) startPlay();
+  };
+  window.evSetBody=function(name){
+    if(!BODIES[name]) return;
+    curBody=name;
+    updateBodyInfo(); evReset(); draw();
+    document.querySelectorAll('.ev-body').forEach(function(b){b.classList.remove('active');});
+    if(typeof event!=='undefined' && event && event.target) event.target.classList.add('active');
+  };
+
+  cv.addEventListener('keydown',function(e){
+    if(e.key===' '||e.key==='Enter'){ e.preventDefault(); window.evTogglePlay(); }
+  });
+  window.addEventListener('resize',function(){ draw(); });
+
+  // init
+  updateBodyInfo(); evReset();
+  if(reduced){
+    // static representative frame: advance a partial orbit then freeze
+    var v0=bodyVals(), GM0=EV_G*v0.b.M;
+    var T0=2*Math.PI*Math.sqrt(Math.pow(v0.b.R*1.2,3)/GM0);
+    for(var q=0;q<120;q++){ step(T0/180,GM0); trail.push({x:pos.x,y:pos.y}); }
+    playing=false; draw();
+    document.getElementById('evBtnPlay').innerHTML='<i class="fas fa-play"></i> 再生';
+  } else {
+    draw(); startPlay();
+  }
+})();
+</script>
 
 <script>
 
@@ -492,7 +863,7 @@ const COMPARE = [
   { label: '土星', ve: 35.5 },
   { label: '木星', ve: 59.5 },
   { label: '太陽', ve: 617.5 },
-  { label: '中性子星', ve: 1.8e5 }
+  { label: '中性子星', ve: 1.928e5 }
 ];
 
 let chart = null;

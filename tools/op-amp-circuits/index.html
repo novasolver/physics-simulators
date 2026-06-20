@@ -42,7 +42,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "オペアンプ回路シミュレーター",
       "description": "反転増幅・非反転増幅・ボルテージフォロワ・加算・積分・微分回路をリアルタイム可視化。ゲイン・波形クリッピング・位相シフトをインタラクティブに体験できるWebシミュレーター。",
       "url": "https://novasolver.jp/tools/op-amp-circuits.html",
@@ -52,7 +52,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["6種類の回路構成（反転/非反転/フォロワ/加算/積分/微分）","入出力波形リアルタイム描画","電源電圧によるクリッピング表示","ゲイン・帯域幅・位相差の自動計算"],
       "keywords": "オペアンプ,反転増幅,非反転増幅,積分回路,微分回路,アナログ回路,電子回路シミュレーター",
       "datePublished": "2026-04-08",
@@ -259,7 +259,15 @@ canvas#schematic { border-radius: 8px; background: #f0f4f8; display: block; widt
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4816359281?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816359281.09._SCMZZZZZZ_.jpg" alt="電気回路の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電気回路 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -271,6 +279,16 @@ canvas#schematic { border-radius: 8px; background: #f0f4f8; display: block; widt
     </div>
 
     <div id="waveformView">
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-bolt"></i> ライブ動作（入力 → 増幅出力）</div>
+        <div class="stat-cards" style="grid-template-columns:repeat(4,1fr)">
+          <div class="stat-card"><div class="sv" id="heroCfg">反転増幅</div><div class="sl">回路構成</div></div>
+          <div class="stat-card"><div class="sv" id="heroGain">—</div><div class="sl">利得 A<sub>v</sub></div></div>
+          <div class="stat-card"><div class="sv" id="heroVin">—</div><div class="sl">入力振幅 [V]</div></div>
+          <div class="stat-card"><div class="sv" id="heroVout">—</div><div class="sl">出力振幅 [V]</div></div>
+        </div>
+        <canvas id="heroCanvas" height="300" tabindex="0" role="img" aria-label="オペアンプ回路の入力波形と増幅・反転された出力波形をリアルタイム表示。電源電圧でのクリッピングも表示します。"></canvas>
+        <div class="clip-note" id="heroClip" style="margin-top:8px">⚠ クリッピング発生：出力が ±Vcc に張り付いています</div>
+      </div>
       <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards" style="margin-bottom:10px">
         <div class="stat-card">
@@ -678,6 +696,186 @@ function bindVccAuditSync(){
 }
 bindVccAuditSync();
 onCircuitChange();
+
+/* ===== v2 hero: live op-amp input -> amplified/inverted output ===== */
+(function(){
+  "use strict";
+  var L = {
+    cfg: { inverting:'反転増幅', noninverting:'非反転増幅', follower:'フォロワ', summing:'加算増幅', integrator:'積分', differentiator:'微分' },
+    vin:'入力 Vin', vout:'出力 Vout', t:'時間', clip:'クリップ', vshort:'仮想短絡 V₋≈0'
+  };
+  var cv = document.getElementById('heroCanvas');
+  if (!cv) return;
+  var cx2 = cv.getContext('2d');
+  var num = function(id){ var e=document.getElementById(id); return e?parseFloat(e.value):0; };
+  var val = function(id){ var e=document.getElementById(id); return e?e.value:''; };
+  var prefersReduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function gainLinear(c, rf, rin){
+    if (c==='inverting' || c==='summing') return -(rf/rin);
+    if (c==='noninverting') return 1 + rf/rin;
+    return 1; // follower / integrator / differentiator -> show unity reference envelope
+  }
+  function state(){
+    var c = val('circuitType');
+    var rin = num('rinSlider'), rf = num('rfSlider');
+    var amp = num('ampSlider'), vcc = num('vccSlider');
+    var g = gainLinear(c, rf, rin);
+    var voutIdeal = Math.abs(g) * amp;
+    var voutReal = Math.min(voutIdeal, vcc);
+    return { c:c, g:g, amp:amp, vcc:vcc, voutIdeal:voutIdeal, voutReal:voutReal,
+             clip: voutIdeal > vcc + 1e-9 };
+  }
+
+  // output sample for a given input phase (with gain, inversion, integration/derivative, clip)
+  function outAt(st, ph){
+    var s = Math.sin(ph);
+    var y;
+    if (st.c==='integrator') y = -st.amp * (-Math.cos(ph));      // ∫sin = -cos, gain sign neg
+    else if (st.c==='differentiator') y = st.amp * Math.cos(ph); // d/dt sin = cos, -RC*... -> show cos
+    else y = st.g * s;                                            // amplified (and inverted) copy
+    return Math.max(-st.vcc, Math.min(st.vcc, y));
+  }
+
+  function updateStats(st){
+    document.getElementById('heroCfg').textContent = L.cfg[st.c] || st.c;
+    var gtxt;
+    if (st.c==='follower') gtxt = '×1';
+    else if (st.c==='integrator' || st.c==='differentiator') gtxt = (st.c==='integrator'?'∫':'d/dt');
+    else gtxt = (st.g<0?'−':'') + Math.abs(st.g).toFixed(2) + '×';
+    document.getElementById('heroGain').textContent = gtxt;
+    document.getElementById('heroVin').textContent = st.amp.toFixed(2);
+    document.getElementById('heroVout').textContent = st.voutReal.toFixed(2);
+    var cn = document.getElementById('heroClip');
+    if (cn) cn.classList.toggle('visible', st.clip);
+  }
+
+  var W=0, H=0, dpr=1;
+  function resize(){
+    var parent = cv.parentElement;
+    var cssW = Math.max(280, Math.floor((parent ? parent.clientWidth : 600) - 4));
+    W = cssW; H = 300;
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+    cx2.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function draw(phase){
+    var st = state();
+    updateStats(st);
+    resize();
+    cx2.clearRect(0,0,W,H);
+    cx2.fillStyle = '#0a1628'; cx2.fillRect(0,0,W,H);
+
+    var padL=44, padR=16, padT=20, padB=26;
+    var plotW = W-padL-padR, plotH = H-padT-padB;
+    var midY = padT + plotH/2;
+    // vertical scale: rails fit, with a little headroom
+    var scaleMax = Math.max(st.vcc, 1);
+    var sy = (plotH/2) / (scaleMax*1.08);
+    var toY = function(v){ return midY - v*sy; };
+
+    // grid + zero axis
+    cx2.strokeStyle='rgba(255,255,255,0.07)'; cx2.lineWidth=1;
+    for (var gi=-1; gi<=1; gi++){
+      var yy = toY(gi*scaleMax);
+      cx2.beginPath(); cx2.moveTo(padL,yy); cx2.lineTo(W-padR,yy); cx2.stroke();
+    }
+    // supply rails
+    cx2.strokeStyle='rgba(231,76,60,0.55)'; cx2.lineWidth=1.2; cx2.setLineDash([6,4]);
+    cx2.beginPath(); cx2.moveTo(padL,toY(st.vcc)); cx2.lineTo(W-padR,toY(st.vcc)); cx2.stroke();
+    cx2.beginPath(); cx2.moveTo(padL,toY(-st.vcc)); cx2.lineTo(W-padR,toY(-st.vcc)); cx2.stroke();
+    cx2.setLineDash([]);
+    cx2.fillStyle='rgba(231,76,60,0.8)'; cx2.font='10px Roboto Mono'; cx2.textAlign='left';
+    cx2.fillText('+Vcc '+st.vcc.toFixed(0)+'V', padL+2, toY(st.vcc)+12);
+    cx2.fillText('−Vcc', padL+2, toY(-st.vcc)-4);
+    // zero baseline
+    cx2.strokeStyle='rgba(255,255,255,0.25)'; cx2.lineWidth=1;
+    cx2.beginPath(); cx2.moveTo(padL,midY); cx2.lineTo(W-padR,midY); cx2.stroke();
+    cx2.fillStyle='rgba(255,255,255,0.5)'; cx2.fillText('0V', 6, midY+3);
+
+    var cycles = 2;
+    var N = Math.max(120, Math.floor(plotW));
+    // input wave (scrolls left with phase)
+    cx2.strokeStyle='rgba(0,123,255,0.9)'; cx2.lineWidth=2; cx2.beginPath();
+    for (var i=0;i<=N;i++){
+      var fx = i/N;
+      var ph = fx*cycles*2*Math.PI + phase;
+      var v = st.amp*Math.sin(ph);
+      var X = padL + fx*plotW, Y = toY(v);
+      if (i===0) cx2.moveTo(X,Y); else cx2.lineTo(X,Y);
+    }
+    cx2.stroke();
+
+    // output wave — red where clipped
+    var prevClip = null, X0=0, Y0=0;
+    for (var j=0;j<=N;j++){
+      var fx2 = j/N;
+      var ph2 = fx2*cycles*2*Math.PI + phase;
+      var raw, vo;
+      if (st.c==='integrator'){ raw = -st.amp*(-Math.cos(ph2)); }
+      else if (st.c==='differentiator'){ raw = st.amp*Math.cos(ph2); }
+      else { raw = st.g*Math.sin(ph2); }
+      vo = Math.max(-st.vcc, Math.min(st.vcc, raw));
+      var clipped = Math.abs(raw) > st.vcc + 1e-9;
+      var X = padL + fx2*plotW, Y = toY(vo);
+      if (j>0){
+        cx2.strokeStyle = clipped ? 'rgba(231,76,60,0.95)' : 'rgba(0,180,216,0.95)';
+        cx2.lineWidth = 2.4;
+        cx2.beginPath(); cx2.moveTo(X0,Y0); cx2.lineTo(X,Y); cx2.stroke();
+      }
+      X0=X; Y0=Y; prevClip=clipped;
+    }
+
+    // moving probe dots showing instantaneous in/out at left edge sampling point
+    var probePh = phase;
+    var vinNow = st.amp*Math.sin(probePh);
+    var voutNow = outAt(st, probePh);
+    cx2.fillStyle='rgba(0,123,255,1)';
+    cx2.beginPath(); cx2.arc(padL, toY(vinNow), 4, 0, 7); cx2.fill();
+    cx2.fillStyle = (Math.abs(voutNow)>=st.vcc-0.02 && st.clip) ? 'rgba(231,76,60,1)' : 'rgba(0,180,216,1)';
+    cx2.beginPath(); cx2.arc(padL, toY(voutNow), 4, 0, 7); cx2.fill();
+
+    // legend + inversion hint
+    cx2.font='11px Noto Sans JP'; cx2.textAlign='left';
+    cx2.fillStyle='rgba(0,123,255,1)'; cx2.fillText('■ '+L.vin, padL+8, padT+2);
+    cx2.fillStyle='rgba(0,180,216,1)'; cx2.fillText('■ '+L.vout, padL+8, padT+16);
+    if (st.g < 0 && st.c!=='integrator' && st.c!=='differentiator'){
+      cx2.fillStyle='rgba(255,213,74,0.9)'; cx2.textAlign='right';
+      cx2.fillText('位相反転 180°', W-padR-4, padT+2);
+    } else if (st.c==='integrator' || st.c==='differentiator'){
+      cx2.fillStyle='rgba(255,213,74,0.9)'; cx2.textAlign='right';
+      cx2.fillText(st.c==='integrator'?'−90° 位相遅れ':'+90° 位相進み', W-padR-4, padT+2);
+    }
+    cx2.textAlign='left';
+  }
+
+  var phase = 0, last = 0, raf = null;
+  function loop(ts){
+    if (!last) last = ts;
+    var dt = Math.min(0.05, (ts-last)/1000); last = ts;
+    phase -= dt * 2 * Math.PI * 0.55; // scroll
+    draw(phase);
+    raf = requestAnimationFrame(loop);
+  }
+
+  function start(){
+    if (prefersReduce){ draw(0); return; }
+    if (!raf){ last = 0; raf = requestAnimationFrame(loop); }
+  }
+
+  // live refresh of stats/static frame when params change (covers reduced-motion + immediate feedback)
+  ['circuitType','rinSlider','rfSlider','ampSlider','vccSlider','rinNum','rfNum','ampNum','vccNum','waveType']
+    .forEach(function(id){
+      var e = document.getElementById(id);
+      if (e){ e.addEventListener('input', function(){ if (prefersReduce) draw(phase); }); e.addEventListener('change', function(){ if (prefersReduce) draw(phase); }); }
+    });
+
+  draw(0);
+  start();
+  window.addEventListener('resize', function(){ if (prefersReduce) draw(phase); });
+})();
 </script>
 
 <section class="explanation">
@@ -727,7 +925,7 @@ onCircuitChange();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">積分回路で出力が徐々にドリフト（変動）するのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">理想積分器では入力オフセット電圧やバイアス電流がコンデンサに蓄積され、出力が電源電圧まで飽和するためです。シミュレーターでは抵抗を並列追加した実用的な積分回路も試せます。</div>
+    <div class="faq-a">理想積分器では入力オフセット電圧やバイアス電流がコンデンサに蓄積され、出力が電源電圧まで飽和するためです。実回路では帰還コンデンサに抵抗を並列接続して直流利得を抑えるのが一般的です。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">ゲイン（利得）を大きくすると出力が歪むのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -744,13 +942,16 @@ onCircuitChange();
 </div>
 <h2>よくある誤解と注意点</h2>
 <div class="fblock">
-<p>シミュレーターを使い始めると、理想オペアンプのモデルに慣れすぎてしまうことが最初の落とし穴だ。例えば、<strong>「利得は周波数に関係ない」と思い込んでしまう</strong>点。確かに基本式 $A_v = -R_f/R_{in}$ には周波数項はない。しかし、実際のオペアンプには「ゲイン帯域幅積(GBW)」という絶対的な制限がある。例えばGBWが1MHzのオペアンプで、100倍の利得を設定すると、理論上は10kHz以上では正しく増幅できなくなる。NovaSolverで「オペアンプ周波数特性」のモデルに切り替えて、高周波数でゲインが落ちていく様子を確認してみよう。</p>
+<p>シミュレーターを使い始めると、理想オペアンプのモデルに慣れすぎてしまうことが最初の落とし穴だ。例えば、<strong>「利得は周波数に関係ない」と思い込んでしまう</strong>点。確かに基本式 $A_v = -R_f/R_{in}$ には周波数項はない。しかし、実際のオペアンプには「ゲイン帯域幅積(GBW)」という絶対的な制限がある。例えばGBWが1MHzのオペアンプで、100倍の利得を設定すると、理論上は10kHz以上では正しく増幅できなくなる。GBW=1MHzのオペアンプなら100倍のゲインで帯域は約10kHzに制限される、という関係を頭に置いておこう。</p>
 <p>次に、<strong>入力インピーダンスを軽視した設計</strong>。反転増幅回路の入力インピーダンスはほぼ $R_{in}$ そのものだ。例えば $R_{in}=1k\Omega$ とすると、前段のセンサーや信号源から見ると1kΩの重たい負荷になる。これでは信号源の電圧が引きずられて（負荷効果）、測定誤差の原因になる。非反転増幅回路は入力インピーダンスが極めて高いので、こうした場面では有利だ。</p>
 <p>最後に、<strong>「仮想短絡」は万能ではない</strong>という点。これはあくまで「負帰還が正常にかかっている状態」での話。オペアンプの出力が飽和（クリッピング）している時や、帰還ループが開いている時（コンパレータ動作など）は、仮想短絡は成り立たない。シミュレーターで意図的に利得を極端に大きくして飽和させると、-端子の電圧が0Vからずれるのを観測できる。これは「仮想」が崩れた状態だ。</p>
 
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="op-amp-circuits.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -805,14 +1006,14 @@ onCircuitChange();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>入力抵抗Rin（1kΩ～100kΩ）とフィードバック抵抗Rf（10kΩ～1MΩ）をスライダーで設定し、反転増幅回路のゲイン（-Rf/Rin）をリアルタイム計算</li>
+<li>入力抵抗Rin（1kΩ～100kΩ）とフィードバック抵抗Rf（1kΩ～200kΩ）をスライダーで設定し、反転増幅回路のゲイン（-Rf/Rin）をリアルタイム計算</li>
 <li>積分・微分回路の場合、キャパシタ値Cを変更してカットオフ周波数fc=1/(2πRC)の変化を観察し、位相遅れ・進みを波形で確認</li>
 <li>入力信号V1（直流0V～5V、AC 100mV～2Vpp）を調整してオペアンプ出力の飽和、歪み、スルーレートの影響を視覚化</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>LM358オペアンプの反転増幅回路：Rin=10kΩ、Rf=100kΩ、V1=0.5V入力時、ゲイン=-10、出力=-5Vとなります。積分回路でRin=100kΩ、C=100nFの場合、時定数τ=10msで、1kHz信号の位相遅れは約84°です。Supply railsは±15V設定で、出力飽和電圧は±13.5Vに制限されます。</p>
+<p>LM358オペアンプの反転増幅回路：Rin=10kΩ、Rf=100kΩ、V1=0.5V入力時、ゲイン=-10、出力=-5Vとなります。積分回路でRin=100kΩ、C=100nFの場合、時定数τ=10msで、本ツールの理想積分モデルでは1kHz正弦波の位相遅れは−90°です。Supply railsを±15Vに設定すると、本ツールは出力を±15Vでクリップします。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -822,6 +1023,16 @@ onCircuitChange();
 <li>キャパシタ選定：積分回路で電解コンデンサを使用する場合、リーク電流とESRが時定数を劣化させるため、フィルムコンデンサ推奨</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4816359281?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816359281.09._SCMZZZZZZ_.jpg" alt="電気回路の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電気回路 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

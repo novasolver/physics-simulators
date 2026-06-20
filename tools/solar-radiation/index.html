@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "太陽放射・日射量計算ツール",
       "description": "緯度・日付・傾斜角・方位角を入力して太陽高度・日射量をリアルタイム計算。水平面と傾斜面の日射量比較グラフを表示。",
       "url": "https://novasolver.jp/tools/solar-radiation.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["太陽高度・天頂角のリアルタイム計算","傾斜面日射量計算（Hottelモデル）","日射量の日変化グラフ・年変化グラフ表示"],
       "keywords": "太陽放射,日射量,太陽高度,傾斜面,ソーラーパネル,日射計算,建築日射解析",
       "datePublished": "2026-04-09",
@@ -202,7 +202,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
 <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -231,8 +239,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="chart-tab active" id="tab1" onclick="switchTab(1)">太陽高度（日内変化）</button>
       <button class="chart-tab" id="tab2" onclick="switchTab(2)">日射量（年変化）</button>
     </div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 日射量 A</div><canvas id="chartA"></canvas></div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 日射量 B</div><canvas class="ux-chartjs-canvas" id="chartB"></canvas></div>
+    <div class="chart-card" id="chartCardA"><div class="chart-title"><i class="fas fa-chart-line"></i> 日射量 A</div><canvas id="chartA"></canvas></div>
+    <div class="chart-card" id="chartCardB"><div class="chart-title"><i class="fas fa-chart-line"></i> 日射量 B</div><canvas class="ux-chartjs-canvas" id="chartB"></canvas></div>
   
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
@@ -279,7 +287,7 @@ function getParams(){
   const cosZ=Math.sin(DEG*alpha);
   const cosT=cosIncidence(p.phi,delta,omega,p.beta,p.gamma);
   const Ib=beamIrradiance(I0,alpha);
-  const IbT=(cosZ>0.01&&cosT>0)?Ib*cosT/cosZ:0;
+  const IbT=(cosZ>0.01&&cosT>0)?Ib*cosT:0;
 
   // daily total via numerical integration (step=0.25h)
   let daily=0;
@@ -289,7 +297,7 @@ function getParams(){
     const cT2=cosIncidence(p.phi,delta,om2,p.beta,p.gamma);
     const cZ2=Math.sin(DEG*al2);
     const Ib2=beamIrradiance(I0,al2);
-    const IbT2=(cZ2>0.01&&cT2>0)?Ib2*cT2/cZ2:0;
+    const IbT2=(cZ2>0.01&&cT2>0)?Ib2*cT2:0;
     daily+=IbT2*0.25/1000;
   }return{alpha,I0,IbT,daily};
 }function updateSliders(){
@@ -342,9 +350,9 @@ function getParams(){
       const al=solarAltitude(p.phi,del,om);
       const cZ=Math.sin(DEG*al);
       const Ib=beamIrradiance(I0,al);
-      dH+=Ib>0?Ib*0.25/1000:0;
+      dH+=Ib>0?Ib*cZ*0.25/1000:0;
       const cT=cosIncidence(p.phi,del,om,p.beta,p.gamma);
-      const IbT2=(cZ>0.01&&cT>0)?Ib*cT/cZ:0;
+      const IbT2=(cZ>0.01&&cT>0)?Ib*cT:0;
       dT+=IbT2*0.25/1000;
     }
     dataHoriz.push(dH);
@@ -361,11 +369,14 @@ function getParams(){
     },
     options:{responsive:true,animation:false,maintainAspectRatio:false,resizeDelay:100,plugins:{legend:{labels:{color:'#1a1a2e',font:{size:12}}}},scales:{x:{ title:{display:true,text:'年日数 N',color:'#6c757d'},ticks:{color:'#6c757d',maxTicksLimit:13},grid:{color:'rgba(0,0,0,.05)'}},y:{title:{display:true,text:'日積算日射量 (kWh/m²)',color:'#6c757d'},ticks:{color:'#6c757d'},grid:{color:'rgba(0,0,0,.05)'}}}}
   });
+}function setChartVisibility(n){
+  const cards=[document.getElementById('chartCardA'),document.getElementById('chartCardB')];
+  cards.forEach((el,i)=>{if(el)el.style.display=(i+1===n)?'':'none';});
 }function switchTab(n){
   activeTab=n;
   document.getElementById('tab1').classList.toggle('active',n===1);
   document.getElementById('tab2').classList.toggle('active',n===2);
-  document.querySelectorAll('.canvas-wrap').forEach((el,i)=>{el.style.display=(i+1===n)?'':'none';});
+  setChartVisibility(n);
   if(n===1)buildChartA();
   else buildChartB();
 }function update(){
@@ -373,6 +384,7 @@ function getParams(){
   updateStats();
   buildChartA();
   buildChartB();
+  setChartVisibility(activeTab);
 }['sLat','sDay','sTilt','sAz','sHour'].forEach(id=>{
   document.getElementById(id).addEventListener('input',update);
 });
@@ -410,7 +422,7 @@ update();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">計算結果の日射量は、実際の天候（曇りや雨）を考慮していますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">いいえ、このツールは晴天時（大気透過率が標準的な状態）の理論日射量を計算します。実際の発電量や室内日射取得を求める際は、別途地域の日照率や気象データを乗算して補正してください。</div>
+    <div class="faq-a">いいえ、このツールは大気透過率0.9の晴天理論値を計算します。雲量や地域別の日照率を入力する欄はないため、実務では実測データや別の発電量モデルと照合してください。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">太陽高度がマイナスになるのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -431,11 +443,14 @@ update();
 </div>
 <h2>よくある誤解と注意点</h2>
 <div class="fblock">
-<p>まず、<strong>「方位角0°=真南」は磁北ではなく真北基準</strong>という点を見落としがちだ。コンパスで測る磁北とは数度ずれる（偏角）ので、精密な設計では補正が必要。例えば東京では西偏約7°だから、真南を向かせるにはコンパスで約187°を向ける計算になる。次に、<strong>「日射量」は理論上の晴天値</strong>であることを理解しよう。ツールは大気減衰（大気外放射量×大気透過率）をモデル化しているが、実際の雲や気象、大気汚染の影響は含まない。実務では、この計算結果に気象統計データから求めた「日照率」や「曇天補正係数」を乗じて実発電量を見積もる。最後に、<strong>傾斜角の最適値は「目的」で変わる</strong>。年間発電量最大化なら緯度に近い角度（東京なら30-35°）が目安だが、冬期の熱取得や雪滑りを重視する北国では60°以上にすることも。逆に、夏季の冷房負荷低減が主目的なら、水平に近い10°以下で設定し、日射取得を抑えるケースもある。</p>
+<p>まず、<strong>「方位角0°=真南」は磁北ではなく真北基準</strong>という点を見落としがちだ。コンパスで測る磁北とは数度ずれる（偏角）ので、精密な設計では補正が必要。例えば東京では西偏約7°だから、真南を向かせるにはコンパスで約187°を向ける計算になる。次に、<strong>「日射量」は理論上の晴天値</strong>であることを理解しよう。ツールは大気減衰（大気外放射量×大気透過率0.9）をモデル化しているが、実際の雲や気象、大気汚染の影響は含まない。実務では、晴天理論値として扱い、実測データや別の発電量モデルと照合する。最後に、<strong>傾斜角の最適値は「目的」で変わる</strong>。年間発電量最大化なら緯度に近い角度（東京なら30-35°）が目安だが、冬期の熱取得や雪滑りを重視する北国では60°以上にすることも。逆に、夏季の冷房負荷低減が主目的なら、水平に近い10°以下で設定し、日射取得を抑えるケースもある。</p>
 
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="solar-radiation.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -493,17 +508,27 @@ update();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>東京（北緯35.7°）で冬至12月21日を計算する場合：正午の太陽高度は31.6°、大気外日射量I₀は1,360W/m²です。傾斜角35°・南向きパネルの直達日射量I_bTは約950W/m²に達し、水平面の760W/m²から25%増加します。一方、夏至6月21日の同地点では太陽高度78.3°で、傾斜角35°パネルのI_bTは約1,020W/m²となり、日積算日射量は約7.2kWh/m²に達します。</p>
+<p>東京（北緯35.7°）で冬至（N=355）を計算すると、正午の太陽高度は30.9°、大気外日射量I₀は1,411W/m²です。傾斜角35°・南向きパネルの直達日射量I_bTは約1,049W/m²になります。夏至（N=172）の同条件では正午のI_bTは約1,095W/m²、日積算日射量は約8.15kWh/m²です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>大気透過率は晴天0.75、薄曇0.6を目安に手動調整（PM2.5や産業排気の影響を考慮）</li>
+<li>大気透過率はツール内部で0.9に固定されており、雲量やPM2.5の補正入力はありません。実務では実測データと照合してください</li>
 <li>南半球での計算時は緯度を負数入力し、方位角を180°反転（例：オーストラリアシドニー南緯33.9°）</li>
 <li>屋上設置時の影の影響：周辺建物の高さから遮蔽開始時刻を逆算し、実効日射量を補正</li>
 <li>反射面の効果：白い外壁があれば地面反射率を0.2から0.4に修正、日射量は3～8%増加</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

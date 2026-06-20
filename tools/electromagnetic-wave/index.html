@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "電磁波シミュレーター",
       "description": "平面電磁波のE場・B場をアニメーション可視化。周波数・媒質・偏光モードを変えてスペクトル帯域・波長・位相速度・インピーダンスをリアルタイム計算。",
       "url": "https://novasolver.jp/tools/electromagnetic-wave.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["E場・B場の3Dパースペクティブアニメーション","周波数スペクトル帯域（電波〜X線）リアルタイム表示","直線・円・楕円偏光モード切替"],
       "keywords": "電磁波,E場,B場,ポインティングベクトル,平面波,偏光,電磁スペクトル,インピーダンス",
       "datePublished": "2026-04-08",
@@ -133,6 +133,27 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 live readouts / controls ===== */
+.btn{ display:inline-flex; align-items:center; gap:6px; background:var(--accent); color:#fff; border:none; padding:9px 16px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-family:inherit; font-weight:600; transition:background .2s; }
+.btn:hover{ background:#0056b3; }
+.btn.secondary{ background:var(--bg); color:var(--text); border:1px solid var(--border); }
+.btn.secondary:hover{ background:var(--border); }
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.speed-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,123,255,.07)}
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:6px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:8px 6px;text-align:center;min-width:0}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:0.95rem;font-weight:700;color:#fff;line-height:1.1;overflow-wrap:anywhere}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas#emCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{transition:none}
+}
+/* end v2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/electromagnetic-wave.html">
@@ -162,11 +183,21 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 <div class="main">
   <div class="panel">
-    <div class="panel-title">周波数 / 媒質</div>
+    <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">スペクトル・プリセット</div>
+      <div class="btn-group" id="presetRow">
+        <button class="preset-btn" type="button" onclick="setPreset('radio')">電波 (FM)</button>
+        <button class="preset-btn" type="button" onclick="setPreset('micro')">マイクロ波</button>
+        <button class="preset-btn" type="button" onclick="setPreset('visible')">可視光</button>
+        <button class="preset-btn" type="button" onclick="setPreset('xray')">X線</button>
+      </div>
+    </div>
 
     <div class="param-group">
-      <div class="param-label"><span class="param-name">周波数 (対数スケール)</span><div class="num-wrap"><input type="number" class="num-input" id="sFreqNum" value="8" min="6" max="18" step="0.05" oninput="syncFromNum('sFreq','sFreqNum')"></div></div>
-      <input type="range" id="sFreq" min="6" max="18" step="0.05" value="8" oninput="syncToNum('sFreq','sFreqNum');update()">
+      <div class="param-label"><label class="param-name" for="sFreq">周波数 f (対数スケール)</label><div class="num-wrap"><input type="number" class="num-input" id="sFreqNum" value="8" min="6" max="18" step="0.05" oninput="syncFromNum('sFreq','sFreqNum');onParam()" aria-label="周波数の指数 (log10 Hz)"></div></div>
+      <input type="range" id="sFreq" min="6" max="18" step="0.05" value="8" oninput="syncToNum('sFreq','sFreqNum');onParam()" aria-label="周波数 対数スケール">
     </div>
 
     <div id="bandIndicator" class="band-indicator">マイクロ波</div>
@@ -189,17 +220,59 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="param-group" style="margin-top:10px">
-      <div class="field-header"><span class="param-name">振幅 E₀</span><div class="num-wrap"><input type="number" class="num-input" id="nAmp" value="1.0" min="0.1" max="5" step="0.1" oninput="syncFromNum('sAmp','nAmp')"><span class="num-unit">V/m</span></div></div>
-      <input type="range" id="sAmp" min="0.1" max="5" step="0.1" value="1.0" oninput="syncToNum('sAmp','sAmpNum');syncToNum('sAmp','nAmp');update()">
-<input type="number" class="num-input" id="sAmpNum" value="1.0" min="0.1" max="5" step="0.1" style="width:70px;margin-left:6px;" oninput="syncFromNum('sAmp','sAmpNum')">
+      <div class="field-header param-label"><label class="param-name" for="sAmp">振幅 E₀</label><div class="num-wrap"><input type="number" class="num-input" id="nAmp" value="1.0" min="0.1" max="5" step="0.1" oninput="syncFromNum('sAmp','nAmp');onParam()" aria-label="電場振幅 E0"><span class="num-unit">V/m</span></div></div>
+      <input type="range" id="sAmp" min="0.1" max="5" step="0.1" value="1.0" oninput="syncToNum('sAmp','sAmpNum');syncToNum('sAmp','nAmp');onParam()" aria-label="電場振幅 E0">
+<input type="number" class="num-input" id="sAmpNum" value="1.0" min="0.1" max="5" step="0.1" style="width:70px;margin-left:6px;" oninput="syncFromNum('sAmp','sAmpNum');onParam()" aria-label="電場振幅 E0 数値">
+    </div>
+
+    <div class="divider"></div>
+    <div class="play-row">
+      <button class="btn" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+      <button class="btn secondary" type="button" onclick="resetSim()"><i class="fas fa-redo"></i> リセット</button>
+      <div style="display:flex;gap:4px;margin-left:auto">
+        <button class="preset-btn speed-btn" type="button" data-speed="0.25" onclick="setSpeed(0.25)">0.25×</button>
+        <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+        <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+      </div>
     </div>
 
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（位相が進むほど波が伝播）</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roLambda">3.00 m</div><div class="rl">波長 λ</div></div>
+        <div class="live-ro"><div class="rv" id="roF">100 MHz</div><div class="rl">周波数 f</div></div>
+        <div class="live-ro"><div class="rv" id="roT">10.0 ns</div><div class="rl">周期 T</div></div>
+        <div class="live-ro"><div class="rv" id="roOmega">6.3e8</div><div class="rl">角周波数 ω [rad/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roK">2.09</div><div class="rl">波数 k [rad/m]</div></div>
+        <div class="live-ro"><div class="rv" id="roE0">1.00</div><div class="rl">E₀ [V/m]</div></div>
+        <div class="live-ro"><div class="rv" id="roB0">3.34 nT</div><div class="rl">B₀=E₀/c</div></div>
+        <div class="live-ro"><div class="rv" id="roC">c=λf</div><div class="rl">速度チェック</div></div>
+        <div class="live-ro accent"><div class="rv" id="roS">1.3e-3</div><div class="rl">強度 ⟨S⟩ [W/m²]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> E場・B場の3Dリアルタイム伝播</div>
+      <canvas id="emCanvas" height="300" tabindex="0" role="img" aria-label="平面電磁波のアニメーション。赤いE場（垂直面）と青いB場（水平面）が同位相で互いに直交して伝播します。"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#ff5252"></i>E場（y方向・垂直）</span>
+        <span><i class="swatch" style="background:#42a5f5"></i>B場（z方向・水平）</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>S=E×B/μ₀（伝播 k）</span>
+      </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="statLambda">3.00 m</div><div class="sl">波長 λ</div></div>
@@ -209,7 +282,6 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> E場・B場の3D可視化</div><canvas id="emCanvas" height="240"></canvas></div>
     <div class="spectrum-bar" id="spectrumBar">
       <div style="background:#ff0000;opacity:.7" title="電波"></div>
       <div style="background:#ff6600;opacity:.7" title="マイクロ波"></div>
@@ -225,241 +297,388 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div id="spectrumMarker" style="width:100%;position:relative;height:6px;margin-bottom:14px">
       <div id="sMarker" style="position:absolute;top:0;width:3px;height:6px;background:white;border-radius:2px;transform:translateX(-50%)"></div>
     </div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 波形</div><canvas class="ux-chartjs-canvas" id="waveChart"></canvas></div>
-  
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 波形（E と B×c は同位相 → 同じ x で最大）</div><canvas class="ux-chartjs-canvas" id="waveChart"></canvas></div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      $$c = \frac{1}{\sqrt{\mu_0 \varepsilon_0}}, \quad v = \frac{c}{\sqrt{\varepsilon_r \mu_r}}$$
-      $$Z = \sqrt{\frac{\mu}{\varepsilon}}, \quad \mathbf{S}= \frac{\mathbf{E}\times \mathbf{B}}{\mu_0}$$
-    
+      $$E = E_0\sin(kx-\omega t),\quad B = B_0\sin(kx-\omega t),\quad B_0 = \frac{E_0}{c}$$
+      $$c = \frac{1}{\sqrt{\mu_0 \varepsilon_0}} = \lambda f, \quad v = \frac{c}{\sqrt{\varepsilon_r \mu_r}}$$
+      $$Z = \sqrt{\frac{\mu}{\varepsilon}}, \quad \mathbf{S}= \frac{\mathbf{E}\times \mathbf{B}}{\mu_0},\quad \langle S\rangle = \frac{E_0^2}{2\mu_0 c}$$
+      <p style="margin-top:8px;font-size:.8rem;color:var(--muted)">検証例：λ=500 nm → f = c/λ ≈ 6.0×10¹⁴ Hz。E₀=1 V/m → B₀=E₀/c ≈ 3.34 nT。E と B は同じ x で同時に最大（同位相）。</p>
+
 </div>
 </div>
 </div>
 
 <script>
-
+"use strict";
+/* ===== Electromagnetic plane wave — v2 ===== */
+const L = {
+  bRadio:'電波', bMicro:'マイクロ波', bIR:'赤外線', bVis:'可視光', bUV:'紫外線', bX:'X線/γ線',
+  eField:'E（電場）', bField:'B（磁束密度）', kDir:'→ 伝播方向 k', inPhase:'同位相：同じ x で最大',
+  eLabel:'E(x,t) [V/m]', bLabel:'B(x,t)×c [V/m 換算]', xAxis:'位置 x（波長単位 λ）',
+  speedOk:'c=λf ✓'
+};
 const canvas = document.getElementById('emCanvas');
 const ctx = canvas.getContext('2d');
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let chart;
-let animId;
-let phase = 0;
-let medium = { name:'vacuum', er:1, mr:1 };
+let animId = null;
+let playing = !reduceMotion;
+let speedMult = 1;
+let phase = 0;              // accumulated ωt-equivalent phase for the on-screen window
+let lastTs = 0;
+let medium = { name:'vacuum', er:1, mr:1, sigma:0 };
 let polMode = 'linear';
-const C0 = 3e8;
+const C0 = 2.998e8;
 const mu0 = 4*Math.PI*1e-7;
 const eps0 = 8.854e-12;
+const CYCLES = 3;          // wave cycles drawn across the canvas window
 
-const mediums ={
-  vacuum:  { name:'真空',  er:1,    mr:1,   sigma:0 },
-  glass:{ name:'ガラス',er:4.5,  mr:1,   sigma:0 },
-  water:{ name:'水',    er:80,   mr:1,   sigma:0.01 },
-  tissue:{ name:'生体',  er:55,   mr:1,   sigma:0.5 }
+const mediums = {
+  vacuum: { name:'真空',  er:1,    mr:1, sigma:0 },
+  glass:  { name:'ガラス', er:4.5,  mr:1, sigma:0 },
+  water:  { name:'水',    er:80,   mr:1, sigma:0.01 },
+  tissue: { name:'生体組織', er:55, mr:1, sigma:0.5 }
 };
 
-const bands = [{min:6,max:8,   name:'電波',     color:'#4fc3f7'},{min:8,max:11,  name:'マイクロ波',color:'#81c784'},{min:11,max:12.5,name:'赤外線',  color:'#ffb74d'},{min:12.5,max:14.5,name:'可視光',color:'#ce93d8'},{min:14.5,max:16,name:'紫外線',  color:'#9575cd'},{min:16,max:18, name:'X線/γ線',  color:'#ef9a9a'}];
+const bands = [
+  {min:6,max:8,     name:L.bRadio, color:'#4fc3f7'},
+  {min:8,max:11,    name:L.bMicro, color:'#81c784'},
+  {min:11,max:12.5, name:L.bIR,    color:'#ffb74d'},
+  {min:12.5,max:14.5,name:L.bVis,  color:'#ce93d8'},
+  {min:14.5,max:16, name:L.bUV,    color:'#9575cd'},
+  {min:16,max:18,   name:L.bX,     color:'#ef9a9a'}
+];
+
+const presets = {
+  radio:   { logf: 7.95 },  // ~88 MHz FM
+  micro:   { logf: 9.39 },  // 2.45 GHz
+  visible: { logf: Math.log10(C0/500e-9) }, // 500 nm -> ~6.0e14 Hz
+  xray:    { logf: 17.5 }
+};
+
+function $(id){ return document.getElementById(id); }
 
 function getBand(logf){
   for (const b of bands) if (logf >= b.min && logf < b.max) return b;
   return bands[bands.length-1];
-}function setMedium(m, btn){
+}
+function setMedium(m, btn){
   medium = mediums[m];
   document.querySelectorAll('#mVacuum,#mGlass,#mWater,#mTissue').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  update();
-}function setPol(p, btn){
+  if (btn) btn.classList.add('active');
+  onParam();
+}
+function setPol(p, btn){
   polMode = p;
   document.querySelectorAll('#polLinear,#polCircular,#polElliptical').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  update();
-}function formatFreq(f){
+  if (btn) btn.classList.add('active');
+  onParam();
+}
+function setPreset(name){
+  const P = presets[name];
+  if (!P) return;
+  $('sFreq').value = P.logf.toFixed(2);
+  if (typeof syncToNum === 'function') syncToNum('sFreq','sFreqNum'); else $('sFreqNum').value = P.logf.toFixed(2);
+  onParam();
+}
+
+function formatFreq(f){
+  if (f >= 1e15) return (f/1e15).toFixed(2) + ' PHz';
   if (f >= 1e12) return (f/1e12).toFixed(2) + ' THz';
   if (f >= 1e9)  return (f/1e9).toFixed(2) + ' GHz';
   if (f >= 1e6)  return (f/1e6).toFixed(2) + ' MHz';
+  if (f >= 1e3)  return (f/1e3).toFixed(2) + ' kHz';
   return f.toFixed(0) + ' Hz';
-}function formatWavelength(lam){
-  if (lam >= 1)      return lam.toFixed(3) + ' m';
-  if (lam >= 1e-3)   return (lam*1e3).toFixed(3) + ' mm';
-  if (lam >= 1e-6)   return (lam*1e6).toFixed(3) + ' µm';
-  if (lam >= 1e-9)   return (lam*1e9).toFixed(3) + ' nm';
+}
+function formatWavelength(lam){
+  if (lam >= 1)    return lam.toFixed(3) + ' m';
+  if (lam >= 1e-3) return (lam*1e3).toFixed(3) + ' mm';
+  if (lam >= 1e-6) return (lam*1e6).toFixed(3) + ' µm';
+  if (lam >= 1e-9) return (lam*1e9).toFixed(3) + ' nm';
   return (lam*1e12).toFixed(3) + ' pm';
-}function update(){
-  updateSlider('sFreq'); updateSlider('sAmp');
-  const logf = parseFloat(document.getElementById('sFreq').value);
-  const freq = Math.pow(10, logf);
-  const amp  = parseFloat(document.getElementById('sAmp').value);
-  const er = medium.er, mr = medium.mr, sigma = medium.sigma;
+}
+function formatTime(T){
+  if (T >= 1)    return T.toFixed(2) + ' s';
+  if (T >= 1e-3) return (T*1e3).toFixed(2) + ' ms';
+  if (T >= 1e-6) return (T*1e6).toFixed(2) + ' µs';
+  if (T >= 1e-9) return (T*1e9).toFixed(2) + ' ns';
+  if (T >= 1e-12)return (T*1e12).toFixed(2) + ' ps';
+  return T.toExponential(2) + ' s';
+}
+function formatB(b){
+  if (b >= 1)    return b.toFixed(2) + ' T';
+  if (b >= 1e-3) return (b*1e3).toFixed(2) + ' mT';
+  if (b >= 1e-6) return (b*1e6).toFixed(2) + ' µT';
+  if (b >= 1e-9) return (b*1e9).toFixed(2) + ' nT';
+  return (b*1e12).toFixed(2) + ' pT';
+}
 
-  const band = getBand(logf);
-  const bi = document.getElementById('bandIndicator');
+/* ===== state from controls ===== */
+function getState(){
+  if (typeof updateSlider === 'function'){ updateSlider('sFreq'); updateSlider('sAmp'); }
+  const logf = parseFloat($('sFreq').value);
+  const freq = Math.pow(10, logf);
+  const amp  = parseFloat($('sAmp').value);
+  const er = medium.er, mr = medium.mr, sigma = medium.sigma;
+  const v = C0 / Math.sqrt(er * mr);
+  const lambda = v / freq;
+  const omega = 2*Math.PI*freq;
+  const k = 2*Math.PI/lambda;
+  const T = 1/freq;
+  const B0 = amp / v;                          // B0 = E0 / v (=E0/c in vacuum)
+  const Z = Math.sqrt((mr*mu0)/(er*eps0));
+  const Savg = amp*amp / (2*Z);                // <S> = E0^2 / (2Z)
+  const skinDepth = sigma > 0 ? Math.sqrt(2/(omega*mu0*mr*sigma)) : Infinity;
+  return { logf, freq, amp, er, mr, sigma, v, lambda, omega, k, T, B0, Z, Savg, skinDepth };
+}
+
+/* ===== update DOM (non-canvas) ===== */
+function update(){
+  const s = getState();
+  const band = getBand(s.logf);
+  const bi = $('bandIndicator');
   bi.textContent = band.name;
   bi.style.background = band.color + '33';
   bi.style.color = band.color;
   bi.style.border = '1px solid ' + band.color + '88';
 
-  // Spectrum marker
-  const pct = (logf - 6) / (18 - 6) * 100;
-  document.getElementById('sMarker').style.left = pct + '%';
+  const pct = (s.logf - 6) / (18 - 6) * 100;
+  $('sMarker').style.left = pct + '%';
 
-  const v = C0 / Math.sqrt(er * mr);
-  const lambda = v / freq;
-  const Z = Math.sqrt((mr * mu0) / (er * eps0));
-  // Skin depth
-  const skinDepth = sigma > 0 ? Math.sqrt(2 / (2*Math.PI*freq * mu0 * mr * sigma)) : Infinity;
+  $('statLambda').textContent = formatWavelength(s.lambda);
+  $('statV').textContent = s.v >= C0*0.999 ? 'c' : 'c/' + Math.sqrt(s.er*s.mr).toFixed(2);
+  $('statZ').textContent = s.Z.toFixed(1) + ' Ω';
+  $('statSkin').textContent = isFinite(s.skinDepth) ? formatWavelength(s.skinDepth) : '∞';
 
-  document.getElementById('statLambda').textContent = formatWavelength(lambda);
-  document.getElementById('statV').textContent = v >= C0*0.999 ? 'c' : 'c/' + Math.sqrt(er*mr).toFixed(2);
-  document.getElementById('statZ').textContent = Z.toFixed(1) + ' Ω';
-  document.getElementById('statSkin').textContent = isFinite(skinDepth) ? formatWavelength(skinDepth) : '∞';
+  // live readouts
+  $('roLambda').textContent = formatWavelength(s.lambda);
+  $('roF').textContent = formatFreq(s.freq);
+  $('roT').textContent = formatTime(s.T);
+  $('roOmega').textContent = s.omega.toExponential(2);
+  $('roK').textContent = s.k.toExponential(2);
+  $('roE0').textContent = s.amp.toFixed(2);
+  $('roB0').textContent = formatB(s.B0);
+  // c=λf consistency check (display λf vs v)
+  $('roC').textContent = (s.lambda*s.freq >= s.v*0.999 && s.lambda*s.freq <= s.v*1.001) ? L.speedOk : (s.lambda*s.freq).toExponential(2);
+  $('roS').textContent = s.Savg.toExponential(2);
 
-  drawWave(freq, amp, lambda, polMode);
-  updateChart(freq, amp, lambda, v);
-}function drawWave(freq, amp, lambda, pol){
-  const W = canvas.offsetWidth, H = 240;
-  var __novaW = W;
-  var __novaH = H;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  const c = ctx;
+  updateChart(s);
+}
+
+/* ===== field sampling: E along y, B along z, in phase ===== */
+function fieldAt(xn, ph, pol){
+  // returns {ey, ez, by, bz} normalized amplitudes (B scaled to E for display)
+  const arg = xn * CYCLES * 2*Math.PI - ph;
+  let ey, ez, by, bz;
+  if (pol === 'linear'){
+    ey = Math.sin(arg); ez = 0;
+    by = 0;            bz = Math.sin(arg);   // B ⟂ E, in phase
+  } else if (pol === 'circular'){
+    ey = Math.sin(arg); ez = Math.cos(arg);
+    bz = Math.sin(arg); by = -Math.cos(arg); // B rotated 90° from E
+  } else { // elliptical
+    ey = Math.sin(arg); ez = 0.45*Math.cos(arg);
+    bz = Math.sin(arg); by = -0.45*Math.cos(arg);
+  }
+  return { ey, ez, by, bz };
+}
+
+/* ===== HiDPI canvas ===== */
+let cssW = 0, cssH = 0;
+function resizeCanvas(){
+  cssW = Math.max(280, Math.floor(canvas.offsetWidth || canvas.parentElement.clientWidth || 600));
+  cssH = 300;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function arrowHead(c, x, y, dx, dy, size){
+  const ang = Math.atan2(dy, dx);
+  c.beginPath();
+  c.moveTo(x, y);
+  c.lineTo(x - size*Math.cos(ang-0.5), y - size*Math.sin(ang-0.5));
+  c.lineTo(x - size*Math.cos(ang+0.5), y - size*Math.sin(ang+0.5));
+  c.closePath(); c.fill();
+}
+
+function drawWave(){
+  resizeCanvas();
+  const W = cssW, H = cssH, c = ctx;
   c.clearRect(0,0,W,H);
-  c.fillStyle = '#020d1a';
-  c.fillRect(0,0,W,H);
+  c.fillStyle = '#020d1a'; c.fillRect(0,0,W,H);
 
-  const cx = W/2, cy = H/2;
-  const scaleX = W * 0.9;
-  const N = 120;
-  const skewY = 0.35; // perspective
+  const x0 = W*0.06, x1 = W*0.96, span = x1 - x0;
+  const cy = H*0.52;
+  const ampPx = H*0.30;
+  const skewY = 0.42;       // pseudo-3D perspective tilt for z-components
+  const N = 160;
+  const pol = polMode;
 
-  // Draw propagation axis (x-axis)
-  c.strokeStyle = 'rgba(255,255,255,0.2)';
-  c.lineWidth = 1;
-  c.beginPath(); c.moveTo(W*0.05, cy); c.lineTo(W*0.95, cy); c.stroke();
+  // propagation axis (k)
+  c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(x0, cy); c.lineTo(x1, cy); c.stroke();
 
-  // Draw E field (red, vertical)
-  c.strokeStyle = '#ff4444';
-  c.lineWidth = 2;
-  c.beginPath();
-  for (let i = 0; i <= N; i++) {
-    const xn = i/N;
-    const x = W*0.05 + xn * scaleX;
-    const phase_local = xn * 4 * Math.PI - phase;
-    let ey, ez;
-    if (pol === 'linear') {
-      ey = amp * Math.sin(phase_local);
-      ez = 0;
-    }else if (pol === 'circular'){
-      ey = amp * Math.sin(phase_local);
-      ez = amp * Math.cos(phase_local);
-    }else{
-      ey = amp * Math.sin(phase_local);
-      ez = amp * 0.5 * Math.cos(phase_local);
-    }
-    const screenY = cy - ey * 55 - ez * 55 * skewY;
-    if (i===0) c.moveTo(x, screenY); else c.lineTo(x, screenY);
-  }c.stroke();
+  // E-field vector arrows (red) at sampled stations
+  const stations = 26;
+  for (let i = 0; i <= stations; i++){
+    const xn = i/stations;
+    const x = x0 + xn*span;
+    const f = fieldAt(xn, phase, pol);
+    const ey = -(f.ey*ampPx) - (f.ez*ampPx*skewY);
+    if (Math.abs(f.ey) + Math.abs(f.ez) < 0.02) continue;
+    c.strokeStyle = 'rgba(255,82,82,0.55)'; c.lineWidth = 1.4; c.fillStyle = 'rgba(255,82,82,0.85)';
+    c.beginPath(); c.moveTo(x, cy); c.lineTo(x, cy+ey); c.stroke();
+    arrowHead(c, x, cy+ey, 0, Math.sign(ey)||1, 5);
+  }
+  // B-field vector arrows (blue, horizontal plane => skewed)
+  for (let i = 0; i <= stations; i++){
+    const xn = i/stations;
+    const x = x0 + xn*span;
+    const f = fieldAt(xn, phase, pol);
+    const bx = (f.bz*ampPx)*0.9;            // horizontal projection
+    const by = (f.bz*ampPx)*skewY*0.5 + (f.by*ampPx);
+    if (Math.abs(f.bz) + Math.abs(f.by) < 0.02) continue;
+    c.strokeStyle = 'rgba(66,165,245,0.55)'; c.lineWidth = 1.4; c.fillStyle = 'rgba(66,165,245,0.9)';
+    c.beginPath(); c.moveTo(x, cy); c.lineTo(x+bx, cy+by); c.stroke();
+    arrowHead(c, x+bx, cy+by, bx, by, 5);
+  }
 
-  // Draw B field (cyan, horizontal-ish in perspective)
-  c.strokeStyle = '#00ccff';
-  c.lineWidth = 2;
-  c.beginPath();
+  // E envelope curve (red)
+  c.strokeStyle = '#ff5252'; c.lineWidth = 2.4; c.beginPath();
   for (let i = 0; i <= N; i++){
-    const xn = i/N;
-    const x = W*0.05 + xn * scaleX;
-    const phase_local = xn * 4 * Math.PI - phase;
-    let bz, by;
-    if (pol === 'linear') {
-      bz = amp/3e8 * Math.sin(phase_local);
-      by = 0;
-    }else if (pol === 'circular'){
-      bz = amp/3e8 * Math.cos(phase_local);
-      by = -amp/3e8 * Math.sin(phase_local);
-    }else{
-      bz = amp/3e8 * Math.sin(phase_local);
-      by = -amp*0.5/3e8 * Math.cos(phase_local);
-    }
-    const screenY = cy + bz * 55 * 3e8 * 0.4 + by * 55 * 3e8 * 0.4 * skewY;
-    if (i===0) c.moveTo(x, screenY); else c.lineTo(x, screenY);
-  }c.stroke();
+    const xn = i/N, x = x0 + xn*span;
+    const f = fieldAt(xn, phase, pol);
+    const y = cy - (f.ey*ampPx) - (f.ez*ampPx*skewY);
+    if (i===0) c.moveTo(x,y); else c.lineTo(x,y);
+  }
+  c.stroke();
+  // B envelope curve (blue, skewed plane)
+  c.strokeStyle = '#42a5f5'; c.lineWidth = 2.4; c.beginPath();
+  for (let i = 0; i <= N; i++){
+    const xn = i/N, x = x0 + xn*span;
+    const f = fieldAt(xn, phase, pol);
+    const bx = (f.bz*ampPx)*0.9;
+    const by = (f.bz*ampPx)*skewY*0.5 + (f.by*ampPx);
+    if (i===0) c.moveTo(x+bx, cy+by); else c.lineTo(x+bx, cy+by);
+  }
+  c.stroke();
 
-  // Labels
-  c.fillStyle = '#ff8888';
-  c.font = 'bold 13px Roboto Mono, monospace';
+  // Poynting / k arrows along axis (yellow), animated drift to show propagation
+  const drift = (phase*0.5) % (span/6);
+  c.fillStyle = 'rgba(255,213,74,0.8)'; c.strokeStyle = 'rgba(255,213,74,0.7)';
+  for (let x = x0 + 30 + drift; x < x1 - 24; x += span/6){
+    c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(x, cy); c.lineTo(x+18, cy); c.stroke();
+    arrowHead(c, x+18, cy, 1, 0, 6);
+  }
+
+  // labels
+  c.fillStyle = '#ff8a8a'; c.font = 'bold 12px Roboto Mono, monospace'; c.textAlign = 'left';
+  c.fillText(L.eField, x0, H*0.13);
+  c.fillStyle = '#9fd0ff';
+  c.fillText(L.bField, x0, H*0.92);
+  c.fillStyle = 'rgba(255,213,74,0.85)';
+  c.fillText('S = E×B/μ₀', x1-110, H*0.13);
+  c.fillStyle = 'rgba(255,255,255,0.5)'; c.font = '11px sans-serif'; c.textAlign = 'right';
+  c.fillText(L.kDir, x1-4, cy-6);
   c.textAlign = 'left';
-  c.fillText('E (電場)', W*0.06, cy - 60);
-  c.fillStyle = '#88ddff';
-  c.fillText('B (磁束密度)', W*0.06, cy + 70);
-  c.fillStyle = 'rgba(255,255,255,0.5)';
-  c.font = '11px Noto Sans JP';
-  c.fillText('→ 伝播方向 k', W*0.78, cy - 8);
+}
 
-  // Poynting arrows
-  for (let i = 0; i < 5; i++){
-    const x = W*0.15 + i * W*0.17;
-    c.strokeStyle = 'rgba(255,200,0,0.5)';
-    c.lineWidth = 1.5;
-    c.beginPath();
-    c.moveTo(x, cy);
-    c.lineTo(x + 22, cy);
-    c.stroke();
-    c.beginPath();
-    c.moveTo(x+22, cy);
-    c.lineTo(x+16, cy-4);
-    c.moveTo(x+22, cy);
-    c.lineTo(x+16, cy+4);
-    c.stroke();
+/* ===== Chart.js E & B(×c) waveform — confirms in-phase ===== */
+function updateChart(s){
+  if (!chart) return;
+  const N = 220, labels = [], dE = [], dB = [];
+  for (let i = 0; i <= N; i++){
+    const xn = i/N;                       // 0..1 over CYCLES wavelengths
+    const arg = xn*CYCLES*2*Math.PI - phase;
+    labels.push((xn*CYCLES).toFixed(2));
+    dE.push(s.amp * Math.sin(arg));
+    dB.push(s.amp * Math.sin(arg));       // B×c equals E in vacuum -> same curve, in phase
   }
-}function updateChart(freq, amp, lambda, v){
-  const N = 200;
-  const labels = [];
-  const dE = [], dB = [];
-  for (let i = 0; i < N; i++) {
-    const x = (i/N) * 2 * lambda;
-    labels.push((x*1000).toExponential(2));
-    dE.push(amp * Math.sin(2*Math.PI*x/lambda - phase));
-    dB.push((amp/3e8) * Math.sin(2*Math.PI*x/lambda - phase) * 3e8 * 0.3);
-  }if (chart){
-    chart.data.labels = labels;
-    chart.data.datasets[0].data = dE;
-    chart.data.datasets[1].data = dB;
-    chart.update('none');
-  }
-}function animate(){
-  phase += 0.05;
-  const logf = parseFloat(document.getElementById('sFreq').value);
-  const freq = Math.pow(10, logf);
-  const amp  = parseFloat(document.getElementById('sAmp').value);
-  const v = C0 / Math.sqrt(medium.er * medium.mr);
-  const lambda = v / freq;
-  drawWave(freq, amp, lambda, polMode);
-  animId = requestAnimationFrame(animate);
-}function initChart(){
-  const ctx2 = document.getElementById('waveChart').getContext('2d');
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = dE;
+  chart.data.datasets[1].data = dB;
+  chart.update('none');
+}
+
+function initChart(){
+  const ctx2 = $('waveChart').getContext('2d');
   chart = new Chart(ctx2, {
     type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        { label: 'E(x,t) [V/m]', data: [], borderColor: '#ff4444', borderWidth: 2, pointRadius: 0, tension: 0.4 },{ label: 'B(x,t)×c [V/m 換算]', data: [], borderColor: '#00ccff', borderWidth: 2, pointRadius: 0, tension: 0.4 }
-      ]
-    },
-    options:{
-      responsive: true, maintainAspectRatio: false,resizeDelay:100, animation: false,
+    data: { labels: [], datasets: [
+      { label: L.eLabel, data: [], borderColor: '#ff5252', borderWidth: 2.2, pointRadius: 0, tension: 0.35 },
+      { label: L.bLabel, data: [], borderColor: '#42a5f5', borderWidth: 1.6, borderDash:[5,4], pointRadius: 0, tension: 0.35 }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false, resizeDelay: 100, animation: false,
       plugins: { legend: { labels: { color: '#6c757d', font:{size:11} } } },
-      scales:{
-        x: { ticks: { color: '#6c757d', maxTicksLimit: 6, font:{size:10} }, grid:{color:'rgba(0,0,0,.05)'}, title:{display:true,text:'位置 x (mm)',color:'#6c757d',font:{size:11}} },
-        y:{ ticks: { color: '#6c757d', font:{size:10} }, grid:{color:'rgba(0,0,0,.05)'} }
+      scales: {
+        x: { ticks: { color:'#6c757d', maxTicksLimit:7, font:{size:10} }, grid:{color:'rgba(0,0,0,.05)'}, title:{display:true,text:L.xAxis,color:'#6c757d',font:{size:11}} },
+        y: { ticks: { color:'#6c757d', font:{size:10} }, grid:{color:'rgba(0,0,0,.05)'} }
       }
     }
   });
-}initChart();
+}
+
+/* ===== animation loop ===== */
+function loop(ts){
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min(0.05, (ts - lastTs)/1000);
+  lastTs = ts;
+  phase += dt * 2.2 * speedMult;
+  drawWave();
+  animId = requestAnimationFrame(loop);
+}
+function startPlay(){
+  playing = true; lastTs = 0;
+  $('btnPlay').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing = false;
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+  $('btnPlay').innerHTML = '<i class="fas fa-play"></i> 再生';
+}
+function togglePlay(){ playing ? stopPlay() : startPlay(); }
+function setSpeed(v){
+  speedMult = v;
+  document.querySelectorAll('.speed-btn').forEach(b=>b.classList.toggle('active', parseFloat(b.dataset.speed) === v));
+}
+function resetSim(){
+  phase = 0;
+  setMedium('vacuum', $('mVacuum'));
+  setPol('linear', $('polLinear'));
+  $('sFreq').value = '8'; $('sAmp').value = '1.0';
+  if (typeof syncToNum === 'function'){ syncToNum('sFreq','sFreqNum'); syncToNum('sAmp','nAmp'); syncToNum('sAmp','sAmpNum'); }
+  onParam();
+}
+
+function onParam(){
+  update();
+  drawWave();
+}
+
+canvas.addEventListener('keydown', e=>{
+  if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); togglePlay(); }
+});
+window.addEventListener('resize', ()=>{ drawWave(); });
+
+/* init */
+initChart();
 update();
-animate();
+drawWave();
+if (reduceMotion){
+  stopPlay();           // static representative frame
+} else {
+  startPlay();
+}
 </script>
 
 <section class="explanation">
@@ -500,13 +719,13 @@ animate();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">シミュレーションを停止・再生したり、視点を回転させる方法はありますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">画面下部の再生/停止ボタンで波の時間発展を制御できます。また、マウスドラッグで3D空間を自由に回転・拡大縮小でき、任意の角度からE場とB場の振動を観察可能です。スライダーで時間ステップを手動操作することもできます。</div>
+    <div class="faq-a">波のアニメーションは自動で連続再生され、周波数・媒質・偏光モード・振幅E₀のスライダーやボタンを操作すると、E場とB場の振る舞いがリアルタイムに更新されます。波長・位相速度・インピーダンス・表皮深さの計算結果も同時に再計算されます。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
 <div class="fblock">
   <p><strong>無線通信・アンテナ設計：</strong>スマートフォンやWi-Fiのアンテナは、特定の周波数（例えば2.4GHz）の電磁波を効率よく放射・受信するように設計されます。シミュレーターで周波数を変えると波長が変わるように、アンテナの長さは使用波長と密接に関係しています。</p>
-  <p><strong>光ファイバー通信：</strong>インターネットの基幹を支える技術です。媒質を「ガラス」に設定すると光速が約2/3に遅くなりますが、この屈折率の差を利用して光をファイバー内部に閉じ込め、長距離伝送を実現しています。</p>
+  <p><strong>光ファイバー通信：</strong>インターネットの基幹を支える技術です。媒質を「ガラス」に設定すると光速が約1/2に遅くなりますが、この屈折率の差を利用して光をファイバー内部に閉じ込め、長距離伝送を実現しています。</p>
   <p><strong>非破壊検査・イメージング：</strong>航空機部品の内部亀裂を探すマイクロ波検査や、医療用のMRI（核磁気共鳴画像法）は、物質と電磁波の相互作用を利用しています。媒質のインピーダンスが異なると電磁波の反射率が変わる原理を応用しています。</p>
   <p><strong>太陽光発電：</strong>太陽から地球に届くエネルギーは、ポインティングベクトル $\mathbf{S}= (\mathbf{E}\times \mathbf{B}) / \mu_0$ で表される電磁波の流れそのものです。シミュレーターで振幅E0を大きくすると、このエネルギー流も大きくなる様子がイメージできます。</p>
 
@@ -520,6 +739,9 @@ animate();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="electromagnetic-wave.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -581,7 +803,7 @@ animate();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>2.4GHz帯（スマートフォン通信）で振幅50V/mの直線偏波を自由空間でシミュレーション：λ=c/f=3×10⁸/2.4×10⁹≈125mm、位相速度vₚ=3×10⁸m/s、インピーダンスZ₀=√(μ₀/ε₀)≈377Ω。銅導体（σ=5.96×10⁷S/m）への侵入では表皮深さδ=√(2/ωμσ)≈10.6μmと急激に減衰。10kHz低周波では波長が30kmに延伸し、地中への浸透が増加します。</p>
+<p>2.4GHz帯（スマートフォン通信）で振幅50V/mの直線偏波を自由空間でシミュレーション：λ=c/f=3×10⁸/2.4×10⁹≈125mm、位相速度vₚ=3×10⁸m/s、インピーダンスZ₀=√(μ₀/ε₀)≈377Ω。銅導体（σ=5.96×10⁷S/m）への侵入では表皮深さδ=√(2/ωμσ)≈1.33μmと急激に減衰。10kHz低周波では波長が30kmに延伸し、地中への浸透が増加します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -591,6 +813,16 @@ animate();
 <li>多層媒質（PCB基板Fr-4：εᵣ≈4.4）では層間でのインピーダンス不整合による反射係数Γ=(Z₂-Z₁)/(Z₂+Z₁)が電磁干渉を引き起こすため要検証</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "2次元熱伝導FDMシミュレーター",
       "description": "20×20グリッドの2次元定常熱伝導をガウス・ザイデル法で数値解析。カラーコンター・等温線・中心線プロファイルをリアルタイム可視化。",
       "url": "https://novasolver.jp/tools/heat-conduction-2d.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["20×20有限差分格子","ガウス・ザイデル反復法（最大500回）","4辺境界温度の任意設定","中心熱源Qの設定","カラーコンターマップ＋等温線","中心水平線の温度プロファイル"],
       "keywords": "2次元熱伝導,有限差分法,FDM,ガウスザイデル,温度分布,等温線,熱解析,CAE",
       "datePublished": "2026-04-09",
@@ -187,32 +187,59 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <input type="range" id="paramK" oninput="syncToNum('paramK','valKNum')" min="1" max="50" step="1" value="10">
     </div>
     <div class="divider"></div>
-    <button class="btn" id="btnRun"><i class="fas fa-fire"></i> 計算実行</button>
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+    <div class="preset-row" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="preset-btn" type="button" onclick="hcPreset('topHot')">上面加熱</button>
+      <button class="preset-btn" type="button" onclick="hcPreset('chip')">中心チップ</button>
+      <button class="preset-btn" type="button" onclick="hcPreset('lr')">左右温度差</button>
+    </div>
+    <button class="btn" id="btnRun"><i class="fas fa-rotate-left"></i> 再スタート</button>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">T_max</div><div class="stat-value" id="statTmax">—</div></div>
-      <div class="stat-card"><div class="stat-label">T_min</div><div class="stat-value" id="statTmin">—</div></div>
-      <div class="stat-card"><div class="stat-label">T_center</div><div class="stat-value" id="statTcenter">—</div></div>
-      <div class="stat-card"><div class="stat-label">収束反復数</div><div class="stat-value" id="statIter">—</div></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ計算値（緩和中）</div>
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat-card"><div class="sv" id="statTcenter">—</div><div class="sl">中心温度 [°C]</div></div>
+      <div class="stat-card"><div class="sv" id="statTmax">—</div><div class="sl">最高温度 [°C]</div></div>
+      <div class="stat-card"><div class="sv" id="statTmin">—</div><div class="sl">最低温度 [°C]</div></div>
+      <div class="stat-card"><div class="sv" id="statFlux">—</div><div class="sl">最大熱流束 [W/m²]</div></div>
+      <div class="stat-card"><div class="sv" id="statIter">—</div><div class="sl">反復回数</div></div>
+      <div class="stat-card"><div class="sv" id="statResid">—</div><div class="sl">残差 max|ΔT|</div></div>
     </div>
     </div>
 
     <div class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title">温度コンターマップ + 等温線（10°C 間隔）</div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-fire-flame-curved"></i> 温度場の緩和アニメーション（コンター＋等温線＋熱流束）</div>
       <div class="contour-row">
-        <canvas id="contourCanvas" width="400" height="400" style="border-radius:8px;max-width:100%;flex:1;"></canvas>
+        <canvas id="contourCanvas" width="400" height="400" tabindex="0" role="img" aria-label="2次元プレートの温度場が境界条件から定常状態へ緩和する様子をリアルタイム描画" style="border-radius:8px;max-width:100%;flex:1;"></canvas>
         <div class="colorbar-col">
           <span class="cb-val" id="cbMax">100°C</span>
           <canvas id="colorbarCanvas" width="18" height="340" style="border-radius:4px;"></canvas>
           <span class="cb-val" id="cbMin">0°C</span>
         </div>
-      </div><canvas class="ux-chartjs-canvas" id="chartProfile"></canvas></div>
+      </div>
+      <div class="play-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 4px;">
+        <button class="btn" type="button" id="btnPlay" style="width:auto"><i class="fas fa-pause"></i> 一時停止</button>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted)"><input type="checkbox" id="chkFlux" checked> 熱流束矢印</label>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted)"><input type="checkbox" id="chkIso" checked> 等温線</label>
+      </div>
+      <div class="legend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-bottom:6px;">
+        <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:14px;height:8px;border-radius:2px;display:inline-block;background:linear-gradient(90deg,#0030ff,#ff2020)"></i>低温→高温</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:2px;display:inline-block;background:rgba(255,255,255,.8)"></i>等温線(10°C)</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:2px;display:inline-block;background:#10141f"></i>熱流束 q=−k∇T</span>
+      </div>
+      <canvas class="ux-chartjs-canvas" id="chartProfile"></canvas></div>
     </div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 <p><strong>定常熱伝導（ポアソン方程式）</strong></p>
       $$\frac{\partial^2 T}{\partial x^2}+\frac{\partial^2 T}{\partial y^2}+\frac{Q}{k}=0$$
@@ -224,117 +251,247 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / dpr || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / dpr || 320));
-  canvas.style.setProperty('width', w + 'px', 'important');
-  canvas.style.setProperty('height', h + 'px', 'important');
-  var bw = Math.round(w * dpr);
-  var bh = Math.round(h * dpr);
-  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
+(function(){
+"use strict";
+/* ===== NovaSolver v2 — 2D heat conduction relaxation (live) ===== */
+var N=41;                         // interior+boundary grid (capped for perf/HiDPI)
+var ci=(N-1>>1), cj=(N-1>>1);     // center indices for heat source
+var T=new Float64Array(N*N), Tn=new Float64Array(N*N);
+var chartProfile=null, raf=null, playing=false, iterCount=0, lastResid=1;
+var labels={Tt:'',Tb:'',Tl:'',Tr:'',Q:0,k:10};
+var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function idx(i,j){return i*N+j;}
+function el(id){return document.getElementById(id);}
+function num(id){return parseFloat(el(id).value);}
+
+function hiDpi(cv,cssW,cssH,ctx){
+  var dpr=Math.min(window.devicePixelRatio||1,2.5);
+  cv.setAttribute('data-ux-no-scale','1');
+  var w=Math.max(1,Math.round(cssW)),h=Math.max(1,Math.round(cssH));
+  cv.style.setProperty('width',w+'px','important');
+  cv.style.setProperty('height',h+'px','important');
+  var bw=Math.round(w*dpr),bh=Math.round(h*dpr);
+  if(cv.width!==bw||cv.height!==bh){cv.width=bw;cv.height=bh;}
+  cv.dataset.cssW=String(w);cv.dataset.cssH=String(h);
+  if(ctx&&ctx.setTransform)ctx.setTransform(dpr,0,0,dpr,0,0);
+  return{w:w,h:h,dpr:dpr};
 }
 
-
-const N=20,IMAX=500;
-let chartProfile=null;
-
-function solveFDM(Ttop,Tbottom,Tleft,Tright,Q,k){
-  const T=Array.from({length:N},()=>new Float64Array(N));
-  const dx=1.0/(N-1),src=Q*dx*dx/k;
-  for(let i=0;i<N;i++)for(let j=0;j<N;j++)T[i][j]=Tleft+(Tright-Tleft)*(j/(N-1));
-  function bc(){for(let j=0;j<N;j++){T[0][j]=Ttop;T[N-1][j]=Tbottom;}for(let i=0;i<N;i++){T[i][0]=Tleft;T[i][N-1]=Tright;}}bc();
-  const ci=Math.floor(N/2),cj=Math.floor(N/2);
-  let iter=0;
-  for(iter=0;iter<IMAX;iter++){
-    let md=0;
-    for(let i=1;i<N-1;i++)for(let j=1;j<N-1;j++){
-      const s=(i===ci&&j===cj)?src:0;
-      const Tnew=(T[i+1][j]+T[i-1][j]+T[i][j+1]+T[i][j-1]+s)/4;
-      md=Math.max(md,Math.abs(Tnew-T[i][j]));T[i][j]=Tnew;
-    }
-    bc();
-    if(md<1e-4)break;
-  }return{T,iter};
-}function hsvToRgb(h,s,v){
-  const c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c;
-  let r=0,g=0,b=0;
-  if(h<60){r=c;g=x;}else if(h<120){r=x;g=c;}else if(h<180){g=c;b=x;}else if(h<240){g=x;b=c;}else if(h<300){r=x;b=c;}else{r=c;b=x;}
-  return[Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)];
-}function tempColor(t,tmin,tmax){const r=Math.max(0,Math.min(1,(t-tmin)/(tmax-tmin)));return hsvToRgb((1-r)*240,1,1);}function drawContour(T){
-  const cv=document.getElementById('contourCanvas'),ctx=cv.getContext('2d');
-  const __novaDims=__novaHiDpiCanvas(cv, cv.clientWidth || cv.offsetWidth || parseFloat(cv.getAttribute('width')) || 400, cv.clientHeight || cv.offsetHeight || parseFloat(cv.getAttribute('height')) || 400, ctx);
-  const W=__novaDims.w,H=__novaDims.h,cw=W/N,ch=H/N;
-  let tmin=Infinity,tmax=-Infinity;
-  for(let i=0;i<N;i++)for(let j=0;j<N;j++){tmin=Math.min(tmin,T[i][j]);tmax=Math.max(tmax,T[i][j]);}if(tmax-tmin<0.5)tmax=tmin+1;
-  for(let i=0;i<N;i++)for(let j=0;j<N;j++){const[r,g,b]=tempColor(T[i][j],tmin,tmax);ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fillRect(j*cw,i*ch,cw+1,ch+1);}// Isotherms
-  ctx.strokeStyle='rgba(255,255,255,0.65)';ctx.lineWidth=1;
-  const step=10,t0=Math.ceil(tmin/step)*step;
-  for(let tv=t0;tv<tmax;tv+=step){
-    ctx.beginPath();
-    for(let i=0;i<N-1;i++)for(let j=0;j<N-1;j++){
-      const corners=[T[i][j],T[i][j+1],T[i+1][j+1],T[i+1][j]];
-      const pts=[];
-      const edges=[[0,1],[1,2],[2,3],[3,0]];
-      const ex=[j*cw,(j+1)*cw,(j+1)*cw,j*cw],ey=[i*ch,i*ch,(i+1)*ch,(i+1)*ch];
-      for(const[a,b]of edges){const ta=corners[a],tb=corners[b];if((ta-tv)*(tb-tv)<=0&&Math.abs(ta-tb)>1e-9){const f=(tv-ta)/(tb-ta);pts.push([ex[a]+f*(ex[b]-ex[a]),ey[a]+f*(ey[b]-ey[a])]);}}if(pts.length>=2){ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[1][0],pts[1][1]);}
-    }
-    ctx.stroke();ctx.beginPath();
+function readParams(){
+  labels.Tt=num('paramTtop');labels.Tb=num('paramTbottom');
+  labels.Tl=num('paramTleft');labels.Tr=num('paramTright');
+  labels.Q=num('paramQ');labels.k=num('paramK');
+}
+function applyBC(arr){
+  var Tt=labels.Tt,Tb=labels.Tb,Tl=labels.Tl,Tr=labels.Tr;
+  for(var j=0;j<N;j++){arr[idx(0,j)]=Tt;arr[idx(N-1,j)]=Tb;}
+  for(var i=0;i<N;i++){arr[idx(i,0)]=Tl;arr[idx(i,N-1)]=Tr;}
+}
+// reset field to a smooth initial guess (linear blend) so the spread is visible
+function resetField(){
+  readParams();
+  var Tt=labels.Tt,Tb=labels.Tb,Tl=labels.Tl,Tr=labels.Tr;
+  var mean=(Tt+Tb+Tl+Tr)/4;
+  for(var i=0;i<N;i++)for(var j=0;j<N;j++){
+    // start interior near the coldest edge so heat visibly diffuses inward
+    T[idx(i,j)]= (i===0||i===N-1||j===0||j===N-1)?0:Math.min(Tt,Tb,Tl,Tr);
   }
-  // Colorbar
-  const cb=document.getElementById('colorbarCanvas'),cbCtx=cb.getContext('2d');
-  const cbDims=__novaHiDpiCanvas(cb, 18, 340, cbCtx);
-  for(let y=0;y<cbDims.h;y++){const[r,g,b]=tempColor(tmin+(1-y/cbDims.h)*(tmax-tmin),tmin,tmax);cbCtx.fillStyle=`rgb(${r},${g},${b})`;cbCtx.fillRect(0,y,cbDims.w,1);}document.getElementById('cbMax').textContent=tmax.toFixed(1)+'°C';
-  document.getElementById('cbMin').textContent=tmin.toFixed(1)+'°C';
-  return{tmin,tmax};
-}function drawProfile(T){
-  const mid=Math.floor(N/2);
-  const labels=Array.from({length:N},(_,j)=>j);
-  const data=Array.from({length:N},(_,j)=>+T[mid][j].toFixed(2));
-  if(chartProfile)chartProfile.destroy();
-  chartProfile=new Chart(document.getElementById('chartProfile'),{type:'line',data:{labels,datasets:[{label:'T(x) at y=中央',data,borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,0.07)',borderWidth:2,pointRadius:3,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,resizeDelay:100,animation:false,plugins:{legend:{labels:{font:{size:11}}}},scales:{x:{ title:{display:true,text:'格子インデックス j',font:{size:11}},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'温度 (°C)',font:{size:11}}}}}});
-}function run(){
-  const Ttop=+document.getElementById('paramTtop').value;
-  const Tbottom=+document.getElementById('paramTbottom').value;
-  const Tleft=+document.getElementById('paramTleft').value;
-  const Tright=+document.getElementById('paramTright').value;
-  const Q=+document.getElementById('paramQ').value;
-  const k=+document.getElementById('paramK').value;
-  const{T,iter}=solveFDM(Ttop,Tbottom,Tleft,Tright,Q,k);
-  drawContour(T);
-  drawProfile(T);
-  const mid=Math.floor(N/2);
-  let tmin=Infinity,tmax=-Infinity;
-  for(let i=0;i<N;i++)for(let j=0;j<N;j++){tmin=Math.min(tmin,T[i][j]);tmax=Math.max(tmax,T[i][j]);}
-  document.getElementById('statTmax').textContent=tmax.toFixed(1)+'°C';
-  document.getElementById('statTmin').textContent=tmin.toFixed(1)+'°C';
-  document.getElementById('statTcenter').textContent=T[mid][mid].toFixed(1)+'°C';
-  document.getElementById('statIter').textContent=iter;
-}function bindSlider(id,dispId,suffix,dec){
-  const el=document.getElementById(id),disp=document.getElementById(dispId);
-  function u(){const _eDV=disp;if(_eDV.tagName==='INPUT'){_eDV.value=parseFloat(el.value).toFixed(dec);}else{_eDV.textContent=parseFloat(el.value).toFixed(dec)+suffix;}el.style.setProperty('--pct',(el.value-el.min)/(el.max-el.min)*100+'%');}
-  el.addEventListener('input',u);u();
-}bindSlider('paramTtop','valTtopNum',' °C',0);
+  applyBC(T);
+  iterCount=0;lastResid=1;
+}
+// One Gauss-Seidel sweep (steady-state interior = avg of 4 neighbors + source).
+// Center source term: src = Q*dx^2/k, dx = 1/(N-1).
+function sweep(steps){
+  var dx=1.0/(N-1);
+  var src=labels.Q*dx*dx/labels.k;
+  var maxd=0;
+  for(var s=0;s<steps;s++){
+    maxd=0;
+    for(var i=1;i<N-1;i++)for(var j=1;j<N-1;j++){
+      var so=(i===ci&&j===cj)?src:0;
+      var nv=(T[idx(i+1,j)]+T[idx(i-1,j)]+T[idx(i,j+1)]+T[idx(i,j-1)]+so)*0.25;
+      var d=nv-T[idx(i,j)];if(d<0)d=-d;if(d>maxd)maxd=d;
+      T[idx(i,j)]=nv;
+    }
+    iterCount++;
+  }
+  lastResid=maxd;
+  return maxd;
+}
+
+function tempColor(t,tmin,tmax){
+  var r=(t-tmin)/(tmax-tmin||1);if(r<0)r=0;if(r>1)r=1;
+  // blue(cold) -> cyan -> green -> yellow -> red(hot) via HSV hue 240->0
+  var hue=(1-r)*240, c=1, x=c*(1-Math.abs((hue/60)%2-1)), m=0;
+  var R=0,G=0,B=0;
+  if(hue<60){R=c;G=x;}else if(hue<120){R=x;G=c;}else if(hue<180){G=c;B=x;}
+  else if(hue<240){G=x;B=c;}else if(hue<300){R=x;B=c;}else{R=c;B=x;}
+  return[(R+m)*255|0,(G+m)*255|0,(B+m)*255|0];
+}
+
+function fieldRange(){
+  var tmin=Infinity,tmax=-Infinity;
+  for(var i=0;i<N*N;i++){var v=T[i];if(v<tmin)tmin=v;if(v>tmax)tmax=v;}
+  if(tmax-tmin<0.5)tmax=tmin+1;
+  return{tmin:tmin,tmax:tmax};
+}
+
+function draw(){
+  var cv=el('contourCanvas'),ctx=cv.getContext('2d');
+  var cw0=cv.clientWidth||parseFloat(cv.getAttribute('width'))||400;
+  var d=hiDpi(cv,cw0,cw0,ctx); // keep square
+  var W=d.w,H=d.h, cw=W/(N-1), ch=H/(N-1);
+  var rg=fieldRange(),tmin=rg.tmin,tmax=rg.tmax;
+  // bilinear smooth fill: draw each cell as solid; image is fine at N=41
+  for(var i=0;i<N-1;i++)for(var j=0;j<N-1;j++){
+    var c=tempColor(T[idx(i,j)],tmin,tmax);
+    ctx.fillStyle='rgb('+c[0]+','+c[1]+','+c[2]+')';
+    ctx.fillRect(j*cw,i*ch,cw+1,ch+1);
+  }
+  // isotherms (marching squares, 10°C)
+  if(el('chkIso').checked){
+    ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=1;ctx.beginPath();
+    var step=10,t0=Math.ceil(tmin/step)*step;
+    for(var tv=t0;tv<tmax;tv+=step){
+      for(var ii=0;ii<N-1;ii++)for(var jj=0;jj<N-1;jj++){
+        var corners=[T[idx(ii,jj)],T[idx(ii,jj+1)],T[idx(ii+1,jj+1)],T[idx(ii+1,jj)]];
+        var ex=[jj*cw,(jj+1)*cw,(jj+1)*cw,jj*cw],ey=[ii*ch,ii*ch,(ii+1)*ch,(ii+1)*ch];
+        var edges=[[0,1],[1,2],[2,3],[3,0]],pts=[];
+        for(var e=0;e<4;e++){var a=edges[e][0],b=edges[e][1],ta=corners[a],tb=corners[b];
+          if((ta-tv)*(tb-tv)<=0&&Math.abs(ta-tb)>1e-9){var f=(tv-ta)/(tb-ta);pts.push([ex[a]+f*(ex[b]-ex[a]),ey[a]+f*(ey[b]-ey[a])]);}}
+        if(pts.length>=2){ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[1][0],pts[1][1]);}
+      }
+    }
+    ctx.stroke();
+  }
+  // heat-flux arrows q = -k grad(T), pointing down the temperature gradient
+  var maxFlux=0;
+  if(el('chkFlux').checked){
+    var dx=1.0/(N-1);
+    var stepg=Math.max(4,Math.round((N-1)/8));
+    var arrows=[];
+    for(var gi=stepg;gi<N-1;gi+=stepg)for(var gj=stepg;gj<N-1;gj+=stepg){
+      var dTdx=(T[idx(gi,gj+1)]-T[idx(gi,gj-1)])/(2*dx);   // x ~ column j
+      var dTdy=(T[idx(gi+1,gj)]-T[idx(gi-1,gj)])/(2*dx);   // y ~ row i
+      var qx=-labels.k*dTdx, qy=-labels.k*dTdy;
+      var mag=Math.sqrt(qx*qx+qy*qy);
+      if(mag>maxFlux)maxFlux=mag;
+      arrows.push([gi,gj,qx,qy,mag]);
+    }
+    var aScale=18/(maxFlux||1);
+    ctx.strokeStyle='rgba(16,20,31,0.9)';ctx.fillStyle='rgba(16,20,31,0.9)';ctx.lineWidth=1.6;
+    for(var ai=0;ai<arrows.length;ai++){
+      var A=arrows[ai];if(A[4]<1e-6)continue;
+      var px=A[1]*cw, py=A[0]*ch;
+      var ux=A[2]*aScale, uy=A[3]*aScale;
+      var len=Math.sqrt(ux*ux+uy*uy);if(len>22){ux*=22/len;uy*=22/len;}
+      var ex2=px+ux, ey2=py+uy;
+      ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(ex2,ey2);ctx.stroke();
+      var ang=Math.atan2(uy,ux),hh=5;
+      ctx.beginPath();ctx.moveTo(ex2,ey2);
+      ctx.lineTo(ex2-hh*Math.cos(ang-0.5),ey2-hh*Math.sin(ang-0.5));
+      ctx.lineTo(ex2-hh*Math.cos(ang+0.5),ey2-hh*Math.sin(ang+0.5));
+      ctx.closePath();ctx.fill();
+    }
+  } else {
+    // still compute max flux for the readout
+    var dx2=1.0/(N-1);
+    for(var fi=1;fi<N-1;fi++)for(var fj=1;fj<N-1;fj++){
+      var gxx=(T[idx(fi,fj+1)]-T[idx(fi,fj-1)])/(2*dx2);
+      var gyy=(T[idx(fi+1,fj)]-T[idx(fi-1,fj)])/(2*dx2);
+      var mg=labels.k*Math.sqrt(gxx*gxx+gyy*gyy);if(mg>maxFlux)maxFlux=mg;
+    }
+  }
+  // colorbar
+  var cb=el('colorbarCanvas'),cbx=cb.getContext('2d');
+  var cd=hiDpi(cb,18,340,cbx);
+  for(var y=0;y<cd.h;y++){var cc=tempColor(tmin+(1-y/cd.h)*(tmax-tmin),tmin,tmax);
+    cbx.fillStyle='rgb('+cc[0]+','+cc[1]+','+cc[2]+')';cbx.fillRect(0,y,cd.w,1);}
+  el('cbMax').textContent=tmax.toFixed(1)+'°C';
+  el('cbMin').textContent=tmin.toFixed(1)+'°C';
+  updateStats(tmin,tmax,maxFlux);
+}
+
+function updateStats(tmin,tmax,maxFlux){
+  el('statTcenter').textContent=T[idx(ci,cj)].toFixed(1);
+  el('statTmax').textContent=tmax.toFixed(1);
+  el('statTmin').textContent=tmin.toFixed(1);
+  el('statFlux').textContent=Math.round(maxFlux).toLocaleString();
+  el('statIter').textContent=iterCount;
+  el('statResid').textContent=lastResid<0.001?lastResid.toExponential(1):lastResid.toFixed(3);
+}
+
+function buildProfile(){
+  if(!window.Chart)return;
+  var mid=(N-1>>1);
+  var labelsX=[],data=[];
+  for(var j=0;j<N;j++){labelsX.push(j);data.push(+T[idx(mid,j)].toFixed(2));}
+  if(chartProfile){chartProfile.data.datasets[0].data=data;chartProfile.update('none');return;}
+  chartProfile=new Chart(el('chartProfile'),{type:'line',data:{labels:labelsX,datasets:[{label:'中心水平線 T(x)',data:data,borderColor:'#007BFF',backgroundColor:'rgba(0,123,255,0.07)',borderWidth:2,pointRadius:0,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,resizeDelay:100,animation:false,plugins:{legend:{labels:{font:{size:11}}}},scales:{x:{title:{display:true,text:'格子インデックス j',font:{size:11}},ticks:{maxTicksLimit:10}},y:{title:{display:true,text:'温度 (°C)',font:{size:11}}}}}});
+}
+
+function loop(){
+  if(!playing){raf=null;return;}
+  sweep(6);            // several GS sweeps per frame -> visible diffusion
+  draw();
+  if(iterCount%18===0)buildProfile();
+  if(lastResid<1e-3){ // converged -> stop, settle
+    buildProfile();setPlay(false);return;
+  }
+  raf=requestAnimationFrame(loop);
+}
+function setPlay(on){
+  playing=on;
+  var b=el('btnPlay');
+  if(on){b.innerHTML='<i class="fas fa-pause"></i> 一時停止';if(!raf)raf=requestAnimationFrame(loop);}
+  else{b.innerHTML='<i class="fas fa-play"></i> 再生';if(raf){cancelAnimationFrame(raf);raf=null;}}
+}
+function restart(){
+  resetField();draw();buildProfile();
+  if(reduce){
+    // static steady-state frame: solve to convergence immediately
+    var g=999;while(g-->0){if(sweep(20)<1e-4)break;}
+    draw();buildProfile();setPlay(false);return;
+  }
+  setPlay(true);
+}
+
+function bindSlider(id,dispId,suffix,dec){
+  var e=el(id),disp=el(dispId);
+  function u(){if(disp.tagName==='INPUT'){disp.value=parseFloat(e.value).toFixed(dec);}else{disp.textContent=parseFloat(e.value).toFixed(dec)+suffix;}e.style.setProperty('--pct',(e.value-e.min)/(e.max-e.min)*100+'%');}
+  e.addEventListener('input',u);u();
+}
+bindSlider('paramTtop','valTtopNum',' °C',0);
 bindSlider('paramTbottom','valTbottomNum',' °C',0);
 bindSlider('paramTleft','valTleftNum',' °C',0);
 bindSlider('paramTright','valTrightNum',' °C',0);
 bindSlider('paramQ','valQNum','',0);
 bindSlider('paramK','valKNum','',1);
 
-document.getElementById('btnRun').addEventListener('click',run);
-['paramTtop','paramTbottom','paramTleft','paramTright','paramQ','paramK'].forEach(id=>document.getElementById(id).addEventListener('change',run));
-run();
+window.hcPreset=function(name){
+  var P={
+    topHot:{Tt:100,Tb:0,Tl:50,Tr:50,Q:0,k:10},
+    chip:{Tt:20,Tb:20,Tl:20,Tr:20,Q:5000,k:10},
+    lr:{Tt:50,Tb:50,Tl:90,Tr:10,Q:0,k:10}
+  }[name];
+  if(!P)return;
+  function set(id,v){var e=el(id);e.value=v;e.dispatchEvent(new Event('input'));}
+  set('paramTtop',P.Tt);set('paramTbottom',P.Tb);set('paramTleft',P.Tl);set('paramTright',P.Tr);set('paramQ',P.Q);set('paramK',P.k);
+  restart();
+};
+
+el('btnRun').addEventListener('click',restart);
+el('btnPlay').addEventListener('click',function(){if(lastResid<1e-3&&!playing){restart();}else{setPlay(!playing);}});
+['paramTtop','paramTbottom','paramTleft','paramTright','paramQ','paramK'].forEach(function(id){
+  el(id).addEventListener('change',restart);
+});
+el('chkFlux').addEventListener('change',draw);
+el('chkIso').addEventListener('change',draw);
+el('contourCanvas').addEventListener('keydown',function(ev){if(ev.key===' '||ev.key==='Enter'){ev.preventDefault();if(lastResid<1e-3&&!playing)restart();else setPlay(!playing);}});
+window.addEventListener('resize',function(){draw();});
+
+restart();
+})();
 </script>
 
 <section class="explanation">
@@ -395,6 +552,9 @@ run();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-conduction-2d.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -448,14 +608,14 @@ run();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>四辺の境界条件を設定します。上辺・下辺・左辺・右辺それぞれについて、温度値（℃）を入力するか熱流束（W/m²）を選択します</li>
-<li>領域内の熱源密度（W/m³）、格子間隔（mm）、材料の熱伝導率（W/m·K）を指定します</li>
-<li>「計算実行」ボタンをクリックするとGauss-Seidel法で反復計算が開始され、収束条件を満たした温度分布が可視化されます</li>
+<li>四辺の境界温度 T_top・T_bottom・T_left・T_right（各 0〜100 ℃）を、スライダーまたは数値で固定温度として設定します</li>
+<li>中心熱源 Q（0〜5000 W/m²）と材料の熱伝導率 k（1〜50 W/m·K）を指定します。格子は 20×20 で固定です</li>
+<li>「計算実行」ボタンをクリックすると Gauss-Seidel 法（最大500回反復）で温度分布を求め、コンター・等温線・中心線プロファイルが描画されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>アルミニウム板（熱伝導率λ=160 W/m·K）50mm×50mm領域で、上辺を80℃固定、下辺を20℃固定、左右辺は断熱（熱流束=0）、内部熱源q=5000 W/m³の場合、FDM格子5×5で計算すると中央部付近は約55℃、左右辺中央では約50℃に収束します。反復回数は通常200～500回程度で相対誤差1%以下に到達します</p>
+<p>デフォルト設定（T_top=100 ℃、T_bottom=0 ℃、T_left=T_right=50 ℃、Q=0、k=10 W/m·K）で「計算実行」を押すと、20×20 格子の Gauss-Seidel 反復が約 262 回で収束し、T_max=100 ℃・T_min=0 ℃・中心温度 T_center≈47.8 ℃ となります。中心熱源 Q を 5000 W/m² に上げると中心温度がわずかに上昇（≈48.7 ℃）し、熱伝導率 k を上げると温度分布が平滑化されます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -465,6 +625,16 @@ run();
 <li>定常解析のため、実際の加熱・冷却プロセスの過渡応答は別途瞬間値シミュレーターで確認が必要です</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

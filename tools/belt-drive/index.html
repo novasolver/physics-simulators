@@ -125,14 +125,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ベルト・チェーン伝動計算機",
       "description": "駆動プーリ径・従動プーリ径・軸間距離・回転数・動力・摩擦係数を設定してベルト長さ・張力・伝達動力・安全率をリアルタイム計算。ベルト駆動幾何をアニメーション表示。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/belt-drive.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -221,7 +221,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <select class="select-styled" id="beltType" onchange="compute()">
         <option value="flat">平ベルト（Flat Belt）</option>
         <option value="vbelt">Vベルト（V-Belt）</option>
-        <option value="chain">チェーン伝動</option>
+
       </select>
       <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">掛け方</div>
       <select class="select-styled" id="beltConfig" onchange="compute()">
@@ -290,7 +290,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="fallow" min="50" max="10000" step="50" value="500" oninput="syncToNum('fallow','fallowVal');syncVal(this,'fallowVal',' N');compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="機械力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">機械力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -339,6 +347,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="playback-bar">
         <button class="pb-btn active" id="btnPlay" title="再生/一時停止" onclick="togglePlay()"><i class="fas fa-pause"></i></button>
         <button class="pb-btn" id="btnStep" title="1フレーム進む" onclick="stepFrame()"><i class="fas fa-step-forward"></i></button>
+        <button class="pb-btn" id="btnReset" title="リセット" onclick="resetSim()"><i class="fas fa-undo"></i></button>
         <select class="speed-sel" id="speedSel" onchange="setSpeed(this.value)" title="再生速度">
           <option value="0.25">0.25×</option>
           <option value="1" selected>1×</option>
@@ -346,7 +355,13 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         </select>
         <span class="elapsed-badge"><i class="fas fa-clock"></i> <span id="elapsedTime">0.00 s</span></span>
       </div>
-    
+      <div class="preset-row" role="group" aria-label="プリセット">
+        <button type="button" class="preset-btn" onclick="applyPreset('reduction')">2:1 減速</button>
+        <button type="button" class="preset-btn" onclick="applyPreset('overdrive')">増速（オーバードライブ）</button>
+        <button type="button" class="preset-btn" onclick="applyPreset('crossed')">クロス掛けで逆転</button>
+        <button type="button" class="preset-btn" onclick="applyPreset('longC')">長い軸間距離</button>
+      </div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
         <p>速度比：$i = D_2/D_1$、ベルト速度：$v = \pi D_1 n_1/60$</p>
@@ -364,7 +379,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 /* ===== State ===== */
 let animId = null;
 let beltOffset = 0;
-let isPlaying = true;
+let spin1 = 0, spin2 = 0;
+const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let isPlaying = !REDUCED_MOTION;
 let playbackSpeed = 1;
 let elapsedTime = 0;
 let lastFrameTime = null;
@@ -423,7 +440,7 @@ function compute(){
     L = Math.PI * (D1 + D2) / 2 + 2 * C + Math.pow(D2 + D1, 2) / (4 * C);
   }let theta;
   if (config === 'open'){
-    const sinA = (D2 - D1) / (2 * C);
+    const sinA = Math.abs(D2 - D1) / (2 * C);
     theta = Math.PI - 2 * Math.asin(Math.min(1, Math.max(-1, sinA)));
   }else{
     const sinA = (D2 + D1) / (2 * C);
@@ -447,8 +464,18 @@ function compute(){
   if (!animId && isPlaying){ lastFrameTime = performance.now(); requestFrame(); }else if (!isPlaying){ renderCurrentFrame(); }
 }function advanceOneFrame(dt){
   if (!currentParams) return;
-  const spd = currentParams.v * playbackSpeed;
+  const p = currentParams;
+  const spd = p.v * playbackSpeed;
   beltOffset = (beltOffset + spd * dt * 12) % 40;
+  /* Pulley rotation: belt linear speed common to both → ω = v/R.
+     Driver (D1) spins clockwise; driven (D2) faster when smaller (ω2/ω1 = D1/D2 = i_speed).
+     Open belt → same rotation direction; crossed belt → driven reverses. */
+  const base = (spd * dt * 12) / 40 * (Math.PI / 3); /* keep belt dash & spoke pitch coherent */
+  const w1 = p.D1 > 0 ? base : 0;
+  const w2 = p.D2 > 0 ? base * (p.D1 / p.D2) : 0;
+  const dir2 = (p.config === 'cross') ? -1 : 1;
+  spin1 = (spin1 + w1) % (Math.PI * 2);
+  spin2 = (spin2 + dir2 * w2) % (Math.PI * 2);
   elapsedTime += dt * playbackSpeed;
   document.getElementById('elapsedTime').textContent = elapsedTime.toFixed(2) + ' s';
 }function setupBeltCanvas(canvas, ctx){
@@ -589,8 +616,8 @@ function roundRect(ctx, x, y, w, h, r){
     drawCrossBelt(ctx, cx1, cy, R1, cx2, cy, R2, W, H);
   }
 
-  drawPulley(ctx, cx1, cy, R1, '#1677ff', 'D\u2081');
-  drawPulley(ctx, cx2, cy, R2, '#00b4d8', 'D\u2082');
+  drawPulley(ctx, cx1, cy, R1, '#1677ff', 'D\u2081', spin1);
+  drawPulley(ctx, cx2, cy, R2, '#00b4d8', 'D\u2082', spin2);
   drawDragHandle(ctx, cx1, cy, R1, dragTarget === 'd1');
   drawDragHandle(ctx, cx2, cy, R2, dragTarget === 'd2');
 
@@ -686,7 +713,8 @@ function roundRect(ctx, x, y, w, h, r){
   ctx.fillStyle = '#48d8ff';
   ctx.fillText('\u5F1B\u307F\u5074', (bx1 + bx2) / 2, Math.max(by1, by2) + 19);
   ctx.restore();
-}function drawPulley(ctx, cx, cy, R, color, label){
+}function drawPulley(ctx, cx, cy, R, color, label, rot){
+  rot = rot || 0;
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,.45)';
   ctx.shadowBlur = 12;
@@ -707,7 +735,8 @@ function roundRect(ctx, x, y, w, h, r){
   ctx.lineWidth = 1.2;
   ctx.stroke();
 
-  for(let a=0; a<Math.PI*2; a+=Math.PI/3){
+  for(let k=0; k<6; k++){
+    const a = rot + k * Math.PI / 3;
     ctx.beginPath();
     ctx.moveTo(cx + Math.cos(a) * R * 0.24, cy + Math.sin(a) * R * 0.24);
     ctx.lineTo(cx + Math.cos(a) * R * 0.68, cy + Math.sin(a) * R * 0.68);
@@ -715,6 +744,12 @@ function roundRect(ctx, x, y, w, h, r){
     ctx.lineWidth = 1.4;
     ctx.stroke();
   }
+
+  /* index mark — makes rotation direction & speed unmistakable */
+  ctx.beginPath();
+  ctx.arc(cx + Math.cos(rot) * R * 0.78, cy + Math.sin(rot) * R * 0.78, Math.max(2.4, R * 0.07), 0, Math.PI * 2);
+  ctx.fillStyle = '#ffde59';
+  ctx.fill();
 
   ctx.beginPath(); ctx.arc(cx, cy, R * 0.22, 0, Math.PI * 2);
   ctx.fillStyle = '#071221'; ctx.fill();
@@ -849,6 +884,47 @@ function saveConfig(){
   });
   html += '</tbody></table>';
   cont.innerHTML = html;
+}/* ===== Presets & Reset ===== */
+function setParam(id, vid, val, unit, dec){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = val;
+  syncVal(el, vid, unit, dec === undefined ? 0 : dec);
+}function applyPreset(name){
+  const cfg = document.getElementById('beltConfig');
+  switch(name){
+    case 'reduction': /* 2:1 reduction: d1=100, d2=200, n1=1000 → n2=500 */
+      setParam('d1','d1Val',100,' mm'); setParam('d2','d2Val',200,' mm');
+      setParam('C','cVal',500,' mm'); setParam('n1','n1Val',1000,' rpm');
+      if (cfg) cfg.value = 'open';
+      break;
+    case 'overdrive': /* driven smaller → speeds up */
+      setParam('d1','d1Val',250,' mm'); setParam('d2','d2Val',100,' mm');
+      setParam('C','cVal',500,' mm'); setParam('n1','n1Val',1200,' rpm');
+      if (cfg) cfg.value = 'open';
+      break;
+    case 'crossed': /* crossed belt reverses driven direction */
+      setParam('d1','d1Val',120,' mm'); setParam('d2','d2Val',180,' mm');
+      setParam('C','cVal',600,' mm'); setParam('n1','n1Val',900,' rpm');
+      if (cfg) cfg.value = 'cross';
+      break;
+    case 'longC': /* long center distance */
+      setParam('d1','d1Val',150,' mm'); setParam('d2','d2Val',300,' mm');
+      setParam('C','cVal',1600,' mm'); setParam('n1','n1Val',1450,' rpm');
+      if (cfg) cfg.value = 'open';
+      break;
+  }
+  compute();
+}function resetSim(){
+  setParam('d1','d1Val',100,' mm'); setParam('d2','d2Val',200,' mm');
+  setParam('C','cVal',500,' mm'); setParam('n1','n1Val',1450,' rpm');
+  setParam('pw','pVal',1500,' W'); setParam('mu','muVal',0.30,'',2);
+  setParam('fallow','fallowVal',500,' N');
+  const cfg = document.getElementById('beltConfig'); if (cfg) cfg.value = 'open';
+  const bt = document.getElementById('beltType'); if (bt) bt.value = 'flat';
+  beltOffset = 0; spin1 = 0; spin2 = 0; elapsedTime = 0;
+  const et = document.getElementById('elapsedTime'); if (et) et.textContent = '0.00 s';
+  compute();
 }/* ===== Init ===== */
 function initSliders(){
   const map = [
@@ -862,6 +938,10 @@ function initSliders(){
     if (el) syncVal(el, vid, unit, dec);
   });
 }window.addEventListener('resize', () =>{ if (!isPlaying) renderCurrentFrame(); });
+if (REDUCED_MOTION){
+  const _pb = document.getElementById('btnPlay');
+  if (_pb){ _pb.innerHTML = '<i class="fas fa-play"></i>'; _pb.classList.remove('active'); }
+}
 initSliders();
 compute();
 </script>
@@ -926,6 +1006,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="belt-drive.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -987,7 +1070,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>ウェッジベルト駆動で、駆動プーリd1=90mm、従動プーリd2=180mm、軸間距離C=300mm、駆動軸n1=1500rpmの場合：速度比i=2.0、従動回転数n2=750rpm、ベルト速度v=7.1m/s、ベルト長さL≈1275mm。伝達動力5kWでベルト張力は緊張側F₁≈900N、弛み側F₂≈200N、巻き付き角θ≈184°、安全率S.F.≈1.8となります。</p>
+<p>ウェッジベルト駆動で、駆動プーリd1=90mm、従動プーリd2=180mm、軸間距離C=300mm、駆動軸n1=1500rpmの場合：速度比i=2.0、従動回転数n2=750rpm、ベルト速度v=7.1m/s、ベルト長さL≈1031mm。伝達動力5kW、摩擦係数μ=0.5では小プーリ巻き付き角θ≈162.7°、緊張側F₁≈933N、弛み側F₂≈225Nとなります。許容張力F_allow=1500Nと仮定すると安全率S.F.≈1.6です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -998,6 +1081,16 @@ compute();
 <li>湿度70%以上の環境ではベルト膨潤によるスリップ発生。定期的な張力調整と防湿カバー設置が必要</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="機械力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">機械力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

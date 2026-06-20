@@ -48,7 +48,7 @@ window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "リサジュー図形シミュレーター — 振動・波形パターン",
       "description": "インタラクティブなリサジュー図形シミュレーター。周波数比・位相差・振幅・減衰を調整して、美しいパラメトリック曲線を描画できます。ハーモノグラフ（減衰）モードとPNGエクスポートに対応。",
       "url": "https://novasolver.jp/tools/lissajous-figures.html",
@@ -58,7 +58,7 @@ window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["周波数比と位相差のリアルタイム制御","位相・周波数アニメーションモード","減衰付きハーモノグラフモード","レインボー／グラデーション／単色の描画モード","PNGエクスポート","8種類のプリセットパターン"],
       "keywords": "リサジュー図形, リサジュー曲線, ハーモノグラフ, 振動合成, 位相差, パラメトリック曲線",
       "datePublished": "2026-04-07",
@@ -146,6 +146,22 @@ details.theory-box[open]>summary h3,details.theory-box[open]>summary h4{margin-b
 details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
+
+/* ===== Lissajous v2 readouts/controls ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.15;word-break:break-word}
+.live-ro .rl{font-size:.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+#lissCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){input[type=range]::-webkit-slider-thumb{transition:none}}
+/* end Lissajous v2 */
+
 
 </style>
 <meta property="og:type" content="article">
@@ -314,29 +330,88 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="preset-btn" data-fx="300" data-fy="500" data-phi="157">3:5 90°</button>
       <button class="preset-btn" data-fx="300" data-fy="700" data-phi="0">3:7 0°</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="振動工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">振動工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="info-bar">
-      <span class="info-pill" id="infoRatio">fx:fy = 3:2</span>
+      <span class="info-pill" id="infoRatio">a:b = 3:2</span>
       <span class="info-pill" id="infoPhi">φ = 0.00π</span>
       <span class="info-pill" id="infoName">蝶型</span>
     </div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> リサジュー図形</div><canvas id="lissCanvas" width="560" height="560"></canvas></div>
-    <div class="canvas-actions">
-      <button class="btn green" id="btnDownload"><i class="fas fa-download"></i> PNG保存</button>
-      <button class="btn secondary" id="btnRedraw"><i class="fas fa-sync"></i> 再描画</button>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ物理量</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roRatio">3:2</div><div class="rl">周波数比 a:b</div></div>
+        <div class="live-ro"><div class="rv" id="roA">3</div><div class="rl">周波数 a</div></div>
+        <div class="live-ro"><div class="rv" id="roB">2</div><div class="rl">周波数 b</div></div>
+        <div class="live-ro"><div class="rv" id="roPhase">0°</div><div class="rl">位相 δ</div></div>
+        <div class="live-ro"><div class="rv" id="roAmp">1.00 / 1.00</div><div class="rl">振幅 A / B</div></div>
+        <div class="live-ro"><div class="rv" id="roClosed">はい</div><div class="rl">閉曲線？</div></div>
+        <div class="live-ro"><div class="rv" id="roLobes">2 / 3</div><div class="rl">ローブ数 x / y</div></div>
+        <div class="live-ro"><div class="rv" id="roPeriod">1.00</div><div class="rl">周期 [×2π]</div></div>
+      </div>
     </div>
 
-<div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論と主要な式</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-wave-square"></i> オシロスコープ（XYモード）— 2つの振動が図形を描く</div>
+      <canvas id="lissCanvas" width="560" height="560" tabindex="0" role="img" aria-label="リサジュー図形をリアルタイムに描画するオシロスコープ。上辺にx振動、左辺にy振動を表示し、それらが合成されて中央の曲線を描きます。"></canvas>
 
-      <div>$x(t) = A_x \sin(\omega_x t + \varphi)$</div>
-      <div>$y(t) = A_y \sin(\omega_y t)$</div>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" id="btnReset"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <button class="toggle-btn" type="button" id="btnSweep"><i class="fas fa-circle-notch"></i> 位相スイープ</button>
+        <button class="toggle-btn active" type="button" id="btnFade"><i class="fas fa-ghost"></i> 残像</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn speed-btn" type="button" data-speed="0.25">0.25×</button>
+          <button class="preset-btn speed-btn active" type="button" data-speed="1">1×</button>
+          <button class="preset-btn speed-btn" type="button" data-speed="2">2×</button>
+        </div>
+      </div>
+
+      <div style="margin:8px 0 2px;font-size:0.74rem;color:var(--muted)">位相プリセット：</div>
+      <div class="btn-group">
+        <button class="preset-btn" data-phase="0">δ = 0°</button>
+        <button class="preset-btn" data-phase="78">δ = 45°</button>
+        <button class="preset-btn" data-phase="157">δ = 90°</button>
+      </div>
+
+      <div class="legend">
+        <span><i class="swatch" style="background:#ff7a7a"></i>x振動（上辺）</span>
+        <span><i class="swatch" style="background:#7ab7ff"></i>y振動（左辺）</span>
+        <span><i class="swatch" style="background:#00e5ff"></i>追跡点 (x,y)</span>
+      </div>
+
+      <div class="canvas-actions">
+        <button class="btn green" id="btnDownload"><i class="fas fa-download"></i> PNG保存</button>
+        <button class="btn secondary" id="btnRedraw"><i class="fas fa-sync"></i> 再描画</button>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-check-double"></i> 既知パターンの検証</div>
+      <ul style="margin:0;padding-left:18px;font-size:0.82rem;line-height:1.9">
+        <li><strong>1:1, δ=0°</strong> → 対角線（プリセット「1:1 45°」でδを0に）</li>
+        <li><strong>1:1, δ=90°</strong> → 円／楕円</li>
+        <li><strong>1:2, δ=0°</strong> → 8の字（ローブ 2 個）</li>
+        <li><strong>2:3</strong> → 蝶型（x方向 3 ローブ・y方向 2 ローブ）</li>
+        <li>比 = (y方向の接点数) / (x方向の接点数)。無理数比（例 1:√2）では図形は閉じず歳差運動します。</li>
+      </ul>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論と主要な式</div>
+      <div>$x(t) = A \sin(a\,t + \delta)$</div>
+      <div>$y(t) = B \sin(b\,t)$</div>
+      <div style="margin-top:6px;font-size:0.78rem;color:var(--muted)">周波数比 $a:b$ が有理数なら閉曲線。位相 $\delta$ が向きを決めます。</div>
       <div style="margin-top:6px;font-size:0.76rem;color:var(--muted)">ハーモノグラフ（減衰あり）：</div>
-      <div style="font-size:0.78rem">$x = A_x e^{-d_x t}\sin(\omega_x t+\varphi)$</div>
-
-</div>
+      <div style="font-size:0.78rem">$x = A\,e^{-d_x t}\sin(a\,t+\delta)$</div>
+    </div>
 </div>
 </div>
 
@@ -406,6 +481,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <p>数値計算と視覚的なフィードバックを組み合わせることで、抽象的な理論と物理的な直感のあいだの溝を埋めます。学生にとっては効果的な学習ツールとなり、現役のエンジニアにとっては素早く検証を行うためのツールになります。</p>
 </div>
 </section>
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="lissajous-figures.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -459,17 +537,17 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>スライダーで X 軸方向の周波数（slFxNum）を 1〜20 Hz の範囲で設定し、水平方向の振動レートを定義します</li>
-<li>Y 軸方向の周波数（slFyNum）を 1〜20 Hz で設定し、垂直方向の振動レートを決めます。周波数比がパターンの複雑さを決定します</li>
-<li>位相オフセット（slPhiNum）を 0〜360° で調整し、リサジュー曲線を回転または反転させます。位相のずれによって非対称な図形が生まれます</li>
-<li>振幅比（slAxNum）を 0.5〜2.0 に変えて、X 軸を基準にパターンを縦方向・横方向へ伸縮させます</li>
-<li>機械振動のエネルギー損失を模擬したい場合は減衰を有効にします。低減衰系では典型的に 0.01〜0.15 程度の減衰比が用いられます</li>
+<li>スライダーで X 軸方向の周波数 f_x を 1.00〜8.00 Hz（スライダー値 100〜800）の範囲で設定し、水平方向の振動レートを定義します</li>
+<li>Y 軸方向の周波数 f_y も同じ範囲（1.00〜8.00 Hz）で設定し、垂直方向の振動レートを決めます。周波数比がパターンの複雑さを決定します</li>
+<li>位相差 φ を 0〜2π rad（スライダー値 0〜628、0〜360° に相当）で調整し、リサジュー曲線を回転または反転させます。位相のずれによって非対称な図形が生まれます</li>
+<li>振幅 Ax・Ay を 0.1〜1.0（スライダー値 10〜100）で変えて、パターンを縦方向・横方向へ伸縮させます</li>
+<li>機械振動のエネルギー損失を模擬したい場合はハーモノグラフモードを有効にし、減衰 d_x・d_y（スライダー値 0〜50、内部係数 0〜0.005）を設定します</li>
 <li>「再描画」ボタンを押すと、2D キャンバス上に追跡されたパラメトリックパスがリアルタイムで描画されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>計算例</h3>
-<p>Fx=3 Hz、Fy=2 Hz、位相=45°、振幅比=1.0、減衰=0 と設定します。3:2 の周波数比により、6 つのローブを持つ古典的なリサジュー曲線が描かれます。位相を 90° にすると図形は傾いた楕円に変わります。減衰=0.08（振り子＋ダンパー系で典型的な値）を加えると、外側の軌跡は 8〜10 周期かけて徐々に内側へ螺旋を描き、中心付近の小さなループに収束します。これは免震ダンパーや制振装置など、現実の機械系における調和振動の減衰挙動を模倣しています。</p>
+<p>Fx=3 Hz、Fy=2 Hz、位相=45°、振幅=1.0、減衰=0 と設定します。3:2 の周波数比により、左右に 3 つずつ・上下に 2 つずつのローブを持つ古典的な「蝶型」のリサジュー曲線が描かれます。位相を 90°（スライダー値 157）に変えても閉曲線のまま形だけが変化します（傾いた楕円になるのは 1:1 比のときだけです）。ハーモノグラフを ON にして減衰 d_x=d_y=50（内部係数 0.005）とすると、描画区間の終端（t=40π）で振幅は exp(−0.005×40π)≈0.53 倍まで減衰し、外側の軌跡から内側へゆるやかに螺旋を描きます。これは免震ダンパーや制振装置など、現実の機械系における調和振動の減衰挙動を単純化して模したものです。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務上の注意点</h3>
@@ -477,9 +555,19 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <li>整数比の周波数比（例：1:1、2:3、5:4）は閉じて対称的なパターンを生み、航空宇宙分野の二軸振動試験台の校正などに有用です</li>
 <li>非整数比（例：7:5）は密で準周期的な軌跡を作ります。産業用途では、回転機械における連成共振の解析などに使われます</li>
 <li>位相オフセットの調整は、交流電気計測における位相遅れ（例：50〜60 Hz での力率分析）や、デュアルモーター駆動系のタイミングずれの模擬に応用できます</li>
-<li>減衰値 >0.2 は過減衰の系を表します。車両サスペンションの衝撃吸収や、臨界減衰の 15〜25 % 程度に設計される建築用免震ダンパーのモデル化などに有用です</li>
+<li>本ツールの減衰 d_x・d_y は描画用の包絡減衰（内部係数 最大 0.005）であり、実機の減衰比（例：臨界減衰の 15〜25 % 程度に設計される建築用免震ダンパー）とは定義が異なります。実システムの評価では減衰比 ζ を用いた振動解析を別途行ってください</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="振動工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">振動工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -492,271 +580,364 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 </footer>
 
+<script>window.__LISS_I18N={"play":"再生","pause":"一時停止","yes":"はい","no":"いいえ","open_spiral":"渦巻","nm_11":"直線／楕円／円","nm_12":"8の字","nm_13":"魚の骨","nm_23":"蝶型","nm_34":"花弁","nm_35":"星型"};</script>
 <script>
+/* ===== Lissajous v2 oscilloscope engine (shared, language-neutral) ===== */
+function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.getElementById(slId+'Num');if(!sl||!el)return;var v=parseFloat(el.value);if(!isNaN(v))sl.value=Math.max(+sl.min,Math.min(+sl.max,v));sl.dispatchEvent(new Event('input'));}
+function syncToNum(slId){var sl=document.getElementById(slId);var el=document.getElementById(slId+'Num');if(sl&&el)el.value=sl.value;}
+window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');
 
-function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.getElementById(slId+'Num');if(!sl||!el)return;var v=parseFloat(el.value);if(!isNaN(v))sl.value=Math.max(+sl.min,Math.min(+sl.max,v));sl.dispatchEvent(new Event('input'));}window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-RSYX6L0L61');</script>
-<script>
 (function(){
-  const canvas = document.getElementById('lissCanvas');
-  const ctx = canvas.getContext('2d');
+  "use strict";
+  var T = window.__LISS_I18N || {};
+  function L(k, d){ return (T[k] != null) ? T[k] : d; }
 
-  // Parameters
-  let fx = 3.0, fy = 2.0, phi = 0.0;
-  let ax = 1.0, ay = 1.0;
-  let nPoints = 2000;
-  let lineWidth = 1.5;
-  let colorMode = 'rainbow';
-  let singleColor = '#00aaff';
-  let gradColor1 = '#ff0080';
-  let gradColor2 = '#00e5ff';
-  let bgColor = '#060616';
-  let harmonograph = false;
-  let dx = 0.001, dy = 0.001;
-  let animPhi = false, animFx = false;
-  let animId = null;
-  let animPhiVal = 0, animFxOffset = 0;
+  var canvas = document.getElementById('lissCanvas');
+  if(!canvas) return;
+  var ctx = canvas.getContext('2d');
 
-  function hexToRgb(hex) {
-    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-    return [r,g,b];
-  }function lerpColor(c1, c2, t){
-    return [
-      Math.round(c1[0]+(c2[0]-c1[0])*t),
-      Math.round(c1[1]+(c2[1]-c1[1])*t),
-      Math.round(c1[2]+(c2[2]-c1[2])*t)
-    ];
+  // ----- state -----
+  var fx = 3, fy = 2;          // integer-ish frequencies (slider/100)
+  var phi = 0.0;               // phase delta (rad)
+  var ax = 1.0, ay = 1.0;      // amplitudes (0..1)
+  var nPoints = 2000;          // persistence / trail length
+  var lineWidth = 1.5;
+  var colorMode = 'rainbow';
+  var singleColor = '#00aaff', gradColor1 = '#ff0080', gradColor2 = '#00e5ff';
+  var bgColor = '#060616';
+  var harmonograph = false;
+  var dx = 0.001, dy = 0.001;
+  var animPhi = false, animFx = false;     // legacy toggles -> phase sweep / freq wobble
+  var animFxOffset = 0;
+
+  var playing = true;          // tracing playback
+  var fade = true;             // persistence/fade trail
+  var speedMult = 1;
+  var simPhase = 0;            // master tracing phase (rad of the slower wave)
+  var animId = null, lastTs = 0;
+
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ----- helpers -----
+  function $(id){ return document.getElementById(id); }
+  function hexToRgb(hex){ return [parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)]; }
+  function lerpColor(c1,c2,t){ return [Math.round(c1[0]+(c2[0]-c1[0])*t),Math.round(c1[1]+(c2[1]-c1[1])*t),Math.round(c1[2]+(c2[2]-c1[2])*t)]; }
+  function gcd(a,b){ a=Math.round(a); b=Math.round(b); while(b){ var t=b; b=a%b; a=t; } return a||1; }
+
+  function strokeFor(frac){
+    if(colorMode==='rainbow') return 'hsl('+(frac*360)+',100%,60%)';
+    if(colorMode==='single') return singleColor;
+    var c = lerpColor(hexToRgb(gradColor1), hexToRgb(gradColor2), frac);
+    return 'rgb('+c[0]+','+c[1]+','+c[2]+')';
   }
 
-  function resizeCanvas() {
-    const vp = canvas.parentElement;
-    const sz = Math.max(220, Math.min((vp.clientWidth || canvas.clientWidth || 604) - 44, 560));
-    var __novaW = sz;
-    var __novaH = sz;
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    canvas.style.width = __novaW + 'px';
-    canvas.style.height = __novaH + 'px';
-    canvas.width = Math.round(__novaW * __novaDpr);
-    canvas.height = Math.round(__novaH * __novaDpr);
-    canvas.dataset.cssW = String(__novaW);
-    canvas.dataset.cssH = String(__novaH);
-    var __novaCtx = canvas.getContext && canvas.getContext('2d');
-    if (__novaCtx) {
-      __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-      __novaCtx.fillStyle = bgColor || '#08131f';
-      __novaCtx.fillRect(0, 0, __novaW, __novaH);
-    }
+  // ----- HiDPI sizing -----
+  var cssW = 560, cssH = 560;
+  function resizeCanvas(){
+    var vp = canvas.parentElement;
+    var sz = Math.max(240, Math.min((vp.clientWidth || 604) - 44, 560));
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cssW = sz; cssH = sz;
+    canvas.style.width = sz + 'px';
+    canvas.style.height = sz + 'px';
+    canvas.width = Math.round(sz * dpr);
+    canvas.height = Math.round(sz * dpr);
+    canvas.dataset.cssW = String(sz);
+    canvas.dataset.cssH = String(sz);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
     draw();
-  }function draw(){
-    const W = __novaCanvasCssW(canvas), H = __novaCanvasCssH(canvas);
-    const cx = W/2, cy = H/2;
-    const r = Math.max(12, (Math.min(W,H)/2) * 0.88);
+  }
 
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0,0,W,H);
+  // ----- ratio analysis -----
+  function analyze(){
+    var a = Math.max(1, Math.round(fx)), b = Math.max(1, Math.round(fy));
+    var g = gcd(a,b);
+    var m = a/g, n = b/g;                 // reduced ratio m:n  (x-freq : y-freq)
+    // Edge tangencies: top/bottom (horizontal) edge = m (=x-freq), left/right (vertical) edge = n.
+    // Visible lobes run opposite to tangencies: lobes along x-direction = n, along y-direction = m.
+    var xLobes = n, yLobes = m;
+    var closed = true;                    // integer ratio -> rational -> closed (when no damping)
+    return { a:a, b:b, m:m, n:n, xLobes:xLobes, yLobes:yLobes, closed:closed };
+  }
 
-    // Draw subtle grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,H); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(W,cy); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  function figureName(m,n){
+    var key = m+'_'+n;
+    var names = {
+      '1_1': L('nm_11','line / ellipse / circle'),
+      '1_2': L('nm_12','figure-eight'), '2_1': L('nm_12','figure-eight'),
+      '1_3': L('nm_13','fishbone'), '3_1': L('nm_13','fishbone'),
+      '2_3': L('nm_23','butterfly'), '3_2': L('nm_23','butterfly'),
+      '3_4': L('nm_34','petals'), '4_3': L('nm_34','petals'),
+      '3_5': L('nm_35','star'), '5_3': L('nm_35','star')
+    };
+    return names[key] || (m+':'+n);
+  }
 
-    const useFx = animFx ? fx + animFxOffset : fx;
-    const usePhi = animPhi ? animPhiVal : phi;
+  // master period (in t units) for one closed figure: 2*pi*LCM/(a) ... use 2*pi over gcd
+  function masterPeriod(){
+    var a = Math.max(1, Math.round(fx)), b = Math.max(1, Math.round(fy));
+    var g = gcd(a,b);
+    return 2*Math.PI / g;   // both a*t and b*t complete integer cycles after this
+  }
 
-    // Generate points
-    const N = Math.max(nPoints, 100);
-    // Period: LCM based, use 2*PI * max(fx,fy) / GCD approx
-    const tMax = harmonograph ? 2*Math.PI*20 : 2*Math.PI*Math.max(Math.ceil(useFx),Math.ceil(fy),1)*1.05;
-    const step = tMax / N;
+  // ----- drawing -----
+  function draw(){
+    var W = cssW, H = cssH;
+    var pad = Math.max(26, W*0.10);
+    var box = Math.min(W,H) - pad*2;     // plotting square
+    var ox = (W-box)/2, oy = (H-box)/2;
+    var cx = ox + box/2, cy = oy + box/2;
+    var R = box/2 * 0.82;                 // curve radius
+    var mtop = oy - 14;                   // margin oscilloscope baseline (top)
+    var mside = ox - 14;                  // margin baseline (left)
 
-    const gc1 = hexToRgb(gradColor1), gc2 = hexToRgb(gradColor2);
+    var useFx = animFx ? fx + animFxOffset : fx;
+    var usePhi = phi;
 
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.fillStyle = bgColor; ctx.fillRect(0,0,W,H);
 
-    // Draw as path segments with per-segment color
-    for (let i = 0; i < N; i++) {
-      const t0 = i * step;
-      const t1 = (i+1) * step;
-      const decay0 = harmonograph ? Math.exp(-dx*t0) : 1;
-      const decay1 = harmonograph ? Math.exp(-dx*t1) : 1;
-      const decayY0 = harmonograph ? Math.exp(-dy*t0) : 1;
-      const decayY1 = harmonograph ? Math.exp(-dy*t1) : 1;
+    // box + axes
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1;
+    ctx.strokeRect(ox, oy, box, box);
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath(); ctx.moveTo(cx,oy); ctx.lineTo(cx,oy+box); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox,cy); ctx.lineTo(ox+box,cy); ctx.stroke();
 
-      const px0 = cx + ax * r * decay0 * Math.sin(useFx * t0 + usePhi);
-      const py0 = cy - ay * r * decayY0 * Math.sin(fy * t0);
-      const px1 = cx + ax * r * decay1 * Math.sin(useFx * t1 + usePhi);
-      const py1 = cy - ay * r * decayY1 * Math.sin(fy * t1);
+    var period = harmonograph ? 2*Math.PI*20 : masterPeriod();
+    var N = Math.max(200, nPoints);
+    var step = period / N;
 
-      const frac = i / (N-1);
+    // how far the trace has progressed (0..1 of period) when playing
+    var prog = playing ? (simPhase % period) / period : 1;
+    if(reduceMotion) prog = 1;
+    if(harmonograph) prog = 1; // harmonograph: draw whole decaying figure
+    var drawN = Math.max(2, Math.floor(N * prog));
 
-      let strokeColor;
-      if (colorMode === 'rainbow') {
-        const hue = frac * 360;
-        strokeColor = `hsl(${hue},100%,60%)`;
-      }else if (colorMode === 'single'){
-        strokeColor = singleColor;
-      }else{
-        const [r,g,b] = lerpColor(gc1, gc2, frac);
-        strokeColor = `rgb(${r},${g},${b})`;
-      }
-
-      ctx.strokeStyle = strokeColor;
+    // ---- the full faint figure (ghost) so shape is always readable ----
+    if(fade && !harmonograph){
+      ctx.lineWidth = Math.max(0.6, lineWidth*0.35);
+      ctx.strokeStyle = 'rgba(255,255,255,0.10)';
       ctx.beginPath();
-      ctx.moveTo(px0, py0);
-      ctx.lineTo(px1, py1);
+      for(var j=0;j<=N;j++){
+        var tj = j*step;
+        var xj = cx + ax*R*Math.sin(useFx*tj + usePhi);
+        var yj = cy - ay*R*Math.sin(fy*tj);
+        if(j===0) ctx.moveTo(xj,yj); else ctx.lineTo(xj,yj);
+      }
       ctx.stroke();
     }
 
-    updateInfoBar(useFx, usePhi);
-  }function updateInfoBar(useFx, usePhi){
-    const fxR = (useFx/100).toFixed(2);
-    const fyR = (fy/100).toFixed(2);
-    document.getElementById('infoRatio').textContent = `fx:fy = ${fxR}:${fyR}`;
-    document.getElementById('infoPhi').textContent = `φ = ${(usePhi/Math.PI).toFixed(2)}π`;
+    // ---- traced curve up to drawN, colored ----
+    ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=lineWidth;
+    for(var i=0;i<drawN;i++){
+      var t0=i*step, t1=(i+1)*step;
+      var d0 = harmonograph ? Math.exp(-dx*t0):1, d1 = harmonograph ? Math.exp(-dx*t1):1;
+      var dy0 = harmonograph ? Math.exp(-dy*t0):1, dy1 = harmonograph ? Math.exp(-dy*t1):1;
+      var px0 = cx + ax*R*d0*Math.sin(useFx*t0+usePhi);
+      var py0 = cy - ay*R*dy0*Math.sin(fy*t0);
+      var px1 = cx + ax*R*d1*Math.sin(useFx*t1+usePhi);
+      var py1 = cy - ay*R*dy1*Math.sin(fy*t1);
+      var frac = i/(N-1);
+      var alpha = 1;
+      if(fade && !harmonograph){ var rel=(drawN-i)/drawN; alpha = Math.max(0.12, 1-rel*0.6); }
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = strokeFor(frac);
+      ctx.beginPath(); ctx.moveTo(px0,py0); ctx.lineTo(px1,py1); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
 
-    // Figure name heuristic
-    const r1 = Math.round(useFx/100), r2 = Math.round(fy/100);
-    const names ={
-      '1_1': '直線／楕円／円', '1_2': '8の字', '2_1': '8の字',
-      '1_3': '魚の骨', '3_1': '魚の骨',
-      '2_3': '蝶型', '3_2': '蝶型',
-      '3_4': '花弁', '4_3': '花弁',
-      '3_5': '星型', '5_3': '星型',
-      '3_7': '複雑なパターン', '7_3': '複雑なパターン'
-    };
-    const key = `${r1}_${r2}`;
-    document.getElementById('infoName').textContent = names[key] || `${r1}:${r2}`;
-  }function animate(){
-    if (animPhi) animPhiVal = (animPhiVal + 0.015) % (2*Math.PI);
-    if (animFx) animFxOffset = Math.sin(Date.now()*0.0003) * 50;
+    // ---- marginal component oscillations (oscilloscope projection) ----
+    // current parameter at the tip
+    var tt = drawN*step;
+    var dtip = harmonograph ? Math.exp(-dx*tt):1, dytip = harmonograph ? Math.exp(-dy*tt):1;
+    var xTip = ax*R*dtip*Math.sin(useFx*tt+usePhi);
+    var yTip = ay*R*dytip*Math.sin(fy*tt);
+    var tipX = cx + xTip, tipY = cy - yTip;
+
+    // top margin: x-oscillation vs time (the wave that drives horizontal motion)
+    var mAmp = (pad-16)*0.5;
+    var mBaseTop = oy - pad*0.45;
+    var mBaseLeft = ox - pad*0.45;
+    var win = period; // show one master period across the box
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = '#ff7a7a';
+    ctx.beginPath();
+    for(var k=0;k<=120;k++){
+      var fr=k/120; var tk=fr*win;
+      var xv = ax*Math.sin(useFx*tk+usePhi);
+      var sx = ox + fr*box;
+      var sy = mBaseTop - xv*mAmp;
+      if(k===0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+    }
+    ctx.stroke();
+    // left margin: y-oscillation (vertical) drawn vertically
+    ctx.strokeStyle = '#7ab7ff';
+    ctx.beginPath();
+    for(var k2=0;k2<=120;k2++){
+      var fr2=k2/120; var tk2=fr2*win;
+      var yv = ay*Math.sin(fy*tk2);
+      var sy2 = oy + fr2*box;
+      var sx2 = mBaseLeft - yv*mAmp;
+      if(k2===0) ctx.moveTo(sx2,sy2); else ctx.lineTo(sx2,sy2);
+    }
+    ctx.stroke();
+
+    // projection guide lines from margins to the tracing point
+    ctx.setLineDash([4,4]); ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(255,122,122,0.55)';
+    ctx.beginPath(); ctx.moveTo(tipX, mBaseTop); ctx.lineTo(tipX, tipY); ctx.stroke();
+    ctx.strokeStyle='rgba(122,183,255,0.55)';
+    ctx.beginPath(); ctx.moveTo(mBaseLeft, tipY); ctx.lineTo(tipX, tipY); ctx.stroke();
+    ctx.setLineDash([]);
+    // markers on the margins
+    var xvNow = ax*Math.sin(useFx*tt+usePhi);
+    var yvNow = ay*Math.sin(fy*tt);
+    ctx.fillStyle='#ff7a7a';
+    ctx.beginPath(); ctx.arc(tipX, mBaseTop - xvNow*mAmp, 3, 0, 7); ctx.fill();
+    ctx.fillStyle='#7ab7ff';
+    ctx.beginPath(); ctx.arc(mBaseLeft - yvNow*mAmp, tipY, 3, 0, 7); ctx.fill();
+
+    // tracing point
+    var bg = ctx.createRadialGradient(tipX-2,tipY-2,1,tipX,tipY,7);
+    bg.addColorStop(0,'#fff'); bg.addColorStop(1,'#00e5ff');
+    ctx.beginPath(); ctx.arc(tipX,tipY,5.5,0,7); ctx.fillStyle=bg; ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=1; ctx.stroke();
+
+    updateReadouts(useFx, usePhi);
+  }
+
+  function updateReadouts(useFx, usePhi){
+    var info = analyze();
+    var fxR = useFx.toFixed(useFx%1?2:0);
+    var fyR = fy.toFixed(fy%1?2:0);
+    if($('infoRatio')) $('infoRatio').textContent = 'a:b = '+info.m+':'+info.n;
+    if($('infoPhi')) $('infoPhi').textContent = 'φ = '+(usePhi/Math.PI).toFixed(2)+'π';
+    if($('infoName')) $('infoName').textContent = figureName(info.m, info.n);
+
+    // live readouts grid
+    set('roA', fxR);
+    set('roB', fyR);
+    set('roRatio', info.m+':'+info.n);
+    var deg = Math.round(usePhi*180/Math.PI) % 360;
+    set('roPhase', deg+'°');
+    set('roAmp', ax.toFixed(2)+' / '+ay.toFixed(2));
+    set('roClosed', harmonograph ? L('open_spiral','spiral') : (info.closed ? L('yes','yes') : L('no','no')));
+    set('roLobes', info.xLobes+' / '+info.yLobes);
+    var per = masterPeriod()/(2*Math.PI);
+    set('roPeriod', per.toFixed(2));
+  }
+  function set(id,v){ var e=$(id); if(e) e.textContent=v; }
+
+  // ----- animation loop -----
+  function loop(ts){
+    if(!playing){ animId=null; return; }
+    if(!lastTs) lastTs=ts;
+    var dt = Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+    if(animPhi){ phi = (phi + dt*0.6*speedMult) % (2*Math.PI); syncPhiSlider(); }
+    if(animFx){ animFxOffset = Math.sin(ts*0.0003)*0.5; }
+    simPhase += dt * 2*Math.PI * speedMult * 0.5;
     draw();
-    animId = requestAnimationFrame(animate);
-  }function startAnim(){
-    if (!animId) animId = requestAnimationFrame(animate);
-  }function stopAnim(){
-    if (animId) { cancelAnimationFrame(animId); animId = null; }
-    if (!animPhi && !animFx) draw();
-  }// Slider helper
-  function setSlider(id, val){
-    const el = document.getElementById(id);
-    el.value = val;
-    const pct = (el.value - el.min)/(el.max-el.min)*100;
-    el.style.setProperty('--pct', pct+'%');
-  }function updateSliderFill(el){
-    const pct=(el.value-el.min)/(el.max-el.min)*100;
-    el.style.setProperty('--pct',pct+'%');
-  }// Sliders
-  document.getElementById('slFx').addEventListener('input', function(){
-    fx = parseInt(this.value)/100;
-    updateSliderFill(this);
-    if(!animPhi&&!animFx) draw();
-  });
-  document.getElementById('slFy').addEventListener('input', function(){
-    fy = parseInt(this.value)/100;
-    updateSliderFill(this);
-    if(!animPhi&&!animFx) draw();
-  });
-  document.getElementById('slPhi').addEventListener('input', function(){
-    phi = parseInt(this.value)/100;
-    updateSliderFill(this);
-    if(!animPhi&&!animFx) draw();
-  });
-  document.getElementById('slAx').addEventListener('input', function(){
-    ax = parseInt(this.value)/100;
-    updateSliderFill(this);
-    if(!animPhi&&!animFx) draw();
-  });
-  document.getElementById('slAy').addEventListener('input', function(){
-    ay = parseInt(this.value)/100;
-    updateSliderFill(this);
-    if(!animPhi&&!animFx) draw();
-  });
-  document.getElementById('slPoints').addEventListener('input', function(){
-    nPoints = parseInt(this.value);
-    updateSliderFill(this);
-    if(!animPhi&&!animFx) draw();
-  });
-  document.getElementById('slLW').addEventListener('input', function(){
-    lineWidth = parseInt(this.value)/10;
-    updateSliderFill(this);
-    if(!animPhi&&!animFx) draw();
-  });
-  document.getElementById('slDx').addEventListener('input', function(){
-    dx = parseInt(this.value)/10000;
-    updateSliderFill(this);
-    if(!animPhi&&!animFx) draw();
-  });
-  document.getElementById('slDy').addEventListener('input', function(){
-    dy = parseInt(this.value)/10000;
-    updateSliderFill(this);
-    if(!animPhi&&!animFx) draw();
-  });
+    animId = requestAnimationFrame(loop);
+  }
+  function startPlay(){ if(reduceMotion){ draw(); return; } playing=true; lastTs=0; setPlayBtn(true); if(!animId) animId=requestAnimationFrame(loop); }
+  function stopPlay(){ playing=false; setPlayBtn(false); if(animId){ cancelAnimationFrame(animId); animId=null; } draw(); }
+  function togglePlay(){ playing ? stopPlay() : startPlay(); }
+  function setPlayBtn(on){
+    var b=$('btnPlay'); if(!b) return;
+    b.innerHTML = on ? '<i class="fas fa-pause"></i> '+L('pause','Pause') : '<i class="fas fa-play"></i> '+L('play','Play');
+  }
+  function resetTrace(){ simPhase=0; if(!playing && !reduceMotion){ /* leave */ } draw(); }
 
-  // Color mode
-  document.getElementById('selColor').addEventListener('change', function(){
-    colorMode = this.value;
-    document.getElementById('rowSingle').style.display = colorMode==='single'?'flex':'none';
-    document.getElementById('rowGradient').style.display = colorMode==='gradient'?'block':'none';
-    if(!animPhi&&!animFx) draw();
-  });
-  document.getElementById('pickSingle').addEventListener('input', function(){ singleColor=this.value; if(!animPhi&&!animFx) draw(); });
-  document.getElementById('pickGrad1').addEventListener('input', function(){ gradColor1=this.value; if(!animPhi&&!animFx) draw(); });
-  document.getElementById('pickGrad2').addEventListener('input', function(){ gradColor2=this.value; if(!animPhi&&!animFx) draw(); });
-  document.getElementById('pickBg').addEventListener('input', function(){ bgColor=this.value; if(!animPhi&&!animFx) draw(); });
+  function syncPhiSlider(){
+    var s=$('slPhi'); if(s){ s.value=String(Math.round(phi*100)); updateFill(s); var n=$('slPhiNum'); if(n)n.value=s.value; }
+  }
+  function updateFill(el){ var pct=(el.value-el.min)/(el.max-el.min)*100; el.style.setProperty('--pct',pct+'%'); }
 
-  // Toggle buttons
-  document.getElementById('btnAnimPhi').addEventListener('click', function(){
-    animPhi = !animPhi;
-    this.classList.toggle('active', animPhi);
-    if (animPhi || animFx) startAnim(); else stopAnim();
-  });
-  document.getElementById('btnAnimFx').addEventListener('click', function(){
-    animFx = !animFx;
-    this.classList.toggle('active', animFx);
-    if (animPhi || animFx) startAnim(); else stopAnim();
-  });
-  document.getElementById('btnHarmo').addEventListener('click', function(){
-    harmonograph = !harmonograph;
-    this.classList.toggle('active', harmonograph);
-    document.getElementById('harmonoParams').style.display = harmonograph ? 'block' : 'none';
-    if(!animPhi&&!animFx) draw();
-  });
+  // ----- wire controls -----
+  function bindSlider(id, fn){
+    var el=$(id); if(!el) return;
+    el.addEventListener('input', function(){ fn(this); updateFill(this); var n=$(id+'Num'); if(n)n.value=this.value; if(!playing||reduceMotion) draw(); });
+    updateFill(el);
+  }
+  bindSlider('slFx', function(e){ fx=parseInt(e.value)/100; });
+  bindSlider('slFy', function(e){ fy=parseInt(e.value)/100; });
+  bindSlider('slPhi', function(e){ phi=parseInt(e.value)/100; });
+  bindSlider('slAx', function(e){ ax=parseInt(e.value)/100; });
+  bindSlider('slAy', function(e){ ay=parseInt(e.value)/100; });
+  bindSlider('slPoints', function(e){ nPoints=parseInt(e.value); });
+  bindSlider('slLW', function(e){ lineWidth=parseInt(e.value)/10; });
+  bindSlider('slDx', function(e){ dx=parseInt(e.value)/10000; });
+  bindSlider('slDy', function(e){ dy=parseInt(e.value)/10000; });
 
-  // Presets
-  document.querySelectorAll('[data-fx]').forEach(btn =>{
-    btn.addEventListener('click', () => {
-      const fxv = parseInt(btn.dataset.fx);
-      const fyv = parseInt(btn.dataset.fy);
-      const phiv = parseInt(btn.dataset.phi);
-      setSlider('slFx', fxv);
-      setSlider('slFy', fyv);
-      setSlider('slPhi', phiv);
-      fx = fxv/100; fy = fyv/100; phi = phiv/100;
-      if(!animPhi&&!animFx) draw();
+  var selC=$('selColor');
+  if(selC) selC.addEventListener('change', function(){
+    colorMode=this.value;
+    if($('rowSingle')) $('rowSingle').style.display = colorMode==='single'?'flex':'none';
+    if($('rowGradient')) $('rowGradient').style.display = colorMode==='gradient'?'block':'none';
+    if(!playing||reduceMotion) draw();
+  });
+  bindColor('pickSingle', function(v){ singleColor=v; });
+  bindColor('pickGrad1', function(v){ gradColor1=v; });
+  bindColor('pickGrad2', function(v){ gradColor2=v; });
+  bindColor('pickBg', function(v){ bgColor=v; });
+  function bindColor(id, fn){ var e=$(id); if(e) e.addEventListener('input', function(){ fn(this.value); if(!playing||reduceMotion) draw(); }); }
+
+  // animation toggles (legacy buttons): phase sweep + freq wobble
+  bindToggle('btnAnimPhi', function(on){ animPhi=on; if(on && !playing) startPlay(); });
+  bindToggle('btnAnimFx', function(on){ animFx=on; if(!on) animFxOffset=0; if(on && !playing) startPlay(); });
+  bindToggle('btnHarmo', function(on){
+    harmonograph=on;
+    if($('harmonoParams')) $('harmonoParams').style.display = on?'block':'none';
+    draw();
+  });
+  function bindToggle(id, fn){ var b=$(id); if(b) b.addEventListener('click', function(){ var on=!b.classList.contains('active'); b.classList.toggle('active',on); fn(on); }); }
+
+  // play / pause / reset / fade / speed (new controls)
+  on('btnPlay', togglePlay);
+  on('btnReset', function(){ simPhase=0; phi=parseInt(($('slPhi')||{value:0}).value)/100; draw(); });
+  on('btnSweep', function(){ var b=$('btnSweep'); var on=!b.classList.contains('active'); b.classList.toggle('active',on); animPhi=on; var ap=$('btnAnimPhi'); if(ap) ap.classList.toggle('active',on); if(on&&!playing) startPlay(); });
+  on('btnFade', function(){ var b=$('btnFade'); fade=!fade; b.classList.toggle('active',fade); if(!playing||reduceMotion) draw(); });
+  // download (id may be btnDownload or btnSave)
+  ['btnDownload','btnSave'].forEach(function(id){ on(id, function(){ var a=document.createElement('a'); a.download='lissajous_'+Math.round(fx)+'_'+Math.round(fy)+'.png'; a.href=canvas.toDataURL('image/png'); a.click(); }); });
+  on('btnRedraw', function(){ draw(); });
+  function on(id, fn){ var e=$(id); if(e) e.addEventListener('click', fn); }
+
+  document.querySelectorAll('.speed-btn').forEach(function(b){
+    b.addEventListener('click', function(){
+      speedMult=parseFloat(b.dataset.speed);
+      document.querySelectorAll('.speed-btn').forEach(function(x){ x.classList.toggle('active', x===b); });
     });
   });
 
-  document.getElementById('btnDownload').addEventListener('click', function(){
-    const link = document.createElement('a');
-    link.download = `lissajous_${(fx).toFixed(1)}_${(fy).toFixed(1)}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+  // presets
+  document.querySelectorAll('[data-fx]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var fxv=parseInt(btn.dataset.fx), fyv=parseInt(btn.dataset.fy), phiv=parseInt(btn.dataset.phi);
+      setSl('slFx',fxv); setSl('slFy',fyv); setSl('slPhi',phiv);
+      fx=fxv/100; fy=fyv/100; phi=phiv/100; simPhase=0;
+      if(!playing||reduceMotion) draw();
+    });
   });
-  document.getElementById('btnRedraw').addEventListener('click', draw);
+  function setSl(id,val){ var el=$(id); if(!el)return; el.value=val; updateFill(el); var n=$(id+'Num'); if(n)n.value=val; }
 
-  // Init sliders fill
-  ['slFx','slFy','slPhi','slAx','slAy','slPoints','slLW','slDx','slDy'].forEach(id =>{
-    const el = document.getElementById(id);
-    if (el) updateSliderFill(el);
+  // phase preset buttons
+  document.querySelectorAll('[data-phase]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pv=parseInt(btn.dataset.phase); setSl('slPhi',pv); phi=pv/100; if(!playing||reduceMotion) draw();
+    });
   });
+
+  // keyboard a11y on canvas
+  canvas.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); togglePlay(); } });
 
   window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
 
+  // init
+  resizeCanvas();
+  if(reduceMotion){ playing=false; setPlayBtn(false); draw(); }
+  else { startPlay(); }
 })();
+
 </script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>
 <script src="/tools/param-edit.js" defer></script>

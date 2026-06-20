@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "タイヤ力学シミュレーター",
       "description": "Pacejka Magic Formulaを使ってタイヤの横力・縦力・摩擦円をリアルタイム計算。スリップ角・荷重・摩擦係数を調整しコーナリング剛性を可視化する。",
       "url": "https://novasolver.jp/tools/tire-mechanics.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Pacejka Magic Formula横力・縦力計算","摩擦円リアルタイム表示","コーナリング剛性・最大横力の統計表示"],
       "keywords": "タイヤ力学,Pacejka,Magic Formula,スリップ角,コーナリング剛性,摩擦円,車両ダイナミクス",
       "datePublished": "2026-04-09",
@@ -231,7 +231,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4274223213?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274223213.09._SCMZZZZZZ_.jpg" alt="自動車工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">自動車工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -360,9 +368,7 @@ function setPreset(name, btn){
     alphaArr.push(a);
     fyArr.push(pacejka(a * Math.PI / 180, B, C, D, E));
   }chartFy.data.datasets[0].data = alphaArr.map((a, i) => ({ x: a, y: fyArr[i] }));
-  const Fy_cur = pacejka(alpha * Math.PI / 180, B, C, D, E);
-  chartFy.data.datasets[1].data = [{ x: alpha, y: Fy_cur }];
-  chartFy.update('none');
+  const Fy_raw = pacejka(alpha * Math.PI / 180, B, C, D, E);
 
   // Longitudinal curve Fx vs kappa
   const kappaArr = [], fxArr = [];
@@ -370,8 +376,15 @@ function setPreset(name, btn){
     kappaArr.push(parseFloat(k.toFixed(3)));
     fxArr.push(pacejka(k, B, C, D, E));
   }chartFx.data.datasets[0].data = kappaArr.map((k, i) => ({ x: k, y: fxArr[i] }));
-  const Fx_cur = pacejka(kappa, B, C, D, E);
+  const Fx_raw = pacejka(kappa, B, C, D, E);
+
+  const rawNorm = Math.sqrt(Fx_raw * Fx_raw + Fy_raw * Fy_raw);
+  const combinedScale = rawNorm > D && D > 0 ? D / rawNorm : 1;
+  const Fy_cur = Fy_raw * combinedScale;
+  const Fx_cur = Fx_raw * combinedScale;
+  chartFy.data.datasets[1].data = [{ x: alpha, y: Fy_cur }];
   chartFx.data.datasets[1].data = [{ x: kappa, y: Fx_cur }];
+  chartFy.update('none');
   chartFx.update('none');
 
   // Stats
@@ -385,7 +398,7 @@ function setPreset(name, btn){
 
   document.getElementById('statFyCur').textContent = Math.round(Fy_cur);
   document.getElementById('statFxCur').textContent = Math.round(Fx_cur);
-  const util = Math.min(100, Math.sqrt(Fx_cur * Fx_cur + Fy_cur * Fy_cur) / D * 100);
+  const util = D > 0 ? Math.min(100, rawNorm / D * 100) : 0;
   document.getElementById('statUtil').textContent = util.toFixed(1);
 
   // Friction circle canvas
@@ -521,6 +534,9 @@ update();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="tire-mechanics.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -574,7 +590,7 @@ update();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>スライダーで鉛直荷重(Fz)を0～15kN、スリップ角(α)を-20～20°の範囲で設定します</li>
+<li>スライダーで鉛直荷重(Fz)を1～10kN、スリップ角(α)を-15～15°の範囲で設定します。</li>
 <li>縦力パラメータ(κ)と摩擦係数(μ)を調整し、乾燥舗装(μ=1.0)または湿潤舗装(μ=0.7)の条件を再現します</li>
 <li>リアルタイムで横力Fy、縦力Fx、グリップ使用率を確認し、Pacejka Magic Formulaに基づく摩擦円を可視化します</li>
 </ol>
@@ -592,6 +608,16 @@ update();
 <li>復元モーメントMzはステアリング操舵反力の予測に有用ですが、キャンバー角や速度依存性は別途考慮が必要です</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4274223213?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274223213.09._SCMZZZZZZ_.jpg" alt="自動車工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">自動車工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

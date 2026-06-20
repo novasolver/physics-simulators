@@ -38,7 +38,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "すべり軸受シミュレーター",
       "description": "短軸受近似レイノルズ方程式によるジャーナル軸受の流体潤滑解析。ゾンマーフェルト数・最小油膜厚さ・負荷容量・摩擦係数をリアルタイム計算。",
       "url": "https://novasolver.jp/tools/fluid-bearing.html",
@@ -48,7 +48,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["短軸受近似レイノルズ方程式","ゾンマーフェルト数 vs 負荷容量・偏心率曲線","周方向油膜圧力分布","摩擦係数・動力損失の自動計算"],
       "keywords": "すべり軸受,ジャーナル軸受,レイノルズ方程式,ゾンマーフェルト数,流体潤滑,油膜厚さ,トライボロジー",
       "datePublished": "2026-04-08",
@@ -160,7 +160,16 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
       <label>荷重 W (N) <div class="num-wrap"><input type="number" class="num-input" id="WValNum" value="5000" min="100" max="50000" step="100" oninput="syncFromNum('W','WValNum')"><span class="num-unit">N</span></div></label>
       <input type="range" id="W" min="100" max="50000" value="5000" step="100" oninput="syncToNum('W','WValNum');update()">
     </div>
-</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 
   <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -176,7 +185,12 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
 
     <div class="viz-top">
       <div>
-        <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 軸受断面図</div><canvas id="bearingCanvas" width="180" height="180"></canvas></div>
+        <div class="chart-card"><div class="chart-title"><i class="fas fa-sync-alt"></i> 軸受断面ライブ（回転＋油くさび＋圧力）</div><canvas id="bearingCanvas" width="300" height="300" role="img" aria-label="ジャーナル軸受の断面アニメーション：回転する軸が油をくさび形すきまに引き込み、収束部に圧力ローブが発生して軸を支える様子を表示します。"></canvas>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.66rem;color:var(--muted);margin-top:8px">
+          <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:12px;height:12px;border-radius:50%;background:#5a7a9a;display:inline-block"></i>ジャーナル（回転軸）</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:12px;height:3px;background:#ff5252;display:inline-block"></i>油膜圧力ローブ</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:12px;height:3px;background:#ffd54a;display:inline-block"></i>最小油膜 h_min</span>
+        </div></div>
       </div>
       <div class="canvas-wrap" style="margin-bottom:0">
         <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 周方向油膜圧力分布</div><canvas class="ux-chartjs-canvas" id="chartPressure"></canvas></div>
@@ -198,224 +212,269 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
 </div>
 
 <script>
+var LANG = {pLabel:'油膜圧力 (MPa)',xAngle:'角度 θ (°)',yPress:'圧力 (MPa)',curve:'h_min/C 曲線',point:'現在の動作点',xSomm:'ゾンマーフェルト数 S',eps:'ε',lobe:'圧力ローブ ↑'};
+(function(){
+"use strict";
 
-
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
+function hidpi(canvas, cssW, cssH, ctx){
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var attrW = parseFloat(canvas.getAttribute("width")) || 0;
-  var attrH = parseFloat(canvas.getAttribute("height")) || 0;
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || attrW || canvas.width / dpr || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || attrH || canvas.height / dpr || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  var bw = Math.round(w * dpr);
-  var bh = Math.round(h * dpr);
-  if (canvas.width !== bw || canvas.height !== bh) {
-    canvas.width = bw;
-    canvas.height = bh;
-  }
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  var bw = Math.round(cssW * dpr), bh = Math.round(cssH * dpr);
+  if (canvas.width !== bw || canvas.height !== bh){ canvas.width = bw; canvas.height = bh; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w: cssW, h: cssH };
 }
-let chartPressure, chartSomm;
 
-function initCharts() {
+function sommerfeldToEcc(S, lambdaLD){
+  if (!isFinite(S) || S <= 0) return 0.999;
+  var geom = lambdaLD * lambdaLD;
+  var lo = 0.001, hi = 0.999;
+  for (var i = 0; i < 80; i++){
+    var eps = 0.5 * (lo + hi);
+    var St = (Math.sqrt(1-eps*eps) / eps) /
+      (Math.PI * Math.sqrt(Math.PI*Math.PI*(1-eps*eps) + 16*eps*eps)) * geom;
+    if (St > S) lo = eps; else hi = eps;
+  }
+  return 0.5 * (lo + hi);
+}
+
+function computePressure(eps, mu, U, R, C, L){
+  var n = 360, angles = [], pressures = [];
+  for (var i = 0; i <= n; i++){
+    var th = i * Math.PI / 180;
+    var den = Math.pow(1 + eps*Math.cos(th), 3);
+    var P = 3 * mu * U * Math.sin(th) * eps * (L*L/4) / (C*C*den);
+    angles.push((th*180/Math.PI).toFixed(0));
+    pressures.push(Math.max(0, P));
+  }
+  return { angles: angles, pressures: pressures };
+}
+
+var chartPressure, chartSomm;
+function initCharts(){
   chartPressure = new Chart(document.getElementById('chartPressure'), {
     type: 'line',
-    data: {
-      labels: [],
-      datasets: [{
-        label: '油膜圧力 (MPa)',
-        data: [],
-        borderColor: '#007BFF',
-        backgroundColor: 'rgba(0,123,255,0.15)',
-        borderWidth: 2,
-        pointRadius: 0,
-        fill: true
-      }]
-    },
-    options:{
-      animation: false, responsive: true,
-      maintainAspectRatio:false,resizeDelay:100,plugins: { legend: { display: false } },
-      scales:{
-        x: { title: { display: true, text: '角度 θ (°)' }, grid:{ color: '#eee' }, ticks:{ font: { size: 10 } } },
-        y:{ title: { display: true, text: '圧力 (MPa)' }, grid:{ color: '#eee' }, ticks:{ font: { size: 10 } } }
-      }
-    }
+    data: { labels: [], datasets: [{ label: LANG.pLabel, data: [], borderColor: '#007BFF',
+      backgroundColor: 'rgba(0,123,255,0.15)', borderWidth: 2, pointRadius: 0, fill: true }] },
+    options: { animation: false, responsive: true, maintainAspectRatio: false, resizeDelay: 100,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { title: { display: true, text: LANG.xAngle }, grid: { color: '#eee' }, ticks: { font: { size: 10 } } },
+        y: { title: { display: true, text: LANG.yPress }, grid: { color: '#eee' }, ticks: { font: { size: 10 } } }
+      } }
   });
-
-  chartSomm = new Chart(document.getElementById('chartSomm'),{
+  chartSomm = new Chart(document.getElementById('chartSomm'), {
     type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        { label: 'h_min/C 曲線', data: [], borderColor: '#00B4D8', borderWidth: 2, pointRadius: 0, fill: false },{ label: '現在の動作点', data: [], borderColor: '#FF4500', backgroundColor: '#FF4500', borderWidth: 0, pointRadius: 8, showLine: false }
-      ]
-    },
-    options:{
-      animation: false, responsive: true,
-      maintainAspectRatio:false,resizeDelay:100,plugins: { legend: { display: true, position: 'top' } },
-      scales:{
-        x: { type: 'logarithmic', title: { display: true, text: 'ゾンマーフェルト数 S' }, grid:{ color: '#eee' }, ticks:{ font: { size: 10 } } , ticks:{callback:function(v){return v.toExponential(0);},maxTicksLimit:8}},
-        y:{ min: 0, max: 1, title: { display: true, text: 'h_min / C' }, grid:{ color: '#eee' }, ticks:{ font: { size: 10 } } }
-      }
-    }
+    data: { labels: [], datasets: [
+      { label: LANG.curve, data: [], borderColor: '#00B4D8', borderWidth: 2, pointRadius: 0, fill: false },
+      { label: LANG.point, data: [], borderColor: '#FF4500', backgroundColor: '#FF4500', borderWidth: 0, pointRadius: 8, showLine: false }
+    ] },
+    options: { animation: false, responsive: true, maintainAspectRatio: false, resizeDelay: 100,
+      plugins: { legend: { display: true, position: 'top' } },
+      scales: {
+        x: { type: 'logarithmic', title: { display: true, text: LANG.xSomm }, grid: { color: '#eee' },
+          ticks: { callback: function(v){ return v.toExponential(0); }, maxTicksLimit: 8, font: { size: 10 } } },
+        y: { min: 0, max: 1, title: { display: true, text: 'h_min / C' }, grid: { color: '#eee' }, ticks: { font: { size: 10 } } }
+      } }
   });
-}// Short-bearing Reynolds: P(theta,z) = 3μU·sin(θ)(L²/4 - z²)·ε / (C²(1+ε cos θ)³)
-// Eccentricity from Sommerfeld number using Ocvirk approximation
+}
 
-function sommerfeldToEcc(S){
-  // ε from S for short bearing (Ocvirk): S = (1/ε)·√(1-ε²)/(π√(π²(1-ε²) + 16ε²)) * (L/2R)²
-  // Numerically solve
-  if (S > 100) return 0.01;
-  if (S < 0.001) return 0.995;
-  let eps = 0.5;
-  for (let iter = 0; iter < 100; iter++) {
-    const f = eps / (Math.sqrt(1-eps*eps) * Math.sqrt(Math.PI**2*(1-eps*eps) + 16*eps*eps));
-    const S_trial = f / (2*Math.PI);
-    const dS = S_trial - S;
-    if (Math.abs(dS) < 1e-8) break;
-    eps = Math.max(0.001, Math.min(0.999, eps - dS * 0.5));
-  }
-  return eps;
-}function computePressure(eps, mu_Pas, U, R, C, L){
-  const pts = 360;
-  const angles = Array.from({length: pts+1}, (_, i) => i * Math.PI / 180 * (360/pts));
-  const z0 = 0; // at midplane
-  const pressures = angles.map(theta =>{
-    const h = C * (1 + eps * Math.cos(theta));
-    // Short bearing P ~ 3μU sin(θ) ε / (C²(1+ε cosθ)³) * (L²/4)
-    const P = 3 * mu_Pas * U * Math.sin(theta) * eps * (L*L/4) / (C*C * Math.pow(1 + eps*Math.cos(theta), 3));
-    return Math.max(0, P); // half-Sommerfeld
-  });
-  return{ angles: angles.map(a => (a*180/Math.PI).toFixed(0)), pressures };
-}function drawBearing(ctx, eps, angle_att){
-  const __novaSize = Math.max(180, Math.min(320, ctx.canvas.clientWidth || parseFloat(ctx.canvas.getAttribute('width')) || 180));
-  const __novaDims = __novaHiDpiCanvas(ctx.canvas, __novaSize, __novaSize, ctx);
-  const W = __novaDims.w, H = __novaDims.h;
-  ctx.clearRect(0, 0, W, H);
-  const cx = W/2, cy = H/2;
-  const R_outer = 75, R_inner = 55;
-  const ecc = eps * (R_outer - R_inner);
-  const jx = cx + ecc * Math.cos(angle_att + Math.PI/2);
-  const jy = cy + ecc * Math.sin(angle_att + Math.PI/2);
+var state = null;
+function setTxt(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; }
+function syncNum(id, v){ var e = document.getElementById(id); if (e){ if (e.tagName === 'INPUT') e.value = v; else e.textContent = v; } }
 
-  // bearing
-  ctx.beginPath();
-  ctx.arc(cx, cy, R_outer, 0, 2*Math.PI);
-  ctx.fillStyle = '#dde5f0';
-  ctx.fill();
+function recompute(){
+  var R_mm = parseFloat(document.getElementById('R').value);
+  var C_um = parseFloat(document.getElementById('C').value);
+  var L_mm = parseFloat(document.getElementById('L').value);
+  var N_rpm = parseFloat(document.getElementById('N').value);
+  var mu_mPas = parseFloat(document.getElementById('mu').value);
+  var W_N = parseFloat(document.getElementById('W').value);
 
-  // oil film (colored wedge)
-  for (let t = 0; t < 360; t += 2) {
-    const theta = t * Math.PI / 180;
-    const h_norm = 1 + eps * Math.cos(theta);
-    const hue = 200 + 60 * (1 - h_norm);
-    ctx.beginPath();
-    ctx.moveTo(jx, jy);
-    ctx.arc(jx, jy, R_inner, theta, theta + 2*Math.PI/180);
-    ctx.closePath();
-    ctx.fillStyle = `hsl(${hue}, 80%, ${40 + 30*h_norm}%)`;
-    ctx.fill();
-  }
+  syncNum('RValNum', R_mm); syncNum('CValNum', C_um); syncNum('LValNum', L_mm);
+  syncNum('NValNum', N_rpm); syncNum('muValNum', mu_mPas); syncNum('WValNum', W_N);
 
-  // journal
-  ctx.beginPath();
-  ctx.arc(jx, jy, R_inner, 0, 2*Math.PI);
-  ctx.fillStyle = '#5a7a9a';
-  ctx.fill();
-  ctx.strokeStyle = '#2a4a6a';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  var R = R_mm*1e-3, C = C_um*1e-6, L = L_mm*1e-3, mu = mu_mPas*1e-3;
+  var N_rps = N_rpm/60;
+  var U = 2*Math.PI*R*N_rps;
 
-  // bearing ring
-  ctx.beginPath();
-  ctx.arc(cx, cy, R_outer, 0, 2*Math.PI);
-  ctx.strokeStyle = '#2a4a6a';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  var S = (mu * N_rps * L * 2*R * Math.pow(R/C, 2)) / W_N;
+  var lambdaLD = L/(2*R);
+  var eps = Math.min(0.98, sommerfeldToEcc(S, lambdaLD));
+  var h_min = C*(1 - eps);
 
-  // center marks
-  ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, 2*Math.PI); ctx.fill();
-  ctx.fillStyle = '#FFD700';
-  ctx.beginPath(); ctx.arc(jx, jy, 3, 0, 2*Math.PI); ctx.fill();
+  var pr = computePressure(eps, mu, U, R, C, L);
+  var P_max = 0; for (var i = 0; i < pr.pressures.length; i++){ if (pr.pressures[i] > P_max) P_max = pr.pressures[i]; }
 
-  // label
-  ctx.fillStyle = '#444';
-  ctx.font = '10px Roboto Mono';
-  ctx.fillText('ε=' + eps.toFixed(3), 10, H-8);
-}function update(){
-  const R_mm = parseFloat(document.getElementById('R').value);
-  const C_um = parseFloat(document.getElementById('C').value);
-  const L_mm = parseFloat(document.getElementById('L').value);
-  const N_rpm = parseFloat(document.getElementById('N').value);
-  const mu_mPas = parseFloat(document.getElementById('mu').value);
-  const W_N = parseFloat(document.getElementById('W').value);
+  var f = (2*Math.PI * mu * N_rps * R * L / W_N) * (2 + eps*eps) / Math.sqrt(1 - eps*eps);
+  var P_loss = f * W_N * U;
 
-  (function(){var _e=document.getElementById('RValNum');if(_e){if(_e.tagName==='INPUT')_e.value=R_mm;else _e.textContent=R_mm;}})();
-  (function(){var _e=document.getElementById('CValNum');if(_e){if(_e.tagName==='INPUT')_e.value=C_um;else _e.textContent=C_um;}})();
-  (function(){var _e=document.getElementById('LValNum');if(_e){if(_e.tagName==='INPUT')_e.value=L_mm;else _e.textContent=L_mm;}})();
-  (function(){var _e=document.getElementById('NValNum');if(_e){if(_e.tagName==='INPUT')_e.value=N_rpm;else _e.textContent=N_rpm;}})();
-  (function(){var _e=document.getElementById('muValNum');if(_e){if(_e.tagName==='INPUT')_e.value=mu_mPas;else _e.textContent=mu_mPas;}})();
-  (function(){var _e=document.getElementById('WValNum');if(_e){if(_e.tagName==='INPUT')_e.value=W_N;else _e.textContent=W_N;}})();
+  state = { R:R, C:C, L:L, mu:mu, N_rps:N_rps, U:U, S:S, eps:eps, h_min:h_min,
+            P_max:P_max, f:f, P_loss:P_loss, lambdaLD:lambdaLD, pr:pr, W:W_N };
 
-  const R = R_mm * 1e-3;
-  const C = C_um * 1e-6;
-  const L = L_mm * 1e-3;
-  const mu = mu_mPas * 1e-3;
-  const N_rps = N_rpm / 60;
-  const U = 2 * Math.PI * R * N_rps; // surface velocity m/s
-
-  // Sommerfeld number
-  const S = (mu * N_rps * L * 2*R * (R/C)**2) / W_N;
-
-  // Eccentricity from S
-  const eps = Math.min(0.98, sommerfeldToEcc(S));
-  const h_min = C * (1 - eps);
-  const angle_att = Math.PI/4; // attitude angle approx
-
-  // Pressure distribution
-  const {angles, pressures}= computePressure(eps, mu, U, R, C, L);
-  const P_max_Pa = Math.max(...pressures);
-
-  // Friction: f = (C/R) * F_tangential/W ~ 2πμNRL/W * (2+ε²)/√(1-ε²)
-  const f = (2*Math.PI * mu * N_rps * R * L / W_N) * (2 + eps*eps) / Math.sqrt(1 - eps*eps);
-  const P_loss = f * W_N * U; // W
-
-  // Sommerfeld curve
-  const sVals = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
-  const hminCurve = sVals.map(sv => ({x: sv, y: 1 - sommerfeldToEcc(sv)}));
-  const currentPoint = [{x: S, y: h_min/C}];
-
-  chartPressure.data.labels = angles;
-  chartPressure.data.datasets[0].data = pressures.map(p => p/1e6);
+  chartPressure.data.labels = pr.angles;
+  chartPressure.data.datasets[0].data = pr.pressures.map(function(p){ return p/1e6; });
   chartPressure.update('none');
-
-  chartSomm.data.datasets[0].data = hminCurve;
-  chartSomm.data.datasets[1].data = currentPoint;
+  var sVals = [0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.2,0.5,1,2,5,10,20,50,100];
+  chartSomm.data.datasets[0].data = sVals.map(function(sv){ return { x: sv, y: 1 - sommerfeldToEcc(sv, lambdaLD) }; });
+  chartSomm.data.datasets[1].data = [{ x: S, y: h_min/C }];
   chartSomm.update('none');
 
-  const ctx = document.getElementById('bearingCanvas').getContext('2d');
-  drawBearing(ctx, eps, angle_att);
+  setTxt('sSomm', S.toExponential(2));
+  setTxt('sEcc', eps.toFixed(4));
+  setTxt('sHmin', (h_min*1e6).toFixed(2));
+  setTxt('sPmax', (P_max/1e6).toFixed(3));
+  setTxt('sFriction', f.toExponential(3));
+  setTxt('sPower', P_loss.toFixed(1));
+}
 
-  document.getElementById('sSomm').textContent = S.toExponential(2);
-  document.getElementById('sEcc').textContent = eps.toFixed(4);
-  document.getElementById('sHmin').textContent = (h_min*1e6).toFixed(2);
-  document.getElementById('sPmax').textContent = (P_max_Pa/1e6).toFixed(3);
-  document.getElementById('sFriction').textContent = f.toExponential(3);
-  document.getElementById('sPower').textContent = P_loss.toFixed(1);
-}initCharts();
-update();
+var bcanvas = document.getElementById('bearingCanvas');
+var bctx = bcanvas.getContext('2d');
+var spin = 0, flow = 0, rafId = null;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function drawBearing(){
+  var size = 300;
+  var dims = hidpi(bcanvas, size, size, bctx);
+  var W = dims.w, H = dims.h;
+  bctx.clearRect(0, 0, W, H);
+  bctx.fillStyle = '#0a1628';
+  bctx.fillRect(0, 0, W, H);
+  if (!state) return;
+
+  var eps = state.eps;
+  var cx = W/2, cy = H/2;
+  var Rb = 108, clr = 26, Rj = Rb - clr;
+  // attitude angle (line of centers vs load). Load acts +y (down). Ocvirk attitude:
+  var att = Math.PI/2 - Math.atan2(Math.PI*Math.sqrt(1-eps*eps), 4*eps);
+  var ex = eps * clr * Math.cos(att), ey = eps * clr * Math.sin(att);
+  var jx = cx + ex, jy = cy + ey;
+
+  // housing
+  bctx.beginPath(); bctx.arc(cx, cy, Rb+14, 0, 7); bctx.fillStyle = '#1b2c44'; bctx.fill();
+
+  // oil film ring colored by film thickness (thin=warm)
+  var steps = 180;
+  for (var i = 0; i < steps; i++){
+    var th = i/steps*2*Math.PI;
+    var phi = th - att;
+    var hN = 1 + eps*Math.cos(phi + Math.PI);
+    var frac = hN/(1+eps);
+    var hue = 205 - 165*(1 - Math.min(1, frac));
+    var light = 30 + 24*frac;
+    bctx.beginPath();
+    bctx.moveTo(cx + Rj*Math.cos(th), cy + Rj*Math.sin(th));
+    bctx.arc(cx, cy, Rb, th, th + 2*Math.PI/steps);
+    bctx.arc(jx, jy, Rj, th + 2*Math.PI/steps, th, true);
+    bctx.closePath();
+    bctx.fillStyle = 'hsl(' + hue.toFixed(0) + ',85%,' + light.toFixed(0) + '%)';
+    bctx.fill();
+  }
+
+  bctx.beginPath(); bctx.arc(cx, cy, Rb, 0, 7); bctx.strokeStyle = 'rgba(255,255,255,.55)'; bctx.lineWidth = 2.5; bctx.stroke();
+
+  // lubricant particles dragged by journal surface
+  bctx.fillStyle = 'rgba(180,225,255,.85)';
+  var np = 46;
+  for (var k = 0; k < np; k++){
+    var a = (k/np*2*Math.PI) + flow;
+    var phi2 = a - att;
+    var hN2 = 1 + eps*Math.cos(phi2 + Math.PI);
+    var rr = Rj + clr*0.5*(0.35 + 0.6*(hN2/(1+eps)));
+    bctx.beginPath(); bctx.arc(jx + rr*Math.cos(a), jy + rr*Math.sin(a), 1.6, 0, 7); bctx.fill();
+  }
+
+  // journal (rotating shaft)
+  bctx.save();
+  bctx.translate(jx, jy);
+  var grd = bctx.createRadialGradient(-Rj*0.3, -Rj*0.3, Rj*0.1, 0, 0, Rj);
+  grd.addColorStop(0, '#7d9bbb'); grd.addColorStop(1, '#3d5b7b');
+  bctx.beginPath(); bctx.arc(0, 0, Rj, 0, 7); bctx.fillStyle = grd; bctx.fill();
+  bctx.strokeStyle = '#2a4a6a'; bctx.lineWidth = 2; bctx.stroke();
+  bctx.rotate(spin);
+  bctx.strokeStyle = 'rgba(255,255,255,.4)'; bctx.lineWidth = 2;
+  for (var s = 0; s < 6; s++){
+    bctx.beginPath(); bctx.moveTo(0, 0);
+    var sa = s*Math.PI/3;
+    bctx.lineTo(Rj*0.82*Math.cos(sa), Rj*0.82*Math.sin(sa)); bctx.stroke();
+  }
+  bctx.beginPath(); bctx.arc(0, 0, 5, 0, 7); bctx.fillStyle = '#ffd54a'; bctx.fill();
+  bctx.restore();
+
+  // rotation arrow
+  bctx.strokeStyle = 'rgba(255,213,74,.9)'; bctx.lineWidth = 2;
+  bctx.beginPath(); bctx.arc(jx, jy, Rj*0.6, -0.6, 0.9); bctx.stroke();
+  var ea = 0.9, ax = jx + Rj*0.6*Math.cos(ea), ay = jy + Rj*0.6*Math.sin(ea);
+  bctx.beginPath(); bctx.moveTo(ax, ay);
+  bctx.lineTo(ax - 7*Math.cos(ea-0.5), ay - 7*Math.sin(ea-0.5));
+  bctx.lineTo(ax - 7*Math.cos(ea+0.9), ay - 7*Math.sin(ea+0.9));
+  bctx.closePath(); bctx.fillStyle = 'rgba(255,213,74,.9)'; bctx.fill();
+
+  // pressure lobe in converging wedge (radial profile outside the bore)
+  bctx.strokeStyle = '#ff5252'; bctx.lineWidth = 2; bctx.fillStyle = 'rgba(255,82,82,.20)';
+  bctx.beginPath();
+  var startTh = null, lastTh = null;
+  for (var j = 0; j <= 80; j++){
+    var phi3 = j/80*Math.PI;
+    var den3 = Math.pow(1 + eps*Math.cos(phi3 + Math.PI), 3);
+    var pv3 = Math.sin(phi3) * eps / den3;
+    var pn = Math.min(1, pv3 / (eps/Math.pow(1-eps,3)*0.7 + 1e-9));
+    var thg = att + Math.PI - phi3;
+    var rr3 = Rb + 4 + pn*48;
+    var ptx = cx + rr3*Math.cos(thg), pty = cy + rr3*Math.sin(thg);
+    if (startTh === null){ startTh = thg; bctx.moveTo(cx + (Rb+4)*Math.cos(thg), cy + (Rb+4)*Math.sin(thg)); }
+    bctx.lineTo(ptx, pty);
+    lastTh = thg;
+  }
+  bctx.lineTo(cx + (Rb+4)*Math.cos(lastTh), cy + (Rb+4)*Math.sin(lastTh));
+  for (var m = 80; m >= 0; m--){
+    var thg2 = att + Math.PI - m/80*Math.PI;
+    bctx.lineTo(cx + (Rb+4)*Math.cos(thg2), cy + (Rb+4)*Math.sin(thg2));
+  }
+  bctx.closePath(); bctx.fill(); bctx.stroke();
+
+  // minimum film thickness marker (narrowest point on line of centers)
+  var minTh = att;
+  bctx.strokeStyle = '#ffd54a'; bctx.lineWidth = 3;
+  bctx.beginPath();
+  bctx.moveTo(jx + Rj*Math.cos(minTh), jy + Rj*Math.sin(minTh));
+  bctx.lineTo(cx + Rb*Math.cos(minTh), cy + Rb*Math.sin(minTh));
+  bctx.stroke();
+
+  // labels
+  bctx.fillStyle = 'rgba(255,255,255,.9)'; bctx.font = 'bold 12px Roboto Mono'; bctx.textAlign = 'left';
+  bctx.fillText('S = ' + state.S.toExponential(2), 10, 18);
+  bctx.fillText(LANG.eps + ' = ' + eps.toFixed(3), 10, 34);
+  bctx.fillStyle = '#ffd54a'; bctx.font = '11px Roboto Mono';
+  bctx.fillText('h_min = ' + (state.h_min*1e6).toFixed(1) + ' µm', 10, H-12);
+  bctx.fillStyle = '#ff5252'; bctx.textAlign = 'right';
+  bctx.fillText(LANG.lobe, W-10, 18);
+  bctx.textAlign = 'left';
+}
+
+function loop(){
+  if (reduceMotion){ drawBearing(); rafId = null; return; }
+  var sp = state ? state.N_rps : 0;
+  spin += 0.035 + Math.min(0.25, sp*0.0006);
+  flow += 0.012 + Math.min(0.12, sp*0.0004);
+  drawBearing();
+  rafId = requestAnimationFrame(loop);
+}
+
+function start(){
+  if (reduceMotion){ drawBearing(); return; }
+  if (!rafId) rafId = requestAnimationFrame(loop);
+}
+
+window.update = function(){ recompute(); if (reduceMotion) drawBearing(); };
+
+initCharts();
+recompute();
+drawBearing();
+start();
+window.addEventListener('resize', function(){ drawBearing(); });
+})();
 </script>
 
 <section class="explanation">
@@ -490,6 +549,9 @@ update();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fluid-bearing.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -537,13 +599,13 @@ update();
 <h3>使い方ガイド</h3>
 <ol>
 <li>軸受半径R（mm）、軸受幅L（mm）、軸受すきまC（μm）を入力。鋼製ジャーナル軸受の場合、典型値はR=25mm、L=50mm、C=50μmです</li>
-<li>回転数N（rpm）を設定。電動機軸受で3000rpm、工作機械主軸で6000rpm以上が一般的。粘度を考慮してゾンマーフェルト数So=（μ・N・R²）/（P・C²）を自動計算</li>
-<li>短軸受レイノルズ方程式を有限差分法で離散化し、油膜圧力分布・最小油膜厚さδmin・負荷容量Wを同時リアルタイム計算。圧力分布の2次元コンター図と軸受性能曲線を表示</li>
+<li>回転数N（rpm）を設定します。粘度・軸受幅・直径・荷重を含む S=μNLD(R/C)²/W を自動計算します</li>
+<li>短軸受近似の解析式で油膜圧力分布・最小油膜厚さ・摩擦係数・動力損失をリアルタイム計算します。負荷容量Wや2次元コンター図は本ツールの出力ではありません</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>R=20mm、L=40mm、C=45μm、N=2800rpm、ISO VG 32鉱物油（μ=32mPa・s）のジャーナル軸受を想定。負荷P=5kNのとき、ゾンマーフェルト数So≈0.95。レイノルズ方程式解析により、最小油膜厚さδmin=8.2μm、最大圧力pmax=2.8MPa、負荷容量W=6.2kNが算出されます。回転数を5600rpmに増加させるとSo=1.90となり、δmin=15.1μm、pmax=1.5MPaへ変化。同一負荷で回転速度の上昇が油膜厚さを増加させるメカニズムを可視化</p>
+<p>R=20mm、L=40mm、C=45μm、N=2800rpm、ISO VG 32鉱物油（μ=32mPa·s）、荷重W=5kNのジャーナル軸受を想定すると、修正後の本ツールではゾンマーフェルト数S≈0.0944、偏心率ε≈0.6865、最小油膜厚さh_min≈14.1μm、最大圧力pmax≈0.599MPa、動力損失≈0.150Wとなります。回転数や粘度を上げるとSが増え、同じ荷重では偏心率が下がり油膜厚さが増える傾向を確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -553,6 +615,16 @@ update();
 <li>最小油膜厚さがすきまの0.2倍未満（C=50μmなら10μm以下）になると、境界潤滑領域に移行して摩耗が急速に進行。警告値を超えたら軸受交換または運転条件見直しが必須</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

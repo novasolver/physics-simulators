@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "風力タービンブレード設計（BEM法）",
       "description": "BEM法（翼素運動量理論）でロータブレードの最適弦長・ねじれ角・出力係数Cpをリアルタイム計算。ベッツ限界との比較可視化。",
       "url": "https://novasolver.jp/tools/wind-turbine-blade.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["BEM法による翼素ごとの誘導係数計算","最適弦長・ねじれ角分布の可視化","Cp-λ曲線とベッツ限界の比較","発電出力のリアルタイム推定"],
       "keywords": "BEM法,翼素運動量理論,風力タービン,ブレード設計,出力係数,ベッツ限界,CAE,再生可能エネルギー",
       "datePublished": "2026-04-09",
@@ -215,7 +215,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="divider"></div>
 
     <div class="panel-title">統計サマリー</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -292,33 +300,42 @@ function prandtlTip(B, r_R, phi_rad){
   if (r_R >= 0.999 || Math.abs(Math.sin(phi_rad)) < 1e-9) return 0.01;
   const exp = -B / 2 * (1 - r_R) / (r_R * Math.sin(phi_rad));
   return Math.max(0.01, (2 / Math.PI) * Math.acos(Math.min(1, Math.max(-1, Math.exp(exp)))));
-}function bemStation(r_R, B, tsr_tip, Cl, alpha_deg){
-  const lambda_r = tsr_tip * r_R;
-  let a = 1/3, ap = 0;
-  for (let iter = 0; iter < 60; iter++) {
-    const phi = Math.atan2(1 - a, lambda_r * (1 + ap));
-    const F = prandtlTip(B, r_R, phi);
-    const sin_phi = Math.sin(phi), cos_phi = Math.cos(phi);
-    const c_R = 8 * Math.PI * r_R * sin_phi / (3 * B * lambda_r * Cl + 1e-9);
-    const sigma = B * Math.max(0, c_R) / (2 * Math.PI * r_R);
-    const kT = sigma * Cl / (4 * F * sin_phi * sin_phi + 1e-9);
-    const kQ = sigma * Cl / (4 * F * sin_phi * cos_phi + 1e-9);
-    const a_new = Math.max(0, Math.min(0.5, kT / (1 + kT)));
-    const ap_new = Math.max(0, kQ / (1 - kQ));
-    if (Math.abs(a_new - a) < 1e-5 && Math.abs(ap_new - ap) < 1e-5) { a = a_new; ap = ap_new; break; }
-    a = 0.6 * a + 0.4 * a_new;
-    ap = 0.6 * ap + 0.4 * ap_new;
-  }const phi_f = Math.atan2(1 - a, lambda_r * (1 + ap));
-  const c_R_f = Math.max(0, 8 * Math.PI * r_R * Math.sin(phi_f) / (3 * B * lambda_r * Cl + 1e-9));
-  const dCp = 8 * a * (1 - a) * (1 - a) * Math.pow(r_R, 2) * (0.9 / N_STATIONS) * tsr_tip;
-  return{ c_R: c_R_f, phi_deg: phi_f * 180 / Math.PI, twist_deg: phi_f * 180 / Math.PI - alpha_deg, a, dCp: Math.max(0, dCp) };
-}function computeCpForLambda(lam, B, Cl){
-  let Cp = 0;
-  for (let i = 0; i < N_STATIONS; i++) {
-    const r_R = 0.1 + (i + 0.5) * 0.9 / N_STATIONS;
-    Cp += bemStation(r_R, B, lam, Cl, 8).dCp;
+}function aFromLambdaR(lr){
+  // Glauert optimum (with wake rotation): lr^2 = (1-a)(4a-1)^2/(1-3a), a in (0.25, 1/3)
+  if (lr < 1e-4) return 0.25;
+  let lo = 0.2500001, hi = 0.3333332;
+  for (let k = 0; k < 80; k++){
+    const a = 0.5 * (lo + hi);
+    const val = (1 - a) * (4*a - 1) * (4*a - 1) / (1 - 3*a);
+    if (val < lr*lr) lo = a; else hi = a;
   }
-  return Math.min(0.593, Math.max(0, Cp));
+  return 0.5 * (lo + hi);
+}function bemStation(r_R, B, tsr_tip, Cl, alpha_deg){
+  const lr = tsr_tip * r_R;
+  const a = aFromLambdaR(lr);
+  const ap = (1 - 3*a) / (4*a - 1);
+  const phi = Math.atan2(1 - a, lr * (1 + ap));
+  const c_R = Math.max(0, 8 * Math.PI * r_R * Math.sin(phi) / (3 * B * lr * Cl + 1e-9));
+  return { c_R: c_R, phi_deg: phi * 180 / Math.PI, twist_deg: phi * 180 / Math.PI - alpha_deg, a: a };
+}function computeCpForLambda(lam, B, Cl){
+  // Glauert optimum power coefficient: Cp = (8/lam^2) integral F a'(1-a) lr^3 (1-(Cd/Cl)cot phi) dlr
+  if (lam < 0.1) return 0;
+  const M = 40, dlr = lam / M, LD = 100.0; // fixed glide ratio L/D=100 (airfoil quality)
+  let Cp = 0;
+  for (let i = 0; i < M; i++){
+    const lr = (i + 0.5) * dlr;
+    if (lr < 1e-4) continue;
+    const a = aFromLambdaR(lr);
+    const ap = (1 - 3*a) / (4*a - 1);
+    const r_R = lr / lam;
+    const phi = Math.atan2(1 - a, lr * (1 + ap));
+    const F = prandtlTip(B, r_R, phi);
+    let drag = 1.0;
+    const tp = Math.tan(phi);
+    if (tp > 1e-6) drag = 1 - (1/LD) / tp;
+    Cp += (8 / (lam*lam)) * F * ap * (1 - a) * (lr*lr*lr) * drag * dlr;
+  }
+  return Math.max(0, Math.min(0.593, Cp));
 }const chordCtx = document.getElementById('chordChart').getContext('2d');
 const cpCtx = document.getElementById('cpChart').getContext('2d');
 
@@ -473,6 +490,9 @@ function compute(){
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="wind-turbine-blade.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -520,7 +540,7 @@ function compute(){
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>風速12 m/s、ロータ半径45 m、3枚ブレード構成でTSR λ=8.5を設定した場合、BEM法計算では根元（半径5 m）でねじれ角25°・弦長2.8 m、先端付近（半径42 m）でねじれ角2.5°・弦長0.65 mが算出されます。この設計により出力係数Cp=0.48、発電出力P=4,200 kWを達成し、ベッツ限界の81%効率となります。ソリディティσ=0.042を保つことで、空力性能と構造剛性のバランスが実現されます。</p>
+<p>風速12 m/s、ロータ半径45 m、3枚ブレード構成でTSR λ=8.5を設定した場合、Glauert最適BEM法（Prandtl翼端損失・揚抗比L/D=100）の計算では、根元（半径5 m）でねじれ角約26°、先端付近（半径42 m）でねじれ角ほぼ0°が算出されます。弦長は純空力最適解では根元側が広く、先端に向かって約1.2 mまで細くなります（実機では構造上の理由から過大な根元弦長を制限します）。この設計により出力係数Cp≈0.50、発電出力P≈3,350 kW（P=½·ρ·πR²·V³·Cp、ρ=1.225）を達成し、ベッツ限界（0.593）の約84%の効率となります。ブレードソリディティσ≈0.18が、空力性能と構造剛性のバランスの目安となります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -531,6 +551,16 @@ function compute(){
 <li>動的失速補正を含む場合、遠心力による弦方向応力（最大値：根元350 MPa）とのカップリング計算により、ねじれ角の非線形変形を評価します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

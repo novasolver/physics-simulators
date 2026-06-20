@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "フィン熱伝達効率・最適フィン設計計算機",
       "description": "フィン効率η=tanh(mL)/(mL)をリアルタイム計算。材料・寸法・熱伝達係数からフィン効率・有効度・最適フィン長を可視化する設計ツール。",
       "url": "https://novasolver.jp/tools/heat-transfer-fins.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["フィン効率・有効度のリアルタイム計算","温度分布の可視化","最適フィン長の提案","材料別（アルミ・銅・鉄）対応"],
       "keywords": "フィン効率,熱伝達,放熱フィン,最適設計,CAE,熱解析,tanh",
       "datePublished": "2026-04-08",
@@ -231,6 +231,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="opt-box" id="optBox">
       <strong>最適設計提案:</strong> 計算中...
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -242,10 +251,11 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="stat-card"><div class="sv" id="statEps">—</div><div class="sl">ε_f [-]</div></div>
       <div class="stat-card"><div class="sv" id="statQfin">—</div><div class="sl">q_fin [W]</div></div>
       <div class="stat-card good"><div class="sv" id="statQtot">—</div><div class="sl">Q_total [W]</div></div>
+      <div class="stat-card"><div class="sv" id="statTtip">—</div><div class="sl">先端温度 T_tip [°C]</div></div>
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> フィン</div><canvas id="finCanvas" height="220"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-fire"></i> 放熱アニメーション（温度＝色／対流＝矢印）</div><canvas id="finCanvas" height="240" role="img" aria-label="フィンの温度分布と対流放熱のリアルタイムアニメーション"></canvas></div>
 
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 効率</div><canvas id="etaChart" height="160"></canvas></div>
     <div class="chart-card" style="margin-top:12px"><div class="chart-title"><i class="fas fa-chart-line"></i> フィン温度分布</div><canvas id="tempChart" height="160"></canvas></div>
@@ -266,26 +276,31 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id);
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 document.querySelectorAll('input[type=range]').forEach(el =>{
   const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
   el.style.setProperty('--pct', ((val - min) / (max - min) * 100) + '%');
 });
 
-const etaCtx = document.getElementById('etaChart').getContext('2d');
-const tempCtx = document.getElementById('tempChart').getContext('2d');
+const etaCtx = $('etaChart').getContext('2d');
+const tempCtx = $('tempChart').getContext('2d');
 
 const etaChart = new Chart(etaCtx,{
   type: 'line',
   data: {
     labels: [],
     datasets: [
-      { label: 'η_f = tanh(mL)/(mL)', data: [], borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.1)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0 },{ label: '現在のmL', data: [], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.15)', borderWidth: 2, pointRadius: 5, pointBackgroundColor: '#e74c3c', showLine: true }
+      { label: 'η_f = tanh(mL)/(mL)', data: [], borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.1)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0 },
+      { label: '現在のmL', data: [], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.15)', borderWidth: 2, pointRadius: 5, pointBackgroundColor: '#e74c3c', showLine: false }
     ]
   },
   options:{
-    responsive: true, maintainAspectRatio: true,
-    plugins: { legend: { labels: { font: { size: 11 }, color: '#1a1a2e' } }, title:{ display: true, text: 'フィン効率 η_f vs mL', color: '#1a1a2e', font: { size: 12, weight: '700' } } },
+    responsive: true, maintainAspectRatio: true, animation: false,
+    plugins: { legend: { labels: { font: { size: 11 }, color: '#1a1a2e' } }, title:{ display: true, text: 'フィン効率 η_f vs mL（赤=現在の動作点）', color: '#1a1a2e', font: { size: 12, weight: '700' } } },
     scales:{
       x: { title: { display: true, text: 'mL', color: '#6c757d', font: { size: 11 } }, grid:{ color: 'rgba(0,0,0,0.05)' } },
       y:{ title: { display: true, text: 'η_f', color: '#6c757d', font: { size: 11 } }, min: 0, max: 1, grid:{ color: 'rgba(0,0,0,0.05)' } }
@@ -302,7 +317,7 @@ const tempChart = new Chart(tempCtx,{
     ]
   },
   options:{
-    responsive: true, maintainAspectRatio: true,
+    responsive: true, maintainAspectRatio: true, animation: false,
     plugins: { legend: { labels: { font: { size: 11 }, color: '#1a1a2e' } }, title:{ display: true, text: 'フィン長手方向温度分布 T(x)', color: '#1a1a2e', font: { size: 12, weight: '700' } } },
     scales:{
       x: { title: { display: true, text: 'x [mm]', color: '#6c757d', font: { size: 11 } }, grid:{ color: 'rgba(0,0,0,0.05)' } },
@@ -311,133 +326,208 @@ const tempChart = new Chart(tempCtx,{
   }
 });
 
+// ===== current physics state (shared with animation) =====
+const S = { k:200, t:0.002, L:0.03, N:10, h:50, Tb:80, Tinf:25, m:0, mL:0, eta:1, dT:55 };
+
+// θ(x)/θb = cosh(m(L-x))/cosh(mL)
+function thetaRatio(xi){ // xi: fraction 0..1 along fin
+  if (S.mL < 1e-6) return 1;
+  return Math.cosh(S.m * S.L * (1 - xi)) / Math.cosh(S.mL);
+}
+
 function onParamChange(){
-  const k = parseFloat(document.getElementById('material').value);
-  const t = parseFloat(document.getElementById('thickness').value) / 1000;
-  const L = parseFloat(document.getElementById('finLength').value) / 1000;
-  const N = parseInt(document.getElementById('finCount').value);
-  const h = parseFloat(document.getElementById('hCoeff').value);
-  const Tb = parseFloat(document.getElementById('tBase').value);
-  const Tinf = parseFloat(document.getElementById('tInf').value);
-  const dT = Tb - Tinf;
+  S.k    = parseFloat($('material').value);
+  S.t    = parseFloat($('thickness').value) / 1000;
+  S.L    = parseFloat($('finLength').value) / 1000;
+  S.N    = parseInt($('finCount').value, 10);
+  S.h    = parseFloat($('hCoeff').value);
+  S.Tb   = parseFloat($('tBase').value);
+  S.Tinf = parseFloat($('tInf').value);
+  S.dT   = S.Tb - S.Tinf;
 
-  const m = Math.sqrt(2 * h / (k * t));
-  const mL = m * L;
-  const eta_f = mL < 0.001 ? 1.0 : Math.tanh(mL) / mL;
+  // thin rectangular fin: m = sqrt(2h/(k t))  [equivalently sqrt(hP/kA) with P≈2W, A=W t]
+  S.m  = Math.sqrt(2 * S.h / (S.k * S.t));
+  S.mL = S.m * S.L;
+  S.eta = S.mL < 0.001 ? 1.0 : Math.tanh(S.mL) / S.mL;
 
-  const W = 0.05; // assume fin width 50mm
-  const P = 2 * (W + t);
-  const Ac = W * t;
-  const Ab = W * t;
-  const q_fin = eta_f * h * P * L * dT;
-  const q_nofin = h * Ab * dT;
+  const W = 0.05;            // fin width 50 mm
+  const P = 2 * (W + S.t);   // perimeter
+  const Ab = W * S.t;        // fin base (cross-section) area
+  // q_fin = eta * h * A_surface * theta_b,  A_surface = P*L
+  const q_fin = S.eta * S.h * P * S.L * S.dT;
+  const q_nofin = S.h * Ab * S.dT;
   const eps_f = q_nofin < 1e-9 ? 0 : q_fin / q_nofin;
-  const Q_total = N * q_fin;
+  const Q_total = S.N * q_fin;
+  const T_tip = S.Tinf + S.dT * thetaRatio(1);
 
-  document.getElementById('statM').textContent = m.toFixed(1);
-  document.getElementById('statML').textContent = mL.toFixed(2);
-  document.getElementById('statEta').textContent = eta_f.toFixed(3);
-  document.getElementById('statEps').textContent = eps_f.toFixed(1);
-  document.getElementById('statQfin').textContent = q_fin.toFixed(2);
-  document.getElementById('statQtot').textContent = Q_total.toFixed(1);
+  $('statM').textContent = S.m.toFixed(1);
+  $('statML').textContent = S.mL.toFixed(2);
+  $('statEta').textContent = S.eta.toFixed(3);
+  $('statEps').textContent = eps_f.toFixed(1);
+  $('statQfin').textContent = q_fin.toFixed(2);
+  $('statQtot').textContent = Q_total.toFixed(1);
+  $('statTtip').textContent = T_tip.toFixed(1);
 
   // Optimal suggestion
-  const Lopt = 1.5 / m * 1000;
-  let optMsg = `<strong>最適設計提案:</strong> mL = ${mL.toFixed(2)}。`;
-  if (mL < 0.5) optMsg += `フィンが短すぎます。推奨長さ: <strong>${Lopt.toFixed(0)}mm</strong>。`;
-  else if (mL <= 3.0) optMsg += `良好な設計範囲(0.5〜3)です。推奨長さ: <strong>${Lopt.toFixed(0)}mm</strong>。`;
+  const Lopt = 1.5 / S.m * 1000;
+  let optMsg = `<strong>最適設計提案:</strong> mL = ${S.mL.toFixed(2)}。`;
+  if (S.mL < 0.5) optMsg += `フィンが短すぎます。推奨長さ: <strong>${Lopt.toFixed(0)}mm</strong>。`;
+  else if (S.mL <= 3.0) optMsg += `良好な設計範囲(0.5〜3)です。推奨長さ: <strong>${Lopt.toFixed(0)}mm</strong>。`;
   else optMsg += `フィンが長すぎます(効率低下)。推奨長さ: <strong>${Lopt.toFixed(0)}mm</strong>に短縮を推奨。`;
-  document.getElementById('optBox').innerHTML = optMsg;
+  $('optBox').innerHTML = optMsg;
 
-  // Update eta chart
+  // eta vs mL curve + current operating point
   const mlVals = [], etaVals = [];
   for (let i = 0; i <= 50; i++){
     const ml = i * 0.1;
     mlVals.push(ml.toFixed(1));
     etaVals.push(ml < 0.001 ? 1.0 : Math.tanh(ml) / ml);
-  }etaChart.data.labels = mlVals;
+  }
+  etaChart.data.labels = mlVals;
   etaChart.data.datasets[0].data = etaVals;
-  etaChart.data.datasets[1].data = [{ x: mL.toFixed(2), y: eta_f }];
-  etaChart.data.datasets[1].data = etaVals.map((v, i) => i === Math.round(mL * 10) ? v : null).map((v, i) => v !== null ? v : null);
-
-  // Workaround: mark current point on eta curve
   const pointData = new Array(51).fill(null);
-  const idx = Math.min(50, Math.round(mL * 10));
-  pointData[idx] = eta_f;
+  pointData[Math.min(50, Math.round(S.mL * 10))] = S.eta;
   etaChart.data.datasets[1].data = pointData;
-  etaChart.data.datasets[1].showLine = false;
   etaChart.update('none');
 
-  // Update temp chart
+  // temperature distribution chart
   const xVals = [], tVals = [];
   const steps = 40;
   for (let i = 0; i <= steps; i++){
     const xi = i / steps;
-    const x_mm = xi * L * 1000;
-    const T_x = Tinf + dT * Math.cosh(m * (L - xi * L)) / Math.cosh(mL);
-    xVals.push(x_mm.toFixed(1));
-    tVals.push(T_x);
+    xVals.push((xi * S.L * 1000).toFixed(1));
+    tVals.push(S.Tinf + S.dT * thetaRatio(xi));
   }
   tempChart.data.labels = xVals;
   tempChart.data.datasets[0].data = tVals;
   tempChart.update('none');
+}
 
-  drawFinArray(N, L * 1000, t * 1000, h, m, Tb, Tinf);
-}function drawFinArray(N, L_mm, t_mm, h, m, Tb, Tinf){
-  const canvas = document.getElementById('finCanvas');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth;
-  canvas.width = W;
-  canvas.height = 220;
-  const cH = 220;
-  ctx.fillStyle = '#020d1a';
-  ctx.fillRect(0, 0, W, cH);
+// ===== HiDPI animation canvas: temperature colour + convection arrows =====
+const canvas = $('finCanvas');
+const ctx = canvas.getContext('2d');
+let cssW = 0, cssH = 240, dpr = 1;
+function resizeCanvas(){
+  const rect = canvas.parentElement.getBoundingClientRect();
+  cssW = Math.max(260, Math.floor(rect.width - 44));
+  cssH = 240;
+  dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
 
-  const baseH = 30;
-  const baseY = cH - baseH;
-  ctx.fillStyle = '#2c3e50';
-  ctx.fillRect(0, baseY, W, baseH);
-  ctx.fillStyle = '#7f8c8d';
-  ctx.font = '11px Roboto Mono';
-  ctx.fillText('ベース（基底）', 8, baseY + 20);
+// temperature -> colour (cool blue -> hot red)
+function tColor(r){ // r: 0(ambient)..1(base)
+  r = Math.max(0, Math.min(1, r));
+  const R = Math.round(40 + r * 215);
+  const G = Math.round(90 + r * 60 - r*r*70);
+  const B = Math.round(220 * (1 - r) + 30);
+  return `rgb(${R},${G},${B})`;
+}
 
-  const finAreaW = W - 60;
-  const finSpacing = finAreaW / (N + 1);
-  const finH = Math.min(baseY - 20, (L_mm / 100) * (baseY - 20));
-  const finW = Math.max(3, (t_mm / 10) * 8);
+let phase = 0;
+function drawFins(anim){
+  const W = cssW, H = cssH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#020d1a'; ctx.fillRect(0,0,W,H);
 
-  for (let i = 1; i <= N; i++) {
-    const fx = 30 + i * finSpacing - finW / 2;
-    const fy = baseY - finH;
-    for (let j = 0; j <= 20; j++) {
-      const ratio = j / 20;
-      const xi = ratio * (L_mm / 1000);
-      const T = Tinf + (Tb - Tinf) * Math.cosh(m * ((L_mm / 1000) - xi)) / Math.cosh(m * (L_mm / 1000));
-      const tRatio = Math.max(0, Math.min(1, (T - Tinf) / (Tb - Tinf)));
-      const r = Math.round(0 + tRatio * 231);
-      const g = Math.round(123 + tRatio * (76 - 123));
-      const b = Math.round(255 * (1 - tRatio));
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      const segY = fy + (j / 20) * finH;
-      const segH2 = finH / 20 + 1;
-      ctx.fillRect(fx, segY, finW, segH2);
+  const baseW = 30;                       // hot base block at left
+  const padT = 14, padB = 20;
+  const areaT = padT, areaB = H - padB;
+  const N = S.N;
+  const gap = (areaB - areaT) / (N + 0.4);
+  const finThick = Math.max(4, Math.min(gap * 0.55, (S.t*1000/10)*10 + 4));
+  const finLenPx = (W - baseW - 70) * Math.min(1, S.L*1000/100) ;
+  const finLen = Math.max(40, finLenPx);
+
+  // hot base
+  const baseGrad = ctx.createLinearGradient(0,0,baseW,0);
+  baseGrad.addColorStop(0, tColor(1)); baseGrad.addColorStop(1, tColor(0.92));
+  ctx.fillStyle = baseGrad; ctx.fillRect(0, areaT-6, baseW, (areaB-areaT)+12);
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = '10px Roboto Mono';
+  ctx.save(); ctx.translate(11, (areaT+areaB)/2); ctx.rotate(-Math.PI/2); ctx.textAlign='center';
+  ctx.fillText('基底 T_b='+S.Tb.toFixed(0)+'°C', 0, 0); ctx.restore();
+
+  const SEG = 26;
+  for (let i = 0; i < N; i++){
+    const cy = areaT + gap*(i+0.5);
+    const fy = cy - finThick/2;
+    // draw fin in segments coloured by local temperature θ(x)
+    for (let s = 0; s < SEG; s++){
+      const xi = s / (SEG-1);
+      const rT = thetaRatio(xi);          // θ/θb in [0,1]
+      ctx.fillStyle = tColor(rT);
+      const sx = baseW + xi*finLen;
+      ctx.fillRect(sx, fy, finLen/SEG + 1.2, finThick);
+    }
+    // convection arrows leaving fin surface (animated upward puffs)
+    if (!reduceMotion){
+      ctx.strokeStyle = 'rgba(120,200,255,0.5)';
+      ctx.lineWidth = 1.2;
+      for (let a = 0; a < 5; a++){
+        const xi = (a+0.5)/5;
+        const rT = thetaRatio(xi);
+        const sx = baseW + xi*finLen;
+        const off = ((phase*0.9 + a*0.27 + i*0.13) % 1);
+        const ay = fy - 2 - off*12;
+        const al = 0.45*(1-off)*(0.35+0.65*rT); // stronger where hotter
+        ctx.strokeStyle = `rgba(140,205,255,${al.toFixed(3)})`;
+        ctx.beginPath(); ctx.moveTo(sx, fy-1); ctx.lineTo(sx, ay); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sx-2, ay+3); ctx.lineTo(sx, ay); ctx.lineTo(sx+2, ay+3); ctx.stroke();
+      }
     }
   }
 
-  // Legend
-  const lgX = W - 50, lgY = 10;
-  const grad = ctx.createLinearGradient(lgX, lgY, lgX, lgY + 80);
-  grad.addColorStop(0, 'rgb(231,76,255)');
-  grad.addColorStop(0.5, 'rgb(0,123,255)');
-  grad.addColorStop(1, 'rgb(0,180,216)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(lgX, lgY, 12, 80);
-  ctx.fillStyle = '#aaa';
-  ctx.font = '10px Roboto Mono';
-  ctx.fillText(Tb.toFixed(0)+'°C', lgX + 15, lgY + 6);
-  ctx.fillText(Tinf.toFixed(0)+'°C', lgX + 15, lgY + 80);
-}onParamChange();
-window.addEventListener('resize', onParamChange);
+  // overlay live efficiency / tip readout
+  ctx.fillStyle = 'rgba(10,22,40,0.78)';
+  const boxW = 150, boxH = 40, bx = W-boxW-8, by = 8;
+  ctx.fillRect(bx, by, boxW, boxH);
+  ctx.strokeStyle = 'rgba(0,180,216,0.6)'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, boxW, boxH);
+  ctx.fillStyle = '#ffd54a'; ctx.font = 'bold 12px Roboto Mono'; ctx.textAlign='left';
+  ctx.fillText('η_f = '+S.eta.toFixed(3), bx+10, by+17);
+  ctx.fillStyle = '#9fd6ff'; ctx.font = '11px Roboto Mono';
+  ctx.fillText('mL = '+S.mL.toFixed(2)+'  T_tip='+(S.Tinf+S.dT*thetaRatio(1)).toFixed(0)+'°', bx+10, by+32);
+  ctx.textAlign='left';
+
+  // colour legend
+  const lgX = 40, lgY = H-12;
+  const grad = ctx.createLinearGradient(lgX, 0, lgX+90, 0);
+  grad.addColorStop(0, tColor(0)); grad.addColorStop(1, tColor(1));
+  ctx.fillStyle = grad; ctx.fillRect(lgX, lgY-7, 90, 7);
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font='9px Roboto Mono';
+  ctx.fillText(S.Tinf.toFixed(0)+'°', lgX-16, lgY-1);
+  ctx.fillText(S.Tb.toFixed(0)+'°', lgX+93, lgY-1);
+}
+
+let rafId = null;
+function loop(ts){
+  phase = (ts||0)/1000;
+  drawFins(true);
+  rafId = requestAnimationFrame(loop);
+}
+
+function startAnim(){
+  resizeCanvas();
+  if (reduceMotion){ drawFins(false); return; }   // single static frame
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+// ----- defensive shims so inline oninput handlers always work -----
+function setPct(e){ if(!e) return; const mn=parseFloat(e.min), mx=parseFloat(e.max); e.style.setProperty('--pct', ((parseFloat(e.value)-mn)/(mx-mn)*100)+'%'); }
+if (typeof window.updateSlider !== 'function') window.updateSlider = setPct;
+if (typeof window.updateslider !== 'function') window.updateslider = setPct;
+if (typeof window.syncToNum !== 'function') window.syncToNum = function(rangeId, numId){ const r=$(rangeId), n=$(numId); if(r&&n) n.value=r.value; };
+if (typeof window.syncFromNum !== 'function') window.syncFromNum = function(rangeId, numId){ const r=$(rangeId), n=$(numId); if(r&&n){ r.value=n.value; setPct(r); } onParamChange(); };
+
+window.onParamChange = onParamChange;  // keep inline oninput handlers working
+onParamChange();
+startAnim();
+window.addEventListener('resize', ()=>{ resizeCanvas(); if (reduceMotion) drawFins(false); onParamChange(); });
+})();
 </script>
 
 <section class="explanation">
@@ -499,6 +589,9 @@ window.addEventListener('resize', onParamChange);
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-transfer-fins.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -548,6 +641,16 @@ window.addEventListener('resize', onParamChange);
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

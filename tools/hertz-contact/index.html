@@ -96,7 +96,7 @@ canvas.patch-canvas{border-radius:8px;background:#f0f4f8;display:block;margin:0 
 
 [{
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
+    "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
     "name": "Hertz接触応力 シミュレーター｜球・円柱接触・接触幅",
     "description": "ヘルツ接触理論に基づく接触応力・接触半径のインタラクティブシミュレーター。球-球・球-平板・円柱接触の圧力分布と表面下応力を可視化。",
     "url": "https://novasolver.jp/tools/hertz-contact.html",
@@ -125,7 +125,7 @@ canvas.patch-canvas{border-radius:8px;background:#f0f4f8;display:block;margin:0 
         "name": "ヘルツ接触応力の最大値p₀はどの位置に発生しますか？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "最大接触圧p₀は接触面の中心（x=0）で発生します。球接触の場合 p₀ = 3P/(2πa²) = (6PE*²/π³R*²)^(1/3) で与えられ、接触面内の圧力分布は p(x) = p₀√(1-(x/a)²) の半楕円形になります。例えばR=20mm、E=200GPa、ν=0.3、P=1000Nの鋼球同士接触では a≈127μm、p₀≈9.4GPaとなります。"
+          "text": "最大接触圧p₀は接触面の中心（x=0）で発生します。球接触の場合 p₀ = 3P/(2πa²) = (6PE*²/π³R*²)^(1/3) で与えられ、接触面内の圧力分布は p(x) = p₀√(1-(x/a)²) の半楕円形になります。例えばR=20mm、E=200GPa、ν=0.3、P=1000Nの鋼球同士接触では a≈408.7μm、p₀≈2.86GPaとなります。"
         }
       },{
         "@type": "Question",
@@ -237,7 +237,16 @@ canvas.patch-canvas{border-radius:8px;background:#f0f4f8;display:block;margin:0 
 <div class="ctrl-label">L — 接触長さ(円柱)<div class="num-wrap"><input class="num-input" id="lLenNum" max="200" min="1" oninput="syncFromNum('Len','lLenNum')" step="1" type="number" value="20"/><span class="num-unit">mm</span></div></div>
 <input id="Len" max="200" min="1" oninput="syncToNum('Len','lLenNum');syncLabel('Len','lLen','mm');update()" step="1" type="range" value="20"/>
 </div>
-</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 <!-- Right: Charts + Stats -->
 <div class="viz-panel">
 <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -287,11 +296,11 @@ canvas.patch-canvas{border-radius:8px;background:#f0f4f8;display:block;margin:0 
 </div>
 <div class="chart-card">
   <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
-  <p>$$a = \left(\frac{3FR^<em> }{4E^</em> }\right)^{1/3}$$</p>
-  <p style="margin-top:6px;">ヘルツ接触半径 $a$（m）：$F$ は荷重（N）、$R^<em> $ は等価曲率半径（m）、$E^</em> $ は等価弾性率（Pa）。</p>
+  <p>$$a = \left(\frac{3FR^{*}}{4E^{*}}\right)^{1/3}$$</p>
+  <p style="margin-top:6px;">ヘルツ接触半径 $a$（m）：$F$ は荷重（N）、$R^{*}$ は等価曲率半径（m）、$E^{*}$ は等価弾性率（Pa）。</p>
   <p>$$p_0 = \frac{3F}{2\pi a^2}$$</p>
   <p style="margin-top:6px;">最大接触圧力（Pa）：接触楕円中心での圧力。構造用鋼では 1〜3 GPa に達する場合も。</p>
-  <p>$$\delta = \frac{a^2}{R^*} = \left(\frac{9F^2}{16 E^{<em> 2} R^</em> }\right)^{1/3}$$</p>
+  <p>$$\delta = \frac{a^2}{R^*} = \left(\frac{9F^2}{16 E^{*2} R^{*}}\right)^{1/3}$$</p>
   <p style="margin-top:6px;">圧縮量（m）：2球の中心間近接量。荷重の2/3乗に比例する非線形弾性変形。</p>
 </div>
 </div>
@@ -414,26 +423,28 @@ function initCharts(){
     const zval = zr * a;
     let sz, tm;
     if (!res.isCyl) {
-      // Sphere: σz = -p0 * [1 - (z/a)*atan(a/z)] (approximate at center)
+      // Sphere (on axis): σz = -p0 / (1 + (z/a)²)
+      const nu = (parseFloat(document.getElementById('nu1').value) + parseFloat(document.getElementById('nu2').value)) / 2;
       if (zr < 0.001) {
         sz = -p0 / 1e6;
-        tm = 0;
+        tm = p0 * (1 - 2 * nu) / 4 / 1e6;
       }else{
-        sz = -p0 * (1 - zr * Math.atan(1 / zr)) / 1e6;
-        // τmax approximate
-        const nu = (parseFloat(document.getElementById('nu1').value) + parseFloat(document.getElementById('nu2').value)) / 2;
-        const szz = -p0 * (1 - zr * Math.atan(1 / zr));
+        sz = -p0 / (1 + zr * zr) / 1e6;
+        // τmax = |σz - σr| / 2 (on axis)
+        const szz = -p0 / (1 + zr * zr);
         const srr = p0 * ((1 + nu) * (zr * Math.atan(1 / zr) - 1) + 0.5 / (1 + zr * zr));
         tm = Math.abs(szz - srr) / 2e6;
       }
     }else{
-      // Cylinder approximate
+      // Cylinder (line contact, on axis): σz = -p0 / √(1 + ζ²)
       if (zr < 0.001) {
         sz = -p0 / 1e6;
         tm = 0;
       }else{
-        sz = -p0 / (1 + zr * zr) / 1e6;
-        tm = p0 * zr / Math.pow(1 + zr * zr, 1.5) / 1e6;
+        const szc = -p0 / Math.sqrt(1 + zr * zr);
+        const sxc = -p0 * ((1 + 2 * zr * zr) / Math.sqrt(1 + zr * zr) - 2 * zr);
+        sz = szc / 1e6;
+        tm = Math.abs(sxc - szc) / 2e6;
       }
     }
     sigZ.push(parseFloat(sz.toFixed(3)));
@@ -692,7 +703,7 @@ update();
 <div class="faq-section">
 <div class="faq-item">
 <button class="faq-q" onclick="toggleFaq(this)">球と平面の接触をシミュレートしたい場合、曲率半径はどう設定すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-<div class="faq-a">球の曲率半径R1を球の半径（正の値）に、平面の曲率半径R2を無限大（∞）に設定してください。数値入力ができない場合は、R2に非常に大きな値（例：1e10 mm）を入力することで平面とみなせます。</div>
+<div class="faq-a">「接触タイプ」で「球 – 平板」（円柱の場合は「円柱 – 平板」）を選択してください。平板側は自動的に曲率半径∞として扱われ、R₂の入力欄は非表示になります。R₁に球（または円柱）の半径を入力するだけで計算できます。</div>
 </div>
 <div class="faq-item">
 <button class="faq-q" onclick="toggleFaq(this)">計算結果の接触圧力が異常に大きいのですが、何が原因ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -700,7 +711,7 @@ update();
 </div>
 <div class="faq-item">
 <button class="faq-q" onclick="toggleFaq(this)">このシミュレーターは凹面（球面座）との接触にも対応していますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-<div class="faq-a">対応しています。凹面の場合は曲率半径を負の値（例：-10 mm）で入力してください。相当曲率半径R*の計算式に自動で反映され、凹面と凸面の接触（例：ボールとソケット）を正しくシミュレートできます。</div>
+<div class="faq-a">本シミュレーターの入力は正の曲率半径（1〜500mm）のみに対応しており、凸面同士または凸面と平板の接触を対象としています。ボールとソケットのような凹面（負の曲率半径）との接触は、理論上は相当曲率半径R*の式でRを負として扱いますが、本ツールでは直接シミュレートできません。</div>
 </div>
 <div class="faq-item">
 <button class="faq-q" onclick="toggleFaq(this)">表面下最大せん断応力の深さはどのように役立ちますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -723,6 +734,9 @@ update();
 
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="hertz-contact.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -767,17 +781,23 @@ update();
 </section>
 <!-- codex-static-related-tools:end -->
 
+<div class="howto-card">
+<h3>準拠規格・前提条件</h3>
+<p><strong>準拠/参考：</strong> ヘルツ接触理論（H. Hertz, 1882; K.L. Johnson, Contact Mechanics, 1985）。球接触で接触半径 \(a = (3FR^{*}/4E^{*})^{1/3}\)、最大接触圧 \(p_0 = 3F/(2\pi a^2)\)。等価弾性率 \(1/E^{*}=(1-\nu_1^2)/E_1+(1-\nu_2^2)/E_2\)、等価曲率 \(1/R^{*}=1/R_1+1/R_2\)。表面下最大せん断応力は球で \(\tau_\text{max}\approx0.31\,p_0\)（深さ \(z\approx0.48a\)）、円柱で \(\approx0.30\,p_0\)（\(z\approx0.78a\)）。</p>
+<p><strong>モデルの前提：</strong> 線形弾性・等方均質、摩擦なし、接触面は曲率に対し十分小さい（\(a \ll R\)）、表面粗さ無視。圧力分布は半楕円 \(p(x)=p_0\sqrt{1-(x/a)^2}\)。表面下応力プロファイルは中心軸上の一次近似です。</p>
+<p><strong>適用範囲・限界：</strong> 既定値（\(R_1{=}R_2{=}20\text{mm}, E{=}200\text{GPa}, \nu{=}0.3, P{=}1000\text{N}\)）で \(a{=}408.7\,\mu\text{m},\ p_0{=}2.86\text{GPa}\)。塑性変形（\(p_0\) が降伏点超）、\(a/R>0.1\)、表面粗さがaと同程度の場合は適用外。実機では動的係数・粗さ補正・潤滑（EHL）を別途考慮します。</p>
+</div>
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>接触する2つの物体の曲率半径を入力します。例えば球-平面接触ではR1=10mm、R2=∞(平面)と設定します</li>
+<li>接触タイプ（球 – 球／球 – 平板／円柱 – 円柱／円柱 – 平板）を選び、曲率半径を入力します。平板を含むタイプではR₂は自動的に∞として扱われます</li>
 <li>各物体のヤング率を材料に応じて設定します。鋼：E1=200GPa、アルミニウム：E2=70GPa、ガラス：E=70GPaなど</li>
 <li>接触荷重を入力するとヘルツ接触応力の最大圧力Pmaxと接触面積、最大せん断応力τmaxがリアルタイム計算されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>鋼球（R1=5mm、E1=200GPa）が鋼平板（R2=∞、E2=200GPa）に荷重F=500N作用した場合、接触応力は最大圧力Pmax≈2,650MPa、接触円半径a≈0.35mm、最大せん断応力τmax≈1,050MPa（深さ0.52mm）となります。ベアリング部品やギア歯面の評価に用いられます</p>
+<p>鋼球（R1=5mm、E1=200GPa）が鋼平板（R2=∞、E2=200GPa）に荷重F=500N作用した場合、接触応力は最大圧力Pmax≈3,600MPa、接触円半径a≈0.26mm、最大せん断応力τmax≈1,120MPa（深さ≈0.12mm）となります。ベアリング部品やギア歯面の評価に用いられます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -787,6 +807,16 @@ update();
 <li>潤滑油粘度やすべり率を考慮した疲労強度評価（Lファクタ）は別途ISO6281規格に基づき補正が必要です</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
 <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

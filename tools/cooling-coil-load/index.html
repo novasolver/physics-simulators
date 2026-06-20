@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "冷却コイル熱負荷シミュレーター",
       "description": "入口空気（温度・相対湿度）と出口空気の状態から、冷却コイルの顕熱負荷・潜熱負荷・全熱負荷・除湿量・顕熱比SHFをリアルタイム計算・可視化する空調設計の教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/cooling-coil-load.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["顕熱負荷・潜熱負荷・全熱負荷の即時計算","除湿量と顕熱比SHFの算出","簡略空気線図上の冷却過程の可視化","入口・出口の絶対湿度とエンタルピーの表示"],
       "keywords": "冷却コイル,熱負荷,顕熱負荷,潜熱負荷,全熱負荷,除湿量,顕熱比,SHF,空気線図,空調設計,HVAC",
       "datePublished": "2026-05-16",
@@ -100,8 +100,19 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#cv,#cvAnim{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#cvAnim:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0 4px; }
+.live-ro{ background:linear-gradient(135deg,#0a1628,#102a4c); border:1px solid rgba(0,180,216,.25); border-radius:10px; padding:8px 6px; text-align:center; }
+.live-ro .rv{ font-family:'Roboto Mono',monospace; font-size:0.92rem; font-weight:700; color:#fff; line-height:1.15; word-break:break-word; }
+.live-ro .rl{ font-size:0.6rem; color:rgba(255,255,255,.6); margin-top:4px; }
+.live-ro.accent .rv{ color:#ffd54a; }
+.play-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+.preset-btn{ padding:5px 11px; font-size:0.76rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); cursor:pointer; font-family:inherit; transition:all .2s; }
+.preset-btn:hover{ border-color:var(--accent); color:var(--accent); }
+@media(max-width:600px){ .live-readouts{ grid-template-columns:repeat(2,1fr); } }
+@media (prefers-reduced-motion: reduce){ .live-ro{ transition:none; } }
 </style>
 </head>
 <body>
@@ -169,9 +180,42 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">出口相対湿度はコイル表面付近の飽和を想定し RH<sub>out</sub>=95% 固定、大気圧 p<sub>atm</sub>=1013 hPa 固定としています。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-film"></i> 冷却コイルを通る空気のアニメーション</div>
+      <canvas id="cvAnim" tabindex="0" role="img" aria-label="冷却コイルを流れる空気のアニメーション。コイル前の暖かく湿った空気が冷却・除湿され、凝縮水がコイルから滴下します。"></canvas>
+      <div class="live-readouts">
+        <div class="live-ro"><div class="rv" id="roTin">—</div><div class="rl">入口 T / RH</div></div>
+        <div class="live-ro"><div class="rv" id="roTout">—</div><div class="rl">出口 T / RH</div></div>
+        <div class="live-ro"><div class="rv" id="roWin">—</div><div class="rl">入口 絶対湿度 w</div></div>
+        <div class="live-ro"><div class="rv" id="roWout">—</div><div class="rl">出口 絶対湿度 w</div></div>
+        <div class="live-ro accent"><div class="rv" id="roQs2">—</div><div class="rl">顕熱負荷 Q_s</div></div>
+        <div class="live-ro accent"><div class="rv" id="roQL2">—</div><div class="rl">潜熱負荷 Q_L</div></div>
+        <div class="live-ro accent"><div class="rv" id="roQt2">—</div><div class="rl">全熱負荷 Q_t</div></div>
+        <div class="live-ro"><div class="rv" id="roSHF2">—</div><div class="rl">顕熱比 SHF</div></div>
+      </div>
+      <div class="play-row">
+        <button type="button" class="btn" id="btnPlay"><i class="fas fa-play"></i> 再生</button>
+        <button type="button" class="btn secondary" id="btnReset2"><i class="fas fa-redo"></i> 最初から</button>
+        <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
+          <button type="button" class="preset-btn" onclick="cclPreset('highLatent')">高潜熱（蒸し暑い）</button>
+          <button type="button" class="preset-btn" onclick="cclPreset('sensible')">顕熱主体（乾燥）</button>
+        </div>
+      </div>
+      <p class="canvas-hint">左＝暖かく湿った空気（赤）がコイルで冷却・除湿され右で冷たく乾いた空気（青）へ。下部バー＝顕熱（赤）と潜熱（青）の割合。露点以下でコイルから凝縮水が滴下します。</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -211,9 +255,25 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Cooling Coil Load Simulator ==========
-var cv = document.getElementById('cv');
-var ctx = cv.getContext('2d');
+window.__CCL_L = {
+  qsLeg: '顕熱 Q_s', qlLeg: '潜熱 Q_L',
+  axisT: '乾球温度 T (°C)', axisW: '絶対湿度 w (g/kg DA)',
+  satLine: '飽和線 (RH=100%)',
+  coil: '冷却コイル', airIn: '暖かく湿った空気', airOut: '冷たく乾いた空気',
+  condensate: '凝縮水', sensible: '顕熱', latent: '潜熱',
+  play: '再生', pause: '一時停止'
+};
+</script>
+<script>
+// ========== Cooling Coil Load Simulator v2 (animated) ==========
+(function(){
+"use strict";
+// ===== Cooling Coil Load Simulator v2 (animated) =====
+var L = window.__CCL_L || {};
+var cv = document.getElementById('cv');                 // psychrometric chart
+var ctx = cv ? cv.getContext('2d') : null;
+var cvA = document.getElementById('cvAnim');             // hero animation
+var ctxA = cvA ? cvA.getContext('2d') : null;
 
 var P_ATM = 1013;     // hPa
 var CP_AIR = 1.006;   // kJ/(kg K)
@@ -221,252 +281,416 @@ var LV = 2501;        // kJ/kg
 var RHO_AIR = 1.2;    // kg/m3
 var RH_OUT_FIX = 95;  // %
 
-function fmt(v, n) {
-  if (!isFinite(v)) return '—';
-  return v.toFixed(n);
-}
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Magnus saturation vapor pressure [hPa]
-function eSat(T) {
-  return 6.112 * Math.exp(17.62 * T / (243.12 + T));
-}
-
-// humidity ratio [g/kg DA] from T and RH(%)
-function humRatio(T, RH) {
-  var es = eSat(T);
-  var e = (RH / 100) * es;
+function fmt(v, n){ if(!isFinite(v)) return '0'; return v.toFixed(n); }
+function eSat(T){ return 6.112 * Math.exp(17.62 * T / (243.12 + T)); }
+function humRatio(T, RH){
+  var es = eSat(T), e = (RH/100)*es;
   if (e >= P_ATM) return 0;
   return 622 * e / (P_ATM - e);
 }
+function enthalpy(T, w){ return CP_AIR*T + (w/1000)*(LV + 1.86*T); }
 
-// moist-air specific enthalpy [kJ/kg DA] from T and w[g/kg]
-function enthalpy(T, w) {
-  return CP_AIR * T + (w / 1000) * (LV + 1.86 * T);
+function getParams(){
+  return {
+    Tin:  parseFloat(document.getElementById('slTin').value),
+    RHin: parseFloat(document.getElementById('slRHin').value),
+    Tout: parseFloat(document.getElementById('slTout').value),
+    Vmin: parseFloat(document.getElementById('slV').value)
+  };
 }
 
-function getParams() {
-  var Tin = parseFloat(document.getElementById('slTin').value);
-  var RHin = parseFloat(document.getElementById('slRHin').value);
-  var Tout = parseFloat(document.getElementById('slTout').value);
-  var Vmin = parseFloat(document.getElementById('slV').value);
-  return { Tin: Tin, RHin: RHin, Tout: Tout, Vmin: Vmin };
-}
-
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var h = Math.round(w * 0.62);
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
-  cv.width = Math.round(w * dpr);
-  cv.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cv.dataset.cssW = String(w);
-  cv.dataset.cssH = String(h);
-}
-
-function drawChart(p, w_in, w_out, eIn, eOut) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-
-  var mx = 56, mt = 18, mb = 38, mr = 18;
-  var x0 = mx, x1 = W - mr, y0 = H - mb, y1 = mt;
-  var gw = x1 - x0, gh = y0 - y1;
-
-  // axes ranges: T in [10, 40], w in [0, 25]
-  var Tmin = 10, Tmax = 40, wMin = 0, wMax = 25;
-  function px(T) { return x0 + (T - Tmin) / (Tmax - Tmin) * gw; }
-  function py(w) { return y0 - (w - wMin) / (wMax - wMin) * gh; }
-
-  // grid
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.lineWidth = 1;
-  for (var t = 10; t <= 40; t += 5) {
-    ctx.beginPath(); ctx.moveTo(px(t), y0); ctx.lineTo(px(t), y1); ctx.stroke();
-  }
-  for (var ww = 0; ww <= 25; ww += 5) {
-    ctx.beginPath(); ctx.moveTo(x0, py(ww)); ctx.lineTo(x1, py(ww)); ctx.stroke();
-  }
-
-  // axes
-  ctx.strokeStyle = 'rgba(207,227,247,0.6)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-
-  // saturation curve (RH=100%)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (var i = 0; i <= 60; i++) {
-    var T = Tmin + (Tmax - Tmin) * i / 60;
-    var wsat = humRatio(T, 100);
-    var wc = Math.min(wsat, wMax);
-    if (i === 0) ctx.moveTo(px(T), py(wc)); else ctx.lineTo(px(T), py(wc));
-  }
-  ctx.stroke();
-
-  // additional RH lines (40%, 60%, 80%)
-  var rhList = [40, 60, 80];
-  var rhCol = ['rgba(0,180,216,0.35)', 'rgba(0,180,216,0.45)', 'rgba(0,180,216,0.55)'];
-  rhList.forEach(function (rh, k) {
-    ctx.strokeStyle = rhCol[k];
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    var moved = false;
-    for (var i = 0; i <= 60; i++) {
-      var T = Tmin + (Tmax - Tmin) * i / 60;
-      var ws = humRatio(T, rh);
-      if (ws > wMax) continue;
-      if (!moved) { ctx.moveTo(px(T), py(ws)); moved = true; }
-      else ctx.lineTo(px(T), py(ws));
-    }
-    ctx.stroke();
-  });
-
-  // clip points to chart range
-  var TinC = Math.max(Tmin, Math.min(Tmax, p.Tin));
-  var ToutC = Math.max(Tmin, Math.min(Tmax, p.Tout));
-  var winC = Math.max(wMin, Math.min(wMax, w_in));
-  var woutC = Math.max(wMin, Math.min(wMax, w_out));
-
-  var ix = px(TinC), iy = py(winC);
-  var ox = px(ToutC), oy = py(woutC);
-  var midx = px(ToutC), midy = py(winC); // intermediate point: sensible cooling first (horizontal), then latent (vertical down)
-
-  // process path: in -> mid (sensible) -> out (latent)
-  ctx.strokeStyle = 'rgba(255,209,102,0.85)';
-  ctx.lineWidth = 2.2;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath();
-  ctx.moveTo(ix, iy);
-  ctx.lineTo(midx, midy);
-  ctx.lineTo(ox, oy);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // straight process line in -> out (overall)
-  ctx.strokeStyle = 'rgba(231,76,60,0.55)';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(ix, iy);
-  ctx.lineTo(ox, oy);
-  ctx.stroke();
-
-  // labels for sensible / latent legs
-  ctx.fillStyle = 'rgba(255,209,102,0.95)';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('顕熱 Q_s', (ix + midx) / 2, iy - 6);
-  ctx.textAlign = 'left';
-  ctx.fillText('潜熱 Q_L', midx + 6, (midy + oy) / 2);
-
-  // inlet marker (red)
-  ctx.beginPath(); ctx.arc(ix, iy, 7, 0, Math.PI * 2);
-  ctx.fillStyle = '#e74c3c';
-  ctx.shadowColor = '#e74c3c'; ctx.shadowBlur = 10;
-  ctx.fill(); ctx.shadowBlur = 0;
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('In (' + p.Tin.toFixed(1) + '°C, ' + w_in.toFixed(1) + 'g/kg)', ix + 10, iy - 8);
-
-  // outlet marker (blue)
-  ctx.beginPath(); ctx.arc(ox, oy, 7, 0, Math.PI * 2);
-  ctx.fillStyle = '#007BFF';
-  ctx.shadowColor = '#007BFF'; ctx.shadowBlur = 10;
-  ctx.fill(); ctx.shadowBlur = 0;
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'left';
-  ctx.fillText('Out (' + p.Tout.toFixed(1) + '°C, ' + w_out.toFixed(1) + 'g/kg)', ox + 10, oy + 16);
-
-  // axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  for (var t2 = 10; t2 <= 40; t2 += 5) {
-    ctx.fillText(t2 + '', px(t2), y0 + 14);
-  }
-  ctx.textAlign = 'right';
-  for (var w2 = 0; w2 <= 25; w2 += 5) {
-    ctx.fillText(w2 + '', x0 - 4, py(w2) + 4);
-  }
-  ctx.textAlign = 'center';
-  ctx.fillText('乾球温度 T (°C)', (x0 + x1) / 2, H - 6);
-  ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('絶対湿度 w (g/kg DA)', 0, 0);
-  ctx.restore();
-
-  // saturation label
-  ctx.fillStyle = '#00B4D8';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('飽和線 (RH=100%)', x0 + 6, y1 + 14);
-}
-
-function compute() {
+// Central physics model -> all derived quantities
+function model(){
   var p = getParams();
-  if (!isFinite(p.Tin) || !isFinite(p.Tout) || !isFinite(p.RHin) || !isFinite(p.Vmin)) return;
-
-  // inlet
-  var es_in = eSat(p.Tin);
-  var e_in = (p.RHin / 100) * es_in;
+  var es_in = eSat(p.Tin), e_in = (p.RHin/100)*es_in;
   var w_in = 622 * e_in / (P_ATM - e_in);
   var h_in = enthalpy(p.Tin, w_in);
-
-  // outlet (RH=95% fixed)
-  var es_out = eSat(p.Tout);
-  var e_out = (RH_OUT_FIX / 100) * es_out;
+  var es_out = eSat(p.Tout), e_out = (RH_OUT_FIX/100)*es_out;
   var w_out = 622 * e_out / (P_ATM - e_out);
+  if (w_out > w_in) w_out = w_in;
   var h_out = enthalpy(p.Tout, w_out);
-
-  // mass flow rate of dry air [kg/s]
-  var m_a = (p.Vmin / 60) * RHO_AIR;
-
-  // loads
+  var m_a = (p.Vmin/60) * RHO_AIR;
   var Qs = m_a * CP_AIR * (p.Tin - p.Tout);
-  var QL = m_a * (w_in - w_out) / 1000 * LV;
+  var QL = m_a * (w_in - w_out)/1000 * LV;
   var Qt = m_a * (h_in - h_out);
-  var dW = m_a * (w_in - w_out) / 1000 * 3600; // kg/h
-  var SHF = Qt > 1e-9 ? Qs / Qt : 0;
-
-  // guard non-cooling / non-dehumid cases
+  var dW = m_a * (w_in - w_out)/1000 * 3600;
   if (Qs < 0) Qs = 0;
   if (QL < 0) QL = 0;
   if (Qt < 0) Qt = 0;
   if (dW < 0) dW = 0;
+  var SHF = Qt > 1e-9 ? Qs/Qt : 0;
   if (!isFinite(SHF) || SHF < 0) SHF = 0;
   if (SHF > 1) SHF = 1;
-
-  document.getElementById('statQs').textContent = fmt(Qs, 1) + ' kW';
-  document.getElementById('statQL').textContent = fmt(QL, 1) + ' kW';
-  document.getElementById('statQt').textContent = fmt(Qt, 1) + ' kW';
-  document.getElementById('statDW').textContent = fmt(dW, 1) + ' kg/h';
-  document.getElementById('statSHF').textContent = fmt(SHF, 2);
-  document.getElementById('statMa').textContent = fmt(m_a, 2) + ' kg/s';
-
-  drawChart(p, w_in, w_out, e_in, e_out);
+  // dew point of inlet air (where condensation begins along the cooling path)
+  var Tdew = dewPoint(w_in);
+  return { p:p, w_in:w_in, w_out:w_out, h_in:h_in, h_out:h_out, m_a:m_a,
+           Qs:Qs, QL:QL, Qt:Qt, dW:dW, SHF:SHF, Tdew:Tdew };
 }
 
-function resetParams() {
-  var defs = { slTin: 28, slRHin: 65, slTout: 16, slV: 100 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
+// invert humidity ratio -> dew-point temperature (Magnus inverse)
+function dewPoint(w){
+  var e = P_ATM * w / (622 + w);                 // hPa
+  if (e <= 0) return -60;
+  var ln = Math.log(e/6.112);
+  return 243.12 * ln / (17.62 - ln);
+}
+
+/* ---------- live stat readouts ---------- */
+function setStats(m){
+  document.getElementById('statQs').textContent  = fmt(m.Qs,1) + ' kW';
+  document.getElementById('statQL').textContent  = fmt(m.QL,1) + ' kW';
+  document.getElementById('statQt').textContent  = fmt(m.Qt,1) + ' kW';
+  document.getElementById('statDW').textContent  = fmt(m.dW,1) + ' kg/h';
+  document.getElementById('statSHF').textContent = fmt(m.SHF,2);
+  document.getElementById('statMa').textContent  = fmt(m.m_a,2) + ' kg/s';
+  var st = document.getElementById('roTin');
+  if (st){
+    document.getElementById('roTin').textContent  = fmt(m.p.Tin,1) + '°C / ' + fmt(m.p.RHin,0) + '%';
+    document.getElementById('roTout').textContent = fmt(m.p.Tout,1) + '°C / ' + fmt(RH_OUT_FIX,0) + '%';
+    document.getElementById('roWin').textContent  = fmt(m.w_in,1) + ' g/kg';
+    document.getElementById('roWout').textContent = fmt(m.w_out,1) + ' g/kg';
+    document.getElementById('roQs2').textContent  = fmt(m.Qs,1) + ' kW';
+    document.getElementById('roQL2').textContent  = fmt(m.QL,1) + ' kW';
+    document.getElementById('roQt2').textContent  = fmt(m.Qt,1) + ' kW';
+    document.getElementById('roSHF2').textContent = fmt(m.SHF,2);
+  }
+}
+
+/* ---------- HiDPI helpers ---------- */
+function fitCanvas(c, cx, ratio){
+  if (!c) return null;
+  var w = Math.max(280, Math.min(c.parentElement.clientWidth - 40, 900));
+  var h = Math.round(w * ratio);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  c.style.width = w + 'px';
+  c.style.height = h + 'px';
+  c.width = Math.round(w * dpr);
+  c.height = Math.round(h * dpr);
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w:w, h:h };
+}
+
+/* ---------- psychrometric chart (static-per-frame) ---------- */
+var chartDim = null;
+function resizeChart(){ if (cv) chartDim = fitCanvas(cv, ctx, 0.62); }
+
+function drawChart(m){
+  if (!ctx || !chartDim) return;
+  var W = chartDim.w, H = chartDim.h, p = m.p;
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
+  var mx = 56, mt = 18, mb = 38, mr = 18;
+  var x0 = mx, x1 = W - mr, y0 = H - mb, y1 = mt;
+  var gw = x1 - x0, gh = y0 - y1;
+  var Tmin = 10, Tmax = 40, wMin = 0, wMax = 25;
+  function px(T){ return x0 + (T - Tmin)/(Tmax - Tmin)*gw; }
+  function py(w){ return y0 - (w - wMin)/(wMax - wMin)*gh; }
+
+  ctx.strokeStyle = 'rgba(143,184,224,0.18)'; ctx.lineWidth = 1;
+  for (var t = 10; t <= 40; t += 5){ ctx.beginPath(); ctx.moveTo(px(t), y0); ctx.lineTo(px(t), y1); ctx.stroke(); }
+  for (var ww = 0; ww <= 25; ww += 5){ ctx.beginPath(); ctx.moveTo(x0, py(ww)); ctx.lineTo(x1, py(ww)); ctx.stroke(); }
+
+  ctx.strokeStyle = 'rgba(207,227,247,0.6)'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2; ctx.beginPath();
+  for (var i = 0; i <= 60; i++){
+    var T = Tmin + (Tmax - Tmin)*i/60;
+    var wc = Math.min(humRatio(T,100), wMax);
+    if (i === 0) ctx.moveTo(px(T), py(wc)); else ctx.lineTo(px(T), py(wc));
+  }
+  ctx.stroke();
+
+  var rhList = [40,60,80], rhCol = ['rgba(0,180,216,0.35)','rgba(0,180,216,0.45)','rgba(0,180,216,0.55)'];
+  rhList.forEach(function(rh,k){
+    ctx.strokeStyle = rhCol[k]; ctx.lineWidth = 1; ctx.beginPath();
+    var moved = false;
+    for (var j = 0; j <= 60; j++){
+      var T2 = Tmin + (Tmax - Tmin)*j/60, ws = humRatio(T2, rh);
+      if (ws > wMax) continue;
+      if (!moved){ ctx.moveTo(px(T2), py(ws)); moved = true; } else ctx.lineTo(px(T2), py(ws));
+    }
+    ctx.stroke();
   });
-  updateSlider(document.getElementById('slTin'), 'slTinVal', 1, '');
-  updateSlider(document.getElementById('slRHin'), 'slRHinVal', 0, '');
-  updateSlider(document.getElementById('slTout'), 'slToutVal', 1, '');
-  updateSlider(document.getElementById('slV'), 'slVVal', 0, '');
-  compute();
+
+  var TinC = Math.max(Tmin, Math.min(Tmax, p.Tin));
+  var ToutC = Math.max(Tmin, Math.min(Tmax, p.Tout));
+  var winC = Math.max(wMin, Math.min(wMax, m.w_in));
+  var woutC = Math.max(wMin, Math.min(wMax, m.w_out));
+  var TdewC = Math.max(Tmin, Math.min(Tmax, m.Tdew));
+  var ix = px(TinC), iy = py(winC);
+  var ox = px(ToutC), oy = py(woutC);
+  var dxp = px(TdewC), dyp = py(winC);
+
+  // process path: in -> dew (pure sensible) -> out (along saturation: latent)
+  ctx.strokeStyle = 'rgba(255,209,102,0.9)'; ctx.lineWidth = 2.4; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(ix, iy); ctx.lineTo(dxp, dyp); ctx.lineTo(ox, oy); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = 'rgba(231,76,60,0.5)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(ix, iy); ctx.lineTo(ox, oy); ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,209,102,0.95)'; ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'center'; ctx.fillText(L.qsLeg || 'Q_s', (ix + dxp)/2, iy - 6);
+  ctx.textAlign = 'left';   ctx.fillText(L.qlLeg || 'Q_L', dxp + 6, (dyp + oy)/2);
+
+  // animated parcel marker travelling along the process path
+  drawParcelOnChart(px, py, TinC, winC, TdewC, ToutC, woutC, m);
+
+  ctx.beginPath(); ctx.arc(ix, iy, 7, 0, Math.PI*2); ctx.fillStyle = '#e74c3c';
+  ctx.shadowColor = '#e74c3c'; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('In (' + p.Tin.toFixed(1) + '°C, ' + m.w_in.toFixed(1) + 'g/kg)', ix + 10, iy - 8);
+
+  ctx.beginPath(); ctx.arc(ox, oy, 7, 0, Math.PI*2); ctx.fillStyle = '#007BFF';
+  ctx.shadowColor = '#007BFF'; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+  ctx.fillText('Out (' + p.Tout.toFixed(1) + '°C, ' + m.w_out.toFixed(1) + 'g/kg)', ox + 10, oy + 16);
+
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  for (var t2 = 10; t2 <= 40; t2 += 5) ctx.fillText(t2 + '', px(t2), y0 + 14);
+  ctx.textAlign = 'right';
+  for (var w2 = 0; w2 <= 25; w2 += 5) ctx.fillText(w2 + '', x0 - 4, py(w2) + 4);
+  ctx.textAlign = 'center'; ctx.fillText(L.axisT || 'Dry-bulb T (°C)', (x0 + x1)/2, H - 6);
+  ctx.save(); ctx.translate(14, (y0 + y1)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(L.axisW || 'Humidity ratio w (g/kg DA)', 0, 0); ctx.restore();
+
+  ctx.fillStyle = '#00B4D8'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText(L.satLine || 'Saturation (RH=100%)', x0 + 6, y1 + 14);
 }
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+// place the moving air parcel on the chart at current animation phase
+function drawParcelOnChart(px, py, Tin, win, Tdew, Tout, wout, m){
+  var ph = anim.phase;                       // 0..1 progress along the path
+  var Tc, wc;
+  var split = (Tin > Tdew) ? (Tin - Tdew) / Math.max(1e-6, (Tin - Tdew) + (win - wout)) : 0;
+  if (m.w_in - m.w_out < 1e-6) split = 1;     // sensible-only
+  if (ph <= split){
+    var f = split > 1e-6 ? ph/split : 1;
+    Tc = Tin + (Tdew - Tin)*f; wc = win;
+  } else {
+    var g = (1 - split) > 1e-6 ? (ph - split)/(1 - split) : 1;
+    Tc = Tdew + (Tout - Tdew)*g; wc = win + (wout - win)*g;
+  }
+  var x = px(Math.max(10, Math.min(40, Tc)));
+  var y = py(Math.max(0, Math.min(25, wc)));
+  ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2);
+  ctx.fillStyle = '#fff'; ctx.shadowColor = '#ffd54a'; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0;
+}
 
-resizeCanvas();
-compute();
+/* ---------- hero animation: air flowing through chilled coil ---------- */
+var animDim = null;
+function resizeAnim(){ if (cvA) animDim = fitCanvas(cvA, ctxA, 0.52); }
+
+var anim = { running:false, t:0, phase:0, raf:null, parcels:[], drips:[] };
+
+function seedParcels(){
+  anim.parcels = [];
+  for (var i = 0; i < 22; i++){
+    anim.parcels.push({ x: Math.random(), y: 0.18 + Math.random()*0.64, sp: 0.16 + Math.random()*0.10 });
+  }
+  anim.drips = [];
+}
+
+function drawAnim(m){
+  if (!ctxA || !animDim) return;
+  var W = animDim.w, H = animDim.h;
+  ctxA.fillStyle = '#0a1929'; ctxA.fillRect(0,0,W,H);
+
+  var coilX = W*0.40, coilW = W*0.20;              // coil band
+  var lane0 = H*0.14, lane1 = H*0.78;
+
+  // ducts
+  ctxA.fillStyle = 'rgba(255,255,255,0.04)';
+  ctxA.fillRect(0, lane0, W, lane1 - lane0);
+  ctxA.strokeStyle = 'rgba(207,227,247,0.35)'; ctxA.lineWidth = 1.5;
+  ctxA.strokeRect(0.5, lane0, W-1, lane1 - lane0);
+
+  // coil fins (chilled, blue)
+  var fins = 7;
+  for (var fi = 0; fi < fins; fi++){
+    var fx = coilX + coilW*fi/(fins-1);
+    var grd = ctxA.createLinearGradient(fx, lane0, fx, lane1);
+    grd.addColorStop(0, 'rgba(0,180,216,0.85)');
+    grd.addColorStop(1, 'rgba(0,123,255,0.85)');
+    ctxA.strokeStyle = grd; ctxA.lineWidth = 4;
+    ctxA.beginPath(); ctxA.moveTo(fx, lane0+4); ctxA.lineTo(fx, lane1-4); ctxA.stroke();
+  }
+  ctxA.fillStyle = 'rgba(0,180,216,0.9)'; ctxA.font = '11px "Roboto Mono",monospace'; ctxA.textAlign = 'center';
+  ctxA.fillText(L.coil || 'CHILLED COIL', coilX + coilW/2, lane0 - 6);
+
+  // air parcels: warmer/humid before coil, cooler/dryer after
+  var p = m.p;
+  for (var i = 0; i < anim.parcels.length; i++){
+    var pt = anim.parcels[i];
+    var rx = pt.x * W;
+    var ry = lane0 + 10 + pt.y*(lane1 - lane0 - 20);
+    var afterCoil = rx > coilX + coilW;
+    var col, rad;
+    if (afterCoil){ col = 'rgba(90,170,255,0.9)'; rad = 3.0; }
+    else { col = 'rgba(255,120,90,0.9)'; rad = 4.2; }
+    ctxA.beginPath(); ctxA.arc(rx, ry, rad, 0, Math.PI*2);
+    ctxA.fillStyle = col; ctxA.fill();
+    // moisture halo before coil (proportional to RHin)
+    if (!afterCoil){
+      ctxA.beginPath(); ctxA.arc(rx, ry, rad + 2.5, 0, Math.PI*2);
+      ctxA.strokeStyle = 'rgba(120,200,255,' + (0.10 + p.RHin/300).toFixed(3) + ')';
+      ctxA.lineWidth = 1.4; ctxA.stroke();
+    }
+  }
+
+  // flow arrows
+  ctxA.fillStyle = 'rgba(255,255,255,0.5)'; ctxA.font = '12px "Roboto Mono",monospace';
+  ctxA.textAlign = 'left';  ctxA.fillText('→ ' + (L.airIn || 'warm humid air'), 6, lane0 - 6);
+  ctxA.textAlign = 'right'; ctxA.fillText((L.airOut || 'cool dry air') + ' →', W - 6, lane1 + 16);
+
+  // condensate drips from coil (only when dehumidifying)
+  if (m.dW > 0.1){
+    for (var d = 0; d < anim.drips.length; d++){
+      var dr = anim.drips[d];
+      ctxA.beginPath(); ctxA.arc(dr.x, dr.y, dr.r, 0, Math.PI*2);
+      ctxA.fillStyle = 'rgba(120,200,255,0.85)'; ctxA.fill();
+    }
+    // drip pan
+    ctxA.strokeStyle = 'rgba(120,200,255,0.5)'; ctxA.lineWidth = 2;
+    ctxA.beginPath(); ctxA.moveTo(coilX-6, lane1+2); ctxA.lineTo(coilX+coilW+6, lane1+2); ctxA.stroke();
+    ctxA.fillStyle = 'rgba(120,200,255,0.9)'; ctxA.font = '10px "Roboto Mono",monospace'; ctxA.textAlign = 'center';
+    ctxA.fillText((L.condensate || 'condensate') + ' ' + m.dW.toFixed(1) + ' kg/h', coilX + coilW/2, lane1 + 20);
+  }
+
+  // sensible / latent split bar (bottom)
+  var barY = H - 14, barX = W*0.04, barW = W*0.92, barH = 8;
+  var tot = m.Qs + m.QL;
+  var sFrac = tot > 1e-6 ? m.Qs/tot : 1;
+  ctxA.fillStyle = 'rgba(255,255,255,0.12)'; ctxA.fillRect(barX, barY, barW, barH);
+  ctxA.fillStyle = '#ff7a5a'; ctxA.fillRect(barX, barY, barW*sFrac, barH);
+  ctxA.fillStyle = '#5aa6ff'; ctxA.fillRect(barX + barW*sFrac, barY, barW*(1-sFrac), barH);
+  ctxA.fillStyle = '#ff7a5a'; ctxA.font = '10px "Roboto Mono",monospace'; ctxA.textAlign = 'left';
+  ctxA.fillText((L.sensible || 'sensible') + ' ' + m.Qs.toFixed(1) + 'kW', barX, barY - 4);
+  ctxA.fillStyle = '#5aa6ff'; ctxA.textAlign = 'right';
+  ctxA.fillText((L.latent || 'latent') + ' ' + m.QL.toFixed(1) + 'kW  SHF=' + m.SHF.toFixed(2), barX + barW, barY - 4);
+}
+
+function stepAnim(dt, m){
+  anim.phase = (anim.phase + dt*0.35) % 1;
+  for (var i = 0; i < anim.parcels.length; i++){
+    var pt = anim.parcels[i];
+    pt.x += pt.sp * dt;
+    if (pt.x > 1.02){ pt.x = -0.02; pt.y = 0.18 + Math.random()*0.64; }
+  }
+  // spawn / move drips when dehumidifying
+  if (animDim && m.dW > 0.1){
+    var coilX = animDim.w*0.40, coilW = animDim.w*0.20, lane1 = animDim.h*0.78;
+    if (Math.random() < Math.min(0.9, m.dW/80)){
+      anim.drips.push({ x: coilX + Math.random()*coilW, y: lane1*0.6 + Math.random()*10, r: 1.6 + Math.random()*1.4, vy: 40 + Math.random()*40 });
+    }
+    for (var d = anim.drips.length - 1; d >= 0; d--){
+      anim.drips[d].y += anim.drips[d].vy * dt;
+      if (anim.drips[d].y > lane1 + 2) anim.drips.splice(d, 1);
+    }
+    if (anim.drips.length > 60) anim.drips.splice(0, anim.drips.length - 60);
+  } else {
+    anim.drips.length = 0;
+  }
+}
+
+/* ---------- main loop ---------- */
+var lastTs = 0;
+function frame(ts){
+  var dt = lastTs ? Math.min(0.05, (ts - lastTs)/1000) : 0.016;
+  lastTs = ts;
+  var m = model();
+  setStats(m);
+  if (anim.running) stepAnim(dt, m);
+  drawAnim(m);
+  drawChart(m);
+  if (anim.running && !reduceMotion) anim.raf = requestAnimationFrame(frame);
+  else anim.raf = null;
+}
+
+function renderOnce(){
+  lastTs = 0;
+  var m = model();
+  setStats(m);
+  drawAnim(m);
+  drawChart(m);
+}
+
+function play(){
+  if (reduceMotion){ renderOnce(); return; }
+  if (anim.running) return;
+  anim.running = true;
+  lastTs = 0;
+  updatePlayBtn();
+  anim.raf = requestAnimationFrame(frame);
+}
+function pause(){
+  anim.running = false;
+  if (anim.raf){ cancelAnimationFrame(anim.raf); anim.raf = null; }
+  updatePlayBtn();
+  renderOnce();
+}
+function togglePlay(){ if (anim.running) pause(); else play(); }
+function updatePlayBtn(){
+  var b = document.getElementById('btnPlay');
+  if (!b) return;
+  b.innerHTML = anim.running
+    ? '<i class="fas fa-pause"></i> ' + (L.pause || 'Pause')
+    : '<i class="fas fa-play"></i> ' + (L.play || 'Play');
+}
+
+function resetAll(){
+  var defs = { slTin:28, slRHin:65, slTout:16, slV:100 };
+  Object.keys(defs).forEach(function(id){ document.getElementById(id).value = defs[id]; });
+  syncNums();
+  anim.phase = 0; seedParcels();
+  renderOnce();
+}
+// keep legacy name used by Reset button onclick
+window.resetParams = resetAll;
+
+function applyPreset(name){
+  var sets = {
+    highLatent: { slTin:30, slRHin:85, slTout:13, slV:120 },
+    sensible:   { slTin:26, slRHin:35, slTout:18, slV:100 }
+  };
+  var s = sets[name]; if (!s) return;
+  Object.keys(s).forEach(function(id){ document.getElementById(id).value = s[id]; });
+  syncNums();
+  anim.phase = 0; seedParcels();
+  renderOnce();
+  if (!anim.running) play();
+}
+window.cclPreset = applyPreset;
+
+// keep number boxes and slider fills in sync with the common helpers when present
+function syncNums(){
+  var pairs = [['slTin','slTinVal',1],['slRHin','slRHinVal',0],['slTout','slToutVal',1],['slV','slVVal',0]];
+  pairs.forEach(function(pr){
+    var box = document.getElementById(pr[1]);
+    if (box) box.value = document.getElementById(pr[0]).value;
+    if (typeof window.updateSlider === 'function'){
+      try { window.updateSlider(document.getElementById(pr[0]), pr[1], pr[2], ''); } catch(e){}
+    }
+  });
+}
+
+// the sliders call compute() inline via oninput; expose a live recompute
+window.compute = function(){ renderOnce(); };
+
+window.addEventListener('resize', function(){ resizeChart(); resizeAnim(); renderOnce(); });
+
+document.addEventListener('DOMContentLoaded', function(){
+  resizeChart(); resizeAnim(); seedParcels();
+  var bp = document.getElementById('btnPlay');   if (bp) bp.addEventListener('click', togglePlay);
+  var br = document.getElementById('btnReset2'); if (br) br.addEventListener('click', resetAll);
+  updatePlayBtn();
+  renderOnce();
+  if (!reduceMotion) play();
+});
+})();
 </script>
 
 <section class="explanation">
@@ -534,6 +758,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="cooling-coil-load.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -596,7 +823,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>オフィスビル中央空調システムの冷却コイル設計例：入口空気35℃・70%RH、出口12℃、体積流量4500 m³/h。空気密度1.165 kg/m³として質量流量m_a=1.44 kg/sを算出。顕熱負荷Q_s=53.5 kW（Cp=1.006 kJ/kg·K）、潜熱負荷Q_L=28.3 kW（除湿量dW=4.2 g/kg）、全熱負荷Q_t=81.8 kW、顕熱比SHF=65.4%。この値から冷却コイルのサイズ選定と圧縮機容量を決定します。</p>
+<p>オフィスビル中央空調システムの冷却コイル設計例：入口空気25℃・70%RH、出口12℃、体積流量4500 m³/hはUIでは75 m³/minとして入力します。計算結果は顕熱負荷Q_s≈19.617 kW、潜熱負荷Q_L≈21.048 kW、全熱負荷Q_t≈41.357 kW、除湿量dW≈30.297 kg/h、顕熱比SHF≈0.474です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -607,6 +834,16 @@ compute();
 <li>空気質量流量の算出に用いる密度は気圧と温度に依存します。高地（1000m以上）での運用では補正が必要です</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

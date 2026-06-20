@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ガウス・プルームシミュレーター",
       "description": "ガウス・プルームモデルで点源大気拡散を計算。地表中心濃度C、拡散係数σy・σzをPasquill Dクラスで即時評価。",
       "url": "https://novasolver.jp/tools/gaussian-plume.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["地表中心濃度Cの計算","Pasquill Dクラスの拡散係数σy・σz","排気塔有効高さHの感度","距離・風速・排出量スイープ"],
       "keywords": "ガウス・プルーム,大気拡散,Pasquill安定度,σy,σz,煙突高さ,環境工学,排出量",
       "datePublished": "2026-05-16",
@@ -100,6 +100,12 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
 .btn.secondary:hover{background:var(--border)}
 .btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.gp-select{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:.82rem;cursor:pointer}
+.gp-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:10px}
+.gp-legend span{display:inline-flex;align-items:center;gap:5px}
+.gp-legend i.sw{width:16px;height:10px;border-radius:2px;display:inline-block}
+.plume-canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.btn,.gp-select{transition:none}}
 </style>
 </head>
 <body>
@@ -161,33 +167,66 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <input type="range" id="slX_km" min="0.1" max="20.0" step="0.1" value="2.0" oninput="syncToNum('slX_km','vX_km');updateSlider(this);calc()">
     </div>
 
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">Pasquill 安定度クラス</span>
+      </div>
+      <select id="selStab" class="gp-select" onchange="calc()">
+        <option value="A">A — 強不安定（日中・微風・快晴）</option>
+        <option value="B">B — 不安定</option>
+        <option value="C">C — やや不安定</option>
+        <option value="D" selected>D — 中立（基準）</option>
+        <option value="E">E — やや安定</option>
+        <option value="F">F — 強安定（夜間・逆転層）</option>
+      </select>
+    </div>
+
     <div class="divider"></div>
-    <div class="panel-title"><i class="fas fa-info-circle"></i> 固定パラメータ</div>
+    <div class="panel-title"><i class="fas fa-info-circle"></i> 拡散係数モデル</div>
     <div style="font-size:.78rem;color:var(--muted);line-height:1.7">
-      Pasquill安定度 = D（中立）<br>
-      σy(x) = 0.10 x^0.92<br>
-      σz(x) = 0.08 x^0.92<br>
-      地表反射あり（z = 0）
+      σy, σz = a·x^p（クラス別係数）<br>
+      地表反射あり（z = 0）<br>
+      最大地表濃度は σz ≈ H/√2 付近で発生
     </div>
 
     <div class="divider"></div>
     <div class="btn-group">
-      <button id="btnPlay" class="btn" onclick="togglePlay()"><i class="fas fa-play"></i> 距離スイープ</button>
       <button class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4753017575?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4753017575.09._SCMZZZZZZ_.jpg" alt="環境工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">環境工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（観測点 x / 全域ピーク）</div>
       <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statC">—</div><div class="sl">地表中心濃度 C</div></div>
-        <div class="stat-card"><div class="sv" id="statSY">—</div><div class="sl">拡散係数 σy</div></div>
-        <div class="stat-card"><div class="sv" id="statSZ">—</div><div class="sl">拡散係数 σz</div></div>
-        <div class="stat-card"><div class="sv" id="statRatio">—</div><div class="sl">無次元比 H/σz</div></div>
+        <div class="stat-card"><div class="sv" id="statC">—</div><div class="sl">観測点 地表濃度 C</div></div>
+        <div class="stat-card"><div class="sv" id="statCmax">—</div><div class="sl">最大地表濃度 Cmax</div></div>
+        <div class="stat-card"><div class="sv" id="statXmax">—</div><div class="sl">Cmax 出現距離</div></div>
+        <div class="stat-card"><div class="sv" id="statSZ">—</div><div class="sl">σz（観測点）</div></div>
       </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-smog"></i> プルーム側面図 — 排気塔・拡散・観測点</div><canvas id="plumeCanvas" class="plume-canvas" height="280" data-ux-no-scale="1"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-smog"></i> プルーム拡散アニメーション — 粒子が風で運ばれ広がる</div>
+      <canvas id="plumeCanvas" class="plume-canvas" height="300" tabindex="0" role="img" aria-label="排気塔から放出された汚染粒子が風下に運ばれ、ガウス分布状に広がり地表に到達する様子のアニメーション" data-ux-no-scale="1"></canvas>
+      <div class="play-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+        <button class="btn" type="button" id="btnAnim" onclick="toggleAnim()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+      </div>
+      <div class="gp-legend">
+        <span><i class="sw" style="background:linear-gradient(90deg,#ff5252,#ffd166)"></i>高濃度→低濃度</span>
+        <span><i class="sw" style="background:rgba(0,180,216,.55)"></i>±2σz 包絡線</span>
+        <span><i class="sw" style="background:#ffd166"></i>観測点 x</span>
+        <span><i class="sw" style="background:#00b894"></i>地表濃度プロファイル</span>
+      </div>
+    </div>
 
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 風下距離 x と地表中心濃度 C</div><canvas class="ux-chartjs-canvas" id="chartCanvas" height="220"></canvas></div>
 
@@ -200,294 +239,313 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 </div>
 
 <script>
-let chartInst=null;
-let playing=false, playTimer=null;
+(function(){
+"use strict";
 
-const SIGMA_Y_COEF = 0.1003;
-const SIGMA_Z_COEF = 0.0803;
-const SIGMA_EXP = 0.92;
+/* ===== Pasquill–Gifford dispersion coefficients (Briggs open-country, rural) =====
+   sigma_y(x)=a*x/sqrt(1+b*x), sigma_z(x)=c*x*(1+d*x)^e  ; x in metres */
+var STAB = {
+  A: { ay:0.22, by:1e-4, cz:0.20, dz:0,      ez:1    },
+  B: { ay:0.16, by:1e-4, cz:0.12, dz:0,      ez:1    },
+  C: { ay:0.11, by:1e-4, cz:0.08, dz:2e-4,   ez:-0.5 },
+  D: { ay:0.08, by:1e-4, cz:0.06, dz:1.5e-3, ez:-0.5 },
+  E: { ay:0.06, by:1e-4, cz:0.03, dz:3e-4,   ez:-1   },
+  F: { ay:0.04, by:1e-4, cz:0.016,dz:3e-4,   ez:-1   }
+};
+var STAB_LABEL = { A:'A 強不安定', B:'B 不安定', C:'C やや不安定', D:'D 中立', E:'E やや安定', F:'F 強安定' };
+
+function el(id){ return document.getElementById(id); }
+function stab(){ var s=el('selStab'); return (s && STAB[s.value]) ? s.value : 'D'; }
+
+function sigmaY(x_m, k){ var c=STAB[k]; if(x_m<=0) return 0; return c.ay*x_m/Math.sqrt(1+c.by*x_m); }
+function sigmaZ(x_m, k){ var c=STAB[k]; if(x_m<=0) return 0; return c.cz*x_m*Math.pow(1+c.dz*x_m, c.ez); }
+
+/* Centreline ground-level concentration with ground reflection (z=0):
+   C = Q/(pi*u*sy*sz)*exp(-H^2/(2*sz^2))  [kg/m^3] */
+function concentration(Q_kgps, u, H, x_m, k){
+  if (x_m <= 0 || u <= 0) return 0;
+  var sy = sigmaY(x_m,k), sz = sigmaZ(x_m,k);
+  if (sy<=0 || sz<=0) return 0;
+  return Q_kgps/(Math.PI*u*sy*sz)*Math.exp(-(H*H)/(2*sz*sz));
+}
+
+/* Concentration at arbitrary (x downwind, z height) on centreline y=0 — for the field map */
+function concAt(Q_kgps, u, H, x_m, z_m, k){
+  if (x_m <= 0 || u <= 0) return 0;
+  var sy = sigmaY(x_m,k), sz = sigmaZ(x_m,k);
+  if (sy<=0 || sz<=0) return 0;
+  var vert = Math.exp(-(z_m-H)*(z_m-H)/(2*sz*sz)) + Math.exp(-(z_m+H)*(z_m+H)/(2*sz*sz));
+  return Q_kgps/(2*Math.PI*u*sy*sz)*vert;
+}
 
 function getParams(){
   return {
-    Q_gps: parseFloat(document.getElementById('slQ_gps').value),
-    u: parseFloat(document.getElementById('slU').value),
-    H: parseFloat(document.getElementById('slH').value),
-    x_km: parseFloat(document.getElementById('slX_km').value)
+    Q_gps: parseFloat(el('slQ_gps').value),
+    u: parseFloat(el('slU').value),
+    H: parseFloat(el('slH').value),
+    x_km: parseFloat(el('slX_km').value),
+    k: stab()
   };
 }
 
-function sigmaY(x_m){ return SIGMA_Y_COEF * Math.pow(x_m, SIGMA_EXP); }
-function sigmaZ(x_m){ return SIGMA_Z_COEF * Math.pow(x_m, SIGMA_EXP); }
-
-function concentration(Q_kgps, u, H, x_m){
-  if (x_m <= 0 || u <= 0) return 0;
-  const sy = sigmaY(x_m);
-  const sz = sigmaZ(x_m);
-  const expArg = Math.exp(-(H*H)/(2*sz*sz));
-  return Q_kgps / (Math.PI * u * sy * sz) * expArg; // kg/m^3
+/* peak ground concentration over downwind distance (scan) */
+function peakGround(p){
+  var Q=p.Q_gps/1000, best=0, bestX=0;
+  for (var xk=0.05; xk<=20; xk+=0.02){
+    var c = concentration(Q, p.u, p.H, xk*1000, p.k)*1e9;
+    if (c>best){ best=c; bestX=xk; }
+  }
+  return { Cmax:best, xmax:bestX };
 }
 
 function compute(p){
-  const x_m = p.x_km * 1000;
-  const Q_kgps = p.Q_gps / 1000; // g/s -> kg/s
-  const sy = sigmaY(x_m);
-  const sz = sigmaZ(x_m);
-  const ratio = p.H / sz;
-  const C = concentration(Q_kgps, p.u, p.H, x_m); // kg/m^3
-  const C_ugm3 = C * 1e9; // ug/m^3
-  return { sy, sz, ratio, C_ugm3, x_m };
+  var x_m = p.x_km*1000, Q=p.Q_gps/1000;
+  var sy = sigmaY(x_m,p.k), sz = sigmaZ(x_m,p.k);
+  var C_ugm3 = concentration(Q, p.u, p.H, x_m, p.k)*1e9;
+  var pk = peakGround(p);
+  return { sy:sy, sz:sz, C_ugm3:C_ugm3, x_m:x_m, Cmax:pk.Cmax, xmax:pk.xmax };
 }
 
-function calc(){
-  const p = getParams();
-  const r = compute(p);
-  document.getElementById('statC').textContent = r.C_ugm3.toFixed(1) + ' μg/m³';
-  document.getElementById('statSY').textContent = r.sy.toFixed(0) + ' m';
-  document.getElementById('statSZ').textContent = r.sz.toFixed(1) + ' m';
-  document.getElementById('statRatio').textContent = r.ratio.toFixed(3);
-  drawPlume(p, r);
-  updateChart(p, r);
+/* live stat readouts (never '—') */
+function updateStats(p, r){
+  el('statC').textContent   = (r.C_ugm3>=1000? (r.C_ugm3/1000).toFixed(2)+' mg/m³' : r.C_ugm3.toFixed(1)+' μg/m³');
+  el('statCmax').textContent= (r.Cmax>=1000? (r.Cmax/1000).toFixed(2)+' mg/m³' : r.Cmax.toFixed(1)+' μg/m³');
+  el('statXmax').textContent= r.xmax.toFixed(2)+' km';
+  el('statSZ').textContent  = r.sz.toFixed(1)+' m';
 }
 
-function drawPlume(p, r){
-  const canvas = document.getElementById('plumeCanvas');
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.offsetWidth || 600;
-  const H_px = 280;
-  canvas.width = W * dpr;
-  canvas.height = H_px * dpr;
+/* ===== particle field ===== */
+var particles = [];
+var anim = { running:true, raf:null, last:0 };
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function spawn(p){
+  // emission from stack top; lateral spread index r in [-1,1] (relative to local sigma_z band)
+  particles.push({ x:0, r:(Math.random()*2-1), life:0, born:performance.now() });
+}
+
+function colorFor(frac){
+  // frac 1=high concentration (red/yellow), 0=low (faded cyan)
+  frac = Math.max(0, Math.min(1, frac));
+  if (frac>0.66){ return 'rgba(255,'+Math.round(120+135*(1-(frac-0.66)/0.34))+',60,'; }
+  if (frac>0.33){ return 'rgba(255,209,102,'; }
+  return 'rgba(0,180,216,';
+}
+
+function drawPlume(p, r, nowTs){
+  var canvas = el('plumeCanvas');
+  var ctx = canvas.getContext('2d');
+  var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  var W = canvas.offsetWidth || 600;
+  var Hpx = 300;
+  if (canvas.width !== Math.round(W*dpr) || canvas.height !== Math.round(Hpx*dpr)){
+    canvas.width = Math.round(W*dpr); canvas.height = Math.round(Hpx*dpr);
+  }
+  canvas.style.height = Hpx+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,W,H_px);
+  ctx.clearRect(0,0,W,Hpx);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,Hpx);
 
-  ctx.fillStyle = '#0a1628';
-  ctx.fillRect(0,0,W,H_px);
+  var groundY = Hpx-30, stackX = 70;
+  var xMax_m = 20000;
+  var zMax_m = Math.max(p.H*2.4+200, 500);
+  var xScale = (W-stackX-30)/xMax_m;
+  var zScale = (groundY-30)/zMax_m;
+  function px(x){ return stackX + x*xScale; }
+  function py(z){ return groundY - z*zScale; }
 
-  // ground line
-  const groundY = H_px - 30;
-  const stackX = 70;
-  ctx.strokeStyle = 'rgba(120,150,200,0.4)';
-  ctx.lineWidth = 1;
+  // sky concentration band (field heat haze): draw vertical strips coloured by max conc in column
+  var Q=p.Q_gps/1000;
+  var colMax = Math.max(concentration(Q,p.u,p.H,p.xmax*1000,p.k), 1e-30);
+  for (var sx=stackX; sx<W-20; sx+=6){
+    var xm=(sx-stackX)/xScale; if(xm<=1) continue;
+    var szl=sigmaZ(xm,p.k);
+    var zc=p.H; // peak height of column
+    var cmaxCol = concAt(Q,p.u,p.H,xm,zc,p.k);
+    var frac = Math.min(1, Math.sqrt(cmaxCol/colMax));
+    if (!isFinite(frac) || frac<0.02) continue;
+    var top = py(Math.min(p.H+2.2*szl, zMax_m));
+    var bot = py(Math.max(p.H-2.2*szl, 0));
+    var g = ctx.createLinearGradient(0, top, 0, bot);
+    g.addColorStop(0, colorFor(frac*0.4)+'0.0)');
+    g.addColorStop(0.5, colorFor(frac)+(0.22*frac).toFixed(3)+')');
+    g.addColorStop(1, colorFor(frac*0.4)+'0.0)');
+    ctx.fillStyle=g; ctx.fillRect(sx, top, 6, bot-top);
+  }
+
+  // ground
+  ctx.fillStyle='rgba(50,80,120,0.5)'; ctx.fillRect(0,groundY,W,30);
+  ctx.strokeStyle='rgba(120,150,200,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,groundY); ctx.lineTo(W,groundY); ctx.stroke();
+
+  // ±2σz envelope outline
   ctx.beginPath();
-  ctx.moveTo(0, groundY);
-  ctx.lineTo(W, groundY);
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(50,80,120,0.5)';
-  ctx.fillRect(0, groundY, W, 30);
+  for (var x=1; x<=xMax_m; x+=120){ var z=Math.min(p.H+2*sigmaZ(x,p.k),zMax_m); (x===1)?ctx.moveTo(px(x),py(z)):ctx.lineTo(px(x),py(z)); }
+  for (var x2=xMax_m; x2>=1; x2-=120){ var zd=Math.max(p.H-2*sigmaZ(x2,p.k),0); ctx.lineTo(px(x2),py(zd)); }
+  ctx.closePath();
+  ctx.strokeStyle='rgba(0,180,216,0.55)'; ctx.lineWidth=1.2; ctx.stroke();
 
-  // axis scaling
-  const xMax_m = 20000;
-  const zMax_m = Math.max(p.H * 2 + 200, 400);
-  const xScale = (W - stackX - 30) / xMax_m;
-  const zScale = (groundY - 30) / zMax_m;
-  function px(x_m){ return stackX + x_m * xScale; }
-  function py(z_m){ return groundY - z_m * zScale; }
+  // centreline
+  ctx.strokeStyle='rgba(255,209,102,0.6)'; ctx.setLineDash([6,4]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(stackX,py(p.H)); ctx.lineTo(W-10,py(p.H)); ctx.stroke(); ctx.setLineDash([]);
+
+  // particles
+  for (var i=0;i<particles.length;i++){
+    var pt=particles[i];
+    var xm=pt.x; if(xm<=0) continue;
+    var szl=sigmaZ(xm,p.k), syl=sigmaY(xm,p.k);
+    var zoff = pt.r*2*szl;           // vertical Gaussian spread (±2σ band)
+    var z = p.H + zoff;
+    // ground reflection: if particle goes below 0, reflect upward
+    if (z<0) z=-z;
+    var concRel = Math.exp(-(zoff*zoff)/(2*szl*szl));
+    var distFade = 1 - Math.min(1, xm/xMax_m);
+    var frac = concRel*distFade;
+    var rad = 1.4 + Math.min(3.2, (syl)/600);
+    ctx.fillStyle = colorFor(frac)+(0.25+0.55*frac).toFixed(3)+')';
+    ctx.beginPath(); ctx.arc(px(xm), py(Math.max(z,0)), rad, 0, 6.283); ctx.fill();
+  }
 
   // stack
-  const stackTopY = py(p.H);
-  ctx.fillStyle = '#8a99aa';
-  ctx.fillRect(stackX - 5, stackTopY, 10, groundY - stackTopY);
-  ctx.strokeStyle = '#cbd5e1';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(stackX - 5, stackTopY, 10, groundY - stackTopY);
+  var stackTopY=py(p.H);
+  ctx.fillStyle='#8a99aa'; ctx.fillRect(stackX-5,stackTopY,10,groundY-stackTopY);
+  ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1; ctx.strokeRect(stackX-5,stackTopY,10,groundY-stackTopY);
 
-  // plume envelope: H +/- 2*sigma_z
-  ctx.beginPath();
-  for (let x = 1; x <= xMax_m; x += 100){
-    const sz_local = sigmaZ(x);
-    const zUp = p.H + 2 * sz_local;
-    if (x === 1) ctx.moveTo(px(x), py(Math.min(zUp, zMax_m)));
-    else ctx.lineTo(px(x), py(Math.min(zUp, zMax_m)));
+  // ground-level concentration profile overlay (green)
+  ctx.strokeStyle='#00b894'; ctx.lineWidth=2; ctx.beginPath();
+  var profMax=Math.max(r.Cmax,1e-9), started=false;
+  for (var gx=stackX+2; gx<W-20; gx+=3){
+    var gxm=(gx-stackX)/xScale; if(gxm<=1) continue;
+    var c=concentration(Q,p.u,p.H,gxm,p.k)*1e9;
+    var gy=groundY - (c/profMax)*(groundY-40);
+    started?ctx.lineTo(gx,gy):ctx.moveTo(gx,gy); started=true;
   }
-  for (let x = xMax_m; x >= 1; x -= 100){
-    const sz_local = sigmaZ(x);
-    const zDn = Math.max(p.H - 2 * sz_local, 0);
-    ctx.lineTo(px(x), py(zDn));
-  }
-  ctx.closePath();
-  const grad = ctx.createLinearGradient(stackX, 0, W, 0);
-  grad.addColorStop(0, 'rgba(0,180,216,0.55)');
-  grad.addColorStop(0.5, 'rgba(0,180,216,0.30)');
-  grad.addColorStop(1, 'rgba(0,180,216,0.10)');
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,180,216,0.7)';
-  ctx.lineWidth = 1;
   ctx.stroke();
-
-  // centerline
-  ctx.strokeStyle = 'rgba(255,209,102,0.8)';
-  ctx.setLineDash([6,4]);
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(stackX, py(p.H));
-  ctx.lineTo(W - 10, py(p.H));
-  ctx.stroke();
-  ctx.setLineDash([]);
 
   // wind arrow
-  ctx.strokeStyle = '#00B4D8';
-  ctx.fillStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  const arrowY = 30;
-  ctx.beginPath();
-  ctx.moveTo(stackX, arrowY);
-  ctx.lineTo(stackX + 100, arrowY);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(stackX + 100, arrowY);
-  ctx.lineTo(stackX + 92, arrowY - 4);
-  ctx.lineTo(stackX + 92, arrowY + 4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.font = '12px "Roboto Mono", monospace';
-  ctx.fillText('u = ' + p.u.toFixed(1) + ' m/s', stackX + 8, arrowY - 8);
+  ctx.strokeStyle='#00B4D8'; ctx.fillStyle='#00B4D8'; ctx.lineWidth=2;
+  var aY=22;
+  ctx.beginPath(); ctx.moveTo(stackX,aY); ctx.lineTo(stackX+90,aY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(stackX+90,aY); ctx.lineTo(stackX+82,aY-4); ctx.lineTo(stackX+82,aY+4); ctx.closePath(); ctx.fill();
+  ctx.font='12px "Roboto Mono",monospace'; ctx.fillText('u = '+p.u.toFixed(1)+' m/s', stackX+8, aY-7);
 
-  // observation point at (x, z=0)
-  const obsX = px(r.x_m);
-  const obsY = groundY;
-  ctx.fillStyle = '#ffd166';
-  ctx.beginPath();
-  ctx.arc(obsX, obsY, 7, 0, Math.PI*2);
-  ctx.fill();
-  ctx.strokeStyle = '#e67e22';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.fillStyle = '#ffd166';
-  ctx.font = '12px "Roboto Mono", monospace';
-  ctx.fillText('観測点 x = ' + p.x_km.toFixed(1) + ' km', obsX + 10, obsY - 8);
+  // observation point
+  var obsX=px(r.x_m);
+  ctx.fillStyle='#ffd166'; ctx.beginPath(); ctx.arc(obsX,groundY,6,0,6.283); ctx.fill();
+  ctx.strokeStyle='#e67e22'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#ffd166'; ctx.font='12px "Roboto Mono",monospace';
+  ctx.fillText('観測点 x = '+p.x_km.toFixed(1)+' km', Math.min(obsX+10,W-150), groundY-10);
 
   // labels
-  ctx.fillStyle = '#cbd5e1';
-  ctx.font = '12px "Roboto Mono", monospace';
-  ctx.fillText('H = ' + p.H.toFixed(0) + ' m', stackX + 10, stackTopY + 4);
-  ctx.fillText('排気塔', stackX - 25, groundY + 18);
-  ctx.fillText('地表', 6, groundY + 18);
-
-  // title
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 12px sans-serif';
-  ctx.fillText('プルーム側面図（Pasquill D）', 10, 18);
+  ctx.fillStyle='#cbd5e1'; ctx.font='12px "Roboto Mono",monospace';
+  ctx.fillText('H = '+p.H.toFixed(0)+' m', stackX+10, stackTopY-2);
+  ctx.fillStyle='#ffffff'; ctx.font='bold 12px sans-serif';
+  ctx.fillText('プルーム拡散（Pasquill '+p.k+'）  Cmax='+(r.Cmax>=1000?(r.Cmax/1000).toFixed(1)+' mg/m³':r.Cmax.toFixed(0)+' μg/m³')+' @ '+r.xmax.toFixed(2)+' km', 10, 16);
 }
 
+/* ===== Chart.js downwind profile ===== */
+var chartInst=null;
 function updateChart(p, r){
-  const labels = [];
-  const data = [];
-  const Q_kgps = p.Q_gps / 1000;
-  for (let xk = 0.1; xk <= 20; xk += 0.2){
-    const x_m = xk * 1000;
-    const c = concentration(Q_kgps, p.u, p.H, x_m) * 1e9;
+  var labels=[], data=[], Q=p.Q_gps/1000;
+  for (var xk=0.1; xk<=20; xk+=0.2){
     labels.push(parseFloat(xk.toFixed(2)));
-    data.push(parseFloat(c.toFixed(3)));
+    data.push(parseFloat((concentration(Q,p.u,p.H,xk*1000,p.k)*1e9).toFixed(3)));
   }
-  const curX = p.x_km;
-  const curC = r.C_ugm3;
-
   if (chartInst) chartInst.destroy();
-  const ctx = document.getElementById('chartCanvas').getContext('2d');
+  if (typeof Chart === 'undefined') return;
+  var ctx = el('chartCanvas').getContext('2d');
   chartInst = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'C(x) (μg/m³)',
-          data,
-          borderColor: '#007BFF',
-          backgroundColor: 'rgba(0,123,255,0.08)',
-          borderWidth: 2,
-          pointRadius: 0,
-          fill: true,
-          tension: 0
-        },
-        {
-          label: '現在の x',
-          data: [{x: curX, y: curC}],
-          borderColor: '#ffc107',
-          backgroundColor: '#ffc107',
-          borderWidth: 0,
-          pointRadius: 7,
-          pointStyle: 'circle',
-          showLine: false
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio:false,resizeDelay:100,animation: false,
-      plugins: {
-        legend: { labels: { font: { size: 10 }, boxWidth: 14 } },
-        title: { display: false }
-      },
-      scales: {
-        x: {
-          type: 'linear',
-          min: 0.1, max: 20,
-          title: { display: true, text: '風下距離 x (km)', color: '#6c757d' },
-          ticks: { color: '#6c757d' },
-          grid: { color: 'rgba(0,0,0,.05)' }
-        },
-        y: {
-          title: { display: true, text: 'C (μg/m³)', color: '#6c757d' },
-          ticks: { color: '#6c757d' },
-          grid: { color: 'rgba(0,0,0,.05)' }
-        }
+    type:'line',
+    data:{ labels:labels, datasets:[
+      { label:'C(x) (μg/m³)', data:data, borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,0.08)', borderWidth:2, pointRadius:0, fill:true, tension:0 },
+      { label:'観測点 x', data:[{x:p.x_km,y:r.C_ugm3}], borderColor:'#ffc107', backgroundColor:'#ffc107', borderWidth:0, pointRadius:7, pointStyle:'circle', showLine:false }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, resizeDelay:100, animation:false,
+      plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:14 } }, title:{display:false} },
+      scales:{
+        x:{ type:'linear', min:0.1, max:20, title:{display:true,text:'風下距離 x (km)',color:'#6c757d'}, ticks:{color:'#6c757d'}, grid:{color:'rgba(0,0,0,.05)'} },
+        y:{ title:{display:true,text:'C (μg/m³)',color:'#6c757d'}, ticks:{color:'#6c757d'}, grid:{color:'rgba(0,0,0,.05)'} }
       }
     }
   });
 }
 
-function togglePlay(){
-  const btn = document.getElementById('btnPlay');
-  if (playing){
-    playing = false;
-    clearInterval(playTimer);
-    btn.innerHTML = '<i class="fas fa-play"></i> 距離スイープ';
-    return;
-  }
-  playing = true;
-  btn.innerHTML = '<i class="fas fa-stop"></i> 停止';
-  const sl = document.getElementById('slX_km');
-  const num = document.getElementById('vX_km');
-  let dir = 1;
-  playTimer = setInterval(() => {
-    let cur = parseFloat(sl.value);
-    cur += dir * 0.4;
-    if (cur >= 20.0){ cur = 20.0; dir = -1; }
-    if (cur <= 0.1){ cur = 0.1; dir = 1; }
-    cur = parseFloat(cur.toFixed(1));
-    sl.value = cur;
-    num.value = cur;
-    updateSlider(sl);
-    calc();
-  }, 120);
+/* ===== main recompute ===== */
+var curP=null, curR=null;
+function calc(){
+  syncSliders();
+  curP = getParams();
+  curR = compute(curP);
+  updateStats(curP, curR);
+  updateChart(curP, curR);
+  if (reduceMotion || !anim.running){ drawPlume(curP, curR, performance.now()); }
+}
+window.calc = calc;
+
+function syncSliders(){
+  ['slQ_gps','slU','slH','slX_km'].forEach(function(id){
+    var e=el(id); if(!e) return;
+    var mn=parseFloat(e.min), mx=parseFloat(e.max), v=parseFloat(e.value);
+    e.style.setProperty('--pct', ((v-mn)/(mx-mn)*100).toFixed(1)+'%');
+  });
 }
 
 function resetParams(){
-  document.getElementById('slQ_gps').value = 10.0;
-  document.getElementById('vQ_gps').value = 10.0;
-  document.getElementById('slU').value = 5.0;
-  document.getElementById('vU').value = 5.0;
-  document.getElementById('slH').value = 50;
-  document.getElementById('vH').value = 50;
-  document.getElementById('slX_km').value = 2.0;
-  document.getElementById('vX_km').value = 2.0;
-  ['slQ_gps','slU','slH','slX_km'].forEach(id => {
-    const el = document.getElementById(id);
-    updateSlider(el);
-  });
-  if (playing) togglePlay();
+  el('slQ_gps').value=10.0; el('vQ_gps').value=10.0;
+  el('slU').value=5.0; el('vU').value=5.0;
+  el('slH').value=50; el('vH').value=50;
+  el('slX_km').value=2.0; el('vX_km').value=2.0;
+  if (el('selStab')) el('selStab').value='D';
+  particles.length=0;
   calc();
 }
+window.resetParams = resetParams;
 
-// init
-['slQ_gps','slU','slH','slX_km'].forEach(id => {
-  const el = document.getElementById(id);
-  const min = parseFloat(el.min), max = parseFloat(el.max), v = parseFloat(el.value);
-  el.style.setProperty('--pct', ((v-min)/(max-min)*100).toFixed(1)+'%');
-});
-window.addEventListener('load', () => { calc(); });
-window.addEventListener('resize', () => { calc(); });
+/* ===== animation loop ===== */
+function loop(ts){
+  if (!anim.running){ anim.raf=null; return; }
+  if (!anim.last) anim.last=ts;
+  var dt=Math.min(0.05,(ts-anim.last)/1000); anim.last=ts;
+  var p = curP || getParams();
+  // advect particles (speed in metres/sec mapped to model space)
+  var speed = p.u; // m/s
+  var emitRate = 60; // particles/sec baseline
+  // spawn proportional to dt
+  var nSpawn = emitRate*dt;
+  anim._acc = (anim._acc||0)+nSpawn;
+  while (anim._acc>=1){ spawn(p); anim._acc-=1; if(particles.length>1400) break; }
+  for (var i=particles.length-1;i>=0;i--){
+    particles[i].x += speed*dt*55; // metres advanced this frame (scaled so transit ~visible)
+    particles[i].life += dt;
+    if (particles[i].x>20000) particles.splice(i,1);
+  }
+  if (curR) drawPlume(p, curR, ts);
+  anim.raf=requestAnimationFrame(loop);
+}
+function toggleAnim(){
+  var btn=el('btnAnim');
+  if (anim.running){ anim.running=false; if(anim.raf){cancelAnimationFrame(anim.raf);anim.raf=null;} btn.innerHTML='<i class="fas fa-play"></i> 再生'; }
+  else { anim.running=true; anim.last=0; btn.innerHTML='<i class="fas fa-pause"></i> 一時停止'; if(!anim.raf) anim.raf=requestAnimationFrame(loop); }
+}
+window.toggleAnim = toggleAnim;
+
+/* ===== init ===== */
+function init(){
+  syncSliders();
+  curP=getParams(); curR=compute(curP);
+  updateStats(curP,curR); updateChart(curP,curR);
+  if (reduceMotion){
+    anim.running=false;
+    var b=el('btnAnim'); if(b) b.innerHTML='<i class="fas fa-play"></i> 再生';
+    drawPlume(curP,curR,performance.now());
+  } else {
+    anim.running=true; anim.raf=requestAnimationFrame(loop);
+  }
+}
+window.addEventListener('load', init);
+window.addEventListener('resize', function(){ if(curP&&curR) drawPlume(curP,curR,performance.now()); if(chartInst) chartInst.resize(); });
+if (document.readyState==='complete') init();
+})();
 </script>
 
 <section class="explanation">
@@ -549,10 +607,13 @@ window.addEventListener('resize', () => { calc(); });
     </div>
     <div class="faq-item">
       <button class="faq-q" onclick="toggleFaq(this)">最大地表濃度はどの距離で発生しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-      <div class="faq-a">理論的には σz = H/√2 となる距離で地表中心濃度が最大になります。本ツールの既定値 H=50 m, D クラスでは σz ≈ 35 m となる距離（約 0.6 km）付近にピークが現れます。右下グラフのカーブで、ピーク位置がどう移動するか確認してみてください。</div>
+      <div class="faq-a">理論的には σz = H/√2 となる距離で地表中心濃度が最大になります。本ツールの既定値 H=50 m, D クラスでは σz ≈ 35 m となる距離（約 0.75 km）付近にピークが現れます。右下グラフのカーブで、ピーク位置がどう移動するか確認してみてください。</div>
     </div>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="gaussian-plume.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -609,12 +670,12 @@ window.addEventListener('resize', () => { calc(); });
 <ol>
 <li>排出量（g/s）、風速（m/s）、排出塔高（m）をスライダーで設定します。鉄鋼製造プラントではSO2排出量50～200 g/sが典型的です</li>
 <li>風下距離（km）を指定して、その地点での地表濃度を計算します。一般的に0.5～10 kmの範囲で評価します</li>
-<li>Pasquill安定度（A～F）に基づいて拡散係数σy、σzが自動設定され、ガウス・プルームモデル式により地表中心濃度C（μg/m3）が出力されます</li>
+<li>本ツールはPasquill安定度D（中立）固定の簡略式 σy=0.10·x^0.92、σz=0.08·x^0.92 で拡散係数を求め、ガウス・プルームモデル式により地表中心濃度C（μg/m3）が出力されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>化学工場からNO2排出量100 g/s、風速3 m/s、塔高50 m、風下距離2 kmの場合を想定します。中立安定度（D級）を仮定すると、σy = 140 m、σz = 80 mが適用されます。ガウス式 C = Q/(2πUσyσz) × exp(-H2/2σz2) により、地表濃度は約85 μg/m3と計算されます。環境基準1時間値200 μg/m3に対して適合判定となります</p>
+<p>化学工場からNO2排出量100 g/s、風速3 m/s、塔高50 m、風下距離2 kmの場合を想定します。中立安定度（D級）の簡略式 σy=0.10·x^0.92、σz=0.08·x^0.92（xはm）より σy ≒ 109 m、σz ≒ 87 mが適用されます。地表反射を含むガウス式 C = Q/(πUσyσz) × exp(−H²/2σz²) により、地表中心濃度は約944 μg/m3と計算され、環境基準1時間値200 μg/m3を超過するため対策が必要と判定されます（排出量を10 g/sに下げると約94 μg/m3）。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -624,6 +685,16 @@ window.addEventListener('resize', () => { calc(); });
 <li>距離0.1 km以下のニアフィールドでは煙突動力論や浮力効果が支配的となり、ガウス・プルームモデルの適用限界です。実測データとの乖離が20％を超える場合は検証が必須です</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4753017575?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4753017575.09._SCMZZZZZZ_.jpg" alt="環境工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">環境工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

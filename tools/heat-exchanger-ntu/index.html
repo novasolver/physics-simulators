@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "熱交換器 ε-NTU 法シミュレーター",
       "description": "熱交換器の ε-NTU 法シミュレーター。熱容量流量から C_min・C_r・NTU を計算し、対向流・並流・クロスフローの効率 ε と交換熱量 Q をリアルタイム可視化・比較できます。",
       "url": "https://novasolver.jp/tools/heat-exchanger-ntu.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["C_min, C_max, C_r, NTU の自動計算","対向流・並流・クロスフロー無混合の効率 ε の比較","ε-NTU 曲線群（C_r = 0, 0.25, 0.5, 0.75, 1.0）","対向流・並流・クロスフローの ε バー比較"],
       "keywords": "熱交換器,NTU,効率,対向流,並流,クロスフロー,ε-NTU 法,熱設計",
       "datePublished": "2026-05-16",
@@ -100,8 +100,22 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#cv,#hxCv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.hx-readouts{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
+.hx-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.hx-ro .rv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.1}
+.hx-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.hx-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.hx-readouts{grid-template-columns:repeat(3,1fr)}}
+.hx-play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.hx-arr-row{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px}
+.hx-preset-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.hx-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.hx-legend span{display:inline-flex;align-items:center;gap:5px}
+.hx-legend i.swatch{width:18px;height:10px;border-radius:3px;display:inline-block}
+#hxCv:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){#hxCv{outline:none}}
 </style>
 </head>
 <body>
@@ -163,15 +177,75 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <input type="range" id="slDT" min="10" max="200" step="5" value="80" oninput="syncToNum('slDT','slDTVal');updateSlider(this,'slDTVal',0,'');compute()">
     </div>
 
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">高温流体入口温度 T_h,in (°C)</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slThiVal" value="120" min="20" max="300" step="5" oninput="syncFromNum('slThi','slThiVal')"><span class="num-unit">°C</span></div>
+      </div>
+      <input type="range" id="slThi" min="20" max="300" step="5" value="120" oninput="syncToNum('slThi','slThiVal');updateSlider(this,'slThiVal',0,'');compute()">
+    </div>
+
     <div class="divider"></div>
 
     <div class="btn-group">
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">C_h・C_c は質量流量×比熱（m·cp）に相当する熱容量流量です。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-water"></i> 熱交換器 流れ＆温度プロファイル アニメーション</div>
+      <div class="hx-readouts">
+        <div class="hx-ro accent"><div class="rv" id="hxEps">—</div><div class="rl">効率 ε</div></div>
+        <div class="hx-ro"><div class="rv" id="hxNTU">—</div><div class="rl">NTU</div></div>
+        <div class="hx-ro"><div class="rv" id="hxCr">—</div><div class="rl">C_r</div></div>
+        <div class="hx-ro"><div class="rv" id="hxQ">—</div><div class="rl">Q [kW]</div></div>
+        <div class="hx-ro"><div class="rv" id="hxThout">—</div><div class="rl">T_h,out [°C]</div></div>
+        <div class="hx-ro"><div class="rv" id="hxTcout">—</div><div class="rl">T_c,out [°C]</div></div>
+      </div>
+      <canvas id="hxCv" width="600" height="420" tabindex="0" role="img" aria-label="熱交換器の高温・低温流体が流れながら熱交換するアニメーションと、流路に沿った温度プロファイル。"></canvas>
+
+      <div class="hx-arr-row" role="group" aria-label="流れ配置の選択">
+        <button type="button" class="toggle-btn active" id="hxArrCounter" onclick="hxSetArr('counter')"><i class="fas fa-arrows-left-right-to-line"></i> 対向流</button>
+        <button type="button" class="toggle-btn" id="hxArrParallel" onclick="hxSetArr('parallel')"><i class="fas fa-arrow-right-long"></i> 並流</button>
+        <button type="button" class="toggle-btn" id="hxArrCross" onclick="hxSetArr('cross')"><i class="fas fa-plus"></i> クロスフロー</button>
+      </div>
+
+      <div class="hx-play-row">
+        <button type="button" class="btn" id="hxPlay" onclick="hxTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button type="button" class="btn secondary" onclick="hxReset()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button type="button" class="preset-btn hx-speed" data-spd="0.5" onclick="hxSetSpeed(0.5)">0.5×</button>
+          <button type="button" class="preset-btn hx-speed active" data-spd="1" onclick="hxSetSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button type="button" class="preset-btn hx-speed" data-spd="2" onclick="hxSetSpeed(2)">2×</button>
+        </div>
+      </div>
+
+      <div class="hx-preset-row" role="group" aria-label="プリセット">
+        <button type="button" class="preset-btn" onclick="hxPreset('counterHigh')">対向流・高NTU</button>
+        <button type="button" class="preset-btn" onclick="hxPreset('parallel')">並流</button>
+        <button type="button" class="preset-btn" onclick="hxPreset('balanced')">バランス Cr=1</button>
+        <button type="button" class="preset-btn" onclick="hxPreset('condenser')">凝縮器 Cr=0</button>
+      </div>
+
+      <div class="hx-legend">
+        <span><i class="swatch" style="background:linear-gradient(90deg,#ff3b30,#ff9e6f)"></i>高温流体（冷えていく）</span>
+        <span><i class="swatch" style="background:linear-gradient(90deg,#2f7bff,#34d399)"></i>低温流体（温まる）</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>現在点 ε</span>
+      </div>
+      <p class="canvas-hint">上：流体が実時間で流れ、色＝温度（高温＝赤→橙、低温＝青→緑）、壁を介して熱が移動。下：流路に沿った温度プロファイル（並流は収束、対向流はほぼ平行で高効率）。</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -412,6 +486,320 @@ resizeCanvas();
 compute();
 </script>
 
+<script>
+// ========== Heat Exchanger animated hero (real-time flow + temperature profiles) ==========
+(function(){
+  "use strict";
+  var cv = document.getElementById('hxCv');
+  if (!cv) return;
+  var ctx = cv.getContext('2d');
+  var arrangement = 'counter';   // 'counter' | 'parallel' | 'cross'
+  var speed = 1;
+  var playing = true;
+  var animId = null;
+  var phase = 0;                 // flow phase (advances each frame)
+  var cssW = 0, cssH = 0;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function el(id){ return document.getElementById(id); }
+  function num(id){ var e = el(id); return e ? parseFloat(e.value) : NaN; }
+
+  // ε correlations (local copies so this IIFE is self-contained)
+  function epsCounter(NTU, Cr){
+    if (Math.abs(Cr - 1) < 1e-6) return NTU / (1 + NTU);
+    var e = Math.exp(-NTU * (1 - Cr));
+    return (1 - e) / (1 - Cr * e);
+  }
+  function epsParallel(NTU, Cr){ return (1 - Math.exp(-NTU * (1 + Cr))) / (1 + Cr); }
+  function epsCross(NTU, Cr){
+    if (Cr < 1e-6) return 1 - Math.exp(-NTU);
+    var n78 = Math.pow(NTU, 0.78), n22 = Math.pow(NTU, 0.22);
+    return 1 - Math.exp((1 / Cr) * n22 * (Math.exp(-Cr * n78) - 1));
+  }
+  function epsFor(arr, NTU, Cr){
+    if (arr === 'parallel') return epsParallel(NTU, Cr);
+    if (arr === 'cross') return epsCross(NTU, Cr);
+    return epsCounter(NTU, Cr);
+  }
+
+  function state(){
+    var Ch = num('slCh'), Cc = num('slCc'), UA = num('slUA'), dT = num('slDT'), Thi = num('slThi');
+    if (!isFinite(Ch) || !isFinite(Cc) || !isFinite(UA)) { Ch = 2000; Cc = 1000; UA = 2000; }
+    if (!isFinite(dT)) dT = 80;
+    if (!isFinite(Thi)) Thi = 120;
+    var Cmin = Math.min(Ch, Cc), Cmax = Math.max(Ch, Cc);
+    var Cr = Cmin / Cmax, NTU = UA / Cmin;
+    var eps = epsFor(arrangement, NTU, Cr);
+    var Tci = Thi - dT;                       // cold inlet
+    var Q = eps * Cmin * dT;                  // W
+    var Thout = Thi - Q / Ch;
+    var Tcout = Tci + Q / Cc;
+    return { Ch:Ch, Cc:Cc, UA:UA, Cmin:Cmin, Cmax:Cmax, Cr:Cr, NTU:NTU,
+             eps:eps, Thi:Thi, Tci:Tci, Thout:Thout, Tcout:Tcout, Q:Q };
+  }
+
+  // temperature -> color. hot side: red(hot)->orange(cool). cold side: blue(cold)->green(warm)
+  function hotColor(frac){ // frac 0=inlet(hottest) .. 1=outlet(coolest)
+    var r = 255, g = Math.round(59 + frac * (158 - 59)), b = Math.round(48 + frac * (111 - 48));
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+  function coldColor(frac){ // frac 0=inlet(coldest blue) .. 1=outlet(warm green)
+    var r = Math.round(47 + frac * (52 - 47)), g = Math.round(123 + frac * (211 - 123)), b = Math.round(255 - frac * (255 - 153));
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  // normalized temperature along the channel (0..1 of position from left inlet).
+  // returns {h: hotTempC, c: coldTempC} using exponential profiles consistent with ε-NTU.
+  function profiles(s, x){ // x in [0,1] left->right
+    var NTU = s.NTU, Cr = s.Cr;
+    // hot enters left for counter & parallel & cross (we draw hot top L->R)
+    // For counterflow cold flows right->left. We compute physical temp vs hot-flow coordinate xi (0 at hot inlet).
+    var xi = x; // hot coordinate
+    var Th, Tc;
+    var dTi = s.Thi - s.Tci;
+    if (arrangement === 'parallel'){
+      // both enter at left (xi=0). local along-length solution
+      var k = NTU * (1 + Cr); // per unit, integrated 0..1 maps to NTU*(1+Cr)
+      var ex = Math.exp(-k * xi);
+      // hot drops, cold rises, converge
+      var Ch = s.Ch, Cc = s.Cc, Cmin = s.Cmin;
+      // effectiveness-style local: total dT consumed = ε at xi=1
+      var epsx = (1 - ex) / (1 + Cr);
+      var Qx = epsx * Cmin * dTi;
+      Th = s.Thi - Qx / Ch;
+      Tc = s.Tci + Qx / Cc;
+    } else if (arrangement === 'counter'){
+      // hot enters left (xi=0), cold enters right (xi=1) and flows toward left
+      var Cr2 = Cr;
+      var Cmin2 = s.Cmin, Ch2 = s.Ch, Cc2 = s.Cc;
+      // local effectiveness from hot inlet to position xi (counterflow)
+      var nt = NTU * xi;
+      var epsx2;
+      if (Math.abs(Cr2 - 1) < 1e-6) epsx2 = nt / (1 + nt);
+      else { var e2 = Math.exp(-nt * (1 - Cr2)); epsx2 = (1 - e2) / (1 - Cr2 * e2); }
+      // scale so that at xi=1 we get the full ε
+      var scale = s.eps / (epsFor('counter', NTU, Cr2) || 1);
+      var Qx2 = epsx2 * Cmin2 * dTi * scale;
+      Th = s.Thi - Qx2 / Ch2;
+      // cold temp at hot-coordinate xi: cold outlet is at xi=0 (left). cold local
+      Tc = s.Tcout - (s.Tcout - s.Tci) * xi; // linear-ish interp between cold outlet(left) and cold inlet(right)
+    } else { // cross
+      var k3 = NTU * (1 + Cr);
+      var ex3 = Math.exp(-k3 * xi);
+      var Cmin3 = s.Cmin, Ch3 = s.Ch, Cc3 = s.Cc;
+      var epsx3 = ((1 - ex3) / (1 + Cr)) * (s.eps / (epsParallel(NTU, Cr) || 1));
+      var Qx3 = epsx3 * Cmin3 * dTi;
+      Th = s.Thi - Qx3 / Ch3;
+      Tc = s.Tci + Qx3 / Cc3;
+    }
+    return { h: Th, c: Tc };
+  }
+
+  function resize(){
+    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
+    var h = Math.round(Math.max(300, Math.min(w * 0.7, 460)));
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cssW = w; cssH = h;
+  }
+
+  function tempToFrac(Tc, lo, hi){ var f = (Tc - lo) / (hi - lo || 1); return Math.max(0, Math.min(1, f)); }
+
+  function draw(){
+    var s = state();
+    var W = cssW, H = cssH;
+    ctx.fillStyle = '#0a1929';
+    ctx.fillRect(0, 0, W, H);
+
+    // readouts
+    el('hxEps').textContent = (s.eps * 100).toFixed(1) + '%';
+    el('hxNTU').textContent = s.NTU.toFixed(2);
+    el('hxCr').textContent = s.Cr.toFixed(2);
+    el('hxQ').textContent = (s.Q / 1000).toFixed(1);
+    el('hxThout').textContent = s.Thout.toFixed(1);
+    el('hxTcout').textContent = s.Tcout.toFixed(1);
+
+    var mx = 50, exW = W - mx - 16;
+    var exX0 = mx;
+    // ----- exchanger schematic (upper ~52%) -----
+    var hyTop = 26, exH = H * 0.50;
+    var hotY = hyTop + exH * 0.18, coldY = hyTop + exH * 0.62, chH = exH * 0.22;
+    var lo = s.Tci - 2, hi = s.Thi + 2;
+
+    // temperature gradient fills for the two channels
+    function channel(yc, isHot){
+      var grad = ctx.createLinearGradient(exX0, 0, exX0 + exW, 0);
+      for (var g = 0; g <= 10; g++){
+        var x = g / 10;
+        var pr = profiles(s, x);
+        var T = isHot ? pr.h : pr.c;
+        grad.addColorStop(x, isHot ? hotColor(tempToFrac(s.Thi - T, 0, (s.Thi - s.Thout) || 1)) : coldColor(tempToFrac(T - s.Tci, 0, (s.Tcout - s.Tci) || 1)));
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(exX0, yc - chH / 2, exW, chH);
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
+      ctx.strokeRect(exX0, yc - chH / 2, exW, chH);
+    }
+    channel(hotY, true);
+    channel(coldY, false);
+
+    // separating wall + heat-transfer arrows
+    var wallY = (hotY + chH / 2 + coldY - chH / 2) / 2;
+    ctx.strokeStyle = 'rgba(180,180,200,0.6)'; ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(exX0, wallY); ctx.lineTo(exX0 + exW, wallY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,200,120,0.85)';
+    for (var aw = 0; aw < 7; aw++){
+      var ax = exX0 + exW * (aw + 0.5) / 7;
+      ctx.beginPath();
+      ctx.moveTo(ax, hotY + chH / 2);
+      ctx.lineTo(ax - 4, hotY + chH / 2 + 7);
+      ctx.lineTo(ax + 4, hotY + chH / 2 + 7);
+      ctx.closePath(); ctx.fill();
+    }
+
+    // flowing particles
+    var nP = 16;
+    for (var i = 0; i < nP; i++){
+      // hot particle
+      var fh = ((i / nP) + phase * 0.012 * speed) % 1;        // 0->1 left->right
+      var prH = profiles(s, fh);
+      ctx.fillStyle = hotColor(tempToFrac(s.Thi - prH.h, 0, (s.Thi - s.Thout) || 1));
+      ctx.beginPath(); ctx.arc(exX0 + fh * exW, hotY, 4.2, 0, 7); ctx.fill();
+      // cold particle: parallel & cross same dir; counter opposite
+      var fc;
+      if (arrangement === 'counter') fc = 1 - (((i / nP) + phase * 0.012 * speed) % 1);
+      else fc = ((i / nP) + phase * 0.012 * speed) % 1;
+      var prC = profiles(s, fc);
+      ctx.fillStyle = coldColor(tempToFrac(prC.c - s.Tci, 0, (s.Tcout - s.Tci) || 1));
+      ctx.beginPath(); ctx.arc(exX0 + fc * exW, coldY, 4.2, 0, 7); ctx.fill();
+    }
+
+    // flow direction arrows + inlet/outlet temp labels
+    ctx.font = '10px "Roboto Mono",monospace';
+    ctx.fillStyle = '#ffcaca'; ctx.textAlign = 'left';
+    ctx.fillText('T_h,in ' + s.Thi.toFixed(0) + '°', exX0, hotY - chH / 2 - 5);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ffd9b0';
+    ctx.fillText(s.Thout.toFixed(0) + '° →', exX0 + exW, hotY - chH / 2 - 5);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#bcd6ff';
+    if (arrangement === 'counter'){
+      ctx.textAlign = 'right';
+      ctx.fillText('← T_c,in ' + s.Tci.toFixed(0) + '°', exX0 + exW, coldY + chH / 2 + 14);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#bfead0';
+      ctx.fillText(s.Tcout.toFixed(0) + '°', exX0, coldY + chH / 2 + 14);
+    } else {
+      ctx.fillText('T_c,in ' + s.Tci.toFixed(0) + '°', exX0, coldY + chH / 2 + 14);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#bfead0';
+      ctx.fillText(s.Tcout.toFixed(0) + '° →', exX0 + exW, coldY + chH / 2 + 14);
+      ctx.textAlign = 'left';
+    }
+
+    var arrLbl = arrangement === 'counter' ? '対向流 Counterflow' : (arrangement === 'parallel' ? '並流 Parallel' : 'クロスフロー Crossflow');
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Noto Sans JP",sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(arrLbl, exX0 + exW / 2, hyTop - 8);
+    ctx.textAlign = 'left';
+
+    // ----- temperature profile plot (lower ~48%) -----
+    var py0 = H * 0.56, py1 = H - 30;
+    var px0 = mx, px1 = W - 16, pgw = px1 - px0, pgh = py1 - py0;
+    ctx.strokeStyle = 'rgba(143,184,224,0.5)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px0, py1); ctx.lineTo(px1, py1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px0, py0); ctx.lineTo(px0, py1); ctx.stroke();
+    var Tlo = Math.min(s.Tci, s.Thout) - 5, Thi2 = Math.max(s.Thi, s.Tcout) + 5;
+    function ty(T){ return py1 - (T - Tlo) / (Thi2 - Tlo || 1) * pgh; }
+    function px(x){ return px0 + x * pgw; }
+    // grid
+    ctx.strokeStyle = 'rgba(143,184,224,0.13)'; ctx.setLineDash([3, 4]);
+    for (var gg = 1; gg <= 3; gg++){ var gy = py0 + gg * pgh / 4; ctx.beginPath(); ctx.moveTo(px0, gy); ctx.lineTo(px1, gy); ctx.stroke(); }
+    ctx.setLineDash([]);
+    // hot profile (left->right)
+    ctx.strokeStyle = '#ff6b5a'; ctx.lineWidth = 2.4; ctx.beginPath();
+    for (var hh = 0; hh <= 40; hh++){ var xx = hh / 40; var T = profiles(s, xx).h; if (hh === 0) ctx.moveTo(px(xx), ty(T)); else ctx.lineTo(px(xx), ty(T)); }
+    ctx.stroke();
+    // cold profile (physical position left->right)
+    ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.4; ctx.beginPath();
+    for (var cc = 0; cc <= 40; cc++){ var xx2 = cc / 40; var Tc2 = profiles(s, xx2).c; if (cc === 0) ctx.moveTo(px(xx2), ty(Tc2)); else ctx.lineTo(px(xx2), ty(Tc2)); }
+    ctx.stroke();
+    // labels
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+    ctx.fillText('T [°C]', px0 + 2, py0 - 4);
+    ctx.textAlign = 'center'; ctx.fillText('流路位置 (入口→出口)', (px0 + px1) / 2, py1 + 16);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#ff6b5a'; ctx.fillText('高温', px1 - 70, ty(profiles(s, 1).h) - 4);
+    ctx.fillStyle = '#34d399'; ctx.fillText('低温', px1 - 70, ty(profiles(s, 1).c) + 12);
+
+    // live ε marker (moving along hot profile)
+    var mxpos = ((phase * 0.012 * speed) % 1);
+    var mTh = profiles(s, mxpos).h;
+    ctx.fillStyle = '#ffd54a'; ctx.shadowColor = '#ffd54a'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(px(mxpos), ty(mTh), 5, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffd54a'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+    ctx.fillText('ε=' + (s.eps * 100).toFixed(1) + '%', px0 + 4, py0 + 12);
+    ctx.textAlign = 'left';
+  }
+
+  function frame(){
+    if (playing && !reduced) phase += 1;
+    draw();
+    animId = requestAnimationFrame(frame);
+  }
+
+  // ---- public controls (attached to window for inline onclick) ----
+  window.hxSetArr = function(a){
+    arrangement = a;
+    ['counter', 'parallel', 'cross'].forEach(function(k){
+      var b = el('hxArr' + k.charAt(0).toUpperCase() + k.slice(1));
+      if (b) b.classList.toggle('active', k === a);
+    });
+    draw();
+  };
+  window.hxTogglePlay = function(){
+    playing = !playing;
+    var b = el('hxPlay');
+    b.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+  };
+  window.hxReset = function(){ phase = 0; draw(); };
+  window.hxSetSpeed = function(sp){
+    speed = sp;
+    var btns = document.querySelectorAll('.hx-speed');
+    for (var i = 0; i < btns.length; i++){
+      var on = parseFloat(btns[i].getAttribute('data-spd')) === sp;
+      btns[i].classList.toggle('active', on);
+      btns[i].style.borderColor = on ? 'var(--accent)' : '';
+      btns[i].style.color = on ? 'var(--accent)' : '';
+    }
+  };
+  window.hxPreset = function(name){
+    function set(id, v){ var e = el(id), ev = el(id + 'Val'); if (e){ e.value = v; if (ev) ev.value = v; if (typeof updateSlider === 'function') updateSlider(e, id + 'Val', 0, ''); } }
+    if (name === 'counterHigh'){ window.hxSetArr('counter'); set('slCh', 2000); set('slCc', 2000); set('slUA', 8000); set('slDT', 80); set('slThi', 150); }
+    else if (name === 'parallel'){ window.hxSetArr('parallel'); set('slCh', 2000); set('slCc', 1000); set('slUA', 2000); set('slDT', 80); set('slThi', 120); }
+    else if (name === 'balanced'){ window.hxSetArr('counter'); set('slCh', 1500); set('slCc', 1500); set('slUA', 3000); set('slDT', 80); set('slThi', 120); }
+    else if (name === 'condenser'){ window.hxSetArr('counter'); set('slCh', 10000); set('slCc', 1000); set('slUA', 2000); set('slDT', 80); set('slThi', 100); }
+    if (typeof compute === 'function') compute();
+    draw();
+  };
+
+  // redraw when user moves the shared sliders
+  ['slCh', 'slCc', 'slUA', 'slDT', 'slThi'].forEach(function(id){
+    var e = el(id), ev = el(id + 'Val');
+    if (e) e.addEventListener('input', draw);
+    if (ev) ev.addEventListener('input', draw);
+  });
+  window.addEventListener('resize', function(){ resize(); draw(); });
+
+  resize();
+  if (reduced){ draw(); } else { frame(); }
+})();
+</script>
+
 <section class="explanation">
   <h2>熱交換器 ε-NTU 法シミュレーターとは</h2>
   <div class="chat">
@@ -422,7 +810,7 @@ compute();
       <div class="bub">どちらも同じ物理を別の角度から見ているだけだよ。LMTD 法は「両端の温度が全部わかっているときに必要な UA を逆算する」のが得意。一方 ε-NTU 法は「UA と入口温度はわかっているけど出口温度はまだ知らない」というときに、繰り返し計算なしに一発で効率と Q が求まる。シミュレーターの左パネルで C_h, C_c, UA, ΔT を入れるだけで右に ε と Q が出るのは、まさに ε-NTU 法の良さなんだ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">既定値だと対向流の効率が約 77.5%、並流が 63.4% って出ました。同じ UA なのに 14 ポイントも違うんですね。</div>
+      <div class="bub">既定値だと対向流の効率が約 77.5%、並流が 63.3% って出ました。同じ UA なのに 14 ポイントも違うんですね。</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
       <div class="bub">そう、ここが対向流と並流の決定的な差だ。並流は入口で温度差が一番大きく、出口に向けてだんだん詰まっていく。両方の温度差が「同じ向きで近づく」ので、理論上どんなに UA を大きくしても、両流体の出口温度が一致した点（中間温度）以上には熱を運べない。対向流なら、片方の入口がもう片方の出口に対向するから、温度差が流路全体で比較的均一に保たれて、効率が高くなるんだ。</div>
@@ -488,6 +876,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-exchanger-ntu.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -541,8 +932,8 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>高温流体の熱容量流量(C_h)をkW/Kの単位でスライダーから設定します。例：鋼鉄冷却で15 kW/K</li>
-<li>低温流体の熱容量流量(C_c)を同様に設定します。例：冷却水で10 kW/K</li>
+<li>高温流体の熱容量流量(C_h)をW/K単位でスライダーから設定します。例：温水側で2000 W/K（既定値）</li>
+<li>低温流体の熱容量流量(C_c)を同様に設定します。例：冷却水側で1000 W/K（既定値）</li>
 <li>熱交換器のUA値(W/K)を入力します。例：プレート式で8500 W/K</li>
 <li>入口温度差ΔT_inを°Cで設定します。例：60°C</li>
 <li>シミュレーターが対向流・並流・クロスフローの効率εと交換熱量Qを自動計算し、NTU値と共に表示します</li>
@@ -550,17 +941,27 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>自動車エンジン冷却系を想定：C_h=20 kW/K(ホットサイド)、C_c=18 kW/K(冷水サイド)、UA=9000 W/K、ΔT_in=45°Cの場合、C_min=18 kW/KからNTU=0.5となります。対向流効率は約38.6%、並流効率は約25.3%です。対向流では交換熱量Q=C_min×ε×ΔT_in=18×0.386×45≈312 kWが得られ、並流では約204 kWとなり、対向流が約50%高い効率を発揮します。</p>
+<p>既定値を例に：C_h=2000 W/K(ホットサイド)、C_c=1000 W/K(冷水サイド)、UA=2000 W/K、ΔT_in=80 Kの場合、C_min=1000 W/KからNTU=2.00、C_r=0.5となります。対向流効率は約77.5%、並流効率は約63.3%です。対向流では交換熱量Q=ε×C_min×ΔT_in=0.775×1000×80≈62.0 kWが得られ、並流では約50.7 kWとなり、同じUAでも対向流が約22%多くの熱を交換できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>自動車ラジエーターやプレート式熱交換器では対向流構造を採用し、NTUが0.3～0.8の範囲で効率を最適化します</li>
+<li>NTUが4を超えると効率向上は頭打ちになるため、コストと効率のバランスからNTU=1～3程度を目安に設計します</li>
 <li>C_minの計算を誤るとNTU法全体の精度が低下します。必ず熱容量流量の小さい方を基準に選択してください</li>
 <li>UA値は温度変化による流体物性変化を平均値で代用しているため、ΔT_inが80°Cを超える場合は補正係数F_tの導入を検討してください</li>
 <li>クロスフロー(混合・非混合)は対向流より効率が5～15%低いため、コンパクト性が必須でない限り対向流設計を推奨します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

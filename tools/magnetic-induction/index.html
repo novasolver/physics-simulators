@@ -43,7 +43,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "電磁誘導シミュレーター",
       "description": "ファラデーの法則に基づき、コイルの巻数・断面積・磁束密度・周波数からEMF波形と磁束波形をリアルタイム計算・可視化するシミュレーター。",
       "url": "https://novasolver.jp/tools/magnetic-induction.html",
@@ -53,7 +53,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ファラデーの法則によるEMF計算","B(t)とEMF(t)の90度位相差可視化","EMF最大値vs周波数・vs巻数の特性グラフ"],
       "keywords": "電磁誘導,ファラデーの法則,EMF,誘導起電力,コイル,磁束,シミュレーター",
       "datePublished": "2026-04-09",
@@ -133,6 +133,11 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+#emfCanvas{display:block;width:100%;max-width:100%;height:300px;background:#0a1628;border-radius:8px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/magnetic-induction.html">
@@ -199,12 +204,38 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
 <div class="divider"></div>
-    
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（磁石がコイルを通過中）</div>
     <div class="stat-cards">
+      <div class="stat-card">
+        <div class="sv" id="statEmf">0.00</div>
+        <div class="sl">誘導EMF ε V</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statDphi">0.00</div>
+        <div class="sl">磁束変化率 dΦ/dt Wb/s</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statFlux">0.00</div>
+        <div class="sl">鎖交磁束 NΦ mWb</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statCurr">0.00</div>
+        <div class="sl">誘導電流 I mA</div>
+      </div>
+    </div>
+    <div class="stat-cards" style="grid-template-columns:repeat(2,1fr)">
       <div class="stat-card">
         <div class="sv" id="statEmfMax">—</div>
         <div class="sl">EMF最大値 V</div>
@@ -213,19 +244,22 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="sv" id="statEmfRms">—</div>
         <div class="sl">EMF実効値 V</div>
       </div>
-      <div class="stat-card">
-        <div class="sv" id="statFluxMax">—</div>
-        <div class="sl">最大磁束 mWb</div>
-      </div>
-      <div class="stat-card">
-        <div class="sv" id="statFreq">—</div>
-        <div class="sl">周波数 Hz</div>
-      </div>
     </div>
     </div>
 
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-magnet"></i> 磁石がコイルを通過 — ファラデー／レンツの法則</div>
+      <canvas id="emfCanvas" height="300" role="img" aria-label="磁石がコイルを通過し、磁束変化が誘導起電力と誘導電流を生むアニメーション。電流の向きはレンツの法則に従い検流計の針が振れます。"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#ff5252"></i>N極（磁石）</span>
+        <span><i class="swatch" style="background:#42a5f5"></i>S極</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>誘導電流</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>コイルを貫く磁束</span>
+      </div>
+      <div style="font-size:.74rem;color:var(--muted);margin-top:6px" id="emfNote">磁石が速く動くほど磁束変化が大きく、EMFも大きくなります。磁石が止まると EMF は 0 になります。</div>
+    </div>
+
     <div>
-      <div class="chart-label">B(t) と EMF(t) の波形（90° 位相差）</div>
+      <div class="chart-label">参考：正弦的に変化させた場合の B(t) と EMF(t)（90° 位相差）</div>
       <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 波形</div><canvas id="chartWave"></canvas></div>
     </div>
     <div>
@@ -246,116 +280,317 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-let chartWave = null, chartSweep = null;
-
+(function(){
+"use strict";
+var L = {
+  emfNote:'磁石が速く動くほど磁束変化が大きく、EMFも大きくなります。磁石が止まると EMF は 0 になります。',
+  approaching:'磁石が接近：磁束が増加 → レンツの法則で反発する向きに電流',
+  leaving:'磁石が遠ざかる：磁束が減少 → 引き留める向きに電流が逆転',
+  stopped:'磁石は静止：磁束一定 → dΦ/dt = 0 → EMF = 0',
+  hint:'クリック／タップで磁石を一突き',
+  waveB:'B(t) [T]', waveE:'EMF(t) [V]', waveT:'時間 (ms)',
+  sweepLbl:'EMF_max vs 周波数 f [Hz]', sweepX:'周波数 (Hz)', sweepY:'EMF_max (V)'
+};
+function el(id){ return document.getElementById(id); }
+function num(id){ return parseFloat(el(id).value); }
 function fmt3(v){
   if (Math.abs(v) >= 1000) return (v/1000).toFixed(2) + 'k';
   if (Math.abs(v) >= 1) return v.toFixed(2);
   return (v*1000).toFixed(1) + 'm';
-}function simulate(){
-  const N = parseFloat(document.getElementById('nTurns').value);
-  const A_cm2 = parseFloat(document.getElementById('aArea').value);
-  const Bmax = parseFloat(document.getElementById('bMax').value);
-  const f = parseFloat(document.getElementById('freq').value);
-  const A = A_cm2 * 1e-4;
-  const omega = 2 * Math.PI * f;
-  const emfMax = N * A * Bmax * omega;
-  const emfRms = emfMax / Math.sqrt(2);
-  const fluxMax = N * A * Bmax * 1000; // mWb
+}
 
-  document.getElementById('statEmfMax').textContent = fmt3(emfMax);
-  document.getElementById('statEmfRms').textContent = fmt3(emfRms);
-  document.getElementById('statFluxMax').textContent = fluxMax.toFixed(2);
-  document.getElementById('statFreq').textContent = f.toFixed(0);
+/* ===== Reference Chart.js waveforms + sweep (sinusoidal interpretation) ===== */
+var chartWave = null, chartSweep = null;
+function simulate(){
+  var N = num('nTurns');
+  var A_cm2 = num('aArea');
+  var Bmax = num('bMax');
+  var f = num('freq');
+  var A = A_cm2 * 1e-4;
+  var omega = 2 * Math.PI * f;
+  var emfMax = N * A * Bmax * omega;
+  var emfRms = emfMax / Math.sqrt(2);
 
-  // Waveform: 3 cycles
-  const nPts = 300;
-  const T = 1 / f;
-  const tEnd = 3 * T;
-  const tArr = [], bArr = [], emfArr = [];
-  for (let i = 0; i <= nPts; i++) {
-    const t = tEnd * i / nPts;
-    tArr.push((t * 1000).toFixed(3)); // ms
+  el('statEmfMax').textContent = fmt3(emfMax);
+  el('statEmfRms').textContent = fmt3(emfRms);
+
+  var nPts = 300, T = 1 / f, tEnd = 3 * T;
+  var tArr = [], bArr = [], emfArr = [];
+  for (var i = 0; i <= nPts; i++){
+    var t = tEnd * i / nPts;
+    tArr.push((t * 1000).toFixed(3));
     bArr.push(Bmax * Math.sin(omega * t));
     emfArr.push(-emfMax * Math.cos(omega * t));
-  }if (chartWave) chartWave.destroy();
-  chartWave = new Chart(document.getElementById('chartWave'),{
-    type: 'line',
-    data: {
-      labels: tArr,
-      datasets: [
-        {
-          label: 'B(t) [T]',
-          data: bArr,
-          borderColor: '#00B4D8',
-          backgroundColor: 'transparent',
-          pointRadius: 0,
-          borderWidth: 2,
-          yAxisID: 'yB'
-        },{
-          label: 'EMF(t) [V]',
-          data: emfArr,
-          borderColor: '#e17055',
-          backgroundColor: 'transparent',
-          pointRadius: 0,
-          borderWidth: 2,
-          yAxisID: 'yE'
-        }
-      ]
-    },
-    options:{
-      responsive: true, animation: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins:{ legend: { position: 'top' } },
+  }
+  if (chartWave) chartWave.destroy();
+  chartWave = new Chart(el('chartWave'),{
+    type:'line',
+    data:{ labels:tArr, datasets:[
+      { label:L.waveB, data:bArr, borderColor:'#00B4D8', backgroundColor:'transparent', pointRadius:0, borderWidth:2, yAxisID:'yB' },
+      { label:L.waveE, data:emfArr, borderColor:'#e17055', backgroundColor:'transparent', pointRadius:0, borderWidth:2, yAxisID:'yE' }
+    ]},
+    options:{ responsive:true, animation:false, interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ position:'top' } },
       scales:{
-        x: { title: { display: true, text: '時間 (ms)' }, ticks:{ maxTicksLimit: 10 } },
-        yB:{ position: 'left', title: { display: true, text: 'B (T)', color: '#00B4D8' }, ticks:{ color: '#00B4D8' } },
-        yE:{ position: 'right', title: { display: true, text: 'EMF (V)', color: '#e17055' }, ticks:{ color: '#e17055' }, grid:{ drawOnChartArea: false } }
+        x:{ title:{ display:true, text:L.waveT }, ticks:{ maxTicksLimit:10 } },
+        yB:{ position:'left', title:{ display:true, text:'B (T)', color:'#00B4D8' }, ticks:{ color:'#00B4D8' } },
+        yE:{ position:'right', title:{ display:true, text:'EMF (V)', color:'#e17055' }, ticks:{ color:'#e17055' }, grid:{ drawOnChartArea:false } }
       }
     }
   });
 
-  // Sweep charts
-  const freqArr = [], emfVsFreq = [];
-  for (let fi = 1; fi <= 1000; fi += 10){
-    freqArr.push(fi);
-    emfVsFreq.push(N * A * Bmax * 2 * Math.PI * fi);
-  }const nArr = [], emfVsN = [];
-  for (let ni = 1; ni <= 200; ni += 2){
-    nArr.push(ni);
-    emfVsN.push(ni * A * Bmax * omega);
-  }if (chartSweep) chartSweep.destroy();
-  chartSweep = new Chart(document.getElementById('chartSweep'),{
-    type: 'line',
-    data: {
-      labels: freqArr,
-      datasets: [
-        {
-          label: 'EMF_max vs 周波数 f [Hz]',
-          data: emfVsFreq,
-          borderColor: '#007BFF',
-          backgroundColor: 'rgba(0,123,255,0.08)',
-          pointRadius: 0,
-          borderWidth: 2,
-          fill: true,
-          yAxisID: 'yF'
-        }
-      ]
-    },
-    options:{
-      responsive: true, animation: false,
-      plugins: { legend: { position: 'top' } },
-      scales:{
-        x: { title: { display: true, text: '周波数 (Hz)' } },
-        yF:{ beginAtZero: true, title: { display: true, text: 'EMF_max (V)' } }
-      }
+  var freqArr = [], emfVsFreq = [];
+  for (var fi = 1; fi <= 1000; fi += 10){ freqArr.push(fi); emfVsFreq.push(N * A * Bmax * 2 * Math.PI * fi); }
+  if (chartSweep) chartSweep.destroy();
+  chartSweep = new Chart(el('chartSweep'),{
+    type:'line',
+    data:{ labels:freqArr, datasets:[
+      { label:L.sweepLbl, data:emfVsFreq, borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,0.08)', pointRadius:0, borderWidth:2, fill:true, yAxisID:'yF' }
+    ]},
+    options:{ responsive:true, animation:false, plugins:{ legend:{ position:'top' } },
+      scales:{ x:{ title:{ display:true, text:L.sweepX } }, yF:{ beginAtZero:true, title:{ display:true, text:L.sweepY } } }
     }
   });
-}document.querySelectorAll('input[type=range]').forEach(el =>{
-  const pct = (el.value - el.min) / (el.max - el.min) * 100;
-  el.style.setProperty('--pct', pct + '%');
+}
+
+/* ===== HERO: magnet moving through coil — Faraday/Lenz, live ===== */
+var canvas = el('emfCanvas');
+var ctx = canvas ? canvas.getContext('2d') : null;
+var cssW = 0, cssH = 300, dpr = 1;
+function resize(){
+  if (!canvas) return;
+  var rect = canvas.parentElement.getBoundingClientRect();
+  cssW = Math.max(260, Math.floor(rect.width - 44));
+  dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// On-axis flux model: magnet centered at z (coil at z=0).
+// Φ_single(z) = (Bmax * A) / (1 + (z/w)^2)^1.5  (dipole-like falloff), peak when magnet at coil center.
+// Linkage = N * Φ_single. EMF = -N dΦ/dt.
+function fluxShape(z, w){
+  var r = z / w;
+  return 1 / Math.pow(1 + r*r, 1.5);
+}
+
+var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var animId = null, t0 = 0, kick = 0;
+
+function physAt(zNorm){
+  // returns {flux(Wb single-turn), linkage(Wb), Bmax, A, N}
+  var N = num('nTurns');
+  var A = num('aArea') * 1e-4;
+  var Bmax = num('bMax');
+  var w = 0.9; // characteristic half-width in normalized z units
+  var phiSingle = Bmax * A * fluxShape(zNorm, w);
+  return { N:N, A:A, Bmax:Bmax, w:w, phiSingle:phiSingle, linkage:N*phiSingle };
+}
+
+function draw(zNorm, vNorm, emf, dphidt, linkage, curr, phase){
+  var W = cssW, H = cssH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+  var cx = W*0.42, cy = H*0.5;       // coil center on screen
+  var coilW = 70, coilH = 120, loops = 7;
+  // map zNorm (-3..3) to screen x around coil center
+  var trackHalf = W*0.40;
+  var magX = cx + (zNorm/3) * trackHalf;
+
+  // ---- magnetic field lines through coil (intensity scales with flux) ----
+  var w = 0.9;
+  var fluxFrac = fluxShape(zNorm, w); // 0..1
+  ctx.save();
+  ctx.globalAlpha = 0.25 + 0.55*fluxFrac;
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 1.4;
+  for (var fy=-2; fy<=2; fy++){
+    var yy = cy + fy*16;
+    ctx.beginPath();
+    ctx.moveTo(magX, yy);
+    ctx.lineTo(cx + coilW*0.6*Math.sign(-zNorm||1), yy);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ---- coil (loops) ----
+  ctx.strokeStyle = '#cfd8e3'; ctx.lineWidth = 3;
+  for (var i=0;i<loops;i++){
+    var lx = cx - coilW/2 + (coilW)*(i/(loops-1));
+    ctx.beginPath();
+    ctx.ellipse(lx, cy, 7, coilH/2, 0, 0, Math.PI*2);
+    ctx.stroke();
+  }
+  // coil leads down to galvanometer
+  ctx.strokeStyle = '#8fa3b8'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - coilW/2, cy + coilH/2);
+  ctx.lineTo(cx - coilW/2, H-40);
+  ctx.lineTo(W*0.80-26, H-40);
+  ctx.moveTo(cx + coilW/2, cy + coilH/2);
+  ctx.lineTo(cx + coilW/2, H-52);
+  ctx.lineTo(W*0.80+26, H-52);
+  ctx.stroke();
+
+  // ---- induced current direction dots on the leads (yellow), sign by Lenz ----
+  var curMag = Math.min(1, Math.abs(emf)/Math.max(0.001, peakEmfEstimate()));
+  if (curMag > 0.02){
+    ctx.fillStyle = '#ffd54a';
+    var dir = Math.sign(emf); // sign sets flow direction
+    var nDots = 6;
+    for (var d=0; d<nDots; d++){
+      var fp = ((phase*0.6 + d/nDots) % 1);
+      var dotx = (cx - coilW/2) + 0; // along bottom lead
+      // animate along the horizontal bottom wire
+      var x1 = cx - coilW/2, x2 = W*0.80-26, yb = H-40;
+      var px = dir>0 ? (x1 + (x2-x1)*fp) : (x2 - (x2-x1)*fp);
+      ctx.globalAlpha = 0.4 + 0.6*curMag;
+      ctx.beginPath(); ctx.arc(px, yb, 3.2, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- magnet (bar: N red / S blue), moving ----
+  var mw = 64, mh = 28;
+  var movingRight = vNorm >= 0;
+  // N pole leads in direction of motion
+  ctx.save();
+  // red half
+  ctx.fillStyle = '#ff5252';
+  ctx.fillRect(magX - mw/2, cy - mh/2, mw/2, mh);
+  ctx.fillStyle = '#42a5f5';
+  ctx.fillRect(magX, cy - mh/2, mw/2, mh);
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(magX - mw/2, cy - mh/2, mw, mh);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Roboto Mono'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('N', magX - mw/4, cy);
+  ctx.fillText('S', magX + mw/4, cy);
+  ctx.restore();
+  // motion arrow
+  if (Math.abs(vNorm) > 0.02){
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.fillStyle='#ffffff';
+    var ax = magX + (movingRight?1:-1)*(mw/2+10);
+    var ax2 = ax + (movingRight?1:-1)*18;
+    ctx.beginPath(); ctx.moveTo(ax, cy); ctx.lineTo(ax2, cy); ctx.stroke();
+    var ang = movingRight?0:Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(ax2, cy);
+    ctx.lineTo(ax2 - 7*Math.cos(ang-0.5), cy - 7*Math.sin(ang-0.5));
+    ctx.lineTo(ax2 - 7*Math.cos(ang+0.5), cy - 7*Math.sin(ang+0.5));
+    ctx.closePath(); ctx.fill();
+  }
+
+  // ---- galvanometer (needle deflects with EMF, sign by Lenz) ----
+  var gx = W*0.80, gy = H-46, gr = 26;
+  ctx.fillStyle = '#11243f'; ctx.strokeStyle='#3a5577'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(gx, gy, gr, 0, 7); ctx.fill(); ctx.stroke();
+  // scale arc
+  ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(gx, gy, gr-4, Math.PI*1.15, Math.PI*1.85); ctx.stroke();
+  // needle
+  var defl = Math.max(-1, Math.min(1, emf / Math.max(0.001, peakEmfEstimate())));
+  var needAng = -Math.PI/2 + defl*0.6;
+  ctx.strokeStyle = '#ffd54a'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + (gr-6)*Math.cos(needAng), gy + (gr-6)*Math.sin(needAng)); ctx.stroke();
+  ctx.fillStyle='#ffd54a'; ctx.beginPath(); ctx.arc(gx, gy, 3, 0, 7); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='10px Noto Sans JP'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.fillText('検流計', gx, gy+gr+12);
+
+  // ---- text readouts on canvas ----
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillStyle = '#fff'; ctx.font='bold 13px Roboto Mono';
+  ctx.fillText('ε = '+emf.toFixed(2)+' V', 12, 22);
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font='11px Roboto Mono';
+  ctx.fillText('dΦ/dt = '+dphidt.toFixed(3)+' Wb/s', 12, 40);
+  // phase annotation
+  ctx.fillStyle = '#00B4D8'; ctx.font='11px Noto Sans JP';
+  var note = Math.abs(vNorm)<0.04 ? L.stopped : (vNorm*(-Math.sign(zNorm||1))>0 ? L.approaching : L.leaving);
+  if (Math.abs(zNorm) < 0.25 && Math.abs(vNorm)>0.04) note = L.approaching;
+  ctx.fillText(note, 12, H-12);
+}
+
+var peakEmfCache = 0.5;
+function peakEmfEstimate(){ return peakEmfCache; }
+
+function step(ts){
+  if (!t0) t0 = ts;
+  var tsec = (ts - t0)/1000;
+  // magnet oscillates back and forth through the coil; "frequency" slider sets pace
+  var f = num('freq');
+  var pace = 0.4 + (f/1000)*1.6;       // slider 1..1000 -> 0.4..2.0 Hz of passes
+  var phase = tsec * pace;
+  // smooth oscillation z in [-3,3]
+  var zNorm = 3*Math.sin(2*Math.PI*0.5*phase);
+  var vNorm = 3*2*Math.PI*0.5*pace*Math.cos(2*Math.PI*0.5*phase); // dz/dt (norm units / s)
+
+  // physics
+  var p = physAt(zNorm);
+  var w = p.w;
+  // dΦ_single/dz analytic for 1/(1+(z/w)^2)^1.5
+  var r = zNorm/w;
+  var dShape_dz = -3*(zNorm/(w*w)) / Math.pow(1 + r*r, 2.5);
+  var dphidt_single = p.Bmax * p.A * dShape_dz * vNorm; // Wb/s (single turn)
+  var dLinkage_dt = p.N * dphidt_single;                // Wb/s total
+  var emf = -dLinkage_dt;                                // ε = -N dΦ/dt
+  var linkage = p.linkage;                               // Wb total
+  var Rcoil = 50;                                        // ohms (illustrative)
+  var curr = emf / Rcoil;                                // A
+
+  // running peak for scaling needle/current
+  peakEmfCache = Math.max(peakEmfCache*0.995, Math.abs(emf), 0.05);
+
+  // live numbers
+  el('statEmf').textContent = emf.toFixed(2);
+  el('statDphi').textContent = dLinkage_dt.toFixed(3);
+  el('statFlux').textContent = (linkage*1000).toFixed(2);
+  el('statCurr').textContent = (curr*1000).toFixed(1);
+
+  draw(zNorm, vNorm, emf, dLinkage_dt, linkage, curr, phase);
+  animId = requestAnimationFrame(step);
+}
+
+function staticFrame(){
+  // single representative frame: magnet approaching coil center
+  resize();
+  var zNorm = 0.6, vNorm = -2.0;
+  var p = physAt(zNorm), w = p.w, r = zNorm/w;
+  var dShape_dz = -3*(zNorm/(w*w)) / Math.pow(1 + r*r, 2.5);
+  var dphidt_single = p.Bmax * p.A * dShape_dz * vNorm;
+  var dLinkage_dt = p.N * dphidt_single;
+  var emf = -dLinkage_dt;
+  peakEmfCache = Math.max(Math.abs(emf), 0.1);
+  el('statEmf').textContent = emf.toFixed(2);
+  el('statDphi').textContent = dLinkage_dt.toFixed(3);
+  el('statFlux').textContent = (p.linkage*1000).toFixed(2);
+  el('statCurr').textContent = (emf/50*1000).toFixed(1);
+  draw(zNorm, vNorm, emf, dLinkage_dt, p.linkage, emf/50, 0);
+}
+
+// slider pct fill
+document.querySelectorAll('input[type=range]').forEach(function(e){
+  var pct = (e.value - e.min) / (e.max - e.min) * 100;
+  e.style.setProperty('--pct', pct + '%');
 });
+
+// hook sliders to refresh charts + (re)compute
+window.addEventListener('resize', function(){ if (!reduced){ resize(); } else { staticFrame(); } });
+
+window.simulate = simulate;
 simulate();
+if (canvas){
+  if (reduced){
+    staticFrame();
+  } else {
+    resize();
+    animId = requestAnimationFrame(step);
+  }
+  // click to "kick" the magnet (visual restart)
+  canvas.addEventListener('click', function(){ t0 = 0; });
+}
+})();
 </script>
 
 <section class="explanation">
@@ -417,6 +652,9 @@ simulate();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="magnetic-induction.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -466,6 +704,16 @@ simulate();
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

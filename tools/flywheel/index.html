@@ -42,14 +42,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "フライホイール設計・エネルギー貯蔵・変動係数計算機",
       "description": "フライホイールの必要慣性モーメント・貯蔵エネルギー・速度変動・バースト安全率をリアルタイム計算。ICエンジン・プレス機・風力発電対応。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/flywheel.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true
     },{
@@ -154,6 +154,24 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 flywheel hero ===== */
+.fw-hero-card canvas#fwHeroCanvas{border-radius:8px;background:#0a1628;display:block;width:100%;max-width:100%;margin-top:6px}
+.fw-live{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:6px}
+.fw-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.fw-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.fw-ro .rl{font-size:0.58rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.fw-ro.accent .rv{color:#ffd54a}
+.fw-ro.over .rv{color:#ff5252}
+@media(max-width:600px){.fw-live{grid-template-columns:repeat(3,1fr)}}
+.fw-play{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.fw-btn{padding:8px 14px;font-size:0.82rem}
+.fw-shape-row,.fw-preset-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.fw-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.fw-legend span{display:inline-flex;align-items:center;gap:5px}
+.fw-legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+#fwHeroCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.fw-ro{transition:none}}
+/* end v2 flywheel hero */
 </style>
 </head>
 <body>
@@ -251,9 +269,60 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="bwSlider" min="0.01" max="0.5" step="0.01" value="0.10" oninput="syncToNum('bwSlider','bwValNum');updateSlider(this);compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
+    <div class="chart-card fw-hero-card"><div class="chart-title"><i class="fas fa-fan"></i> リアルタイム・フライホイール（回転エネルギー貯蔵）</div>
+      <div class="fw-live">
+        <div class="fw-ro accent"><div class="rv" id="fwOmega">0</div><div class="rl">角速度 ω [rad/s]</div></div>
+        <div class="fw-ro"><div class="rv" id="fwRpm">0</div><div class="rl">回転数 [RPM]</div></div>
+        <div class="fw-ro"><div class="rv" id="fwE">0</div><div class="rl">貯蔵エネルギー E [kJ]</div></div>
+        <div class="fw-ro"><div class="rv" id="fwI">0</div><div class="rl">慣性モーメント I [kg·m²]</div></div>
+        <div class="fw-ro"><div class="rv" id="fwVrim">0</div><div class="rl">リム速度 [m/s]</div></div>
+        <div class="fw-ro" id="fwStressRo"><div class="rv" id="fwStress">0</div><div class="rl">リム応力 [MPa]</div></div>
+      </div>
+      <canvas id="fwHeroCanvas" height="340" tabindex="0" role="img" aria-label="回転するフライホイールのアニメーション。スポーク付きの円板が回転し、貯蔵エネルギーを示します。"></canvas>
+      <div class="fw-play">
+        <button class="btn fw-btn" type="button" id="fwPlay"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary fw-btn" type="button" id="fwLoad"><i class="fas fa-bolt"></i> 負荷パルス</button>
+        <button class="btn secondary fw-btn" type="button" id="fwReset"><i class="fas fa-rotate-left"></i> リセット</button>
+        <div style="display:flex;gap:4px;margin-left:auto;align-items:center">
+          <span style="font-size:.68rem;color:var(--muted)">表示速度</span>
+          <button class="sel-btn fw-spd" type="button" data-spd="0.25">0.25×</button>
+          <button class="sel-btn fw-spd active" type="button" data-spd="1">1×</button>
+          <button class="sel-btn fw-spd" type="button" data-spd="2">2×</button>
+        </div>
+      </div>
+      <div class="fw-shape-row">
+        <span style="font-size:.7rem;color:var(--muted)">表示形状</span>
+        <button class="sel-btn fw-shape active" type="button" data-shape="disk">ソリッドディスク</button>
+        <button class="sel-btn fw-shape" type="button" data-shape="ring">リング</button>
+        <button class="sel-btn fw-shape" type="button" data-shape="spoke">スポーク</button>
+      </div>
+      <div class="fw-preset-row">
+        <span style="font-size:.7rem;color:var(--muted)">プリセット</span>
+        <button class="sel-btn fw-preset" type="button" data-pre="storage">高RPMエネルギー貯蔵</button>
+        <button class="sel-btn fw-preset" type="button" data-pre="engine">エンジン平滑化</button>
+        <button class="sel-btn fw-preset" type="button" data-pre="rim">重リム</button>
+        <button class="sel-btn fw-preset" type="button" data-pre="press">プレス用</button>
+      </div>
+      <div class="fw-legend">
+        <span><i class="swatch" style="background:#00b4d8"></i>回転マーカー</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>エネルギーリング</span>
+        <span><i class="swatch" style="background:#ff5252"></i>負荷トルク</span>
+        <span id="fwBurstLeg" style="display:none;color:#ff5252;font-weight:700">⚠ バースト限界超過</span>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:8px" id="fwNote">フライホイールは E=½Iω² で回転エネルギーを貯蔵します。「負荷パルス」を押すと負荷が加わり、慣性 I が大きいほど速度変動は小さくなります。</div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -310,6 +379,236 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
   </div>
 
+
+<script>
+/* ===== v2 Flywheel real-time hero (self-contained IIFE) ===== */
+(function(){
+  "use strict";
+  var cv = document.getElementById('fwHeroCanvas');
+  if(!cv) return;
+  var cx2 = cv.getContext('2d');
+  var RHO = 7850, SY = 250e6;      // steel density / yield (matches calculator)
+  var prm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var playing = !prm, animId = null, lastTs = 0, speedMult = 1;
+  var heroShape = 'disk';          // visual shape (disk/ring/spoke)
+  var angle = 0;                   // current rotation angle (rad) for the visuals
+  var omega = 0;                   // visual angular speed (rad/s, real physical units)
+  var omegaTarget = 0;             // steady-state target from sliders
+  var loadActive = false, loadTimer = 0;
+
+  function gv(id){ var e=document.getElementById(id); return e?parseFloat(e.value):0; }
+  function curShapeCalc(){ return (typeof shapeType!=='undefined')?shapeType:'ring'; } // calculator's shape
+  function setTxt(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+
+  // Physical quantities from the existing sliders
+  function physics(){
+    var N = gv('nSlider'), Cs = gv('csSlider'), R = gv('rSlider');
+    var r = gv('rrSlider'), b = gv('bwSlider');
+    var sh = curShapeCalc();
+    var rIn = (sh==='ring') ? Math.min(r, R*0.95) : 0;
+    var vol = Math.PI*(R*R - rIn*rIn)*b;
+    var mass = RHO*vol;
+    var I = (sh==='ring') ? 0.5*mass*(R*R+rIn*rIn) : 0.5*mass*R*R;
+    var w = N*2*Math.PI/60;
+    return { N:N, Cs:Cs, R:R, rIn:rIn, mass:mass, I:I, w:w };
+  }
+
+  function refreshTargets(){
+    var p = physics();
+    omegaTarget = p.w;
+    if(omega === 0) omega = p.w;   // initialise on first run
+  }
+
+  function hidpi(){
+    var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    var rect = cv.parentElement.getBoundingClientRect();
+    var w = Math.max(280, Math.floor(rect.width - 28));
+    var h = 340;
+    cv.style.width = w+'px'; cv.style.height = h+'px';
+    cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr);
+    cx2.setTransform(dpr,0,0,dpr,0,0);
+    return { w:w, h:h };
+  }
+
+  function fmt(x, d){ return (Math.abs(x)>=1000)? x.toFixed(0): x.toFixed(d); }
+
+  function draw(){
+    var dim = hidpi(), W=dim.w, H=dim.h;
+    var p = physics();
+    cx2.clearRect(0,0,W,H);
+    cx2.fillStyle='#0a1628'; cx2.fillRect(0,0,W,H);
+
+    var ccx = W*0.40, ccy = H/2;
+    var Rpx = Math.min(W*0.30, H*0.40);
+    var rimSpeed = p.w * p.R;                    // m/s
+    var stress = RHO*p.w*p.w*p.R*p.R/1e6;        // MPa
+    var burst = (SY/1e6)/Math.max(stress,0.01);
+    var over = burst < 1;
+
+    // energy ring (outer, fraction of a reference max energy)
+    var E = 0.5*p.I*omega*omega;                 // J  (uses live omega)
+    var Eref = 0.5*p.I*(6000*2*Math.PI/60)*(6000*2*Math.PI/60) + 1e-9;
+    var frac = Math.max(0, Math.min(1, E/Eref));
+    cx2.lineWidth=7; cx2.strokeStyle='rgba(255,255,255,0.08)';
+    cx2.beginPath(); cx2.arc(ccx,ccy,Rpx+18,0,2*Math.PI); cx2.stroke();
+    cx2.strokeStyle = over ? '#ff5252' : '#ffd54a';
+    cx2.beginPath(); cx2.arc(ccx,ccy,Rpx+18,-Math.PI/2,-Math.PI/2+2*Math.PI*frac); cx2.stroke();
+
+    // wheel body
+    cx2.save();
+    cx2.translate(ccx,ccy); cx2.rotate(angle);
+    var grd = cx2.createRadialGradient(0,0,Rpx*0.1,0,0,Rpx);
+    grd.addColorStop(0,'#2d5986'); grd.addColorStop(1,'#1e4080');
+    if(heroShape==='ring'){
+      cx2.fillStyle=grd; cx2.beginPath(); cx2.arc(0,0,Rpx,0,2*Math.PI); cx2.fill();
+      cx2.fillStyle='#0a1628'; cx2.beginPath(); cx2.arc(0,0,Rpx*0.55,0,2*Math.PI); cx2.fill();
+    } else if(heroShape==='spoke'){
+      cx2.strokeStyle='#1e4080'; cx2.lineWidth=Rpx*0.16;
+      cx2.beginPath(); cx2.arc(0,0,Rpx*0.86,0,2*Math.PI); cx2.stroke(); // rim
+      cx2.lineWidth=Rpx*0.08; cx2.strokeStyle='#2d5986';
+      for(var s=0;s<6;s++){ var a=s*Math.PI/3; cx2.beginPath(); cx2.moveTo(0,0); cx2.lineTo(Math.cos(a)*Rpx*0.82, Math.sin(a)*Rpx*0.82); cx2.stroke(); }
+    } else {
+      cx2.fillStyle=grd; cx2.beginPath(); cx2.arc(0,0,Rpx,0,2*Math.PI); cx2.fill();
+    }
+    // rotation markers (so spin is visible regardless of shape)
+    cx2.fillStyle='#00b4d8';
+    for(var m=0;m<4;m++){
+      var am=m*Math.PI/2;
+      cx2.beginPath(); cx2.arc(Math.cos(am)*Rpx*0.7, Math.sin(am)*Rpx*0.7, Rpx*0.07, 0, 2*Math.PI); cx2.fill();
+    }
+    // a bold reference marker + spoke line
+    cx2.strokeStyle='#ffd54a'; cx2.lineWidth=3;
+    cx2.beginPath(); cx2.moveTo(0,0); cx2.lineTo(Rpx*0.92,0); cx2.stroke();
+    cx2.fillStyle='#fff'; cx2.beginPath(); cx2.arc(Rpx*0.92,0,Rpx*0.06,0,2*Math.PI); cx2.fill();
+    // hub
+    cx2.fillStyle='#2d5986'; cx2.beginPath(); cx2.arc(0,0,Rpx*0.12,0,2*Math.PI); cx2.fill();
+    cx2.restore();
+
+    // load torque arrow when active
+    if(loadActive){
+      cx2.strokeStyle='#ff5252'; cx2.lineWidth=3;
+      cx2.beginPath(); cx2.arc(ccx,ccy,Rpx+34,0.4,0.4+Math.PI*0.9,false); cx2.stroke();
+      var ea=0.4+Math.PI*0.9, ex=ccx+Math.cos(ea)*(Rpx+34), ey=ccy+Math.sin(ea)*(Rpx+34);
+      cx2.fillStyle='#ff5252'; cx2.beginPath();
+      cx2.moveTo(ex,ey); cx2.lineTo(ex-8,ey-9); cx2.lineTo(ex+9,ey-7); cx2.closePath(); cx2.fill();
+      cx2.font='bold 12px Noto Sans JP'; cx2.fillText('負荷', ccx+Rpx+8, ccy-Rpx-6);
+    }
+
+    // burst warning
+    if(over){
+      cx2.fillStyle='rgba(255,82,82,0.12)'; cx2.fillRect(0,0,W,H);
+      cx2.strokeStyle='#ff5252'; cx2.lineWidth=2; cx2.strokeRect(2,2,W-4,H-4);
+    }
+
+    // right-side energy bar text panel
+    cx2.textAlign='left';
+    cx2.fillStyle='rgba(255,255,255,0.78)'; cx2.font='bold 13px Roboto Mono';
+    var tx = W*0.74;
+    cx2.fillText('E = ½Iω²', tx, 28);
+    cx2.fillStyle='#ffd54a'; cx2.font='bold 18px Roboto Mono';
+    cx2.fillText((E/1000).toFixed(2)+' kJ', tx, 50);
+    cx2.fillStyle='rgba(255,255,255,0.6)'; cx2.font='11px Roboto Mono';
+    cx2.fillText('ω = '+omega.toFixed(1)+' rad/s', tx, 72);
+    cx2.fillText('I = '+p.I.toFixed(2)+' kg·m²', tx, 90);
+    cx2.fillText('rim = '+rimSpeed.toFixed(0)+' m/s', tx, 108);
+    cx2.fillStyle = over ? '#ff5252' : 'rgba(255,255,255,0.6)';
+    cx2.fillText('σ = '+stress.toFixed(1)+' MPa', tx, 126);
+    cx2.fillText('SF = '+burst.toFixed(2), tx, 144);
+
+    // live readouts (HTML)
+    setTxt('fwOmega', omega.toFixed(1));
+    setTxt('fwRpm', (omega*60/(2*Math.PI)).toFixed(0));
+    setTxt('fwE', (E/1000).toFixed(2));
+    setTxt('fwI', p.I.toFixed(2));
+    setTxt('fwVrim', rimSpeed.toFixed(1));
+    setTxt('fwStress', stress.toFixed(1));
+    var sro=document.getElementById('fwStressRo'); if(sro) sro.classList.toggle('over', over);
+    var bl=document.getElementById('fwBurstLeg'); if(bl) bl.style.display = over?'':'none';
+  }
+
+  function step(dt){
+    // load pulse: removes energy, then a restoring torque brings omega back toward target
+    if(loadActive){
+      loadTimer -= dt;
+      // braking proportional to Cs so a larger I / smaller Cs => smaller dip is felt
+      var Cs = gv('csSlider');
+      omega -= omegaTarget * Cs * 6 * dt;        // visible dip scaled by Cs
+      if(loadTimer<=0){ loadActive=false; }
+    } else {
+      // restoring toward steady target (drive torque)
+      omega += (omegaTarget - omega) * Math.min(1, 2.0*dt);
+    }
+    if(omega<0) omega=0;
+    // visual spin: cap displayed angular rate so very high RPM stays watchable
+    var visW = Math.sign(omega)*Math.min(Math.abs(omega), 18) + omega*0.0;
+    angle += visW * dt * speedMult;
+    if(angle>1e6) angle -= 1e6;
+  }
+
+  function loop(ts){
+    if(!playing){ animId=null; return; }
+    if(!lastTs) lastTs=ts;
+    var dt = Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+    step(dt); draw();
+    animId = requestAnimationFrame(loop);
+  }
+  function start(){ if(playing&&!animId){ lastTs=0; animId=requestAnimationFrame(loop);} }
+  function setPlay(on){
+    playing=on; var b=document.getElementById('fwPlay');
+    if(b) b.innerHTML = on?'<i class="fas fa-pause"></i> 一時停止':'<i class="fas fa-play"></i> 再生';
+    if(on) start(); else if(animId){ cancelAnimationFrame(animId); animId=null; }
+  }
+
+  // wiring
+  document.getElementById('fwPlay').addEventListener('click', function(){ setPlay(!playing); });
+  document.getElementById('fwLoad').addEventListener('click', function(){ loadActive=true; loadTimer=0.9; if(!playing) setPlay(true); });
+  document.getElementById('fwReset').addEventListener('click', function(){ refreshTargets(); omega=omegaTarget; angle=0; loadActive=false; draw(); });
+  Array.prototype.forEach.call(document.querySelectorAll('.fw-spd'), function(btn){
+    btn.addEventListener('click', function(){
+      speedMult=parseFloat(btn.dataset.spd);
+      document.querySelectorAll('.fw-spd').forEach(function(o){o.classList.remove('active');});
+      btn.classList.add('active');
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.fw-shape'), function(btn){
+    btn.addEventListener('click', function(){
+      heroShape=btn.dataset.shape;
+      document.querySelectorAll('.fw-shape').forEach(function(o){o.classList.remove('active');});
+      btn.classList.add('active'); draw();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.fw-preset'), function(btn){
+    btn.addEventListener('click', function(){
+      var P={ storage:{N:5000,R:0.4,r:0.3,b:0.08,cs:0.005,sh:'ring'},
+              engine:{N:1500,R:0.3,r:0.2,b:0.1,cs:0.02,sh:'disk'},
+              rim:{N:1200,R:0.6,r:0.5,b:0.12,cs:0.02,sh:'ring'},
+              press:{N:600,R:0.5,r:0.35,b:0.2,cs:0.15,sh:'spoke'} }[btn.dataset.pre];
+      if(!P) return;
+      function setS(slider,num,val){ var s=document.getElementById(slider),n=document.getElementById(num);
+        if(s){ s.value=val; if(typeof updateSlider==='function') updateSlider(s);} if(n) n.value=val; }
+      setS('nSlider','nValNum',P.N); setS('rSlider','rValNum',P.R);
+      setS('rrSlider','rrValNum',P.r); setS('bwSlider','bwValNum',P.b); setS('csSlider','csValNum',P.cs);
+      // sync calculator shape buttons if present
+      var shBtn=document.querySelector('[onclick^="setShape(\''+(P.sh==='spoke'?'disk':P.sh)+'\'"]');
+      if(shBtn && typeof setShape==='function') setShape(P.sh==='spoke'?'disk':P.sh, shBtn);
+      heroShape=P.sh;
+      document.querySelectorAll('.fw-shape').forEach(function(o){o.classList.toggle('active', o.dataset.shape===P.sh);});
+      if(typeof compute==='function') compute();
+      refreshTargets(); omega=omegaTarget; angle=0; draw();
+    });
+  });
+  // recompute targets whenever a slider changes
+  ['nSlider','rSlider','rrSlider','bwSlider','csSlider'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.addEventListener('input', refreshTargets);
+  });
+  cv.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); setPlay(!playing); } });
+  window.addEventListener('resize', draw);
+
+  refreshTargets();
+  if(prm){ setPlay(false); draw(); }   // static frame for reduced motion
+  else { draw(); start(); }
+})();
+</script>
 
 <script>
 function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
@@ -574,7 +873,7 @@ compute();
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">慣性モーメントと貯蔵エネルギーの数値はどのように入力すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">左側の入力パネルで「フライホイール形状」を選択し、質量・半径・厚さを入力すると自動計算されます。直接慣性モーメントを数値入力したい場合は「カスタム」モードを選んでください。</div>
+    <div class="faq-a">左側パネルで用途（ICエンジン／プレス機／風力発電）と形状（リング／ソリッドディスク）を選び、外径 R・内径 r・幅 b をスライダーで指定すると、慣性モーメント I・貯蔵エネルギー E・リム応力 σ・バースト安全率が自動計算されます。質量は寸法と密度（鋼 7850 kg/m³ 固定）から逆算されるため、質量や I を直接入力する欄はありません。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">変動係数（Cs）の目標値はどの程度に設定すべきですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -606,6 +905,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="flywheel.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -668,7 +970,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>ICエンジン用フライホイール：外径300mm、内径150mm（リング形状）、厚さ40mm、鋳鉄（ρ=7200kg/m³）、運転速度3000RPMで速度変動係数2%設定。計算結果：慣性モーメントI≈8.5kg·m²、貯蔵エネルギーE≈33.6kJ、許容速度変動ΔN=60RPM、推定質量m≈28kg、リム応力σ≈85MPa、バースト安全率Sf≈1.65。高速プレス機では同仕様で速度変動1%設定により安全率を2.0以上に確保可能です。</p>
+<p>ICエンジン用フライホイール（リング形状）の既定条件：平均トルク T_mean=200 N·m、回転数 N=1500 RPM、変動係数 C_s=0.020、外径 R=0.30 m、内径 r=0.20 m、幅 b=0.10 m、材料は鋼（本ツールは ρ=7850 kg/m³ 固定）。計算結果：慣性モーメント I≈8.01 kg·m²、貯蔵エネルギー E≈98.9 kJ、速度変動 ΔN=30 RPM、推定質量 m≈123 kg、リム応力 σ≈17.4 MPa、バースト安全率≈14.3（必要慣性モーメント I_req≈1.53）。外径 R や回転数 N を上げるとリム応力 σ=ρω²R² が急増し安全率が下がります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -679,6 +981,16 @@ compute();
 <li>リング形状は中心孔加工精度がバースト安全率に大きく影響するため、ΔS/R比チェック必須</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

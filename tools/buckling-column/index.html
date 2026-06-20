@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "柱の座屈計算機",
       "description": "オイラー座屈荷重とジョンソン式を使った柱の座屈計算ツール。端末条件・断面・材料を選択して座屈荷重・安全率・細長比をリアルタイム計算。",
       "url": "https://novasolver.jp/tools/buckling-column.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["端末条件4種類（ピン-ピン/固定-自由/固定-ピン/固定-固定）","断面形状3種類（円形/正方形/I形鋼）","オイラー式とジョンソン式の自動切り替え","Pcr vs L 曲線と σcr vs λ 曲線"],
       "keywords": "座屈,オイラー荷重,ジョンソン式,細長比,柱,構造解析,CAE,座屈荷重計算",
       "datePublished": "2026-04-09",
@@ -247,6 +247,31 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
 
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">アニメーション</span></div>
+      <div class="btn-group" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" id="btn-play" type="button" style="flex:1;min-width:90px;padding:8px 12px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer;"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn" id="btn-reset" type="button" style="flex:1;min-width:90px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-weight:600;cursor:pointer;"><i class="fas fa-undo"></i> リセット</button>
+      </div>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">プリセット（端末条件）</span></div>
+      <div class="btn-group" style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="preset-btn" id="pre-pp" type="button" style="flex:1;min-width:88px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:.74rem;cursor:pointer;">ピン—ピン</button>
+        <button class="preset-btn" id="pre-ff" type="button" style="flex:1;min-width:88px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:.74rem;cursor:pointer;">固定—自由</button>
+        <button class="preset-btn" id="pre-cc" type="button" style="flex:1;min-width:88px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:.74rem;cursor:pointer;">固定—固定</button>
+      </div>
+    </div>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -257,12 +282,20 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="sl">P<sub>cr</sub> (kN)</div>
       </div>
       <div class="stat-card">
-        <div class="sv" id="stat-FS">—</div>
-        <div class="sl">安全率 FS</div>
+        <div class="sv" id="stat-K">—</div>
+        <div class="sl">有効長さ係数 K</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="stat-lambda">—</div>
         <div class="sl">細長比 λ = KL/r</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="stat-sigma">—</div>
+        <div class="sl">座屈応力 σ<sub>cr</sub> (MPa)</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="stat-FS">—</div>
+        <div class="sl">安全率 FS</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="stat-formula">—</div>
@@ -271,31 +304,47 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-ruler-vertical"></i> 座屈アニメーション（荷重ランプ → 横倒れ）</div>
+      <canvas id="buckleCanvas" height="300" aria-label="柱に軸荷重がかかり、荷重が座屈荷重Pcrに達すると端末条件に応じた座屈モード形に横倒れする様子のアニメーション" role="img"></canvas>
+    </div>
+
     <div class="chart-section">
       <div class="chart-card"><div class="chart-title">座屈荷重 P<sub>cr</sub> vs 柱長さ L</div><canvas class="ux-chartjs-canvas" id="pcrChart" height="230"></canvas></div>
     </div>
     <div class="chart-section">
-      <div class="chart-card"><div class="chart-title">座屈応力 <span style="text-transform:none">σ</span><sub>cr</sub> vs 細長比 <span style="text-transform:none">λ</span></div><canvas class="ux-chartjs-canvas" id="sigmaChart" height="230"></canvas></div>
+      <div class="chart-card"><div class="chart-title">座屈応力 <span style="text-transform:none">σ</span><sub>cr</sub> vs 細長比 <span style="text-transform:none">λ</span>（動作点付き）</div><canvas class="ux-chartjs-canvas" id="sigmaChart" height="230"></canvas></div>
     </div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
       <p>$$P_{cr}= \frac{\pi^2 EI}{(KL)^2}\text{ [オイラー]}$$</p>
+      <p style="margin-top:6px;font-size:0.8rem;">座屈臨界荷重。$E$＝ヤング率、$I$＝最小断面二次モーメント、$K$＝有効長さ係数、$L$＝柱長さ。</p>
+      <p style="margin-top:8px;">$$\sigma_{cr}= \frac{\pi^2 E}{(KL/r)^2}$$</p>
+      <p style="margin-top:6px;font-size:0.8rem;">座屈応力。$r=\sqrt{I/A}$＝断面二次半径、$KL/r$＝細長比 λ。</p>
       <p style="margin-top:8px;font-size:0.8rem;">ジョンソン式（短柱時）:</p>
       <p style="font-size:0.82rem;">$$P_{cr}= A\sigma_y\!\left[1 - \frac{\sigma_y}{4\pi^2 E}\left(\frac{KL}{r}\right)^2\right]$$</p>
       <p style="margin-top:8px;font-size:0.8rem;color:var(--muted);">$\lambda_c = \pi\sqrt{2E/\sigma_y}$：遷移細長比<br> $\lambda \gt  \lambda_c$：オイラー式<br> $\lambda \le \lambda_c$：ジョンソン式</p>
-    
+
 </div>
 </div>
 </div>
 
 <script>
+const T = {
+  euler:'オイラー', johnson:'ジョンソン', current:'現在', operating:'動作点',
+  play:'再生', pause:'一時停止', buckled:'座屈発生', stable:'安定'
+};
 
+/* ===== Column Buckling v2 — real-time animation + charts =====
+   Physics: Euler  Pcr = π²EI/(KL)²   ;  σcr = π²E/(KL/r)²
+            Johnson Pcr = A·σy[1 - σy(KL/r)²/(4π²E)]  for λ ≤ λc = π√(2E/σy)
+*/
 const MATS = {
   steel: { E: 200e9, sy: 250e6 },
   alum:{ E: 70e9,  sy: 270e6 },
   timber:{ E: 12e9,  sy: 30e6  }
 };
+const fin = (v, d) => (Number.isFinite(v) ? v : (d || 0));
 
 function getSection(){
   const sec = document.getElementById('sel-sec').value;
@@ -317,22 +366,27 @@ function getSection(){
     const Atot = bf * h - (bf - tw) * (h - 2*tf);
     I = Itot; A = Atot;
   }return{ I, A };
-}function calcPcr(E, sy, K, L, I, A){
+}
+function calcPcr(E, sy, K, L, I, A){
   const r = Math.sqrt(I / A);
   const lam = K * L / r;
   const lamC = Math.PI * Math.sqrt(2 * E / sy);
-  let Pcr, formula;
+  let Pcr, formula, sigCr;
   if (lam > lamC) {
-    Pcr = Math.PI**2 * E * I / (K * L)**2;
+    Pcr = Math.PI**2 * E * I / (K * L)**2;            // Euler
+    sigCr = Math.PI**2 * E / lam**2;                  // = Pcr/A
     formula = 'Euler';
   }else{
-    Pcr = A * sy * (1 - sy * lam**2 / (4 * Math.PI**2 * E));
+    sigCr = sy * (1 - sy * lam**2 / (4 * Math.PI**2 * E));  // Johnson
+    Pcr = A * sigCr;
     formula = 'Johnson';
-  }return{ Pcr, lam, lamC, r, formula };
-}function updateSliderBg(el){
+  }return{ Pcr, lam, lamC, r, formula, sigCr };
+}
+function updateSliderBg(el){
   const min=parseFloat(el.min),max=parseFloat(el.max),val=parseFloat(el.value);
   el.style.setProperty('--pct',((val-min)/(max-min))*100+'%');
-}const sliders = ['sl-d','sl-b','sl-h','sl-bf','sl-tw','sl-tf','sl-L','sl-P'];
+}
+const sliders = ['sl-d','sl-b','sl-h','sl-bf','sl-tw','sl-tf','sl-L','sl-P'];
 sliders.forEach(id =>{
   const el = document.getElementById(id);
   if (el) { updateSliderBg(el); el.addEventListener('input', () => { updateSliderBg(el); syncValues(); render(); }); }
@@ -357,14 +411,15 @@ function syncValues(){
   (function(){var _e=document.getElementById('val-tf');if(_e){if(_e.tagName==='INPUT')_e.value=document.getElementById('sl-tf').value;else _e.textContent=document.getElementById('sl-tf').value;}})();
   (function(){var _e=document.getElementById('val-L');if(_e){if(_e.tagName==='INPUT')_e.value=document.getElementById('sl-L').value;else _e.textContent=document.getElementById('sl-L').value;}})();
   (function(){var _e=document.getElementById('val-P');if(_e){if(_e.tagName==='INPUT')_e.value=document.getElementById('sl-P').value;else _e.textContent=document.getElementById('sl-P').value;}})();
-}// Charts
+}
 
+// ===== Charts =====
 const pCtx = document.getElementById('pcrChart').getContext('2d');
 const sCtx = document.getElementById('sigmaChart').getContext('2d');
 const pcrChart = new Chart(pCtx,{
   type: 'line',
   data: { datasets: [
-    { label: 'Euler', data: [], borderColor: '#007BFF', borderWidth: 2, pointRadius: 0, tension: 0 },{ label: 'Johnson', data: [], borderColor: '#FF6B6B', borderWidth: 2, pointRadius: 0, tension: 0 },{ label: '現在', data: [], borderColor: '#FFD93D', backgroundColor: '#FFD93D', pointRadius: 6, showLine: false }
+    { label: T.euler, data: [], borderColor: '#007BFF', borderWidth: 2, pointRadius: 0, tension: 0 },{ label: T.johnson, data: [], borderColor: '#FF6B6B', borderWidth: 2, pointRadius: 0, tension: 0 },{ label: T.current, data: [], borderColor: '#FFD93D', backgroundColor: '#FFD93D', pointRadius: 6, showLine: false }
   ]},
   options:{ animation: false, responsive: true,
     maintainAspectRatio:false,resizeDelay:100,plugins: { legend: { labels: { font: { size: 10 }, color: '#1a1a2e' } } },
@@ -377,7 +432,7 @@ const pcrChart = new Chart(pCtx,{
 const sigmaChart = new Chart(sCtx,{
   type: 'line',
   data: { datasets: [
-    { label: 'Euler', data: [], borderColor: '#007BFF', borderWidth: 2, pointRadius: 0, tension: 0 },{ label: 'Johnson', data: [], borderColor: '#FF6B6B', borderWidth: 2, pointRadius: 0, tension: 0 },{ label: '現在', data: [], borderColor: '#FFD93D', backgroundColor: '#FFD93D', pointRadius: 6, showLine: false }
+    { label: T.euler, data: [], borderColor: '#007BFF', borderWidth: 2, pointRadius: 0, tension: 0 },{ label: T.johnson, data: [], borderColor: '#FF6B6B', borderWidth: 2, pointRadius: 0, tension: 0 },{ label: T.operating, data: [], borderColor: '#FFD93D', backgroundColor: '#FFD93D', pointRadius: 6, showLine: false }
   ]},
   options:{ animation: false, responsive: true,
     maintainAspectRatio:false,resizeDelay:100,plugins: { legend: { labels: { font: { size: 10 }, color: '#1a1a2e' } } },
@@ -388,6 +443,9 @@ const sigmaChart = new Chart(sCtx,{
   }
 });
 
+// ===== State shared with animation =====
+let STATE = { K:1, Pcr:0, lam:0, sigCr:0, r:0, formula:'Euler', Papp:0, L:2 };
+
 function render(){
   syncValues();
   const K = parseFloat(document.getElementById('sel-end').value);
@@ -396,12 +454,14 @@ function render(){
   const{ I, A }= getSection();
   const L = parseFloat(document.getElementById('sl-L').value) * 1e-3;
   const Papp = parseFloat(document.getElementById('sl-P').value) * 1e3;
-  const{ Pcr, lam, lamC, formula }= calcPcr(E, sy, K, L, I, A);
+  const{ Pcr, lam, lamC, formula, sigCr }= calcPcr(E, sy, K, L, I, A);
   const FS = Pcr / Papp;
 
   document.getElementById('stat-Pcr').textContent = (Pcr/1e3).toFixed(1);
-  document.getElementById('stat-FS').textContent = FS.toFixed(2);
+  document.getElementById('stat-K').textContent = K.toFixed(2);
   document.getElementById('stat-lambda').textContent = lam.toFixed(1);
+  document.getElementById('stat-sigma').textContent = (sigCr/1e6).toFixed(1);
+  document.getElementById('stat-FS').textContent = FS.toFixed(2);
   document.getElementById('stat-formula').innerHTML =
     formula === 'Euler'
       ? '<span class="formula-tag euler-tag">Euler</span>'
@@ -417,25 +477,213 @@ function render(){
     const johnsonPcr = Math.max(0, A * sy * (1 - sy * lam2**2 / (4 * Math.PI**2 * E))) / 1e3;
     eulerL.push({ x: Lmm, y: Math.min(eulerPcr, 50000) });
     johnsonL.push({ x: Lmm, y: johnsonPcr });
-  }// Build sigma_cr vs lambda curves
+  }
+  // Build sigma_cr vs lambda curves (operating-point curve)
   const eulerSig = [], johnsonSig = [];
   for (let lv = 10; lv <= 300; lv += 2){
     const ePcr = Math.PI**2 * E / lv**2 / 1e6;
     const jSig = Math.max(0, sy * (1 - sy * lv**2 / (4 * Math.PI**2 * E))) / 1e6;
     if (ePcr < sy / 1e6 * 1.5) eulerSig.push({ x: lv, y: ePcr });
     johnsonSig.push({ x: lv, y: jSig });
-  }pcrChart.data.datasets[0].data = eulerL;
+  }
+  pcrChart.data.datasets[0].data = eulerL;
   pcrChart.data.datasets[1].data = johnsonL;
   pcrChart.data.datasets[2].data = [{ x: L*1e3, y: Pcr/1e3 }];
 
-  const currentSigma = Pcr / A / 1e6;
   sigmaChart.data.datasets[0].data = eulerSig;
   sigmaChart.data.datasets[1].data = johnsonSig;
-  sigmaChart.data.datasets[2].data = [{ x: lam, y: currentSigma }];
+  sigmaChart.data.datasets[2].data = [{ x: lam, y: sigCr/1e6 }];
 
   pcrChart.update('none');
   sigmaChart.update('none');
-}render();
+
+  // hand state to animation
+  STATE.K = K; STATE.Pcr = Pcr; STATE.lam = lam; STATE.sigCr = sigCr;
+  STATE.r = Math.sqrt(I/A); STATE.formula = formula; STATE.Papp = Papp; STATE.L = L;
+}
+
+// ===== Buckling animation =====
+const animCanvas = document.getElementById('buckleCanvas');
+const actx = animCanvas.getContext('2d');
+let aw = 0, ah = 0;
+const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let playing = !reduced;
+let loadFrac = 0;          // ramping axial load as fraction of Pcr (0..~1.1)
+let buckled = 0;           // 0..1 lateral bow amplitude (post-critical)
+
+function fitCanvas(){
+  const dpr = Math.max(1, Math.min(window.devicePixelRatio||1, 2));
+  const rect = animCanvas.getBoundingClientRect();
+  const cssW = Math.max(200, rect.width || animCanvas.clientWidth || 320);
+  const cssH = 300;
+  if (Math.abs(animCanvas.width - cssW*dpr) > 1 || Math.abs(animCanvas.height - cssH*dpr) > 1){
+    animCanvas.width = Math.round(cssW*dpr);
+    animCanvas.height = Math.round(cssH*dpr);
+    animCanvas.style.height = cssH + 'px';
+  }
+  actx.setTransform(dpr,0,0,dpr,0,0);
+  aw = cssW; ah = cssH;
+}
+
+// mode-shape lateral offset, t in 0..1 (0=top, 1=bottom), returns 0..1
+function modeShape(K, t){
+  if (K >= 1.9)  return Math.sin(Math.PI * t / 2);              // fixed-free: quarter sine (max at top)
+  if (K <= 0.55) return 0.5 * (1 - Math.cos(2*Math.PI*t));      // fixed-fixed: S, zero at both ends
+  if (K <= 0.75) return Math.sin(Math.PI * t) * (1 - 0.30*Math.cos(Math.PI*t)); // fixed-pin: skewed half sine
+  return Math.sin(Math.PI * t);                                 // pin-pin: half sine
+}
+
+function drawColumn(){
+  fitCanvas();
+  actx.clearRect(0,0,aw,ah);
+  const cx = aw * 0.5;
+  const topY = 40, botY = ah - 46;
+  const colH = botY - topY;
+  const maxBow = Math.min(aw*0.30, 90);
+
+  const overload = Math.max(0, loadFrac - 1);
+  const amp = buckled * maxBow * (1 + Math.min(overload,0.4));
+
+  // baseline (undeformed) ghost
+  actx.strokeStyle = 'rgba(108,117,125,.35)';
+  actx.lineWidth = 1.5;
+  actx.setLineDash([5,5]);
+  actx.beginPath(); actx.moveTo(cx, topY); actx.lineTo(cx, botY); actx.stroke();
+  actx.setLineDash([]);
+
+  // deformed column (mode shape)
+  const colColor = loadFrac >= 1 ? '#e63946' : (loadFrac > 0.85 ? '#f59e0b' : '#007BFF');
+  actx.strokeStyle = colColor;
+  actx.lineWidth = 7;
+  actx.lineCap = 'round';
+  actx.beginPath();
+  const N = 60;
+  for (let i=0;i<=N;i++){
+    const t = i/N;                 // 0 top .. 1 bottom
+    const off = fin(amp * modeShape(STATE.K, t), 0);
+    const yy = topY + t*colH;
+    const xx = fin(cx + off, cx);
+    if (i===0) actx.moveTo(xx, yy); else actx.lineTo(xx, yy);
+  }
+  actx.stroke();
+
+  // supports
+  drawSupports(cx, topY, botY);
+
+  // load arrow (top, pushing down); length grows with loadFrac
+  const arrowLen = 26 + 18*Math.min(loadFrac,1.1);
+  const ay0 = topY - 6 - arrowLen, ay1 = topY - 8;
+  actx.strokeStyle = colColor; actx.fillStyle = colColor; actx.lineWidth = 3;
+  actx.beginPath(); actx.moveTo(cx, ay0); actx.lineTo(cx, ay1); actx.stroke();
+  actx.beginPath();
+  actx.moveTo(cx, ay1+2); actx.lineTo(cx-6, ay1-8); actx.lineTo(cx+6, ay1-8); actx.closePath(); actx.fill();
+  actx.font = '12px monospace'; actx.fillStyle = colColor; actx.textAlign = 'center';
+  actx.fillText('P', cx+16, ay0+12);
+
+  // load vs Pcr gauge (bottom bar)
+  drawGauge();
+
+  // critical annotation
+  actx.textAlign = 'center';
+  actx.font = '600 13px sans-serif';
+  if (loadFrac >= 1){
+    actx.fillStyle = '#e63946';
+    actx.fillText(T.buckled + '  (P ≥ Pcr)', cx, 22);
+  } else {
+    actx.fillStyle = '#6c757d';
+    actx.fillText(T.stable + '  ' + (loadFrac*100).toFixed(0) + '% Pcr', cx, 22);
+  }
+}
+
+function drawSupports(cx, topY, botY){
+  actx.strokeStyle = '#1a1a2e'; actx.fillStyle = '#1a1a2e'; actx.lineWidth = 2;
+  const K = STATE.K;
+  // bottom support: fixed for K<=0.75 (fixed-fixed/fixed-pin/fixed-free), else pinned
+  if (K <= 0.75){
+    actx.fillRect(cx-26, botY, 52, 7);
+    hatch(cx-26, botY+7, 52);
+  } else {
+    pin(cx, botY, false);
+    hatch(cx-22, botY+12, 44);
+  }
+  // top support
+  if (K <= 0.55){           // fixed-fixed: fixed top
+    actx.fillRect(cx-26, topY-7, 52, 7);
+  } else if (K >= 1.9){     // fixed-free: free top (no support)
+  } else {                  // pin-pin / fixed-pin: pinned top
+    pin(cx, topY, true);
+  }
+}
+function pin(x, y, up){
+  actx.beginPath();
+  if (up){ actx.moveTo(x, y); actx.lineTo(x-9, y-12); actx.lineTo(x+9, y-12); }
+  else   { actx.moveTo(x, y); actx.lineTo(x-9, y+12); actx.lineTo(x+9, y+12); }
+  actx.closePath(); actx.stroke();
+}
+function hatch(x, y, w){
+  actx.strokeStyle = '#6c757d'; actx.lineWidth = 1;
+  for (let i=0;i<=w;i+=7){ actx.beginPath(); actx.moveTo(x+i, y); actx.lineTo(x+i-6, y+6); actx.stroke(); }
+  actx.strokeStyle = '#1a1a2e'; actx.lineWidth = 2;
+}
+function drawGauge(){
+  const gx = 14, gw = aw - 28, gy = ah - 18, gh = 9;
+  actx.fillStyle = '#e9ecef';
+  actx.fillRect(gx, gy, gw, gh);
+  const f = Math.min(loadFrac, 1.15) / 1.15;
+  const fw = fin(gw * f, 0);
+  actx.fillStyle = loadFrac>=1 ? '#e63946' : '#00B4D8';
+  actx.fillRect(gx, gy, fw, gh);
+  const mx = gx + gw * (1/1.15);
+  actx.strokeStyle = '#001F3F'; actx.lineWidth = 2;
+  actx.beginPath(); actx.moveTo(mx, gy-3); actx.lineTo(mx, gy+gh+3); actx.stroke();
+  actx.fillStyle = '#001F3F'; actx.font = '10px monospace'; actx.textAlign = 'left';
+  actx.fillText('Pcr', gx, gy-4);
+  actx.textAlign = 'right';
+  actx.fillText((Math.min(loadFrac,1.15)*100).toFixed(0)+'%  ('+(STATE.Papp/1e3).toFixed(0)+' / '+(STATE.Pcr/1e3).toFixed(0)+' kN)', gx+gw, gy-4);
+}
+
+function step(){
+  if (playing){
+    loadFrac += 0.006;
+    if (loadFrac > 1.23) loadFrac = 0;
+  }
+  // buckle amplitude engages past critical
+  const eng = loadFrac >= 1 ? Math.min(1, (loadFrac - 1) * 6 + 0.15) : 0;
+  buckled += (eng - buckled) * 0.12;
+  drawColumn();
+  raf = requestAnimationFrame(step);
+}
+let raf = null;
+
+document.getElementById('btn-play').addEventListener('click', () => {
+  playing = !playing;
+  document.getElementById('btn-play').innerHTML = playing
+    ? '<i class="fas fa-pause"></i> '+T.pause
+    : '<i class="fas fa-play"></i> '+T.play;
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  loadFrac = 0; buckled = 0;
+});
+
+// presets
+function applyPreset(K){
+  document.getElementById('sel-end').value = K;
+  loadFrac = 0; buckled = 0;
+  render();
+}
+document.getElementById('pre-pp').addEventListener('click', ()=>applyPreset('1.0'));
+document.getElementById('pre-ff').addEventListener('click', ()=>applyPreset('2.0'));
+document.getElementById('pre-cc').addEventListener('click', ()=>applyPreset('0.5'));
+
+window.addEventListener('resize', () => { fitCanvas(); });
+
+render();
+if (reduced){
+  loadFrac = 1.0; buckled = 1.0; drawColumn();
+} else {
+  raf = requestAnimationFrame(step);
+}
+
 </script>
 
 <section class="explanation">
@@ -496,6 +744,9 @@ function render(){
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="buckling-column.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -558,17 +809,27 @@ function render(){
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>H形鋼H-200×200×8×12（H300×200×8×16と混同しないよう注意）、柱高さ3000mm、両端ピン支持（K=1.0）の場合：断面二次半径r≈81mm、細長比λ=37となり、S400鋼（σy=400N/mm²、E=200GPa）ではオイラー式を適用、Pcr≈1650kNを得ます。設計荷重P=800kNに対し安全率FS=2.06を確保でき、圧縮応力は127N/mm²となります</p>
+<p>H形鋼H-200×200×8×12（H300×200×8×16と混同しないよう注意）、柱高さ3000mm、両端ピン支持（K=1.0）の場合：断面二次半径r≈86mm、細長比λ≈35となり、S400鋼（σy=400N/mm²、E=200GPa）では遷移細長比λc=π√(2E/σy)≈99を下回るためジョンソン式を適用、Pcr≈2330kNを得ます。設計荷重P=800kNに対し安全率FS≈2.91を確保でき、作用圧縮応力は約129N/mm²となります</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>細長比λ≈90をオイラー式とジョンソン式の切替値とし、λが小さい短柱ではジョンソン式で座屈荷重が過大評価されるため注意してください</li>
-<li>両端固定（K=0.65）と片持ち柱（K=2.0）では座屈荷重が大きく異なるため、実構造の拘束条件を正確に判定することが極めて重要です</li>
+<li>切替は遷移細長比λc=π√(2E/σy)（鋼S250で約126、S400で約99）で行い、λが小さい短柱でオイラー式を使うと座屈荷重を過大評価するため、短柱域ではジョンソン式を用いてください</li>
+<li>両端固定（K=0.5）と固定-自由・片持ち（K=2.0）では座屈荷重が大きく異なるため、実構造の拘束条件を正確に判定することが極めて重要です</li>
 <li>圧縮応力が降伏応力を超えると塑性変形が生じるため、座屈荷重がPcr=σy×A以下に制限されることを確認してください</li>
 <li>溶接部や初期不整がある実鋼材ではペリー・ロバートソン式など実験に基づく補正式採用も検討してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

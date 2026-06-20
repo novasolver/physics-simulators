@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "流量計算ツール",
       "description": "オリフィス・ベンチュリ・ピトー管・電磁流量計の4種類で体積流量・質量流量・流速・レイノルズ数をリアルタイム計算・比較するCAE流体解析ツール。",
       "url": "https://novasolver.jp/tools/flow-meter.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["オリフィス・ベンチュリ・ピトー管・電磁流量計の4種比較","水・油・空気の流体選択と物性値自動設定","Q vs ΔP曲線の4流量計同時プロット","レイノルズ数・質量流量・流速の計算"],
       "keywords": "流量計,オリフィス,ベンチュリ,ピトー管,電磁流量計,差圧,流量計算,CAE,流体力学",
       "datePublished": "2026-04-09",
@@ -209,7 +209,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
 <div id="fluidInfo" style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;line-height:1.6;"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -218,18 +226,22 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="stat-card"><div class="sv" id="rQ">—</div><div class="sl">Q (m³/s)</div></div>
       <div class="stat-card"><div class="sv" id="rQh">—</div><div class="sl">Q (m³/h)</div></div>
       <div class="stat-card"><div class="sv" id="rMdot">—</div><div class="sl">ṁ (kg/s)</div></div>
-      <div class="stat-card"><div class="sv" id="rV">—</div><div class="sl">V (m/s)</div></div>
+      <div class="stat-card"><div class="sv" id="rV">—</div><div class="sl">管内流速 V (m/s)</div></div>
+      <div class="stat-card"><div class="sv" id="rVt">—</div><div class="sl">絞り部流速 (m/s)</div></div>
       <div class="stat-card"><div class="sv" id="rRe">—</div><div class="sl">Re</div></div>
       <div class="stat-card"><div class="sv" id="rBeta">—</div><div class="sl">β = d/D</div></div>
+      <div class="stat-card"><div class="sv" id="rRead">—</div><div class="sl">計器出力</div></div>
     </div>
     </div>
 
     <div class="tab-bar">
-      <button class="tab active" onclick="setTab('chart')">Q vs ΔP 曲線（4流量計比較）</button>
+      <button class="tab active" onclick="setTab('flow')">流れアニメーション</button>
+      <button class="tab" onclick="setTab('chart')">Q vs ΔP 曲線（差圧式3流量計比較）</button>
       <button class="tab" onclick="setTab('sketch')">断面スケッチ</button>
     </div>
     <div class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 可視化</div><canvas class="ux-chartjs-canvas" id="chartCanvas" height="400"></canvas></div>
+      <div class="chart-card" id="flowCard"><div class="chart-title"><i class="fas fa-water"></i> リアルタイム流れ可視化</div><canvas id="flowCanvas" height="400"></canvas><p class="hint">粒子の速さ＝局所流速。絞り部（オリフィス／ベンチュリ）で連続の式により流れが加速します。差圧ΔP・流体・絞り径を変えると、即座に流速と計器出力が応答します。</p></div>
+      <div class="chart-card" id="chartCard" style="display:none"><div class="chart-title"><i class="fas fa-chart-line"></i> 可視化</div><canvas class="ux-chartjs-canvas" id="chartCanvas" height="400"></canvas><p class="hint">電磁流量計はΔP方式ではないため、この差圧スイープ曲線から除外しています。</p></div>
       <canvas id="sketchCanvas" height="400" style="display:none"></canvas>
     </div>
   
@@ -249,20 +261,27 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
+(function(){
+"use strict";
 
 const fluids = {
-  water: { rho: 998, mu: 1.002e-3, name: '水（20°C）', color: '#007BFF' },
+  water: { rho: 998, mu: 1.002e-3, name: '水（20°C）', color: '#4aa3ff' },
   oil:{ rho: 870, mu: 46e-3,    name: '油（40°C）', color: '#f39c12' },
-  air:{ rho: 1.204, mu: 1.813e-5, name: '空気（20°C）', color: '#00B4D8' }
+  air:{ rho: 1.204, mu: 1.813e-5, name: '空気（20°C）', color: '#9ad0ff' }
 };
 
-let currentTab = 'chart';
+const METER_LABELS = { orifice:'オリフィス', venturi:'ベンチュリ', pitot:'ピトー管', em:'電磁流量計' };
+
+let currentTab = 'flow';
 let myChart = null;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function setTab(tab){
   currentTab = tab;
-  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',['chart','sketch'][i]===tab));
-  document.getElementById('chartCanvas').style.display = tab==='chart'?'block':'none';
+  const tabs = ['flow','chart','sketch'];
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',tabs[i]===tab));
+  document.getElementById('flowCard').style.display = tab==='flow'?'block':'none';
+  document.getElementById('chartCard').style.display = tab==='chart'?'block':'none';
   document.getElementById('sketchCanvas').style.display = tab==='sketch'?'block':'none';
   update();
 }function setPct(el){
@@ -307,23 +326,37 @@ function setTab(tab){
   const cdMap ={ orifice: 0.61, venturi: 0.98, pitot: 1.0, em: 1.0 };
   const Cd = cdMap[mtype];
   const Q = calcQ(mtype, Cd, D_m, d_m, dP, fluid.rho);
-  const V = Q / A_pipe;
+  const V = Q / A_pipe;                       // pipe-average velocity (continuity)
+  // throat velocity: orifice/venturi -> V_pipe * A_pipe/A_throat = V/beta^2; pitot/em -> V
+  const Vthroat = (mtype==='orifice'||mtype==='venturi') ? V / (beta*beta) : V;
   const mdot = Q * fluid.rho;
   const nu = fluid.mu / fluid.rho;
   const Re = V * D_m / nu;
+
+  // meter reading / output string per type
+  let readStr;
+  if (mtype==='orifice'||mtype==='venturi') readStr = (dP/1000).toFixed(2)+' kPa';
+  else if (mtype==='pitot') readStr = (dP/1000).toFixed(2)+' kPa';
+  else readStr = (V*1.0).toFixed(3)+' mV/(B·D)'; // EMF ∝ V
 
   document.getElementById('rQ').textContent = Q.toExponential(3);
   document.getElementById('rQh').textContent = (Q * 3600).toFixed(2);
   document.getElementById('rMdot').textContent = mdot.toFixed(4);
   document.getElementById('rV').textContent = V.toFixed(3);
+  document.getElementById('rVt').textContent = Vthroat.toFixed(3);
   document.getElementById('rRe').textContent = Re >= 1e6 ? (Re/1e6).toFixed(2)+'M' : Re >= 1000 ? (Re/1000).toFixed(1)+'k' : Re.toFixed(0);
   document.getElementById('rBeta').textContent = beta.toFixed(3);
+  document.getElementById('rRead').textContent = readStr;
 
   document.getElementById('fluidInfo').textContent =
     fluid.name + '  ρ = ' + fluid.rho + ' kg/m³  μ = ' + fluid.mu.toExponential(2) + ' Pa·s';
 
+  // store live model for animation
+  MODEL = { mtype, fluid, D_mm, d_mm, dP, beta, V, Vthroat, Q, Re, color: fluid.color };
+
   if (currentTab === 'chart') drawChart(D_m, d_m, fluid, dP);
-  else drawSketch(mtype, D_mm, d_mm);
+  else if (currentTab === 'sketch') drawSketch(mtype, D_mm, d_mm);
+  // 'flow' tab is driven by the rAF loop reading MODEL
 }function drawChart(D_m, d_m, fluid, dPcurrent){
   const dpArr = [];
   const maxDP = 100000;
@@ -331,7 +364,7 @@ function setTab(tab){
   for (let i = 1; i <= steps; i++) dpArr.push(i * maxDP / steps);
 
   const datasets = [
-    { type:'orifice', cd:0.61, label:'オリフィス (Cd=0.61)', color:'#e74c3c' },{ type:'venturi', cd:0.98, label:'ベンチュリ (Cd=0.98)', color:'#007BFF' },{ type:'pitot',   cd:1.0,  label:'ピトー管',             color:'#00B4D8' },{ type:'em',      cd:1.0,  label:'電磁流量計',           color:'#2ecc71' }].map(m => ({
+    { type:'orifice', cd:0.61, label:'オリフィス (Cd=0.61)', color:'#e74c3c' },{ type:'venturi', cd:0.98, label:'ベンチュリ (Cd=0.98)', color:'#007BFF' },{ type:'pitot',   cd:1.0,  label:'ピトー管',             color:'#00B4D8' }].map(m => ({
     label: m.label,
     data: dpArr.map(dp => ({ x: dp/1000, y: calcQ(m.type, m.cd, D_m, d_m, dp, fluid.rho) * 3600 })),
     borderColor: m.color,
@@ -493,13 +526,196 @@ function setTab(tab){
   ctx.font = '12px Roboto Mono';
   ctx.textAlign = 'left';
   ctx.fillText('→ 流れ', px0 + 8, cy + 4);
-}window.addEventListener('load', () =>{
+}
+
+/* ===== Live flow animation ===== */
+let MODEL = null;
+const flowCanvas = document.getElementById('flowCanvas');
+const fctx = flowCanvas ? flowCanvas.getContext('2d') : null;
+let fCssW = 0, fCssH = 400;
+const PARTICLES = [];
+const N_PART = 150;
+let rafId = null, lastTs = 0;
+
+function geom(W, H){
+  const cy = H/2;
+  const Dpx = Math.min(H*0.34, 110);
+  const px0 = W*0.06, px1 = W*0.94;
+  return { cy, Dpx, px0, px1, len: px1-px0 };
+}
+// half pipe radius (px) as a function of x (px), narrowing through constriction
+function radiusAt(x, g, m){
+  const R = g.Dpx/2;
+  const rThroat = R * (m.d_mm / m.D_mm);
+  const cx = (g.px0+g.px1)/2;
+  if (m.mtype==='venturi'){
+    const x1=cx-g.len*0.16, x2=cx-g.len*0.05, x3=cx+g.len*0.05, x4=cx+g.len*0.22;
+    if (x<=x1||x>=x4) return R;
+    if (x<x2) return R + (rThroat-R)*((x-x1)/(x2-x1));
+    if (x<=x3) return rThroat;
+    return rThroat + (R-rThroat)*((x-x3)/(x4-x3));
+  } else if (m.mtype==='orifice'){
+    const plate=4;
+    if (x>cx-plate && x<cx+plate) return rThroat;       // sharp plate
+    if (x>=cx+plate && x<cx+g.len*0.10) return rThroat + (R-rThroat)*((x-(cx+plate))/(g.len*0.10-plate)); // jet contraction recovery
+    return R;
+  }
+  return R; // pitot / em : full bore
+}
+
+function initParticles(){
+  PARTICLES.length=0;
+  for (let i=0;i<N_PART;i++) PARTICLES.push({ x:Math.random(), yf:(Math.random()*2-1)*0.9 });
+}
+
+function resizeFlow(){
+  if (!flowCanvas) return;
+  const w = flowCanvas.parentElement.offsetWidth || 600;
+  fCssW = w; fCssH = 400;
+  const dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  flowCanvas.style.width = w+'px';
+  flowCanvas.style.height = fCssH+'px';
+  flowCanvas.width = Math.round(w*dpr);
+  flowCanvas.height = Math.round(fCssH*dpr);
+  fctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function renderFlow(dt){
+  if (!fctx || !MODEL) return;
+  const m = MODEL, W = fCssW, H = fCssH, g = geom(W,H);
+  fctx.clearRect(0,0,W,H);
+  fctx.fillStyle = '#071524'; fctx.fillRect(0,0,W,H);
+
+  // pipe body
+  fctx.fillStyle = 'rgba(255,255,255,0.03)';
+  fctx.fillRect(g.px0, g.cy-g.Dpx/2, g.len, g.Dpx);
+  // pipe walls
+  fctx.fillStyle = '#13314a';
+  fctx.fillRect(g.px0, g.cy-g.Dpx/2-7, g.len, 7);
+  fctx.fillRect(g.px0, g.cy+g.Dpx/2, g.len, 7);
+
+  // velocity scale: map pipe velocity to px/s for animation; clamp for visibility
+  const vRef = Math.max(0.05, m.V);
+  const baseSpeed = Math.min(420, 60 + m.V*42); // px/s at full bore
+
+  // draw the constriction outline
+  const cx=(g.px0+g.px1)/2;
+  fctx.strokeStyle = 'rgba(0,180,216,0.55)'; fctx.lineWidth=2;
+  if (m.mtype==='venturi'){
+    fctx.beginPath();
+    for (let s=0;s<=1;s+=0.02){ const x=g.px0+ (cx-g.px0)*2*s; const r=radiusAt(Math.min(x,g.px1),g,m); if(s===0)fctx.moveTo(x,g.cy-r); else fctx.lineTo(x,g.cy-r);} fctx.stroke();
+    fctx.beginPath();
+    for (let s=0;s<=1;s+=0.02){ const x=g.px0+ (cx-g.px0)*2*s; const r=radiusAt(Math.min(x,g.px1),g,m); if(s===0)fctx.moveTo(x,g.cy+r); else fctx.lineTo(x,g.cy+r);} fctx.stroke();
+  } else if (m.mtype==='orifice'){
+    const rT=(g.Dpx/2)*(m.d_mm/m.D_mm);
+    fctx.fillStyle='#1f6aa8';
+    fctx.fillRect(cx-4, g.cy-g.Dpx/2, 8, g.Dpx/2-rT);
+    fctx.fillRect(cx-4, g.cy+rT, 8, g.Dpx/2-rT);
+    // pressure taps
+    fctx.strokeStyle='#e74c3c'; fctx.lineWidth=1.5; fctx.setLineDash([4,3]);
+    fctx.beginPath(); fctx.moveTo(cx-46,g.cy-g.Dpx/2); fctx.lineTo(cx-46,g.cy-g.Dpx/2-22); fctx.stroke();
+    fctx.beginPath(); fctx.moveTo(cx+46,g.cy-g.Dpx/2); fctx.lineTo(cx+46,g.cy-g.Dpx/2-22); fctx.stroke();
+    fctx.setLineDash([]);
+    fctx.fillStyle='#e74c3c'; fctx.font='11px Roboto Mono'; fctx.textAlign='center';
+    fctx.fillText('P₁', cx-46, g.cy-g.Dpx/2-26); fctx.fillText('P₂', cx+46, g.cy-g.Dpx/2-26);
+  } else if (m.mtype==='pitot'){
+    fctx.strokeStyle='#2ecc71'; fctx.lineWidth=3;
+    fctx.beginPath(); fctx.moveTo(cx, g.cy-g.Dpx/2-7); fctx.lineTo(cx, g.cy); fctx.stroke();
+    fctx.beginPath(); fctx.arc(cx, g.cy, 5, 0, 7); fctx.fillStyle='#2ecc71'; fctx.fill();
+    fctx.fillStyle='#2ecc71'; fctx.font='11px Roboto Mono'; fctx.textAlign='center';
+    fctx.fillText('全圧孔', cx, g.cy-g.Dpx/2-12);
+  } else { // em
+    for (const sign of [-1,1]){
+      const ey=g.cy+sign*(g.Dpx/2+18);
+      fctx.strokeStyle='#f39c12'; fctx.lineWidth=2;
+      fctx.beginPath(); fctx.arc(cx, ey, 11, 0, 7); fctx.stroke();
+      fctx.fillStyle = sign<0?'#e74c3c':'#4aa3ff'; fctx.font='bold 13px sans-serif'; fctx.textAlign='center';
+      fctx.fillText(sign<0?'N':'S', cx, ey+5);
+    }
+    fctx.strokeStyle='rgba(243,156,18,0.45)'; fctx.lineWidth=1; fctx.setLineDash([4,4]);
+    for(let k=-2;k<=2;k++){ const yy=g.cy+k*g.Dpx*0.18; fctx.beginPath(); fctx.moveTo(cx-44,yy); fctx.lineTo(cx+44,yy); fctx.stroke(); }
+    fctx.setLineDash([]);
+  }
+
+  // particles
+  for (const p of PARTICLES){
+    const x = g.px0 + p.x*g.len;
+    const r = radiusAt(x, g, m);
+    const y = g.cy + p.yf*(r-2);
+    // local speed factor (continuity): speed ∝ (R/r)^2
+    const R = g.Dpx/2;
+    const localFactor = (R/Math.max(r,1))*(R/Math.max(r,1));
+    const localSpeed = baseSpeed * localFactor;
+    // color by speed (slow=blue, fast=cyan/white)
+    const t = Math.min(1, (localFactor-1)/3);
+    const col = t<0.5
+      ? 'rgba('+Math.round(74+t*2*40)+','+Math.round(163+t*2*40)+',255,0.85)'
+      : 'rgba(255,'+Math.round(255-(t-0.5)*2*40)+','+Math.round(255-(t-0.5)*2*120)+',0.95)';
+    fctx.fillStyle = col;
+    const len = Math.min(14, 3+localSpeed*0.018);
+    fctx.fillRect(x-len, y-1.1, len, 2.2);
+    if (!reduceMotion){
+      p.x += (localSpeed/g.len)*dt;
+      if (p.x>1){ p.x-=1; p.yf=(Math.random()*2-1)*0.9; }
+    }
+  }
+
+  // labels
+  fctx.fillStyle='rgba(255,255,255,0.85)'; fctx.font='12px Roboto Mono'; fctx.textAlign='left';
+  fctx.fillText('→ 流れ  '+METER_LABELS[m.mtype], g.px0+6, g.cy-g.Dpx/2-12);
+  fctx.fillStyle='rgba(255,255,255,0.55)'; fctx.font='11px Roboto Mono';
+  fctx.fillText('D='+m.D_mm+'mm', g.px0+6, g.cy+g.Dpx/2+22);
+  fctx.textAlign='right';
+  fctx.fillText('管内 V='+m.V.toFixed(2)+' m/s', g.px1-6, g.cy+g.Dpx/2+22);
+  if (m.mtype==='orifice'||m.mtype==='venturi'){
+    fctx.fillStyle='#7fe3ff';
+    fctx.fillText('絞り部 '+m.Vthroat.toFixed(2)+' m/s', g.px1-6, g.cy+g.Dpx/2+38);
+  } else if (m.mtype==='em'){
+    fctx.fillStyle='#f3c46b';
+    fctx.fillText('EMF ∝ V', g.px1-6, g.cy+g.Dpx/2+38);
+  }
+  // ΔP gauge bar
+  const gw=Math.min(160,W*0.32), gx=g.px0+6, gy=g.cy-g.Dpx/2-30;
+  if (m.mtype!=='em'){
+    fctx.fillStyle='rgba(255,255,255,0.12)'; fctx.fillRect(gx,gy,gw,6);
+    const frac=Math.min(1,m.dP/100000);
+    fctx.fillStyle='#ffd54a'; fctx.fillRect(gx,gy,gw*frac,6);
+    fctx.fillStyle='rgba(255,213,74,0.9)'; fctx.font='10px Roboto Mono'; fctx.textAlign='left';
+    fctx.fillText('ΔP '+(m.dP/1000).toFixed(1)+' kPa', gx, gy-3);
+  }
+}
+
+function loop(ts){
+  rafId = requestAnimationFrame(loop);
+  if (currentTab!=='flow'){ return; }
+  let dt = (ts-lastTs)/1000; lastTs = ts;
+  if (!isFinite(dt) || dt>0.05) dt = 0.016;
+  renderFlow(dt);
+}
+
+window.addEventListener('load', () =>{
   document.getElementById('sketchCanvas').width = document.getElementById('sketchCanvas').parentElement.offsetWidth;
+  resizeFlow();
+  initParticles();
   update();
+  if (fctx){
+    renderFlow(0.016);
+    if (!reduceMotion){ lastTs = performance.now(); rafId = requestAnimationFrame(loop); }
+  }
+  // expose for inline onchange/oninput handlers
+  window.update = update;
+  window.setTab = setTab;
 });
 window.addEventListener('resize', () =>{
+  resizeFlow();
   if (currentTab === 'sketch') update();
+  if (currentTab === 'flow' && reduceMotion) renderFlow(0.016);
 });
+
+// expose immediately for inline handlers that may fire before load
+window.update = update;
+window.setTab = setTab;
+})();
 </script>
 
 <section class="explanation">
@@ -554,12 +770,15 @@ window.addEventListener('resize', () =>{
 <h2>よくある誤解と注意点</h2>
 <div class="fblock">
 <p>このツールで遊んでいると、いくつか勘違いしやすいポイントがあるから、実務で使う前に頭に入れておこう。まず、<strong>「差圧ΔPが同じなら流量Qも同じ」と思いがちだけど、それは大きな間違い</strong>だ。流量係数 $C_d$ が大きく異なるからね。例えば、同じ配管(D=100mm)で水を流し、差圧を10kPaに設定した場合、オリフィス($C_d≈0.61$)とベンチュリ($C_d≈0.98$)では、計算上の流量は約1.6倍も違ってくる。ツールで切り替えて比べてみると、その差が一目瞭然だよ。</p>
-<p>次に、<strong>流体の選択を軽視しないこと</strong>。油を選んだ時に「なんで流量が水よりずっと少ないの？」と驚く人がいる。これは密度ρが式に入っているから。同じ差圧でも、密度が大きい（重い）流体ほど、加速しにくくなるんだ。例えば、密度が約800 kg/m³の油と、約1000 kg/m³の水では、理論的には流量が√(1000/800)≈1.12倍、水の方が多く流れる計算になる。空気（密度約1.2 kg/m³）ならその差はもっと劇的だ。</p>
+<p>次に、<strong>流体の選択を軽視しないこと</strong>。油を選んだ時に「なんで流量が水より少し多いの？」と気づく人がいる。これは密度ρが式に入っており、同じ差圧では密度が小さい流体ほど加速しやすいから。同じ差圧条件ではQ∝1/√ρなので、密度が約870 kg/m³の油は約998 kg/m³の水より理論上√(998/870)≈1.07倍多く流れる。空気（密度約1.2 kg/m³）ならその差はもっと劇的だ。</p>
 <p>最後に、<strong>このシミュレーションは「理想的な条件」での計算だということを忘れないで</strong>。実際の現場では、配管の入口形状や上流側の流れの乱れが流量係数に影響するし、流体の温度変化で粘度や密度も変わる。特にレイノルズ数が低い（粘性の影響が強い）領域では、$C_d$ は一定じゃなくなる。ツールの結果はあくまで「第一近似」。詳細な設計や計測には、各流量計のJISやISO規格に定められた詳細な補正式が必要になるんだ。</p>
 
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="flow-meter.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -621,7 +840,7 @@ window.addEventListener('resize', () =>{
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>配管径D=100mm、オリフィス径d=60mm（β=0.6）、水温20℃（ρ=998kg/m³、μ=1.002mPa·s）、差圧ΔP=50kPa条件では、理論流速V_理=√(2×50000/998)≈10.0m/sに対し、流量係数C=0.61を適用してQ=0.0283m³/s（101.9m³/h）、質量流量ṁ=28.3kg/s、レイノルズ数Re=596000となります。実配管での弁開度調整や配管内の絞りを模擬するに適した条件です。</p>
+<p>配管径D=100mm、オリフィス径d=60mm（β=0.6）、水温20℃（ρ=998kg/m³、μ=1.002mPa·s）、差圧ΔP=50kPa条件では、流量係数C=0.61を適用してQ=C·A_t√(2ΔP/(ρ(1-β⁴)))=0.0185m³/s（66.6m³/h）、質量流量ṁ=18.5kg/s、平均流速V=2.36m/s、レイノルズ数Re≈2.35×10⁵となります。実配管での弁開度調整や配管内の絞りを模擬するに適した条件です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -632,6 +851,16 @@ window.addEventListener('resize', () =>{
 <li>電磁流量計はRe>4000領域で精度±0.5%を保証するが、導電率σ&lt;5μS/cm の蒸留水やアルコール使用時は出力信号劣化のため直管部前後10D以上確保が必須</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

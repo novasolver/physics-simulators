@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "露点温度・相対湿度計算ツール",
       "description": "Magnus 近似で乾球温度と相対湿度から露点温度・湿球温度・水蒸気圧・絶対湿度をリアルタイムに計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/dew-point-rh.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Magnus 近似による飽和水蒸気圧の高精度計算","露点温度・湿球温度・水蒸気圧・絶対湿度の同時表示","RH 等値線付き e-T 図","SI / USCS 単位切替"],
       "keywords": "露点温度,相対湿度,Magnus式,湿球温度,水蒸気圧,絶対湿度,結露,空調,HVAC",
       "datePublished": "2026-05-16",
@@ -101,7 +101,16 @@
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#cv:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+.live-ro{ background:linear-gradient(135deg,#0a1628,#102a4c); border:1px solid rgba(0,180,216,.25); border-radius:10px; padding:10px 8px; text-align:center; }
+.live-ro .rv{ font-family:'Roboto Mono',monospace; font-size:1.1rem; font-weight:700; color:#fff; line-height:1.1; }
+.live-ro .rl{ font-size:0.62rem; color:rgba(255,255,255,.6); margin-top:4px; letter-spacing:.03em; }
+.live-ro.accent .rv{ color:#7CFFB2; }
+@media(max-width:600px){ .live-readouts{ grid-template-columns:repeat(2,1fr); } }
+.play-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+@media (prefers-reduced-motion: reduce){ .live-ro{ transition:none; } }
 </style>
 </head>
 <body>
@@ -169,9 +178,28 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">Magnus 係数 (a=17.62, b=243.12 °C) は WMO 推奨値。湿球温度は Stull 近似 (大気圧 1013 hPa 付近で精度約 ±0.3 °C) を使用。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roTd">—</div><div class="rl">露点 T_d [°C]</div></div>
+        <div class="live-ro"><div class="rv" id="roRH">—</div><div class="rl">相対湿度 RH [%]</div></div>
+        <div class="live-ro"><div class="rv" id="roE">—</div><div class="rl">水蒸気圧 e [hPa]</div></div>
+        <div class="live-ro"><div class="rv" id="roEs">—</div><div class="rl">飽和水蒸気圧 e_s [hPa]</div></div>
+      </div>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -183,9 +211,14 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-area"></i> 飽和曲線と RH 等値線（e-T 線図）</div>
-      <canvas id="cv"></canvas>
-      <p class="canvas-hint">青実線＝飽和水蒸気圧 e_s(T)／破線＝RH 等値線 (20/40/60/80 %)／赤丸＝現在の (T, e)／緑×＝露点位置 (T_d, e)</p>
+      <div class="chart-title"><i class="fas fa-film"></i> 空気を冷やすと露点で結露する（e-T 線図ライブ）</div>
+      <canvas id="cv" tabindex="0" role="img" aria-label="飽和水蒸気圧曲線と、空気を定圧で冷却して露点で結露するアニメーション"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnCool" onclick="toggleCool()"><i class="fas fa-snowflake"></i> 冷却アニメ</button>
+        <button class="btn secondary" type="button" onclick="resetCool()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <span style="font-size:.74rem;color:var(--muted);margin-left:auto" id="coolNote">青実線＝飽和 e_s(T)／黄線＝定圧冷却（e 一定）／緑●＝露点 T_d で結露開始</span>
+      </div>
+      <p class="canvas-hint">破線＝RH 等値線 (20/40/60/80 %)／赤丸＝現在の空気 (T, e)／青点＝冷却中のカーソル／緑●＝露点 (T_d, e) で水滴が発生</p>
     </div>
 
     <div class="chart-card">
@@ -207,32 +240,27 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Dew Point & RH (Magnus) Simulator ==========
+// ========== Dew Point & RH (Magnus) v2 Simulator ==========
+(function(){
+"use strict";
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
 
 var MAG_A = 17.62, MAG_B = 243.12;
+var Tmin = -10, Tmax = 50, emin = 0, emax = 80;
 
-function getParams() {
-  var T = parseFloat(document.getElementById('slT').value);
-  var RH = parseFloat(document.getElementById('slRH').value);
-  var p = parseFloat(document.getElementById('slP').value);
-  var unit = parseInt(document.getElementById('slUnit').value, 10) || 0;
-  return { T: T, RH: RH, p: p, unit: unit };
-}
-
-// physics
-function eSat(T) { return 6.112 * Math.exp(MAG_A * T / (MAG_B + T)); }
-function dewPoint(T, RH) {
+// ---- physics ----
+function eSat(T){ return 6.112 * Math.exp(MAG_A * T / (MAG_B + T)); }
+function dewPoint(T, RH){
   var rh = Math.max(RH, 0.01);
   var gamma = Math.log(rh / 100) + MAG_A * T / (MAG_B + T);
   return MAG_B * gamma / (MAG_A - gamma);
 }
-function humidityRatio(e, p) {
+function humidityRatio(e, p){
   if (p - e <= 0) return NaN;
   return 622 * e / (p - e);
 }
-function wetBulbStull(T, RH) {
+function wetBulbStull(T, RH){
   var rh = Math.max(RH, 0.01);
   return T * Math.atan(0.151977 * Math.sqrt(rh + 8.313659))
        + Math.atan(T + rh)
@@ -240,12 +268,27 @@ function wetBulbStull(T, RH) {
        + 0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh)
        - 4.686035;
 }
+function cToF(c){ return c * 9 / 5 + 32; }
+function hPaToInHg(h){ return h * 0.029530; }
 
-// unit conversion (°C -> °F, hPa -> inHg, g/kg unchanged)
-function cToF(c) { return c * 9 / 5 + 32; }
-function hPaToInHg(h) { return h * 0.029530; }
+function getParams(){
+  return {
+    T: parseFloat(document.getElementById('slT').value),
+    RH: parseFloat(document.getElementById('slRH').value),
+    p: parseFloat(document.getElementById('slP').value),
+    unit: parseInt(document.getElementById('slUnit').value, 10) || 0
+  };
+}
 
-function resizeCanvas() {
+// ---- animation state ----
+// cursorT = temperature of the cooling cursor (slides from T down to Td).
+var cursorT = 25, targetTd = 16.7, startT = 25;
+var cooling = false, condensed = false, animId = null;
+var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var drops = []; // condensation droplets {x,y,r,vy,life}
+
+// ---- HiDPI canvas ----
+function resizeCanvas(){
   var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
   var h = Math.round(w * 0.62);
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
@@ -258,110 +301,145 @@ function resizeCanvas() {
   cv.dataset.cssH = String(h);
 }
 
-function drawChart(p) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+function geom(){
+  var W = parseFloat(cv.dataset.cssW) || cv.width, H = parseFloat(cv.dataset.cssH) || cv.height;
   var mx = 56, my = 32;
   var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
-  var gw = x1 - x0, gh = y0 - y1;
-  // axis range: T in [-10, 50] °C, e in [0, 80] hPa
-  var Tmin = -10, Tmax = 50, emin = 0, emax = 80;
-  function tx(T) { return x0 + (T - Tmin) / (Tmax - Tmin) * gw; }
-  function ty(e) { return y0 - (e - emin) / (emax - emin) * gh; }
+  return {
+    W:W, H:H, x0:x0, x1:x1, y0:y0, y1:y1,
+    tx: function(T){ return x0 + (T - Tmin) / (Tmax - Tmin) * (x1 - x0); },
+    ty: function(e){ return y0 - (e - emin) / (emax - emin) * (y0 - y1); }
+  };
+}
 
-  // axes
+function drawAxes(g){
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, g.W, g.H);
   ctx.strokeStyle = 'rgba(143,184,224,0.5)';
   ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-  // grid + ticks
+  ctx.beginPath(); ctx.moveTo(g.x0, g.y0); ctx.lineTo(g.x1, g.y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(g.x0, g.y0); ctx.lineTo(g.x0, g.y1); ctx.stroke();
   ctx.fillStyle = '#8fb8e0';
   ctx.font = '10px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
-  for (var T = Tmin; T <= Tmax; T += 10) {
-    var gx = tx(T);
+  for (var T = Tmin; T <= Tmax; T += 10){
+    var gx = g.tx(T);
     ctx.strokeStyle = 'rgba(143,184,224,0.12)';
-    ctx.beginPath(); ctx.moveTo(gx, y1); ctx.lineTo(gx, y0); ctx.stroke();
-    ctx.fillText(T + '°C', gx, y0 + 13);
+    ctx.beginPath(); ctx.moveTo(gx, g.y1); ctx.lineTo(gx, g.y0); ctx.stroke();
+    ctx.fillStyle = '#8fb8e0';
+    ctx.fillText(T + '°C', gx, g.y0 + 13);
   }
   ctx.textAlign = 'right';
-  for (var e = 0; e <= emax; e += 20) {
-    var gy = ty(e);
+  for (var e = 0; e <= emax; e += 20){
+    var gy = g.ty(e);
     ctx.strokeStyle = 'rgba(143,184,224,0.12)';
-    ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x1, gy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(g.x0, gy); ctx.lineTo(g.x1, gy); ctx.stroke();
     ctx.fillStyle = '#8fb8e0';
-    ctx.fillText(e.toFixed(0), x0 - 4, gy + 3);
+    ctx.fillText(e.toFixed(0), g.x0 - 4, gy + 3);
   }
-
-  // RH iso-lines (20, 40, 60, 80 %)
-  var rhVals = [20, 40, 60, 80];
-  ctx.setLineDash([5, 4]);
-  ctx.lineWidth = 1.2;
-  rhVals.forEach(function (rh) {
-    ctx.strokeStyle = 'rgba(0,180,216,' + (0.3 + rh / 200) + ')';
-    ctx.beginPath();
-    var first = true;
-    for (var T = Tmin; T <= Tmax; T += 0.5) {
-      var e = rh / 100 * eSat(T);
-      if (e > emax) continue;
-      var X = tx(T), Y = ty(e);
-      if (first) { ctx.moveTo(X, Y); first = false; } else ctx.lineTo(X, Y);
-    }
-    ctx.stroke();
-    // label near right
-    var Tlbl = Tmax - 4;
-    var elbl = rh / 100 * eSat(Tlbl);
-    if (elbl <= emax) {
-      ctx.fillStyle = 'rgba(0,180,216,0.85)';
-      ctx.textAlign = 'left';
-      ctx.font = '10px "Roboto Mono",monospace';
-      ctx.fillText(rh + '%', tx(Tlbl) + 4, ty(elbl) + 3);
-    }
-  });
-  ctx.setLineDash([]);
-
-  // saturation curve e_s(T)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  var first2 = true;
-  for (var T2 = Tmin; T2 <= Tmax; T2 += 0.4) {
-    var es = eSat(T2);
-    if (es > emax) continue;
-    var X = tx(T2), Y = ty(es);
-    if (first2) { ctx.moveTo(X, Y); first2 = false; } else ctx.lineTo(X, Y);
-  }
-  ctx.stroke();
-  // saturation label
-  ctx.fillStyle = '#00B4D8';
-  ctx.font = 'bold 11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('e_s(T)  100%', tx(30) + 4, ty(eSat(30)) - 6);
-
-  // axis labels
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '11px "Noto Sans JP",sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('乾球温度 T (°C)', (x0 + x1) / 2, H - 8);
+  ctx.fillText('乾球温度 T (°C)', (g.x0 + g.x1) / 2, g.H - 8);
   ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
+  ctx.translate(14, (g.y0 + g.y1) / 2);
   ctx.rotate(-Math.PI / 2);
   ctx.fillText('水蒸気圧 e (hPa)', 0, 0);
   ctx.restore();
+}
 
-  // current state (T, e)
+function drawRHlines(g){
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 1.2;
+  [20, 40, 60, 80].forEach(function(rh){
+    ctx.strokeStyle = 'rgba(0,180,216,' + (0.3 + rh / 200) + ')';
+    ctx.beginPath();
+    var first = true;
+    for (var T = Tmin; T <= Tmax; T += 0.5){
+      var e = rh / 100 * eSat(T);
+      if (e > emax) continue;
+      var X = g.tx(T), Y = g.ty(e);
+      if (first){ ctx.moveTo(X, Y); first = false; } else ctx.lineTo(X, Y);
+    }
+    ctx.stroke();
+    var elbl = rh / 100 * eSat(Tmax - 4);
+    if (elbl <= emax){
+      ctx.fillStyle = 'rgba(0,180,216,0.85)';
+      ctx.textAlign = 'left';
+      ctx.font = '10px "Roboto Mono",monospace';
+      ctx.fillText(rh + '%', g.tx(Tmax - 4) + 4, g.ty(elbl) + 3);
+    }
+  });
+  ctx.setLineDash([]);
+}
+
+function drawSatCurve(g){
+  ctx.strokeStyle = '#00B4D8';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  var first = true;
+  for (var T = Tmin; T <= Tmax; T += 0.4){
+    var es = eSat(T);
+    if (es > emax) continue;
+    var X = g.tx(T), Y = g.ty(es);
+    if (first){ ctx.moveTo(X, Y); first = false; } else ctx.lineTo(X, Y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = '#00B4D8';
+  ctx.font = 'bold 11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('e_s(T) 飽和 100%', g.tx(31) + 4, g.ty(eSat(31)) - 6);
+}
+
+// draw the whole frame for given params
+function drawFrame(p){
+  var g = geom();
+  drawAxes(g);
+  drawRHlines(g);
+  drawSatCurve(g);
+
   var T = p.T, RH = p.RH;
   var es = eSat(T);
-  var eNow = RH / 100 * es;
-  if (T >= Tmin && T <= Tmax && eNow <= emax) {
-    var cx = tx(T), cy = ty(eNow);
-    // crosshair
-    ctx.strokeStyle = 'rgba(255,209,102,0.4)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(cx, y0); ctx.lineTo(cx, cy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x0, cy); ctx.lineTo(cx, cy); ctx.stroke();
-    // red dot
+  var eNow = RH / 100 * es;            // actual vapor pressure (constant during cooling)
+  var Td = dewPoint(T, RH);
+  if (eNow > emax) eNow = emax;
+
+  // constant vapor-pressure cooling line (e = eNow) from current T down to Td
+  if (isFinite(Td)){
+    ctx.strokeStyle = 'rgba(255,209,102,0.85)';
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(g.tx(Math.max(Td, Tmin)), g.ty(eNow));
+    ctx.lineTo(g.tx(T), g.ty(eNow));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,209,102,0.9)';
+    ctx.font = '10px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('定圧冷却 (e 一定)', (g.tx(T) + g.tx(Math.max(Td, Tmin))) / 2, g.ty(eNow) - 7);
+  }
+
+  // RH gap: vertical line from current point up to saturation curve at same T
+  if (T >= Tmin && T <= Tmax){
+    ctx.strokeStyle = 'rgba(0,180,216,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(g.tx(T), g.ty(eNow));
+    ctx.lineTo(g.tx(T), g.ty(Math.min(es, emax)));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // RH label mid-gap
+    ctx.fillStyle = 'rgba(0,180,216,0.95)';
+    ctx.font = 'bold 10px "Roboto Mono",monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('RH ' + RH.toFixed(0) + '%', g.tx(T) + 8, (g.ty(eNow) + g.ty(Math.min(es, emax))) / 2);
+  }
+
+  // current air state (red dot)
+  if (T >= Tmin && T <= Tmax){
+    var cx = g.tx(T), cy = g.ty(eNow);
     ctx.beginPath();
     ctx.arc(cx, cy, 7, 0, Math.PI * 2);
     ctx.fillStyle = '#e74c3c';
@@ -372,72 +450,209 @@ function drawChart(p) {
     ctx.fillStyle = '#cfe3f7';
     ctx.font = '11px "Roboto Mono",monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('(' + T.toFixed(1) + '°C, ' + eNow.toFixed(1) + ' hPa)', cx + 10, cy - 8);
+    ctx.fillText('現在 (' + T.toFixed(1) + '°C, ' + eNow.toFixed(1) + ' hPa)', cx + 10, cy - 8);
   }
 
-  // dew point on saturation curve at e = eNow
-  var Td = dewPoint(T, RH);
-  if (isFinite(Td) && Td >= Tmin && Td <= Tmax && eNow <= emax) {
-    var dx = tx(Td), dy = ty(eNow);
-    ctx.strokeStyle = '#7CFFB2';
-    ctx.lineWidth = 2;
-    var s = 7;
+  // dew point marker on saturation curve at e = eNow
+  if (isFinite(Td) && Td >= Tmin && Td <= Tmax){
+    var dx = g.tx(Td), dy = g.ty(eNow);
     ctx.beginPath();
-    ctx.moveTo(dx - s, dy - s); ctx.lineTo(dx + s, dy + s);
-    ctx.moveTo(dx + s, dy - s); ctx.lineTo(dx - s, dy + s);
-    ctx.stroke();
+    ctx.arc(dx, dy, 6.5, 0, Math.PI * 2);
+    ctx.fillStyle = condensed ? '#7CFFB2' : 'rgba(124,255,178,0.35)';
+    ctx.shadowColor = '#7CFFB2'; ctx.shadowBlur = condensed ? 12 : 0;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#7CFFB2'; ctx.lineWidth = 1.6; ctx.stroke();
     ctx.fillStyle = '#7CFFB2';
-    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.font = 'bold 11px "Roboto Mono",monospace';
     ctx.textAlign = 'right';
-    ctx.fillText('T_d = ' + Td.toFixed(1) + '°C', dx - 10, dy - 8);
+    ctx.fillText('露点 T_d = ' + Td.toFixed(1) + '°C', dx - 10, dy + 16);
+  }
+
+  // moving cooling cursor (slides along e=eNow from startT to Td)
+  if (cooling && isFinite(Td)){
+    var ccx = g.tx(cursorT), ccy = g.ty(eNow);
+    ctx.beginPath();
+    ctx.arc(ccx, ccy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#4aa3ff';
+    ctx.shadowColor = '#4aa3ff'; ctx.shadowBlur = 10;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#bcdcff';
+    ctx.font = '10px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('冷却中 ' + cursorT.toFixed(1) + '°C', ccx, ccy + 18);
+  }
+
+  // condensation droplets on a cooled surface band at the bottom-right
+  if (condensed){
+    var bx = g.x1 - 120, by = g.y1 + 4, bw = 104, bh = 26;
+    ctx.fillStyle = 'rgba(124,255,178,0.10)';
+    ctx.strokeStyle = 'rgba(124,255,178,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 5); else ctx.rect(bx, by, bw, bh);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#7CFFB2';
+    ctx.font = '9px "Noto Sans JP",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('結露面', bx + bw / 2, by + 11);
+    for (var i = 0; i < drops.length; i++){
+      var d = drops[i];
+      ctx.beginPath();
+      ctx.arc(bx + d.x, by + 14 + d.y, d.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(170,225,255,' + (0.5 + 0.4 * d.life) + ')';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 0.6; ctx.stroke();
+    }
   }
 }
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.T) || !isFinite(p.RH) || !isFinite(p.p)) return;
+// ---- live readouts (every frame) ----
+function updateReadouts(p){
+  var es = eSat(p.T);
+  var eNow = p.RH / 100 * es;
+  var Td = dewPoint(p.T, p.RH);
+  document.getElementById('roTd').textContent = isFinite(Td) ? Td.toFixed(1) : '0.0';
+  document.getElementById('roRH').textContent = p.RH.toFixed(0);
+  document.getElementById('roE').textContent  = isFinite(eNow) ? eNow.toFixed(2) : '0.00';
+  document.getElementById('roEs').textContent = isFinite(es) ? es.toFixed(2) : '0.00';
+}
+
+function updateStats(p){
   var es = eSat(p.T);
   var e = p.RH / 100 * es;
   var Td = dewPoint(p.T, p.RH);
   var Tw = wetBulbStull(p.T, p.RH);
   var w = humidityRatio(e, p.p);
-
   var statTd = document.getElementById('statTd');
   var statTw = document.getElementById('statTw');
   var statE = document.getElementById('statE');
   var statW = document.getElementById('statW');
-
-  if (p.unit === 1) {
-    // USCS: °F, inHg, gr/lb (grains per pound)
+  if (p.unit === 1){
     statTd.textContent = isFinite(Td) ? cToF(Td).toFixed(1) + ' °F' : '—';
     statTw.textContent = isFinite(Tw) ? cToF(Tw).toFixed(1) + ' °F' : '—';
-    statE.textContent = isFinite(e) ? hPaToInHg(e).toFixed(2) + ' inHg' : '—';
-    statW.textContent = isFinite(w) ? (w * 7).toFixed(1) + ' gr/lb' : '—';
+    statE.textContent  = isFinite(e) ? hPaToInHg(e).toFixed(2) + ' inHg' : '—';
+    statW.textContent  = isFinite(w) ? (w * 7).toFixed(1) + ' gr/lb' : '—';
   } else {
     statTd.textContent = isFinite(Td) ? Td.toFixed(2) + ' °C' : '—';
     statTw.textContent = isFinite(Tw) ? Tw.toFixed(1) + ' °C' : '—';
-    statE.textContent = isFinite(e) ? e.toFixed(2) + ' hPa' : '—';
-    statW.textContent = isFinite(w) ? w.toFixed(2) + ' g/kg' : '—';
+    statE.textContent  = isFinite(e) ? e.toFixed(2) + ' hPa' : '—';
+    statW.textContent  = isFinite(w) ? w.toFixed(2) + ' g/kg' : '—';
   }
-  drawChart(p);
 }
 
-function resetParams() {
-  var defs = { slT: 25, slRH: 60, slP: 1013, slUnit: 0 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slT'), 'slTVal', 1, '');
-  updateSlider(document.getElementById('slRH'), 'slRHVal', 0, '');
-  updateSlider(document.getElementById('slP'), 'slPVal', 0, '');
-  updateSlider(document.getElementById('slUnit'), 'slUnitVal', 0, '');
+function compute(){
+  var p = getParams();
+  if (!isFinite(p.T) || !isFinite(p.RH) || !isFinite(p.p)) return;
+  updateStats(p);
+  updateReadouts(p);
+  if (!cooling){
+    // keep cursor pinned to current air state when not animating
+    cursorT = p.T; startT = p.T; targetTd = dewPoint(p.T, p.RH); condensed = false; drops = [];
+  }
+  drawFrame(p);
+}
+
+// ---- cooling animation ----
+function spawnDrops(){
+  drops = [];
+  for (var i = 0; i < 8; i++){
+    drops.push({ x: 8 + Math.random() * 88, y: -2 - Math.random() * 6, r: 1.4 + Math.random() * 2.2, vy: 0.15 + Math.random() * 0.4, life: 0 });
+  }
+}
+
+function loop(){
+  if (!cooling){ animId = null; return; }
+  var p = getParams();
+  targetTd = dewPoint(p.T, p.RH);
+  // slide cursorT toward Td
+  var step = Math.max(0.06, (startT - targetTd) * 0.012);
+  if (cursorT > targetTd + 0.05){
+    cursorT -= step;
+    if (cursorT < targetTd) cursorT = targetTd;
+    condensed = false;
+  } else {
+    cursorT = targetTd;
+    if (!condensed){ condensed = true; spawnDrops(); }
+  }
+  // animate droplets growing/drifting on the surface band
+  if (condensed){
+    for (var i = 0; i < drops.length; i++){
+      var d = drops[i];
+      d.life = Math.min(1, d.life + 0.03);
+      if (d.r < 3.4) d.r += 0.02;
+      d.y += d.vy * 0.6;
+      if (d.y > 10){ d.y = -3; d.r = 1.4 + Math.random() * 1.5; d.life = 0; }
+    }
+  }
+  drawFrame(p);
+  updateReadouts(p);
+  // pause a moment after condensing, then restart the cooling sweep
+  if (condensed && drops.length && drops[0].life >= 1){
+    if (loop._hold === undefined) loop._hold = 0;
+    loop._hold++;
+    if (loop._hold > 90){ loop._hold = 0; cursorT = startT; condensed = false; }
+  }
+  animId = requestAnimationFrame(loop);
+}
+
+window.toggleCool = function(){
+  if (cooling){
+    cooling = false;
+    if (animId){ cancelAnimationFrame(animId); animId = null; }
+    document.getElementById('btnCool').innerHTML = '<i class="fas fa-snowflake"></i> 冷却アニメ';
+    document.getElementById('coolNote').textContent = '青実線＝飽和 e_s(T)／黄線＝定圧冷却（e 一定）／緑●＝露点 T_d で結露開始';
+    compute();
+  } else {
+    var p = getParams();
+    startT = p.T; cursorT = p.T; targetTd = dewPoint(p.T, p.RH);
+    condensed = false; loop._hold = 0;
+    if (prefersReduced){
+      // static: show fully condensed state, no animation loop
+      cursorT = targetTd; condensed = true; spawnDrops();
+      drawFrame(p); updateReadouts(p);
+      return;
+    }
+    cooling = true;
+    document.getElementById('btnCool').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    document.getElementById('coolNote').textContent = '空気を定圧で冷却中：青点が飽和曲線（緑●＝T_d）に達すると結露が始まります';
+    if (!animId) animId = requestAnimationFrame(loop);
+  }
+};
+
+window.resetCool = function(){
+  cooling = false;
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+  document.getElementById('btnCool').innerHTML = '<i class="fas fa-snowflake"></i> 冷却アニメ';
+  document.getElementById('coolNote').textContent = '青実線＝飽和 e_s(T)／黄線＝定圧冷却（e 一定）／緑●＝露点 T_d で結露開始';
+  condensed = false; drops = [];
   compute();
-}
+};
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+window.compute = compute;
+
+window.resetParams = function(){
+  var defs = { slT: 25, slRH: 60, slP: 1013, slUnit: 0 };
+  Object.keys(defs).forEach(function(id){ document.getElementById(id).value = defs[id]; });
+  if (typeof updateSlider === 'function'){
+    updateSlider(document.getElementById('slT'), 'slTVal', 1, '');
+    updateSlider(document.getElementById('slRH'), 'slRHVal', 0, '');
+    updateSlider(document.getElementById('slP'), 'slPVal', 0, '');
+    updateSlider(document.getElementById('slUnit'), 'slUnitVal', 0, '');
+  }
+  resetCool();
+};
+
+cv.addEventListener('keydown', function(e){
+  if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); window.toggleCool(); }
+});
+
+window.addEventListener('resize', function(){ resizeCanvas(); compute(); });
 
 resizeCanvas();
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -505,6 +720,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="dew-point-rh.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -560,23 +778,33 @@ compute();
 <ol>
 <li>乾球温度スライダーで現在の気温を設定します（例：25℃）</li>
 <li>相対湿度スライダーで空気の湿り具合を入力します（例：60%）</li>
-<li>気圧値を設定し、計算ボタンを押すと露点温度・湿球温度・水蒸気圧・含水量が即座に算出されます</li>
+<li>気圧値を設定し、値を変えると自動で露点温度・湿球温度・水蒸気圧・含水量が即座に再計算されます</li>
 <li>露点温度が表面温度より低い場合、その表面では結露が発生しません</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>冷凍倉庫の入口で乾球温度5℃、相対湿度85%、気圧101.325kPaを測定した場合、Magnus近似により露点温度は2.1℃、水蒸気圧は0.87kPa、絶対湿度は5.2g/kg(DA)と算出されます。壁面温度が0℃の場合、結露発生の危険があります。一方、室内25℃・相対湿度45%・気圧101.325kPaでは露点温度は13.8℃、水蒸気圧は1.41kPa、含水量は7.1g/kgとなり、結露リスクは低い環境です。</p>
+<p>冷凍倉庫の入口で乾球温度5℃、相対湿度85%、気圧101.325kPaを測定した場合、Magnus近似により露点温度は2.7℃、水蒸気圧は0.74kPa、絶対湿度は4.6g/kg(DA)と算出されます。壁面温度が0℃の場合、結露発生の危険があります。一方、室内25℃・相対湿度45%・気圧101.325kPaでは露点温度は12.2℃、水蒸気圧は1.41kPa、含水量は8.9g/kgとなり、結露リスクは低い環境です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
-<li>食品工場や医薬品製造では相対湿度を±5%以内で管理するため、露点温度の監視が必須です。露点-5℃管理では乾球温度20℃時の目標相対湿度は約34%になります</li>
+<li>食品工場や医薬品製造では相対湿度を±5%以内で管理するため、露点温度の監視が必須です。露点-5℃管理では乾球温度20℃時の目標相対湿度は約18%になります</li>
 <li>HVACシステム設計では、除湿装置の出口空気の露点を-10℃以下に設定することで表面結露を確実に防止できます</li>
-<li>Magnus係数（a=17.27、b=237.7℃）は0～60℃の範囲で精度±0.5℃です。極低温や高温領域では専用の相湿計算式を使用してください</li>
+<li>Magnus係数（a=17.62、b=243.12℃）は0～60℃の範囲で精度±0.5℃です。極低温や高温領域では専用の相湿計算式を使用してください</li>
 <li>結露判定時は壁材の熱容量を考慮し、測定点より低い部分の温度を確認することが重要です</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

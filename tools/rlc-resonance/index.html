@@ -43,7 +43,7 @@ window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "RLC回路共振シミュレーター",
       "description": "直列・並列RLC回路の共振周波数・インピーダンス・Q値・帯域幅をインタラクティブに解析。周波数特性とフェーザー図をリアルタイム表示。",
       "url": "https://novasolver.jp/tools/rlc-resonance.html",
@@ -53,7 +53,7 @@ window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["直列/並列RLC回路の切り替え","インピーダンス・電流の周波数特性グラフ（対数軸）","フェーザー図のリアルタイム表示","Q値・帯域幅・共振周波数の自動計算","AMラジオ・オーディオフィルター等のプリセット"],
       "keywords": "RLC回路,共振,インピーダンス,Q値,帯域幅,電気回路,AM受信機,同調回路",
       "datePublished": "2026-04-08",
@@ -146,6 +146,27 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 RLC animation additions ===== */
+#rlcAnimCanvas{border-radius:8px;background:#0a1628;display:block;width:100%;max-width:100%;outline:none}
+#rlcAnimCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.rlc-live{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+.rlc-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:8px 6px;text-align:center}
+.rlc-ro .rv{font-family:'Roboto Mono',monospace;font-size:0.92rem;font-weight:700;color:#fff;line-height:1.1}
+.rlc-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:3px;letter-spacing:.02em}
+.rlc-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.rlc-live{grid-template-columns:repeat(2,1fr)}}
+.rlc-anim-state{margin-top:6px;font-size:.82rem;font-weight:600;text-align:center;color:#2ecc71}
+.rlc-drive-row{display:flex;align-items:center;gap:12px;margin-top:12px}
+.rlc-drive-row input[type=range]{flex:1}
+.rlc-preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.rlc-play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+.rlc-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.rlc-legend span{display:inline-flex;align-items:center;gap:5px}
+.rlc-legend i.rlc-swatch{width:16px;height:3px;border-radius:2px;display:inline-block}
+@media (prefers-reduced-motion: reduce){.rlc-ro{transition:none}}
+
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/rlc-resonance.html">
@@ -231,6 +252,56 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 
   <div class="viz-panel" data-ux-visual-stage="off">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（駆動周波数 f）</div>
+      <div class="rlc-live">
+        <div class="rlc-ro accent"><div class="rv" id="roDriveF">—</div><div class="rl">駆動 f</div></div>
+        <div class="rlc-ro"><div class="rv" id="roF0">—</div><div class="rl">共振 f₀</div></div>
+        <div class="rlc-ro"><div class="rv" id="roZ">—</div><div class="rl">インピーダンス Z</div></div>
+        <div class="rlc-ro"><div class="rv" id="roI">—</div><div class="rl">電流 |I|</div></div>
+        <div class="rlc-ro"><div class="rv" id="roPhi">—</div><div class="rl">位相 φ</div></div>
+        <div class="rlc-ro"><div class="rv" id="roXL">—</div><div class="rl">X_L</div></div>
+        <div class="rlc-ro"><div class="rv" id="roXC">—</div><div class="rl">X_C</div></div>
+        <div class="rlc-ro"><div class="rv" id="roQ">—</div><div class="rl">Q値</div></div>
+        <div class="rlc-ro"><div class="rv" id="roBW">—</div><div class="rl">帯域幅 Δf</div></div>
+        <div class="rlc-ro"><div class="rv" id="roPF">—</div><div class="rl">力率 cosφ</div></div>
+      </div>
+      <div class="rlc-anim-state" id="rlcState">共振：φ≈0、|I|最大、Z=R</div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> リアルタイム・アニメーション（フェーザー＋波形）</div>
+      <div class="canvas-wrap">
+        <canvas id="rlcAnimCanvas" height="360" tabindex="0" role="img" aria-label="RLC回路の電源電圧と電流の交流波形、および回転フェーザー図のリアルタイムアニメーション"></canvas>
+      </div>
+      <div class="rlc-drive-row">
+        <label for="rlcDrive" style="font-size:.78rem;color:var(--muted);white-space:nowrap"><i class="fas fa-sliders-h"></i> 駆動周波数 f/f₀ = <span id="roDriveRatio" style="font-family:'Roboto Mono',monospace;color:var(--accent)">1.000×</span></label>
+        <input type="range" id="rlcDrive" min="0" max="100" value="50" step="0.5" oninput="rlcAnimDrive()" aria-label="駆動周波数（共振周波数比）">
+      </div>
+      <div class="rlc-preset-row">
+        <button class="preset-btn" type="button" onclick="rlcAnimPreset('atres')">共振点</button>
+        <button class="preset-btn" type="button" onclick="rlcAnimPreset('below')">共振以下（容量性）</button>
+        <button class="preset-btn" type="button" onclick="rlcAnimPreset('above')">共振以上（誘導性）</button>
+        <button class="preset-btn" type="button" onclick="applyPreset('am');rlcAnimPreset('highq')">高Q（鋭い）</button>
+        <button class="preset-btn" type="button" onclick="applyPreset('audio');rlcAnimPreset('lowq')">低Q（広帯域）</button>
+      </div>
+      <div class="rlc-play-row">
+        <button class="btn" type="button" id="rlcPlayBtn" onclick="rlcAnimToggle()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="rlcAnimReset()"><i class="fas fa-rotate-left"></i> リセット</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn rlc-speed-btn" type="button" data-speed="0.25" onclick="rlcAnimSpeed(0.25)">0.25×</button>
+          <button class="preset-btn rlc-speed-btn active" type="button" data-speed="1" onclick="rlcAnimSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn rlc-speed-btn" type="button" data-speed="2" onclick="rlcAnimSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="rlc-legend">
+        <span><i class="rlc-swatch" style="background:#ffffff"></i>V(t) 電源電圧</span>
+        <span><i class="rlc-swatch" style="background:#51cf66"></i>I(t) 電流</span>
+        <span><i class="rlc-swatch" style="background:#ff6b6b"></i>V_R</span>
+        <span><i class="rlc-swatch" style="background:#ffa94d"></i>V_L</span>
+        <span><i class="rlc-swatch" style="background:#74c0fc"></i>V_C</span>
+      </div>
+      <div class="chart-note"><strong>見方：</strong>駆動 f を f₀ に近づけると電流振幅がピークに達し、位相 φ→0 で電圧と電流が揃います（共振）。f₀ 以下は容量性（電流が進む）、f₀ 以上は誘導性（電流が遅れる）。</div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="statF0">—</div><div class="sl">共振周波数 f₀</div></div>
@@ -241,7 +312,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="chart-card rlc-frequency-card"><div class="chart-title"><i class="fas fa-chart-line"></i> インピーダンス・電流 vs 周波数（対数スケール）</div>
-          <canvas class="ux-chartjs-canvas" id="freqChart"></canvas>
+          <div class="canvas-wrap">
+            <canvas class="ux-chartjs-canvas" id="freqChart"></canvas>
+          </div>
           <div class="chart-note"><strong>見方：</strong>青線=|Z|（左軸）、赤線=|I|（右軸）、黄縦線=f₀、薄黄破線=半値幅（−3dB）周波数。</div>
         </div>
 
@@ -260,7 +333,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
           <div>位相角 φ = <span id="phaseAngle" style="font-family:monospace;color:var(--accent);">0.0°</span></div>
           <div style="margin-top:4px;">共振時 |I| = <span id="phasorI" style="font-family:monospace;color:var(--accent);">—</span></div>
           <div style="margin-top:4px;">共振時 |Z| = <span id="phasorZ" style="font-family:monospace;color:var(--accent);">—</span></div>
-          <div style="margin-top:4px;color:var(--muted);font-size:0.75rem;">直列共振: Z=R（最小）<br>並列共振: Z=Q²R（最大）</div>
+          <div style="margin-top:4px;color:var(--muted);font-size:0.75rem;">直列共振: Z=R（最小）<br>並列共振: Z=R（最大）</div>
         </div>
       </div>
     </div>
@@ -457,7 +530,7 @@ function buildData(){
   }
 }function updateStats(){
   const f0=getF0(), Q=getQ(), BW=getBW();
-  const Z0=circuitType==='series'?R:Q*Q*R;
+  const Z0=getZ(getF0());
   document.getElementById('statF0').textContent=fmtSI(f0,'Hz');
   document.getElementById('statQ').textContent=Q.toFixed(2);
   document.getElementById('statBW').textContent=fmtSI(BW,'Hz');
@@ -501,6 +574,205 @@ window.addEventListener('load',()=>{
 });
 </script>
 
+<script>window.__RLC_I18N__={play:'再生',pause:'一時停止',atRes:'共振：φ≈0、|I|最大、Z=R',below:'共振以下 — 容量性（電流が進む）',above:'共振以上 — 誘導性（電流が遅れる）',vWave:'V(t) 電源',iWave:'I(t) 電流'};</script>
+<script>
+/* ===== RLC v2 real-time animation (IIFE, prefix rlcAnim) ===== */
+(function(){
+  "use strict";
+  var LBL = window.__RLC_I18N__ || {};
+  function L(k,d){ return (LBL[k]!==undefined)?LBL[k]:d; }
+  function el(id){ return document.getElementById(id); }
+  function sR(){ return (typeof R==='number')?R:100; }
+  function sL(){ return (typeof L==='number')?L:0.01; }
+  function sC(){ return (typeof C==='number')?C:1e-5; }
+  function sVs(){ return (typeof Vs==='number')?Vs:5; }
+
+  var canvas=null, ctx=null, cssW=0, cssH=0;
+  var playing=false, animId=null, phase=0, lastTs=0, speed=1;
+  var driveRatio=1.0;
+  var reduced=false;
+
+  function f0(){ return (typeof getF0==='function')?getF0():1/(2*Math.PI*Math.sqrt(sL()*sC())); }
+  function driveF(){ return f0()*driveRatio; }
+  function Zmag(f){ return (typeof getZ==='function')?getZ(f):Math.sqrt(sR()*sR()); }
+  function phaseDeg(f){ return (typeof getPhase==='function')?getPhase(f):0; }
+
+  function metrics(){
+    var f=driveF(), w=2*Math.PI*f;
+    var XL=w*sL(), XC=w>0?1/(w*sC()):1e15;
+    var Z=Zmag(f), I=sVs()/Z;
+    var phi=phaseDeg(f)*Math.PI/180;
+    var Q=(typeof getQ==='function')?getQ():(1/sR())*Math.sqrt(sL()/sC());
+    var BW=(typeof getBW==='function')?getBW():f0()/Q;
+    return {f:f,w:w,XL:XL,XC:XC,Z:Z,I:I,phi:phi,Q:Q,BW:BW,f0:f0()};
+  }
+  function fmt(v,u){ return (typeof fmtSI==='function')?fmtSI(v,u):(v.toPrecision(3)+' '+u); }
+
+  function setReadouts(m){
+    var map={
+      roDriveF:fmt(m.f,'Hz'), roF0:fmt(m.f0,'Hz'),
+      roXL:fmt(m.XL,'Ω'), roXC:fmt(m.XC,'Ω'),
+      roZ:fmt(m.Z,'Ω'), roI:fmt(m.I,'A'),
+      roPhi:(m.phi*180/Math.PI).toFixed(1)+'°',
+      roQ:m.Q.toFixed(2), roBW:fmt(m.BW,'Hz'),
+      roPF:Math.cos(m.phi).toFixed(3)
+    };
+    for(var k in map){ var e=el(k); if(e) e.textContent=map[k]; }
+    var rf=el('roDriveRatio'); if(rf) rf.textContent=driveRatio.toFixed(3)+'×';
+    var st=el('rlcState');
+    if(st){
+      var dphi=m.phi*180/Math.PI;
+      if(Math.abs(dphi)<2){ st.textContent=L('atRes','At resonance: φ≈0, |I| max, Z=R'); st.style.color='#2ecc71'; }
+      else if(dphi<0){ st.textContent=L('below','Below f₀ — capacitive (current leads)'); st.style.color='#74c0fc'; }
+      else { st.textContent=L('above','Above f₀ — inductive (current lags)'); st.style.color='#ffa94d'; }
+    }
+  }
+
+  function resize(){
+    if(!canvas) return;
+    var rect=canvas.parentElement.getBoundingClientRect();
+    cssW=Math.max(280,Math.floor(rect.width-44));
+    cssH=360;
+    var dpr=Math.min(window.devicePixelRatio||1,2.5);
+    canvas.style.width=cssW+'px'; canvas.style.height=cssH+'px';
+    canvas.width=Math.round(cssW*dpr); canvas.height=Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  function arrow(cx,cy,x1,y1,x2,y2,color,lw){
+    ctx.save(); ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=lw||2.4;
+    ctx.beginPath(); ctx.moveTo(cx+x1,cy-y1); ctx.lineTo(cx+x2,cy-y2); ctx.stroke();
+    var ang=Math.atan2(y2-y1,x2-x1), aw=7;
+    ctx.beginPath(); ctx.moveTo(cx+x2,cy-y2);
+    ctx.lineTo(cx+x2-aw*Math.cos(ang-0.42),cy-(y2-aw*Math.sin(ang-0.42)));
+    ctx.lineTo(cx+x2-aw*Math.cos(ang+0.42),cy-(y2-aw*Math.sin(ang+0.42)));
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  function render(){
+    if(!canvas) return;
+    resize();
+    var W=cssW,H=cssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+    var m=metrics();
+    setReadouts(m);
+    var phW=Math.min(H, W*0.42);
+    var pcx=phW/2+8, pcy=H/2;
+    var prad=phW*0.34;
+    ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(8,pcy); ctx.lineTo(phW+8,pcy);
+    ctx.moveTo(pcx,pcy-prad*1.25); ctx.lineTo(pcx,pcy+prad*1.25); ctx.stroke();
+    ctx.beginPath(); ctx.arc(pcx,pcy,prad,0,7); ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.stroke();
+    var Vsrc=sVs(), I=m.I;
+    var VR=I*sR(), VL=I*m.XL, VC=I*m.XC;
+    var ref=Math.max(Vsrc,VR,VL,VC,1e-9);
+    var sc=prad/ref;
+    var a=phase;
+    var vsx=Math.cos(a), vsy=Math.sin(a);
+    var ia=a-m.phi;
+    var icx=Math.cos(ia), icy=Math.sin(ia);
+    var vrx=Math.cos(ia), vry=Math.sin(ia);
+    var vlx=Math.cos(ia+Math.PI/2), vly=Math.sin(ia+Math.PI/2);
+    var vcx=Math.cos(ia-Math.PI/2), vcy=Math.sin(ia-Math.PI/2);
+    arrow(pcx,pcy,0,0,VR*sc*vrx,VR*sc*vry,'#ff6b6b',2.6);
+    arrow(pcx,pcy,0,0,VL*sc*vlx,VL*sc*vly,'#ffa94d',2.2);
+    arrow(pcx,pcy,0,0,VC*sc*vcx,VC*sc*vcy,'#74c0fc',2.2);
+    arrow(pcx,pcy,0,0,Vsrc*sc*vsx,Vsrc*sc*vsy,'#ffffff',2.8);
+    var iMaxRef=sVs()/Math.max(sR(),1e-9);
+    var isc=prad/Math.max(iMaxRef,1e-9);
+    arrow(pcx,pcy,0,0,I*isc*icx,I*isc*icy,'#51cf66',2.6);
+    ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('φ='+(m.phi*180/Math.PI).toFixed(0)+'°', pcx, pcy+prad*1.25+14);
+    var wx0=phW+30, wx1=W-14, wW=wx1-wx0;
+    var wcy=H/2, wAmpV=H*0.30, wAmpI=H*0.30;
+    ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(wx0,wcy); ctx.lineTo(wx1,wcy); ctx.stroke();
+    var cycles=2, I0=m.I, Imaxref=sVs()/Math.max(sR(),1e-9);
+    ctx.lineWidth=2.2;
+    ctx.strokeStyle='#ffffff'; ctx.beginPath();
+    for(var i=0;i<=wW;i++){
+      var th=phase + (i/wW)*cycles*2*Math.PI;
+      var y=wcy - Math.sin(th)*wAmpV;
+      if(i===0) ctx.moveTo(wx0+i,y); else ctx.lineTo(wx0+i,y);
+    }
+    ctx.stroke();
+    ctx.strokeStyle='#51cf66'; ctx.beginPath();
+    var iScale=(I0/Math.max(Imaxref,1e-9));
+    for(var j=0;j<=wW;j++){
+      var th2=phase + (j/wW)*cycles*2*Math.PI;
+      var y2=wcy - Math.sin(th2 - m.phi)*wAmpI*iScale;
+      if(j===0) ctx.moveTo(wx0+j,y2); else ctx.lineTo(wx0+j,y2);
+    }
+    ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='11px "Noto Sans JP"'; ctx.textAlign='left';
+    ctx.fillText(L('vWave','V(t) source'), wx0, 16);
+    ctx.fillStyle='#51cf66';
+    ctx.fillText(L('iWave','I(t) current'), wx0, 30);
+    ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,0.6)';
+    ctx.fillText('f/f₀='+driveRatio.toFixed(2), wx1, 16);
+  }
+  function loop(ts){
+    if(!playing){ animId=null; return; }
+    if(!lastTs) lastTs=ts;
+    var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+    phase += dt*speed*2.4;
+    if(phase>1e6) phase=phase%(2*Math.PI);
+    render();
+    animId=requestAnimationFrame(loop);
+  }
+  function start(){
+    if(reduced){ render(); return; }
+    playing=true; lastTs=0;
+    var b=el('rlcPlayBtn'); if(b) b.innerHTML='<i class="fas fa-pause"></i> '+L('pause','Pause');
+    if(!animId) animId=requestAnimationFrame(loop);
+  }
+  function stop(){
+    playing=false; if(animId){ cancelAnimationFrame(animId); animId=null; }
+    var b=el('rlcPlayBtn'); if(b) b.innerHTML='<i class="fas fa-play"></i> '+L('play','Play');
+  }
+  window.rlcAnimToggle=function(){ playing?stop():start(); };
+  window.rlcAnimReset=function(){ phase=0; driveRatio=1.0; var s=el('rlcDrive'); if(s){ s.value='50'; } syncDriveSlider(); render(); };
+  window.rlcAnimSpeed=function(v){ speed=v; document.querySelectorAll('.rlc-speed-btn').forEach(function(b){
+      var on=parseFloat(b.dataset.speed)===v; b.classList.toggle('active',on);
+      b.style.borderColor=on?'var(--accent)':''; b.style.color=on?'var(--accent)':'';
+    }); };
+  function syncDriveSlider(){
+    var s=el('rlcDrive'); if(!s) return;
+    var v=parseFloat(s.value);
+    driveRatio=Math.exp(Math.log(0.2)+(Math.log(5)-Math.log(0.2))*v/100);
+    s.style.setProperty('--pct',v.toFixed(0)+'%');
+  }
+  window.rlcAnimDrive=function(){ syncDriveSlider(); render(); };
+  window.rlcAnimPreset=function(name){
+    var map={ atres:1.0, below:0.5, above:2.0, highq:1.0, lowq:1.0 };
+    var r=map[name]!==undefined?map[name]:1.0;
+    driveRatio=r;
+    var s=el('rlcDrive');
+    if(s){ var v=(Math.log(r)-Math.log(0.2))/(Math.log(5)-Math.log(0.2))*100; s.value=String(Math.max(0,Math.min(100,v))); s.style.setProperty('--pct',s.value+'%'); }
+    render();
+  };
+  function hook(){
+    var ids=['slR','slL','slC','slVs','slRNum','slLNum','slCNum','slVsNum'];
+    ids.forEach(function(id){ var e=el(id); if(e){ e.addEventListener('input',function(){ if(canvas) render(); }); } });
+    ['btnSeries','btnParallel'].forEach(function(id){ var e=el(id); if(e){ e.addEventListener('click',function(){ if(canvas) setTimeout(render,0); }); } });
+  }
+  function init(){
+    canvas=el('rlcAnimCanvas');
+    if(!canvas) return;
+    ctx=canvas.getContext('2d');
+    reduced=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    syncDriveSlider();
+    hook();
+    canvas.addEventListener('keydown',function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); window.rlcAnimToggle(); } });
+    window.addEventListener('resize',function(){ render(); });
+    render();
+    if(!reduced){ start(); }
+    else { var b=el('rlcPlayBtn'); if(b) b.innerHTML='<i class="fas fa-play"></i> '+L('play','Play'); }
+  }
+  if(document.readyState==='complete'||document.readyState==='interactive'){ setTimeout(init,60); }
+  else { window.addEventListener('load',function(){ setTimeout(init,60); }); }
+})();
+</script>
+
 <section class="explanation">
   <h2>RLC回路共振とは</h2>
   <div class="chat">
@@ -523,7 +795,44 @@ window.addEventListener('load',()=>{
       <div class="bub">例えば、隣り合った周波数の2つのラジオ局をきれいに分離するために使うんだ。帯域幅が狭い（Q値が高い）ほど、隣の局のノイズが入りにくくなる。逆にオーディオのイコライザーでは、ある程度広い帯域で音を調整したいから、意図的にQ値を低く設計する場合もある。下のタブで「フェーザー図」を見ると、共振時に電圧と電流の位相がどう揃うかもわかるよ。</div>
     </div>
   </div>
-  <h2>よくある質問</h2>
+  <h2>共振周波数とリアクタンス</h2>
+<div class="fblock">
+<p>RLC回路では、インダクタの<strong>誘導性リアクタンス $X_L=\omega L$</strong> とコンデンサの<strong>容量性リアクタンス $X_C=1/(\omega C)$</strong> が周波数で変化します。両者が等しくなる（$X_L=X_C$）周波数が<strong>共振周波数</strong>です。</p>
+<p style="text-align:center">$X_L=X_C \;\Rightarrow\; \omega_0=\dfrac{1}{\sqrt{LC}}, \qquad f_0=\dfrac{1}{2\pi\sqrt{LC}}$</p>
+<p>直列回路のインピーダンスは $Z=\sqrt{R^2+(X_L-X_C)^2}$ で、共振時はリアクタンス分が打ち消し合って<strong>$Z=R$（最小）</strong>になり、電流が最大になります。本シミュレーターは周波数を変えたときの $Z$・電流・位相の変化と共振点をリアルタイムに表示します。</p>
+</div>
+
+<h2>Q値（先鋭度）と帯域幅</h2>
+<div class="fblock">
+<p><strong>Q値</strong>は共振の鋭さ（選択度）を表す無次元量で、大きいほど鋭く狭帯域な共振になります。</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">量</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">式（直列）</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">意味</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">Q値</td><td style="border:1px solid #d0d7de;padding:6px 8px">$Q=\dfrac{\omega_0 L}{R}=\dfrac{1}{\omega_0 C R}=\dfrac{1}{R}\sqrt{\dfrac{L}{C}}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">共振の鋭さ・選択度</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">帯域幅 BW</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\mathrm{BW}=\dfrac{f_0}{Q}=\dfrac{R}{2\pi L}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">振幅が$1/\sqrt2$（−3dB）になる周波数幅</td></tr>
+</tbody>
+</table>
+</div>
+<p>$R$ が小さいほど Q値が高く帯域が狭くなります。AMラジオの同調回路では高いQ値で目的の放送局だけを選び出します。一方、広帯域が必要な用途では Q値を下げます。</p>
+</div>
+
+<h2>直列共振と並列共振の違い</h2>
+<div class="fblock">
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">項目</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">直列共振</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">並列共振（タンク回路）</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">共振時インピーダンス</td><td style="border:1px solid #d0d7de;padding:6px 8px">最小 $Z=R$</td><td style="border:1px solid #d0d7de;padding:6px 8px">最大</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">電流</td><td style="border:1px solid #d0d7de;padding:6px 8px">最大</td><td style="border:1px solid #d0d7de;padding:6px 8px">電源から見て最小</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">用途</td><td style="border:1px solid #d0d7de;padding:6px 8px">帯域通過・同調（特定周波数を通す）</td><td style="border:1px solid #d0d7de;padding:6px 8px">帯域阻止・発振（特定周波数を遮る／選ぶ）</td></tr>
+</tbody>
+</table>
+</div>
+<p>どちらも共振周波数は $f_0=1/(2\pi\sqrt{LC})$ で同じですが、インピーダンスと電流の振る舞いが逆になります。フィルタ設計では、通したい／遮りたいの目的に応じて直列・並列を使い分けます。</p>
+</div>
+
+<h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">Q値（クオリティファクター）とは何ですか？シミュレーター上でどのように確認できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -613,7 +922,7 @@ window.addEventListener('load',()=>{
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>AMラジオ同調回路での設定例：R=10Ω、L=100μH、C=10pFの直列RLC回路に10Vを印加した場合、共振周波数は約1.59MHzとなります。この時のQ値は約99.9、帯域幅は15.9kHzです。共振点でのインピーダンスは抵抗値10Ωまで低下し、電流は最大の1Aに達します。周波数が±7.95kHz離れると電流は0.707Aまで減少し、この幅が実用帯域幅となります。</p>
+<p>AMラジオ同調回路での設定例：R=10Ω、L=100μH、C=100pFの直列RLC回路に10Vを印加した場合、共振周波数は約1.59MHzとなります。この時のQ値は約99.9、帯域幅は15.9kHzです。共振点でのインピーダンスは抵抗値10Ωまで低下し、電流は最大の1Aに達します。周波数が±7.95kHz離れると電流は0.707Aまで減少し、この幅が実用帯域幅となります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>

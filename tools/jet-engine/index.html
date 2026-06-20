@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ジェットエンジン性能計算ツール",
       "description": "ブレイトンサイクルの熱効率・推進効率・比推力・TSFCをリアルタイム算出。T-s線図を状態点付きで可視化。",
       "url": "https://novasolver.jp/tools/jet-engine.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ブレイトンサイクル熱力学計算","T-s線図のリアルタイム描画","熱効率・推進効率の算出","TSFC（燃料消費率）計算"],
       "keywords": "ジェットエンジン,ブレイトンサイクル,ターボジェット,ターボファン,TSFC,比推力,熱効率,航空エンジン",
       "datePublished": "2026-04-08",
@@ -126,7 +126,8 @@ details.theory-box[open]>summary h3,details.theory-box[open]>summary h4{margin-b
 details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
-
+#engineCanvas{border-radius:8px;background:#0a1628;display:block;width:100%;max-width:100%}
+#engineCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/jet-engine.html">
@@ -192,7 +193,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
   <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -216,6 +225,17 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-fan"></i> エンジン断面アニメーション — 空気が圧縮・燃焼・膨張して推力に</div>
+      <canvas id="engineCanvas" height="300" role="img" aria-label="ジェットエンジンの断面アニメーション。吸気→圧縮→燃焼→タービン→ノズルへ流れる空気と温度・速度・推力を表示します。"></canvas>
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
+        <div class="stat-card"><div class="sv" id="roThrust">—</div><div class="sl">比推力 (N·s/kg)</div></div>
+        <div class="stat-card"><div class="sv" id="roVe">—</div><div class="sl">排気速度 Ve (m/s)</div></div>
+        <div class="stat-card"><div class="sv" id="roTmax">—</div><div class="sl">燃焼温度 T3 (K)</div></div>
+        <div class="stat-card"><div class="sv" id="roFuel">—</div><div class="sl">燃空比 f (g/kg)</div></div>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:8px">青＝低温の吸気が圧縮機で圧縮され（流れが絞られ昇温）、燃焼器で燃料が燃えて赤く膨張、タービンが軸を回し、ノズルで高速排気＝推力に。スライダーを動かすと即座に変化します。</div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> T-s 線図 (ブレイトンサイクル)</div><canvas class="ux-chartjs-canvas" id="tsChart"></canvas></div>
   
 
@@ -229,156 +249,338 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 </div>
 <script>
-const gam=1.4, cp=1005, R_air=287;
+window.__JET_L={cycleLabel:'ブレイトンサイクル',sAxis:'比エントロピー s (J/kg·K)',tAxis:'温度 T (K)',stateTip:['状態1: 吸気','状態2: 圧縮後','状態3: 燃焼後','状態4: 膨張後','排熱'],stateShort:['①吸気','②圧縮','③燃焼','④膨張','⑤排熱'],stages:['吸気','圧縮機','燃焼器','タービン','ノズル'],thrust:'推力',bypass:' バイパス'};
+(function(){
+"use strict";
+var L = window.__JET_L || {};
+var gam=1.4, cp=1005, R_air=287, LHV=43e6;
 
-let tsChart=null;
+function el(id){ return document.getElementById(id); }
+function num(id){ var e=el(id); return e?parseFloat(e.value):0; }
 
-function compute(){
-  const engType=document.getElementById('engineType').value;
-  const BPR=engType==='turbofan'?parseFloat(document.getElementById('bpr').value):0;
-  const pic=parseFloat(document.getElementById('pic').value);
-  const T3=parseFloat(document.getElementById('t3').value);
-  const etac=parseFloat(document.getElementById('etac').value);
-  const etat=parseFloat(document.getElementById('etat').value);
-  const M=parseFloat(document.getElementById('mach').value);
+/* ===== Brayton-cycle physics (shared model) ===== */
+function model(){
+  var engType = el('engineType').value;
+  var BPR = engType==='turbofan' ? num('bpr') : 0;
+  var pic = num('pic');
+  var T3  = num('t3');
+  var etac= num('etac');
+  var etat= num('etat');
+  var M   = num('mach');
 
-  // Ambient (altitude ~10km approx sea level for simplicity)
-  const T1=288.15*(1+(gam-1)/2*M*M)**(-1); // static temperature
-  const P1=101325;
+  var T1=288.15, P1=101325;
+  var Tstatic = 288.15*Math.pow(1+(gam-1)/2*M*M, -1);
+  var a0 = Math.sqrt(gam*R_air*Tstatic);
+  var V0 = M*a0;
 
   // State 2: after compressor (isentropic + efficiency)
-  const T2s=T1*pic**((gam-1)/gam);
-  const T2=T1+(T2s-T1)/etac;
+  var T2s = T1*Math.pow(pic,(gam-1)/gam);
+  var T2  = T1 + (T2s-T1)/etac;
+  // State 3: combustor exit (given)
+  var T3act = T3;
+  // State 4: after turbine (turbine drives compressor)
+  var Wc  = cp*(T2-T1);
+  var T4s = T3act/Math.pow(pic,(gam-1)/gam);
+  var T4  = T3act - etat*(T3act-T4s);
 
-  // State 3: after combustor
-  const T3act=T3; // given
+  // Core exhaust velocity from remaining enthalpy
+  var Ve = Math.sqrt(Math.max(0, 2*cp*(T4-T1)));
 
-  // State 4: after turbine
-  // Work balance: turbine drives compressor
-  const Wc=cp*(T2-T1);
-  const Wt_needed=Wc; // simplified ideal case
-  const T4=T3-Wt_needed/(etat*cp);
+  // Net specific work & efficiencies
+  var Wnet = cp*(T3act-T4) - Wc;
+  var Qin  = cp*(T3-T2);
+  var eta_th = Qin>0 ? Wnet/Qin : 0;
 
-  // State 4s (isentropic expansion)
-  const T4s=T3-Wt_needed/cp;
+  // Turbofan: core hot jet + slower fan stream
+  var coreThrust = Math.max(1e-6, Ve - V0);
+  var fanJetVelocity = V0 + 0.38*Math.max(0, Ve - V0);
+  var fanThrust = Math.max(0, fanJetVelocity - V0);
+  var thrustPerCoreFlow = engType==='turbofan' ? coreThrust + BPR*fanThrust : coreThrust;
+  var F_sp = engType==='turbofan' ? thrustPerCoreFlow/Math.max(1,1+BPR) : thrustPerCoreFlow;
+  var jetPower = 0.5*(Math.max(0,Ve*Ve - V0*V0) + (engType==='turbofan' ? BPR*Math.max(0,fanJetVelocity*fanJetVelocity - V0*V0) : 0));
+  var eta_p = jetPower>0 ? (thrustPerCoreFlow*V0)/jetPower : 0;
 
-  // Exhaust velocity
-  const Ve=Math.sqrt(2*cp*(T4-T1));
-  const V0=M*Math.sqrt(gam*R_air*T1);
+  var f = Qin/LHV;
+  var TSFC = f/Math.max(thrustPerCoreFlow,1e-6)*1e6;
 
-  // Net specific work
-  const Wnet=cp*(T3-T4)-cp*(T2-T1);
-  const Qin=cp*(T3-T2);
+  return {engType:engType,BPR:BPR,pic:pic,T1:T1,T2:T2,T3:T3act,T4:T4,
+    Ve:Ve,V0:V0,fanV:fanJetVelocity,eta_th:eta_th,eta_p:eta_p,F_sp:F_sp,TSFC:TSFC,f:f};
+}
 
-  const eta_th=Wnet/Qin;
+/* ===== state-card + live readout updates ===== */
+function setTxt(id,v){ var e=el(id); if(e) e.textContent=v; }
+function updateStats(m){
+  setTxt('etathVal',(m.eta_th*100).toFixed(1));
+  setTxt('etapVal', isFinite(m.eta_p)?(m.eta_p*100).toFixed(1):'0.0');
+  setTxt('spthVal', isFinite(m.F_sp)?m.F_sp.toFixed(0):'0');
+  setTxt('tsfcVal', isFinite(m.TSFC)?m.TSFC.toFixed(1):'0.0');
+  setTxt('roThrust', isFinite(m.F_sp)?m.F_sp.toFixed(0):'0');
+  setTxt('roVe', isFinite(m.Ve)?m.Ve.toFixed(0):'0');
+  setTxt('roTmax', m.T3.toFixed(0));
+  setTxt('roFuel', isFinite(m.f)?(m.f*1000).toFixed(1):'0.0');
+}
 
-  // Propulsive model. A turbofan splits flow into a hot core jet and a slower fan stream.
-  const coreThrust = Math.max(1e-6, Ve - V0);
-  const fanJetVelocity = V0 + 0.38 * Math.max(0, Ve - V0);
-  const fanThrust = Math.max(0, fanJetVelocity - V0);
-  const thrustPerCoreFlow = engType === 'turbofan' ? coreThrust + BPR * fanThrust : coreThrust;
-  const F_sp = engType === 'turbofan' ? thrustPerCoreFlow / Math.max(1, 1 + BPR) : thrustPerCoreFlow;
-  const jetPower = 0.5 * (Math.max(0, Ve*Ve - V0*V0) + (engType === 'turbofan' ? BPR * Math.max(0, fanJetVelocity*fanJetVelocity - V0*V0) : 0));
-  const eta_p = jetPower > 0 ? (thrustPerCoreFlow * V0) / jetPower : 0;
-
-  // Fuel-air ratio (simplified, LHV=43e6 J/kg)
-  const LHV=43e6;
-  const f=Qin/LHV;
-
-  // TSFC: fuel flow per total thrust generated by the core-plus-fan stream.
-  const TSFC=f/Math.max(thrustPerCoreFlow,1e-6)*1e6;
-
-  document.getElementById('etathVal').textContent=(eta_th*100).toFixed(1);
-  document.getElementById('etapVal').textContent=isFinite(eta_p)?(eta_p*100).toFixed(1):'—';
-  document.getElementById('spthVal').textContent=isFinite(F_sp)?F_sp.toFixed(0):'—';
-  document.getElementById('tsfcVal').textContent=isFinite(TSFC)?TSFC.toFixed(1):'—';
-
-  drawTsChart(T1,T2,T3,T4,pic,etac,etat);
-}function drawTsChart(T1,T2,T3,T4,pic,etac,etat){
-  // s values (relative, set s1=0)
-  const s1=0;
-  const s2=0; // isentropic compression → ideally same s, but with irreversibility
-  const ds_comp=cp*Math.log(T2/T1)-R_air*Math.log(pic); // entropy increase in compressor
-  const s2r=s1+Math.max(0,ds_comp);
-
-  const ds_comb=cp*Math.log(T3/T2); // combustion at const P
-  const s3=s2r+ds_comb;
-
-  const ds_exp=cp*Math.log(T4/T3); // expansion
-  const s4=s3+ds_exp;
-
-  // Build path points
-  const pts=[
-    {s:s1, T:T1, label:'1'},{s:s2r,T:T2, label:'2'},{s:s3, T:T3, label:'3'},{s:s4, T:T4, label:'4'},{s:s4, T:T1, label:'1\''},
-  ];
-
-  const data=pts.map(p=>({x:p.s,y:p.T}));
-
-  const ctx=document.getElementById('tsChart').getContext('2d');
-  if(tsChart)tsChart.destroy();
+/* ===== T-s chart (Chart.js) ===== */
+var tsChart=null;
+function drawTsChart(m){
+  if(typeof Chart==='undefined') return;
+  var c=el('tsChart'); if(!c) return;
+  var T1=m.T1,T2=m.T2,T3=m.T3,T4=m.T4,pic=m.pic;
+  var s1=0;
+  var ds_comp=cp*Math.log(T2/T1)-R_air*Math.log(pic);
+  var s2r=s1+Math.max(0,ds_comp);
+  var s3=s2r+cp*Math.log(T3/T2);
+  var s4=s3+cp*Math.log(T4/T3);
+  var data=[{x:s1,y:T1},{x:s2r,y:T2},{x:s3,y:T3},{x:s4,y:T4},{x:s4,y:T1}];
+  var ctx=c.getContext('2d');
+  if(tsChart) tsChart.destroy();
   tsChart=new Chart(ctx,{
     type:'line',
-    data:{
-      datasets:[
-        {
-          label:'ブレイトンサイクル',
-          data:data,
-          borderColor:'#007BFF',
-          backgroundColor:'rgba(0,123,255,0.1)',
-          fill:true,
-          tension:0.3,
-          pointRadius:8,
-          pointBackgroundColor:['#27ae60','#f39c12','#e74c3c','#9b59b6','#27ae60'],
-          pointBorderColor:'#fff',
-          pointBorderWidth:2,
-        }
-      ]
-    },
-    options:{
-      responsive:true,animation:false,
-      maintainAspectRatio:false,resizeDelay:100,
-      scales:{
-        x:{type:'linear',title:{display:true,text:'比エントロピー s (J/kg·K)'}},
-        y:{title:{display:true,text:'温度 T (K)'},min:Math.min(T1*0.9,200)}
-      },
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          callbacks:{
-            label:ctx=>{
-              const labels=['状態1: 吸気','状態2: 圧縮後','状態3: 燃焼後','状態4: 膨張後','排熱'];
-              return `${labels[ctx.dataIndex] || ''}: T=${ctx.parsed.y.toFixed(0)}K`;
-            }
-          }
-        }
-      }
-    },
-    plugins:[{
-      id:'stateLabels',
-      afterDatasetsDraw(chart){
-        const ctx=chart.ctx;
-        const labels=['①吸気','②圧縮','③燃焼','④膨張','⑤排熱'];
-        const colors=['#27ae60','#f39c12','#e74c3c','#9b59b6','#27ae60'];
-        chart.data.datasets[0].data.forEach((pt,i)=>{
-          const meta=chart.getDatasetMeta(0);
-          const el=meta.data[i];
-          if(el){
-            ctx.fillStyle=colors[i];
-            ctx.font='bold 12px Noto Sans JP,sans-serif';
-            ctx.textAlign='center';
-            ctx.fillText(labels[i]||'',el.x,el.y-14);
-          }
-        });
-      }
-    }]
+    data:{datasets:[{label:L.cycleLabel||'Brayton',data:data,borderColor:'#007BFF',
+      backgroundColor:'rgba(0,123,255,0.1)',fill:true,tension:0.3,pointRadius:7,
+      pointBackgroundColor:['#27ae60','#f39c12','#e74c3c','#9b59b6','#27ae60'],
+      pointBorderColor:'#fff',pointBorderWidth:2}]},
+    options:{responsive:true,animation:false,maintainAspectRatio:false,resizeDelay:100,
+      scales:{x:{type:'linear',title:{display:true,text:L.sAxis||'s (J/kg·K)'}},
+        y:{title:{display:true,text:L.tAxis||'T (K)'},min:Math.min(T1*0.9,200)}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){
+        var labs=L.stateTip||['1','2','3','4','5'];
+        return (labs[c.dataIndex]||'')+': T='+c.parsed.y.toFixed(0)+'K';}}}}},
+    plugins:[{id:'stateLabels',afterDatasetsDraw:function(chart){
+      var cx=chart.ctx, labs=L.stateShort||['1','2','3','4','5'],
+        cols=['#27ae60','#f39c12','#e74c3c','#9b59b6','#27ae60'];
+      chart.data.datasets[0].data.forEach(function(pt,i){
+        var elm=chart.getDatasetMeta(0).data[i];
+        if(elm){cx.fillStyle=cols[i];cx.font='bold 12px Noto Sans JP,sans-serif';
+          cx.textAlign='center';cx.fillText(labs[i]||'',elm.x,elm.y-14);}});}}]
   });
-}['bpr','pic','t3','etac','etat','mach'].forEach(id=>{
-  const el=document.getElementById(id);
-  if(!el)return;
-  const min=parseFloat(el.min),max=parseFloat(el.max),v=parseFloat(el.value);
-  el.style.setProperty('--pct',((v-min)/(max-min)*100).toFixed(1)+'%');
-});
-compute();
+}
+
+/* ===== Engine cutaway animation ===== */
+var cv=el('engineCanvas'), cx=cv?cv.getContext('2d'):null;
+var cssW=0,cssH=0, phase=0, raf=null, lastM=null;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function resize(){
+  if(!cv) return;
+  var rect=cv.parentElement.getBoundingClientRect();
+  cssW=Math.max(280,Math.floor(rect.width-44));
+  cssH=300;
+  var dpr=Math.min(window.devicePixelRatio||1,2.5);
+  cv.style.width=cssW+'px'; cv.style.height=cssH+'px';
+  cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
+  cx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+// map a normalized temperature (T1..T3) to a hot color
+function tempColor(t, a){
+  // t 0..1 cold->hot
+  var r,g,b;
+  if(t<0.5){ var u=t/0.5; r=40+u*60; g=90+u*120; b=200-u*120; }       // blue->teal/green
+  else { var u2=(t-0.5)/0.5; r=100+u2*200; g=210-u2*100; b=80-u2*70; } // green->orange/red
+  return 'rgba('+(r|0)+','+(g|0)+','+(b|0)+','+(a==null?1:a)+')';
+}
+
+// Engine geometry helper: returns top/bottom y of duct at fraction fx (0..1)
+function ductY(fx, H, cy){
+  // intake wide, compressor narrowing, combustor mid, turbine, nozzle flares out
+  var half;
+  if(fx<0.12) half=0.40;                                   // intake lip
+  else if(fx<0.40) half=0.40-(fx-0.12)/0.28*0.18;          // compressor squeeze -> 0.22
+  else if(fx<0.55) half=0.22+0.06*Math.sin((fx-0.40)/0.15*Math.PI); // combustor bulge
+  else if(fx<0.78) half=0.22-(fx-0.55)/0.23*0.04;          // turbine
+  else half=0.18+(fx-0.78)/0.22*0.16;                      // nozzle flare
+  var h=half*H;
+  return {top:cy-h, bot:cy+h, half:h};
+}
+
+function drawEngine(m){
+  if(!cx) return;
+  resize();
+  var W=cssW,H=cssH, cy=H*0.5;
+  cx.clearRect(0,0,W,H);
+  cx.fillStyle='#0a1628'; cx.fillRect(0,0,W,H);
+
+  var padL=14, padR=14;
+  var x0=padL, x1=W-padR, span=x1-x0;
+  function X(fx){ return x0+fx*span; }
+
+  // stage boundary fractions
+  var fIntake=0.12, fComp=0.40, fComb=0.55, fTurb=0.78, fNoz=1.0;
+
+  // normalized temps for color along stages (T1..T3)
+  var Tn = function(T){ return Math.max(0,Math.min(1,(T-m.T1)/Math.max(1,(m.T3-m.T1)))); };
+
+  // ---- duct fill: colored bands by stage temperature ----
+  var NB=64;
+  for(var i=0;i<NB;i++){
+    var fa=i/NB, fb=(i+1)/NB;
+    var fxm=(fa+fb)/2;
+    // temperature profile through engine
+    var T;
+    if(fxm<fComp) T=m.T1+(m.T2-m.T1)*(fxm/fComp);
+    else if(fxm<fComb) T=m.T2+(m.T3-m.T2)*((fxm-fComp)/(fComb-fComp));
+    else if(fxm<fTurb) T=m.T3-(m.T3-m.T4)*((fxm-fComb)/(fTurb-fComb));
+    else T=m.T4-(m.T4-Math.max(m.T1,m.T4*0.85))*((fxm-fTurb)/(fNoz-fTurb));
+    var ya=ductY(fa,H,cy), yb=ductY(fb,H,cy);
+    cx.fillStyle=tempColor(Tn(T),0.85);
+    cx.beginPath();
+    cx.moveTo(X(fa),ya.top); cx.lineTo(X(fb),yb.top);
+    cx.lineTo(X(fb),yb.bot); cx.lineTo(X(fa),ya.bot); cx.closePath(); cx.fill();
+  }
+
+  // ---- combustor flame flare (animated flicker) ----
+  var flick=0.5+0.5*Math.sin(phase*0.9)+0.15*Math.sin(phase*3.3);
+  var fcx=X((fComb+fTurb)/2);
+  var fy=ductY((fComb+fTurb)/2,H,cy);
+  var fgrad=cx.createRadialGradient(X(fComb),cy,2,X(fComb),cy,span*0.16);
+  fgrad.addColorStop(0,'rgba(255,240,180,'+(0.85*flick).toFixed(2)+')');
+  fgrad.addColorStop(0.4,'rgba(255,140,30,'+(0.7*flick).toFixed(2)+')');
+  fgrad.addColorStop(1,'rgba(220,40,10,0)');
+  cx.fillStyle=fgrad;
+  cx.fillRect(X(fComp), fy.top, span*(fTurb-fComp), fy.bot-fy.top);
+
+  // ---- moving flow particles ----
+  var nP=70;
+  var sp = 0.0008 + 0.0016*(m.Ve/600);  // base speed scaled by exhaust velocity
+  for(var p=0;p<nP;p++){
+    var seed=p*0.137;
+    var prog=((phase*sp*1000 + seed*7) % 1);
+    // particles accelerate after combustor (flow speeds up toward nozzle)
+    var fxp=prog;
+    var yy=ductY(fxp,H,cy);
+    var lane=((p*2654435761)>>>0)/4294967295; // 0..1 stable per particle
+    var py=yy.top+6 + lane*(yy.bot-yy.top-12);
+    var T;
+    if(fxp<fComp) T=m.T1+(m.T2-m.T1)*(fxp/fComp);
+    else if(fxp<fComb) T=m.T2+(m.T3-m.T2)*((fxp-fComp)/(fComb-fComp));
+    else if(fxp<fTurb) T=m.T3;
+    else T=m.T4;
+    // speed visual: longer streaks where faster (nozzle)
+    var streak = fxp>fTurb ? 12 : (fxp<fComp?4:6);
+    cx.strokeStyle=tempColor(Tn(T),0.9);
+    cx.lineWidth=1.6;
+    cx.beginPath();
+    cx.moveTo(X(fxp),py); cx.lineTo(X(Math.min(1,fxp+streak/span)),py); cx.stroke();
+  }
+
+  // ---- rotating shaft + compressor/turbine blades ----
+  var rot = reduceMotion ? 0.6 : phase*1.4;
+  // shaft line
+  cx.strokeStyle='rgba(180,200,220,0.5)'; cx.lineWidth=3;
+  cx.beginPath(); cx.moveTo(X(0.12),cy); cx.lineTo(X(0.80),cy); cx.stroke();
+  // compressor disks (3) and turbine disks (2)
+  function disk(fx, n, baseHalf, col){
+    var yy=ductY(fx,H,cy);
+    var h=yy.half*0.92;
+    var ph2=rot;
+    cx.strokeStyle=col; cx.lineWidth=2;
+    for(var k=0;k<n;k++){
+      var ang=ph2 + k*Math.PI/n;
+      var dy=Math.sin(ang)*h;
+      cx.beginPath();
+      cx.moveTo(X(fx), cy-dy*0.18 - 0); // give slight skew so rotation reads
+      cx.lineTo(X(fx), cy-dy);
+      cx.moveTo(X(fx), cy+dy*0.18);
+      cx.lineTo(X(fx), cy+dy);
+      cx.stroke();
+    }
+  }
+  var ci;
+  for(ci=0;ci<3;ci++) disk(0.16+ci*0.07, 7, 0, 'rgba(150,190,230,0.85)');
+  for(ci=0;ci<2;ci++) disk(0.60+ci*0.07, 7, 0, 'rgba(255,180,120,0.9)');
+
+  // ---- duct outline ----
+  cx.strokeStyle='rgba(200,220,240,0.55)'; cx.lineWidth=2;
+  cx.beginPath();
+  var fx;
+  for(fx=0; fx<=1.0001; fx+=0.02){ var y=ductY(fx,H,cy); if(fx===0)cx.moveTo(X(fx),y.top); else cx.lineTo(X(fx),y.top); }
+  cx.stroke();
+  cx.beginPath();
+  for(fx=0; fx<=1.0001; fx+=0.02){ var y2=ductY(fx,H,cy); if(fx===0)cx.moveTo(X(fx),y2.bot); else cx.lineTo(X(fx),y2.bot); }
+  cx.stroke();
+
+  // ---- intake inflow arrow ----
+  drawArrow(X(0.0)-2, cy, X(0.0)+18, cy, 'rgba(120,200,255,0.9)', 2.4);
+
+  // ---- exhaust thrust arrow (length ∝ specific thrust) ----
+  var thrLen = Math.min(span*0.22, 30+ (m.F_sp/300)*span*0.16);
+  var ny=ductY(1,H,cy);
+  drawArrow(X(1.0)-4, cy, X(1.0)-4+thrLen, cy, '#ff5a3c', 4.5);
+  cx.fillStyle='#ff5a3c'; cx.font='bold 12px Noto Sans JP,sans-serif'; cx.textAlign='left';
+  cx.fillText((L.thrust||'Thrust')+' '+m.F_sp.toFixed(0)+' N·s/kg', X(1.0)-4, cy-ny.half-6);
+
+  // ---- exhaust hot plume ----
+  var pg=cx.createLinearGradient(X(1.0),0,X(1.0)+thrLen+20,0);
+  pg.addColorStop(0,'rgba(255,160,40,0.55)'); pg.addColorStop(1,'rgba(255,80,30,0)');
+  cx.fillStyle=pg;
+  cx.beginPath();
+  cx.moveTo(X(1.0),ny.top); cx.lineTo(X(1.0)+thrLen+24,cy-4); cx.lineTo(X(1.0)+thrLen+24,cy+4); cx.lineTo(X(1.0),ny.bot); cx.closePath(); cx.fill();
+
+  // ---- stage labels ----
+  cx.font='bold 10px Noto Sans JP,sans-serif'; cx.textAlign='center';
+  var stages=L.stages||['Intake','Compressor','Combustor','Turbine','Nozzle'];
+  var sxc=[0.06,0.27,0.475,0.69,0.90];
+  cx.fillStyle='rgba(255,255,255,0.85)';
+  for(var s=0;s<5;s++){ cx.fillText(stages[s], X(sxc[s]), 16); }
+
+  // bypass fan indicator for turbofan
+  if(m.engType==='turbofan' && m.BPR>0){
+    cx.strokeStyle='rgba(120,200,255,0.45)'; cx.lineWidth=2; cx.setLineDash([4,4]);
+    var by=ductY(0.12,H,cy);
+    cx.beginPath(); cx.moveTo(X(0.12),by.top); cx.lineTo(X(0.97),cy-ny.half-12); cx.stroke();
+    cx.beginPath(); cx.moveTo(X(0.12),by.bot); cx.lineTo(X(0.97),cy+ny.half+12); cx.stroke();
+    cx.setLineDash([]);
+    cx.fillStyle='rgba(150,210,255,0.85)'; cx.font='10px Noto Sans JP,sans-serif'; cx.textAlign='right';
+    cx.fillText('BPR '+m.BPR.toFixed(1)+(L.bypass||' bypass'), X(0.97), cy-ny.half-16);
+  }
+  cx.textAlign='left';
+}
+
+function drawArrow(x0,y0,x1,y1,color,width){
+  cx.strokeStyle=color; cx.lineWidth=width; cx.fillStyle=color;
+  cx.beginPath(); cx.moveTo(x0,y0); cx.lineTo(x1,y1); cx.stroke();
+  var ang=Math.atan2(y1-y0,x1-x0), h=6+width;
+  cx.beginPath(); cx.moveTo(x1,y1);
+  cx.lineTo(x1-h*Math.cos(ang-0.45),y1-h*Math.sin(ang-0.45));
+  cx.lineTo(x1-h*Math.cos(ang+0.45),y1-h*Math.sin(ang+0.45));
+  cx.closePath(); cx.fill();
+}
+
+/* ===== loop ===== */
+function frame(){
+  phase += 0.045;
+  if(lastM) drawEngine(lastM);
+  raf=requestAnimationFrame(frame);
+}
+
+function recompute(){
+  var m=model();
+  lastM=m;
+  updateStats(m);
+  drawTsChart(m);
+  if(reduceMotion && cx) drawEngine(m); // single static frame
+}
+window.compute = recompute; // keep inline onchange handlers working
+
+function syncSlider(e){
+  var min=parseFloat(e.min),max=parseFloat(e.max),v=parseFloat(e.value);
+  e.style.setProperty('--pct',((v-min)/(max-min)*100).toFixed(1)+'%');
+}
+
+function init(){
+  ['bpr','pic','t3','etac','etat','mach'].forEach(function(id){
+    var e=el(id); if(!e) return;
+    syncSlider(e);
+    e.addEventListener('input',function(){ syncSlider(e); recompute(); });
+  });
+  var et=el('engineType'); if(et) et.addEventListener('change',recompute);
+  recompute();
+  if(!reduceMotion && cx){ raf=requestAnimationFrame(frame); }
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+else init();
+})();
 </script>
 
 <section class="explanation">
@@ -438,6 +640,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 
 <!-- codex-static-related-tools:start -->
@@ -510,6 +715,16 @@ compute();
 <li>バイパス比を大幅に増加させると推進効率は向上しますが、エンジン重量とフロントファン径が増大し、実装上の制約が生じます。民間輸送機ではBPR=10前後が最適値です。</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

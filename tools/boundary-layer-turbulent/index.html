@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "乱流境界層シミュレーター",
       "description": "平板上の乱流境界層を1/7乗則で扱い、流速・位置・動粘度・密度から境界層厚さ・摩擦係数・壁面せん断応力をリアルタイムに計算・可視化する教育用シミュレーター。Blasius層流解との対比も表示。",
       "url": "https://novasolver.jp/tools/boundary-layer-turbulent.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["1/7乗則による乱流境界層厚さの計算","局所摩擦係数と壁面せん断応力","Blasius層流解との比較","層流と乱流の速度プロファイル可視化"],
       "keywords": "乱流境界層,1/7乗則,Blasius,摩擦係数,壁面せん断応力,Reynolds数,平板,境界層厚さ",
       "datePublished": "2026-05-16",
@@ -104,6 +104,18 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
 .warn-box{ background:rgba(231,76,60,.08); border:1px solid rgba(231,76,60,.3); color:#c0392b; border-radius:8px; padding:8px 12px; font-size:0.8rem; margin-top:10px; display:none; }
 .warn-box.show{ display:block; }
+.sim-toolbar{ display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 2px; }
+.sim-toolbar .btn{ flex:1 1 auto; }
+.ov-toggles{ display:flex; flex-wrap:wrap; gap:10px 16px; margin-top:8px; font-size:0.8rem; color:var(--text); }
+.ov-toggles label{ display:flex; align-items:center; gap:5px; cursor:pointer; }
+@media (max-width:820px){
+  .main{ grid-template-columns:1fr; height:auto; }
+  .panel{ max-height:50vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+}
+@media (prefers-reduced-motion: reduce){
+  .sim-anim-note{ display:inline; }
+}
+.sim-anim-note{ display:none; font-size:0.72rem; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -132,6 +144,11 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 <div class="main">
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="sim-toolbar">
+      <button type="button" class="btn" id="btnPlay" onclick="togglePlay()" aria-label="再生／一時停止"><i class="fas fa-pause"></i> <span id="playLabel">一時停止</span></button>
+      <button type="button" class="btn secondary" onclick="resetAnim()" aria-label="最初から"><i class="fas fa-undo"></i> 最初から</button>
+    </div>
 
     <div class="param-group">
       <div class="param-label">
@@ -168,35 +185,60 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     <div class="divider"></div>
 
     <div class="btn-group">
+      <button type="button" class="btn secondary" onclick="presetLowRe()"><i class="fas fa-feather"></i> 低Re (層流)</button>
+      <button type="button" class="btn secondary" onclick="presetTransition()"><i class="fas fa-exchange-alt"></i> 遷移点</button>
+      <button type="button" class="btn secondary" onclick="presetHighRe()"><i class="fas fa-bolt"></i> 高Re (乱流)</button>
+    </div>
+    <div class="btn-group" style="margin-top:8px;">
       <button type="button" class="btn secondary" onclick="presetAir()"><i class="fas fa-cloud"></i> 空気 (20°C)</button>
       <button type="button" class="btn secondary" onclick="presetWater()"><i class="fas fa-tint"></i> 水 (20°C)</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
+
+    <div class="ov-toggles" role="group" aria-label="オーバーレイ表示切替">
+      <label><input type="checkbox" id="ovDelta" checked onchange="compute()"> δ(x) 成長</label>
+      <label><input type="checkbox" id="ovEddy" checked onchange="compute()"> 乱流渦</label>
+      <label><input type="checkbox" id="ovProfile" checked onchange="compute()"> 速度分布(層流対比)</label>
+      <label><input type="checkbox" id="ovTrans" checked onchange="compute()"> 遷移点</label>
+    </div>
+
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">遷移目安 Re_x ≥ 5×10⁵ で乱流式が適用されます。それ未満では層流域として警告を表示。</p>
+    <p class="sim-anim-note">アニメーションは低減設定のため静止表示です。</p>
     <div class="warn-box" id="warnBox"><i class="fas fa-exclamation-triangle"></i> <span id="warnText">層流域・乱流式不適</span></div>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（ライブ）</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statRex">—</div><div class="sl">Reynolds 数 Re_x</div></div>
         <div class="stat-card"><div class="sv" id="statDelta99">—</div><div class="sl">乱流境界層厚さ δ_99</div></div>
         <div class="stat-card"><div class="sv" id="statCf">—</div><div class="sl">局所摩擦係数 C_f</div></div>
         <div class="stat-card"><div class="sv" id="statTauW">—</div><div class="sl">壁面せん断応力 τ_w</div></div>
+        <div class="stat-card"><div class="sv" id="statDeltaLam">—</div><div class="sl">層流 δ_99 (Blasius)</div></div>
+        <div class="stat-card"><div class="sv" id="statRatio">—</div><div class="sl">δ乱流 / δ層流</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-wind"></i> 平板上の境界層と速度プロファイル</div>
+      <div class="chart-title"><i class="fas fa-wind"></i> 平板上の乱流境界層（リアルタイム）</div>
       <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">水色矢印＝主流 U／灰板＝平板／黄色破線＝境界層厚さ δ_99／青曲線＝乱流(1/7乗則)、橙曲線＝層流(Blasius近似)</p>
+      <p class="canvas-hint">水色矢印＝主流 U／灰板＝平板／黄破線＝成長する δ(x)（乱流 ~x^0.8）／緑破線＝層流 δ ~√x／渦＝壁近傍の乱流変動／粒子＝流れ。右端に速度分布（青＝乱流1/7乗則、橙＝層流）。赤線＝遷移点 Re_x=5×10⁵。</p>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 速度プロファイル u(y)/U</div>
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 速度プロファイル u(y)/U — 乱流 vs 層流</div>
       <canvas id="profileCanvas"></canvas>
-      <p class="canvas-hint">横軸＝無次元速度 u/U／縦軸＝壁からの無次元距離 y/δ（青＝乱流 1/7乗則、橙＝層流 放物線近似）</p>
+      <p class="canvas-hint">横軸＝無次元速度 u/U／縦軸＝壁からの無次元距離 y/δ（青＝乱流 1/7乗則は壁近くで「充満」＝壁の速度勾配が急→高せん断、橙＝層流 放物線近似）</p>
     </div>
 
     <div class="chart-card">
@@ -218,13 +260,22 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Turbulent Boundary Layer (Flat Plate, 1/7 Power Law) ==========
+// ========== Turbulent Boundary Layer v2 (Flat Plate, 1/7 Power Law) — real-time ==========
 var cvCanvas = document.getElementById('cv');
 var cvCtx = cvCanvas.getContext('2d');
 var profileCanvas = document.getElementById('profileCanvas');
 var profileCtx = profileCanvas.getContext('2d');
 
 var RE_TRANSITION = 5e5;
+var __reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var __playing = !__reduceMotion;
+var __t = 0;            // animation clock (s)
+var __lastTs = 0;
+var __particles = [];  // flow tracer particles
+var __eddies = [];     // turbulent eddies near wall
+var __lastP = null;    // last computed params for animation frame
+
+function clampFinite(v, fallback){ return (typeof v === 'number' && isFinite(v)) ? v : fallback; }
 
 function getParams() {
   var U = parseFloat(document.getElementById('slU').value);
@@ -233,6 +284,7 @@ function getParams() {
   var rho = parseFloat(document.getElementById('slRho').value);
   return { U: U, x: x, nu: nu, rho: rho };
 }
+function ov(id){ var e = document.getElementById(id); return e ? e.checked : true; }
 
 function fmtRe(re) {
   if (!isFinite(re)) return '—';
@@ -241,24 +293,19 @@ function fmtRe(re) {
   var mant = re / Math.pow(10, exp);
   return mant.toFixed(2) + 'e' + (exp >= 0 ? '+' : '') + exp;
 }
-
 function fmtCf(cf) {
   if (!isFinite(cf) || cf === 0) return '—';
-  // Use scientific if very small
   if (Math.abs(cf) < 0.001) return cf.toExponential(2);
   return cf.toFixed(5);
 }
-
 function fmtLengthMM(m) {
-  // m -> mm display
   if (!isFinite(m)) return '—';
   return (m * 1000).toFixed(1);
 }
-
 function fmtTauMPa(pa) {
-  // Pa -> mPa display (1 Pa = 1000 mPa)
-  if (!isFinite(pa)) return '—';
-  return (pa * 1000).toFixed(0);
+  if (!isFinite(pa)) return '?';
+  if (pa >= 1) return pa.toFixed(2) + ' Pa';
+  return (pa * 1000).toFixed(0) + ' mPa';
 }
 
 function __novaCanvasCssW(canvas){
@@ -272,7 +319,7 @@ function resizeCanvases() {
   var cv = cvCanvas;
   var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
   var __novaW = w;
-  var __novaH = Math.round(w * 0.65);
+  var __novaH = Math.round(w * 0.6);
   var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
   cv.style.width = __novaW + 'px';
   cv.style.height = __novaH + 'px';
@@ -280,340 +327,359 @@ function resizeCanvases() {
   cv.height = Math.round(__novaH * __novaDpr);
   cv.dataset.cssW = String(__novaW);
   cv.dataset.cssH = String(__novaH);
-  var __novaCtx = cv.getContext && cv.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+  var c1 = cv.getContext && cv.getContext('2d');
+  if (c1) c1.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
 
   var pc = profileCanvas;
-  var __novaW = w;
-  var __novaH = Math.round(w * 0.5);
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  pc.style.width = __novaW + 'px';
-  pc.style.height = __novaH + 'px';
-  pc.width = Math.round(__novaW * __novaDpr);
-  pc.height = Math.round(__novaH * __novaDpr);
-  pc.dataset.cssW = String(__novaW);
-  pc.dataset.cssH = String(__novaH);
-  var __novaCtx = pc.getContext && pc.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+  var pH = Math.round(w * 0.5);
+  pc.style.width = w + 'px';
+  pc.style.height = pH + 'px';
+  pc.width = Math.round(w * __novaDpr);
+  pc.height = Math.round(pH * __novaDpr);
+  pc.dataset.cssW = String(w);
+  pc.dataset.cssH = String(pH);
+  var c2 = pc.getContext && pc.getContext('2d');
+  if (c2) c2.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+  seedParticles();
 }
 
-// turbulent boundary layer thickness via 1/7 power law
-function deltaTurb(p, Rex) {
-  if (Rex <= 0) return 0;
-  return 0.37 * p.x * Math.pow(Rex, -1 / 5);
-}
-function deltaLam(p, Rex) {
-  if (Rex <= 0) return 0;
-  return 5.0 * p.x * Math.pow(Rex, -1 / 2);
-}
-function CfTurb(Rex) {
-  if (Rex <= 0) return 0;
-  return 0.059 * Math.pow(Rex, -1 / 5);
-}
-function CfLam(Rex) {
-  if (Rex <= 0) return 0;
-  return 0.664 * Math.pow(Rex, -1 / 2);
+// ---- physics ----
+function deltaTurb(p, Rex) { if (Rex <= 0) return 0; return 0.37 * p.x * Math.pow(Rex, -1 / 5); }
+function deltaLam(p, Rex)  { if (Rex <= 0) return 0; return 5.0 * p.x * Math.pow(Rex, -1 / 2); }
+function CfTurb(Rex) { if (Rex <= 0) return 0; return 0.0592 * Math.pow(Rex, -1 / 5); }
+function CfLam(Rex)  { if (Rex <= 0) return 0; return 0.664 * Math.pow(Rex, -1 / 2); }
+
+// ---- particle / eddy seeding ----
+function seedParticles() {
+  __particles = [];
+  var W = __novaCanvasCssW(cvCanvas), H = __novaCanvasCssH(cvCanvas);
+  if (!isFinite(W) || !isFinite(H)) return;
+  var n = 60;
+  for (var i = 0; i < n; i++) {
+    __particles.push({ x: Math.random() * W, y: 20 + Math.random() * (H - 70), seed: Math.random() * 6.28 });
+  }
+  __eddies = [];
+  for (var j = 0; j < 22; j++) {
+    __eddies.push({ fx: Math.random(), seed: Math.random() * 6.28, r: 4 + Math.random() * 5, spin: (Math.random() < 0.5 ? 1 : -1) });
+  }
 }
 
+// ---- main plate canvas drawing ----
 function drawPlate(p, Rex, delta99) {
   var ctx = cvCtx, W = __novaCanvasCssW(cvCanvas), H = __novaCanvasCssH(cvCanvas);
+  if (!isFinite(W) || !isFinite(H)) return;
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
-  // plate at bottom
-  var plateY = H - 30;
-  ctx.fillStyle = '#4a5a6e';
-  ctx.fillRect(0, plateY, W, 30);
-  // hatching for plate
-  ctx.strokeStyle = '#7d8ea0';
-  ctx.lineWidth = 1;
-  for (var i = 0; i < W; i += 10) {
-    ctx.beginPath();
-    ctx.moveTo(i, plateY + 30);
-    ctx.lineTo(i + 10, plateY);
-    ctx.stroke();
-  }
-  // leading edge marker
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.fillText('前縁 (x=0)', 6, plateY - 6);
-  // free-stream arrows
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 1.5;
-  for (var y = 20; y < plateY - 50; y += 24) {
-    ctx.beginPath();
-    ctx.moveTo(20, y);
-    ctx.lineTo(80, y);
-    ctx.stroke();
-    // arrowhead
-    ctx.beginPath();
-    ctx.moveTo(80, y);
-    ctx.lineTo(74, y - 3);
-    ctx.lineTo(74, y + 3);
-    ctx.closePath();
-    ctx.fillStyle = '#00B4D8';
-    ctx.fill();
-  }
-  ctx.fillStyle = '#00B4D8';
-  ctx.fillText('U = ' + p.U.toFixed(1) + ' m/s', 18, 14);
 
-  // boundary layer growth visualization
-  // map x ∈ [0, p.x] -> screen x ∈ [100, W-40]
-  var x0 = 100, x1 = W - 40;
+  var plateY = H - 26;
+  var x0 = 96, x1 = W - 96;
   var Lpx = x1 - x0;
-  // Scale delta on screen: use ratio of computed delta99 to plate length, capped
-  var deltaPx_max = (plateY - 30); // available vertical space
-  // Compute delta along plate (turbulent assumption for visual)
-  var nPts = 60;
-  var deltaScreen = function (xi) {
-    if (xi <= 0) return 0;
-    var Rex_i = p.U * xi / p.nu;
-    if (Rex_i <= 0) return 0;
-    var d = 0.37 * xi * Math.pow(Rex_i, -1 / 5);
-    return d;
-  };
-  // find max delta to set vertical scale
-  var dmaxPhys = deltaScreen(p.x);
-  if (dmaxPhys <= 0) dmaxPhys = 1e-6;
-  // Use a vertical scale: physical y in [0, 2*delta99] mapped to pixels
-  var yScalePx = Math.min(deltaPx_max * 0.85, deltaPx_max);
-  var phys2px = yScalePx / (2 * dmaxPhys);
+  var topPad = 18;
 
-  // draw turbulent BL upper curve
-  ctx.strokeStyle = 'rgba(255,209,102,0.85)';
-  ctx.setLineDash([5, 4]);
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (var i = 0; i <= nPts; i++) {
-    var xi = p.x * i / nPts;
-    var d = deltaScreen(xi);
-    var sx = x0 + (xi / p.x) * Lpx;
-    var sy = plateY - d * phys2px;
-    if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+  // delta along plate (turbulent) and laminar; find vertical scale
+  function dTurbAt(xi){ if (xi <= 0) return 0; var R = p.U * xi / p.nu; if (R <= 0) return 0; return 0.37 * xi * Math.pow(R, -1/5); }
+  function dLamAt(xi){ if (xi <= 0) return 0; var R = p.U * xi / p.nu; if (R <= 0) return 0; return 5.0 * xi * Math.pow(R, -1/2); }
+  var dmaxPhys = dTurbAt(p.x);
+  if (!isFinite(dmaxPhys) || dmaxPhys <= 0) dmaxPhys = 1e-6;
+  var avail = plateY - topPad;
+  var phys2px = clampFinite((avail * 0.82) / (1.35 * dmaxPhys), 1);
+
+  // transition x (where Rex = RE_TRANSITION)
+  var xTrans = (p.U > 0) ? RE_TRANSITION * p.nu / p.U : Infinity;
+  var transFrac = (isFinite(xTrans) && p.x > 0) ? Math.min(xTrans / p.x, 1) : 1;
+
+  // plate
+  ctx.fillStyle = '#4a5a6e';
+  ctx.fillRect(0, plateY, W, 26);
+  ctx.strokeStyle = '#7d8ea0'; ctx.lineWidth = 1;
+  for (var i = 0; i < W; i += 10) { ctx.beginPath(); ctx.moveTo(i, plateY + 26); ctx.lineTo(i + 10, plateY); ctx.stroke(); }
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('前縁 (x=0)', 6, plateY - 6);
+
+  // free-stream arrows
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 1.5;
+  for (var y = 18; y < topPad + 4; y += 24) {}
+  for (var ya = 16; ya < plateY - dmaxPhys*phys2px - 10 && ya < plateY - 30; ya += 26) {
+    ctx.beginPath(); ctx.moveTo(14, ya); ctx.lineTo(64, ya); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(64, ya); ctx.lineTo(58, ya - 3); ctx.lineTo(58, ya + 3); ctx.closePath();
+    ctx.fillStyle = '#00B4D8'; ctx.fill();
   }
-  ctx.stroke();
-  ctx.setLineDash([]);
+  ctx.fillStyle = '#00B4D8'; ctx.fillText('U = ' + clampFinite(p.U,0).toFixed(1) + ' m/s', 14, 12);
 
-  // velocity profile at x = p.x (right side)
-  var profileBaseX = x1;
-  var ySpan = 2 * dmaxPhys * phys2px;
-  // turbulent profile (1/7)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  var profW = 80;
-  for (var k = 0; k <= 30; k++) {
-    var yPhys = dmaxPhys * k / 30; // 0..delta99
-    var uOverU = Math.pow(Math.min(yPhys / dmaxPhys, 1), 1 / 7);
-    var sx = profileBaseX - 80 + uOverU * profW;
-    var sy = plateY - yPhys * phys2px;
-    if (k === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
-  }
-  // continue at u/U = 1 above delta
-  ctx.lineTo(profileBaseX, plateY - dmaxPhys * phys2px);
-  ctx.lineTo(profileBaseX, plateY - ySpan);
-  ctx.stroke();
-  // base of profile (vertical at u=0)
-  ctx.strokeStyle = 'rgba(143,184,224,0.4)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(profileBaseX - 80, plateY);
-  ctx.lineTo(profileBaseX - 80, plateY - ySpan);
-  ctx.stroke();
-  // u=U vertical line
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  ctx.moveTo(profileBaseX, plateY);
-  ctx.lineTo(profileBaseX, plateY - ySpan);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // laminar profile (parabolic-like, scaled to its own delta)
-  var dLamPhys = deltaLam(p, Rex);
-  if (dLamPhys > 0 && dLamPhys < 3 * dmaxPhys) {
-    ctx.strokeStyle = '#FF9F43';
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([4, 3]);
+  // boundary-layer filled region (turbulent) under delta(x)
+  if (ov('ovDelta')) {
     ctx.beginPath();
-    for (var k = 0; k <= 30; k++) {
-      var yPhys = dLamPhys * k / 30;
-      var eta = Math.min(yPhys / dLamPhys, 1);
-      // Pohlhausen-like parabolic approximation: u/U = 2η − η²
-      var uOverU = 2 * eta - eta * eta;
-      var sx = profileBaseX - 80 + uOverU * profW;
-      var sy = plateY - yPhys * phys2px;
-      if (k === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    ctx.moveTo(x0, plateY);
+    for (var k = 0; k <= 80; k++) {
+      var xi = p.x * k / 80;
+      var sx = x0 + (xi / p.x) * Lpx;
+      var sy = plateY - clampFinite(dTurbAt(xi) * phys2px, 0);
+      ctx.lineTo(sx, sy);
     }
+    ctx.lineTo(x1, plateY);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,180,216,0.10)';
+    ctx.fill();
+    // turbulent delta(x) upper curve (yellow dashed)
+    ctx.strokeStyle = 'rgba(255,209,102,0.95)'; ctx.setLineDash([5, 4]); ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (var k2 = 0; k2 <= 80; k2++) {
+      var xi2 = p.x * k2 / 80;
+      var sx2 = x0 + (xi2 / p.x) * Lpx;
+      var sy2 = plateY - clampFinite(dTurbAt(xi2) * phys2px, 0);
+      if (k2 === 0) ctx.moveTo(sx2, sy2); else ctx.lineTo(sx2, sy2);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#FFD166'; ctx.fillText('δ(x) 乱流 ~x^0.8', x0 + 6, plateY - clampFinite(dTurbAt(p.x*0.55)*phys2px,0) - 6);
+
+    // laminar delta(x) for comparison (green dashed)
+    ctx.strokeStyle = 'rgba(123,241,168,0.8)'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (var k3 = 0; k3 <= 80; k3++) {
+      var xi3 = p.x * k3 / 80;
+      var sx3 = x0 + (xi3 / p.x) * Lpx;
+      var sy3 = plateY - clampFinite(dLamAt(xi3) * phys2px, 0);
+      if (k3 === 0) ctx.moveTo(sx3, sy3); else ctx.lineTo(sx3, sy3);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#7bf1a8'; ctx.fillText('δ 層流 ~√x', x0 + 6, plateY - clampFinite(dLamAt(p.x)*phys2px,0) - 4);
+  }
+
+  // transition marker line
+  if (ov('ovTrans') && isFinite(transFrac) && transFrac > 0 && transFrac < 1) {
+    var txp = x0 + transFrac * Lpx;
+    ctx.strokeStyle = 'rgba(255,107,107,0.9)'; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(txp, topPad - 4); ctx.lineTo(txp, plateY); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#ff6b6b'; ctx.textAlign = 'center';
+    ctx.fillText('遷移 Re_x=5e5', txp, topPad + 6); ctx.textAlign = 'left';
+  }
+
+  // animated flow particles
+  if (ov('ovEddy') || true) {
+    for (var pi = 0; pi < __particles.length; pi++) {
+      var pt = __particles[pi];
+      // local delta at this screen-x
+      var xiP = Math.max(((pt.x - x0) / Lpx) * p.x, 0);
+      var dLoc = clampFinite(dTurbAt(xiP) * phys2px, 0);
+      var ytop = plateY - dLoc;
+      var inBL = pt.y > ytop;
+      // velocity: outside BL = U; inside follows 1/7 law of local height
+      var uFrac;
+      if (!inBL || dLoc < 1) { uFrac = 1; }
+      else {
+        var yloc = (plateY - pt.y) / dLoc; // 0..1
+        uFrac = Math.pow(Math.max(Math.min(yloc, 1), 0.0), 1/7);
+      }
+      var vx = 26 + 70 * uFrac; // px/s base
+      pt.x += vx * 0.016 * (__playing ? 1 : 0);
+      // turbulent wandering inside BL
+      if (inBL && dLoc > 2) {
+        pt.y += Math.sin(__t * 3 + pt.seed) * 0.6 * (__playing ? 1 : 0);
+      }
+      if (pt.x > x1 + 10 || pt.x > W) { pt.x = x0 - 5; pt.y = 20 + Math.random() * (plateY - 30); }
+      var alpha = inBL ? 0.85 : 0.5;
+      ctx.fillStyle = inBL ? 'rgba(0,180,216,' + alpha + ')' : 'rgba(143,184,224,' + alpha + ')';
+      var pr = clampFinite(inBL ? 2.2 : 1.6, 1.6);
+      ctx.beginPath(); ctx.arc(clampFinite(pt.x, x0), clampFinite(pt.y, plateY-2), pr, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // turbulent eddies near wall (only downstream of transition)
+  if (ov('ovEddy')) {
+    for (var ei = 0; ei < __eddies.length; ei++) {
+      var ed = __eddies[ei];
+      var efrac = transFrac + (1 - transFrac) * ((ed.fx + 0.13 * __t) % 1);
+      if (transFrac >= 1) continue; // fully laminar, no eddies
+      var ex = x0 + efrac * Lpx;
+      var xiE = Math.max(efrac * p.x, 0);
+      var dE = clampFinite(dTurbAt(xiE) * phys2px, 0);
+      if (dE < 3) continue;
+      var ey = plateY - dE * (0.25 + 0.5 * (0.5 + 0.5 * Math.sin(__t * 2 + ed.seed)));
+      var er = clampFinite(Math.min(ed.r, dE * 0.45), 3);
+      if (!isFinite(ex) || !isFinite(ey) || er <= 0) continue;
+      var ang = __t * 2.5 * ed.spin + ed.seed;
+      ctx.strokeStyle = 'rgba(120,220,255,0.45)'; ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.arc(ex, ey, er, ang, ang + Math.PI * 1.6);
+      ctx.stroke();
+    }
+  }
+
+  // velocity profile at station x = p.x (right edge), turbulent vs laminar
+  if (ov('ovProfile')) {
+    var profBaseX = x1 + 4;
+    var profW = 70;
+    var dStation = clampFinite(dTurbAt(p.x) * phys2px, 0);
+    // turbulent 1/7
+    ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    for (var s = 0; s <= 30; s++) {
+      var yp = dStation * s / 30;
+      var uOverU = Math.pow(Math.min(s / 30, 1), 1/7);
+      var sx = profBaseX + uOverU * profW;
+      var sy = plateY - yp;
+      if (s === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    }
+    ctx.lineTo(profBaseX + profW, plateY - dStation);
+    ctx.lineTo(profBaseX + profW, plateY - Math.min(dStation * 1.25, avail));
     ctx.stroke();
-    ctx.setLineDash([]);
+    // laminar parabolic profile at same station scaled to its own delta
+    var dLamStation = clampFinite(dLamAt(p.x) * phys2px, 0);
+    if (dLamStation > 0) {
+      ctx.strokeStyle = '#FF9F43'; ctx.lineWidth = 1.7; ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      for (var s2 = 0; s2 <= 30; s2++) {
+        var eta = s2 / 30;
+        var u2 = 2 * eta - eta * eta;
+        var sx2 = profBaseX + u2 * profW;
+        var sy2 = plateY - dLamStation * eta;
+        if (s2 === 0) ctx.moveTo(sx2, sy2); else ctx.lineTo(sx2, sy2);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.strokeStyle = 'rgba(143,184,224,0.4)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(profBaseX, plateY); ctx.lineTo(profBaseX, plateY - Math.min(dStation*1.25, avail)); ctx.stroke();
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace';
+    ctx.fillText('u/U @ x', profBaseX - 4, plateY + 16);
   }
 
-  // delta99 horizontal line at x = p.x
-  ctx.strokeStyle = 'rgba(255,209,102,0.7)';
-  ctx.setLineDash([6, 4]);
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x0, plateY - delta99 * phys2px);
-  ctx.lineTo(profileBaseX, plateY - delta99 * phys2px);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  // station marker & delta99 callout at x
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
+  ctx.fillText('x = ' + clampFinite(p.x,0).toFixed(2) + ' m', x1 - 70, plateY + 16);
 
-  // labels
-  ctx.fillStyle = '#FFD166';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('δ_99', x0 + 4, plateY - delta99 * phys2px - 4);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.fillText('x = ' + p.x.toFixed(2) + ' m', profileBaseX - 75, plateY + 18);
-
-  // stats overlay bottom-right
-  var bx = W - 200, by = 16;
-  ctx.fillStyle = 'rgba(0,31,63,0.7)';
-  ctx.fillRect(bx, by, 190, 86);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.fillText('Re_x = ' + fmtRe(Rex), bx + 8, by + 16);
-  ctx.fillText('δ_99 = ' + (delta99 * 1000).toFixed(1) + ' mm', bx + 8, by + 32);
-  ctx.fillText('C_f = ' + fmtCf(CfTurb(Rex)), bx + 8, by + 48);
-  ctx.fillText('τ_w = ' + (0.5 * CfTurb(Rex) * p.rho * p.U * p.U * 1000).toFixed(0) + ' mPa', bx + 8, by + 64);
-  if (Rex < RE_TRANSITION) {
-    ctx.fillStyle = '#ff6b6b';
-    ctx.fillText('(層流域)', bx + 8, by + 80);
-  } else {
-    ctx.fillStyle = '#7bf1a8';
-    ctx.fillText('(乱流域)', bx + 8, by + 80);
-  }
+  // live stats overlay
+  var bx = 12, by = plateY - 96; if (by < topPad) by = topPad + 2;
+  ctx.fillStyle = 'rgba(0,31,63,0.78)'; ctx.fillRect(bx, by, 188, 90);
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
+  ctx.fillText('Re_x  = ' + fmtRe(Rex), bx + 8, by + 16);
+  ctx.fillText('δ_99  = ' + (delta99 * 1000).toFixed(1) + ' mm', bx + 8, by + 32);
+  ctx.fillText('C_f   = ' + fmtCf(CfTurb(Rex)), bx + 8, by + 48);
+  ctx.fillText('τ_w   = ' + fmtTauMPa(0.5 * CfTurb(Rex) * p.rho * p.U * p.U), bx + 8, by + 64);
+  if (Rex < RE_TRANSITION) { ctx.fillStyle = '#ff6b6b'; ctx.fillText('(層流域 — 乱流式は参考値)', bx + 8, by + 80); }
+  else { ctx.fillStyle = '#7bf1a8'; ctx.fillText('(乱流域)', bx + 8, by + 80); }
 }
 
+// ---- profile comparison canvas ----
 function drawProfile(p, Rex) {
   var ctx = profileCtx, W = __novaCanvasCssW(profileCanvas), H = __novaCanvasCssH(profileCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+  if (!isFinite(W) || !isFinite(H)) return;
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
   var mx = 50, my = 28;
   var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
   var gw = x1 - x0, gh = y0 - y1;
   function px(uU) { return x0 + uU * gw; }
   function py(yd) { return y0 - yd * gh; }
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(143,184,224,0.5)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.stroke();
-  // grid: u/U = 0.5
-  ctx.strokeStyle = 'rgba(143,184,224,0.2)';
-  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = 'rgba(143,184,224,0.2)'; ctx.setLineDash([3, 3]);
   ctx.beginPath(); ctx.moveTo(px(0.5), y1); ctx.lineTo(px(0.5), y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, py(0.5)); ctx.lineTo(x1, py(0.5)); ctx.stroke();
   ctx.setLineDash([]);
 
-  // turbulent 1/7 power law profile
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  for (var i = 0; i <= 60; i++) {
-    var yd = i / 60; // y/delta
-    var uU = Math.pow(yd, 1 / 7);
-    if (i === 0) ctx.moveTo(px(uU), py(yd)); else ctx.lineTo(px(uU), py(yd));
-  }
+  // turbulent 1/7 power law
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.5; ctx.beginPath();
+  for (var i = 0; i <= 60; i++) { var yd = i / 60; var uU = Math.pow(yd, 1/7); if (i===0) ctx.moveTo(px(uU), py(yd)); else ctx.lineTo(px(uU), py(yd)); }
   ctx.stroke();
+  // laminar parabolic
+  ctx.strokeStyle = '#FF9F43'; ctx.lineWidth = 2.5; ctx.setLineDash([5, 4]); ctx.beginPath();
+  for (var i2 = 0; i2 <= 60; i2++) { var yd2 = i2 / 60; var uU2 = 2 * yd2 - yd2 * yd2; if (i2===0) ctx.moveTo(px(uU2), py(yd2)); else ctx.lineTo(px(uU2), py(yd2)); }
+  ctx.stroke(); ctx.setLineDash([]);
 
-  // laminar parabolic approximation
-  ctx.strokeStyle = '#FF9F43';
-  ctx.lineWidth = 2.5;
-  ctx.setLineDash([5, 4]);
-  ctx.beginPath();
-  for (var i = 0; i <= 60; i++) {
-    var yd = i / 60;
-    var uU = 2 * yd - yd * yd;
-    if (i === 0) ctx.moveTo(px(uU), py(yd)); else ctx.lineTo(px(uU), py(yd));
-  }
-  ctx.stroke();
-  ctx.setLineDash([]);
+  // wall-gradient annotation: tangent at wall for both (turbulent steeper)
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('壁での勾配↑ = せん断↑', px(0.04), py(0.10));
 
-  // legend
-  ctx.fillStyle = '#00B4D8';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.fillText('— 乱流 (1/7 乗則)', x0 + 12, y1 + 18);
+  ctx.fillStyle = '#00B4D8'; ctx.font = '12px "Roboto Mono",monospace';
+  ctx.fillText('— 乱流 (1/7 乗則・充満形)', x0 + 12, y1 + 18);
   ctx.fillStyle = '#FF9F43';
   ctx.fillText('-- 層流 (放物線近似)', x0 + 12, y1 + 34);
 
-  // axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('u/U = 0', x0, y0 + 14);
-  ctx.textAlign = 'right';
-  ctx.fillText('u/U = 1', x1, y0 + 14);
-  ctx.textAlign = 'left';
-  ctx.fillText('y/δ', x0 + 4, y1 + 4);
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'left'; ctx.fillText('u/U = 0', x0, y0 + 14);
+  ctx.textAlign = 'right'; ctx.fillText('u/U = 1', x1, y0 + 14);
+  ctx.textAlign = 'left'; ctx.fillText('y/δ', x0 + 4, y1 + 4);
 }
 
+// ---- compute & render ----
 function compute() {
   var p = getParams();
   if (!isFinite(p.U) || !isFinite(p.x) || !isFinite(p.nu) || p.nu <= 0 || p.x <= 0) return;
+  __lastP = p;
   var Rex = p.U * p.x / p.nu;
   var delta99 = deltaTurb(p, Rex);
+  var dLam = deltaLam(p, Rex);
   var Cf = CfTurb(Rex);
   var tauW = 0.5 * Cf * p.rho * p.U * p.U;
 
-  // warn if laminar regime
   var warn = document.getElementById('warnBox');
   var warnText = document.getElementById('warnText');
   if (Rex < RE_TRANSITION) {
     warn.classList.add('show');
     warnText.textContent = '層流域 (Re_x = ' + fmtRe(Rex) + ' < 5×10⁵) — 乱流式は不適';
-  } else {
-    warn.classList.remove('show');
-  }
+  } else { warn.classList.remove('show'); }
 
   document.getElementById('statRex').textContent = fmtRe(Rex);
   document.getElementById('statDelta99').textContent = fmtLengthMM(delta99) + ' mm';
   document.getElementById('statCf').textContent = fmtCf(Cf);
-  document.getElementById('statTauW').textContent = fmtTauMPa(tauW) + ' mPa';
+  document.getElementById('statTauW').textContent = fmtTauMPa(tauW);
+  document.getElementById('statDeltaLam').textContent = fmtLengthMM(dLam) + ' mm';
+  document.getElementById('statRatio').textContent = (dLam > 0 && isFinite(delta99/dLam)) ? (delta99 / dLam).toFixed(2) + '×' : '—';
 
   drawPlate(p, Rex, delta99);
   drawProfile(p, Rex);
 }
 
-function presetAir() {
-  document.getElementById('slU').value = 20;
-  document.getElementById('slX').value = 1.00;
-  document.getElementById('slNu').value = 0.0000150;
-  document.getElementById('slRho').value = 1.2;
-  updateSlider(document.getElementById('slU'), 'slUVal', 1, '');
-  updateSlider(document.getElementById('slX'), 'slXVal', 2, '');
-  updateSlider(document.getElementById('slNu'), 'slNuVal', 7, '');
-  updateSlider(document.getElementById('slRho'), 'slRhoVal', 1, '');
-  compute();
+// ---- animation loop ----
+function frame(ts) {
+  if (!__lastTs) __lastTs = ts;
+  var dt = Math.min((ts - __lastTs) / 1000, 0.05);
+  __lastTs = ts;
+  if (__playing) { __t += dt; }
+  if (__lastP) { drawPlate(__lastP, __lastP.U * __lastP.x / __lastP.nu, deltaTurb(__lastP, __lastP.U * __lastP.x / __lastP.nu)); }
+  requestAnimationFrame(frame);
 }
 
-function presetWater() {
-  document.getElementById('slU').value = 2;
-  document.getElementById('slX').value = 1.00;
-  document.getElementById('slNu').value = 0.0000010;
-  document.getElementById('slRho').value = 1000;
-  updateSlider(document.getElementById('slU'), 'slUVal', 1, '');
-  updateSlider(document.getElementById('slX'), 'slXVal', 2, '');
-  updateSlider(document.getElementById('slNu'), 'slNuVal', 7, '');
-  updateSlider(document.getElementById('slRho'), 'slRhoVal', 1, '');
-  compute();
+function togglePlay() {
+  __playing = !__playing;
+  var lbl = document.getElementById('playLabel');
+  var ic = document.querySelector('#btnPlay i');
+  if (lbl) lbl.textContent = __playing ? '一時停止' : '再生';
+  if (ic) ic.className = __playing ? 'fas fa-pause' : 'fas fa-play';
+}
+function resetAnim() {
+  __t = 0; seedParticles(); compute();
 }
 
-function resetParams() {
-  var defs = { slU: 20, slX: 1.00, slNu: 0.0000150, slRho: 1.2 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
+// ---- presets ----
+function __setSliders(U, x, nu, rho) {
+  document.getElementById('slU').value = U;
+  document.getElementById('slX').value = x;
+  document.getElementById('slNu').value = nu;
+  document.getElementById('slRho').value = rho;
   updateSlider(document.getElementById('slU'), 'slUVal', 1, '');
   updateSlider(document.getElementById('slX'), 'slXVal', 2, '');
   updateSlider(document.getElementById('slNu'), 'slNuVal', 7, '');
   updateSlider(document.getElementById('slRho'), 'slRhoVal', 1, '');
   compute();
 }
+function presetAir()   { __setSliders(20, 1.00, 0.0000150, 1.2); }
+function presetWater()  { __setSliders(2, 1.00, 0.0000010, 1000); }
+function presetLowRe()  { __setSliders(3, 0.20, 0.0000150, 1.2); }   // Rex=4e4 laminar
+function presetTransition() { __setSliders(7.5, 1.00, 0.0000150, 1.2); } // Rex=5e5 transition
+function presetHighRe() { __setSliders(60, 3.00, 0.0000150, 1.2); }  // Rex~1.2e7 strongly turbulent
+function resetParams()  { __setSliders(20, 1.00, 0.0000150, 1.2); }
 
 window.addEventListener('resize', function () { resizeCanvases(); compute(); });
 
 resizeCanvases();
 compute();
+if (__reduceMotion) {
+  __playing = false;
+  var lbl0 = document.getElementById('playLabel'); if (lbl0) lbl0.textContent = '再生';
+  var ic0 = document.querySelector('#btnPlay i'); if (ic0) ic0.className = 'fas fa-play';
+}
+requestAnimationFrame(frame);
 </script>
 
 <section class="explanation">
@@ -677,9 +743,12 @@ compute();
   <div class="fblock">
     <p>最も多い誤解は、<strong>「乱流のほうが境界層が厚いから、抵抗が小さいはず」と直感的に思い込む</strong>ことです。実際は逆で、乱流境界層は厚くなった上に摩擦も大きくなります。なぜなら、乱流の渦が運動量を激しく混合するため、壁近くの速度勾配 ∂u/∂y が層流より急峻になり、せん断応力 τ_w = μ·(∂u/∂y) が増えるからです。本ツールで Cf の値を Blasius解と比べると、同じ Re_x で乱流のほうが数倍大きいことが一目で分かります。「厚い＝抵抗大」が乱流境界層の本質です。</p>
     <p>次に多いのが、<strong>境界層厚さ δ_99 を「物理的に明確な境界」と勘違いする</strong>ことです。実際の流体には不連続な境界は存在せず、δ_99 は単に「u が主流速度 U の 99% になる便宜的な位置」です。定義によっては δ_95 や δ_90 が使われることもあり、それぞれ値が変わります。設計に使うのは、より物理的に明確な排除厚さ δ* や運動量厚さ θ のほうが信頼できます。形状係数 H = δ*/θ も、δ_99 より遷移や剥離の判定に有効です。</p>
-    <p>最後に、<strong>1/7乗則の式が Re_x = 0 や非常に小さい Re_x でも成立すると思い込む</strong>注意点です。本式は遷移後の完全乱流域 (Re_x ≥ 5×10⁵ 程度) で導出されており、層流域で適用すると δ や Cf が物理的にあり得ない値になります。例えば Re_x = 10⁴ で乱流式を使うと δ/x = 0.37·(10⁴)^(-0.2) ≈ 0.059、つまり境界層厚さが位置の6%という非現実的な大きさになります。本ツールでは Re_x < 5×10⁵ で警告を表示するようにしているので、必ず確認してください。実務では、層流域では Blasius、乱流域では本式、と切り分ける必要があります。</p>
+    <p>Do not apply the 1/7 power-law relations at Re_x = 0 or very small Re_x. The correlation is for fully turbulent flow, roughly Re_x >= 5e5, and this tool shows a warning below that range. Use a laminar Blasius estimate below transition and this turbulent correlation above transition.</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="boundary-layer-turbulent.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -732,27 +801,35 @@ compute();
 <!-- codex-static-related-tools:end -->
 
 <div class="howto-card howto-guide">
-<h3>使い方ガイド</h3>
+<h3>How to use</h3>
 <ol>
-<li>流速スライダー（slUVal）で主流速度を設定します。風洞実験では典型的に0.5～50 m/sの範囲です</li>
-<li>測定位置（slXVal）を平板前縁からの距離で指定します。航空機翼では0.1～2.0 m程度が実務的です</li>
-<li>動粘度（slNuVal）と密度（slRhoVal）を流体種に応じて設定します。20°C空気ではν=1.5×10⁻⁵ m²/s、ρ=1.2 kg/m³</li>
-<li>シミュレーション実行後、Reynolds数Re_x、境界層厚さδ₉₉、局所摩擦係数Cf、壁面せん断応力τwが自動計算されます</li>
+<li>Set free-stream velocity U in m/s.</li>
+<li>Set x as the distance from the plate leading edge in meters.</li>
+<li>Set kinematic viscosity nu and density rho for the fluid. For 20 C air, use nu about 1.5e-5 m2/s and rho about 1.2 kg/m3.</li>
+<li>Check Re_x, delta99, Cf, and wall shear stress tau_w. Treat Re_x below 5e5 as a laminar/transitional warning.</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
-<h3>具体的な計算例</h3>
-<p>主流速度U=10 m/s、測定位置x=0.5 m、空気（ν=1.5×10⁻⁵ m²/s、ρ=1.2 kg/m³）の条件でRe_x=3.33×10⁶となります。1/7乗則よりδ₉₉≈0.037 m（37 mm）、局所摩擦係数Cf≈0.00256が得られ、壁面せん断応力τw=ρ×U²×Cf/2≈0.154 Paとなります。造船分野での船体抵抗推定では同様計算で粘性抵抗係数を求めます</p>
+<h3>Measured example</h3>
+<p>For air with U=10 m/s, x=5 m, nu=1.5e-5 m2/s, and rho=1.2 kg/m3, Re_x=3.333e6. The 1/7 power law gives delta99=0.0917 m (91.7 mm), Cf=2.93e-3, and tau_w=0.1756 Pa, so the turbulent formula is in range.</p>
 </div>
 <div class="howto-card howto-notes">
-<h3>実務での注意点</h3>
-<ul>
-<li>Re_x < 5×10⁵では層流領域のため1/7乗則は適用不可。遷移領域の正確なCf推定にはCecco式やJacobi式を併用してください</li>
-<li>圧力勾配がある場合（翼面上など）、1/7乗則の精度は低下します。逆圧力勾配下では分離予測にThwaites法が必須です</li>
-<li>高Re数（航空機巡航時Re>10⁷）では摩擦係数がさらに減少し、粗さの影響が顕在化。表面粗度情報が不可欠になります</li>
-<li>水中環境（ν=1.0×10⁻⁶ m²/s）では同じ速度でも境界層が薄くなり、せん断応力値が大きく変わります</li>
-</ul>
+<h3>Notes</h3>
+<ol>
+<li>Below Re_x=5e5, use Blasius or a transition model rather than the turbulent 1/7 relation as a design value.</li>
+<li>For transition location, combine this estimate with real methods such as the Michel criterion or e^N method.</li>
+<li>tau_w displays in Pa above 1 Pa and in mPa below 1 Pa.</li>
+</ol>
 </div>
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "マッハ円錐 シミュレーター",
       "description": "マッハ円錐シミュレーターでマッハ数・音速・飛行高度・観測者位置からマッハ角 μ=sin⁻¹(1/M)・到達距離・時間遅延をリアルタイム計算・可視化する空力解析ツール。",
       "url": "https://novasolver.jp/tools/mach-cone.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["マッハ角 μ = arcsin(1/M) の実時間計算と可視化","亜音速 (M<1)・遷音速 (M=1)・超音速 (M>1) の波面パターンの違いを直観的に表示","飛行高度・音速・観測者位置からソニックブーム到達距離と時間遅延を算出","マッハ角 μ(M) 曲線（M=1→∞）と現在のマッハ数のマーカー表示","M を 0.5→5.0 で自動スイープして円錐の鋭化過程を体感"],
       "keywords": "マッハ円錐,Mach cone,マッハ角,sonic boom,ソニックブーム,超音速,supersonic,衝撃波,圧縮性流体,Mach number",
       "datePublished": "2026-05-15",
@@ -167,12 +167,42 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> M をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+      <button type="button" class="btn secondary" onclick="resetSim()"><i class="fas fa-step-backward"></i> 最初から</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <div class="note-block">
-      飛行体は左から右へ移動し、現在位置 (0, h) から円錐が後方に伸びます。観測者は地表 (x, 0) に立ち、円錐との交点が「ソニックブーム到達点」です。x が円錐到達距離 l = h/tan μ と一致するとブームが観測者に届きます。
+
+    <div class="param-group" style="margin-top:14px;">
+      <div class="param-label"><span class="param-name">プリセット</span></div>
+      <div class="preset-row" id="presetRow">
+        <button type="button" class="preset-btn" onclick="applyPreset(0.7)">亜音速 M=0.7</button>
+        <button type="button" class="preset-btn" onclick="applyPreset(1.0)">遷音速 M=1.0</button>
+        <button type="button" class="preset-btn" onclick="applyPreset(2.0)">超音速 M=2.0 → 30°</button>
+        <button type="button" class="preset-btn" onclick="applyPreset(5.0)">極超音速 M=5</button>
+      </div>
     </div>
+
+    <div class="param-group" style="margin-top:6px;">
+      <div class="param-label"><span class="param-name">再生速度</span></div>
+      <div class="preset-row" id="speedRow">
+        <button type="button" class="preset-btn speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+        <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="setSpeed(1)">1×</button>
+        <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+      </div>
+    </div>
+
+    <div class="note-block">
+      飛行体（橙）は左から右へ実時間で移動し、一定間隔で音波（青い円）を放ちます。各円は放出位置から音速 a で広がります。M&lt;1 では円が前方に密集（ドップラー）、M=1 で壁状に重なり、M&gt;1 では円の包絡線がマッハ円錐を形成します。M をスライダーで変えると M=1 を境にこの遷移が見えます。観測者を置くと、円錐がその位置に達した瞬間が「ソニックブーム到達」です。
+    </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -188,9 +218,9 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-jet-fighter"></i> マッハ円錐と地表ソニックブーム</div>
-      <canvas id="coneCanvas"></canvas>
-      <p class="canvas-hint">飛行体（橙）は (0, h) を右向きに飛行。後方に伸びる青い線がマッハ円錐の側面（半頂角 μ）。緑のドットは観測者 (x, 0)、赤×は円錐と地表の交点（ブーム到達点）。M ≤ 1 では円錐の代わりに同心円状の球面波を表示します。</p>
+      <div class="chart-title"><i class="fas fa-jet-fighter"></i> 波面とマッハ円錐（実時間）</div>
+      <canvas id="coneCanvas" role="img" aria-label="移動する音源が音波を放ち、亜音速ではドップラーで前方に密集、超音速では円錐を形成する実時間アニメーション"></canvas>
+      <p class="canvas-hint">橙の音源が右へ移動しながら音波（青い円）を放出。各円は放出点から音速 a で広がります。M&lt;1 では円が前方に密集、M=1 で重なって壁となり、M&gt;1 では円に接する黄色いマッハ線（半頂角 μ）が円錐を描きます。緑＝観測者、赤×＝円錐到達点。</p>
     </div>
 
     <div class="chart-card">
@@ -213,19 +243,49 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Mach Cone Simulator ==========
+var LANG = {
+  play: '再生', pause: '一時停止',
+  wall: '（壁状に重なる）', undef: '未定義',
+  boomHit: 'ブーム到達', observer: '観測者', boomArrived: 'ソニックブーム到達！',
+  subsonic: '亜音速 M<1', sonic: '遷音速 M=1', supersonic: '超音速 M>1',
+  regSub: '亜音速 (M<1): 円錐は形成されません（前方に密集）',
+  regSonic: '遷音速 (M=1): 波面が壁状に重なる (μ=90°)',
+  regSuper: '超音速 (M>1): マッハ円錐が形成されています',
+  axX: '水平距離', axY: '高度',
+  asym1: 'M→1: μ→90° (平面波)', asym2: 'M→∞: μ→0° (鋭い円錐)',
+  muAxX: 'マッハ数 M', muAxY: 'マッハ角 μ (度)'
+};
+// ========== Mach Cone Simulator (v2 live wavefronts) ==========
 var coneCanvas = document.getElementById('coneCanvas');
 var coneCtx = coneCanvas.getContext('2d');
 var muCanvas = document.getElementById('muCanvas');
 var muCtx = muCanvas.getContext('2d');
+
+var prefersReduced = false;
+try { prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
 var playing = false;
 var animId = null;
+var lastTs = 0;
+var speedMult = 1;
+
+// Simulation state (world units: metres, seconds). Source starts at left, flies right.
+var sim = {
+  t: 0,            // elapsed sim seconds
+  srcX: 0,         // source horizontal position (m), grows with V
+  emits: [],       // wavefronts: {x: emission x (m), t0: emission time (s)}
+  lastEmit: -1e9,
+  boomFired: false,
+  boomX: null
+};
 
 function getParams() {
   var M = parseFloat(document.getElementById('slM').value);
   var c = parseFloat(document.getElementById('slC').value);
   var h = parseFloat(document.getElementById('slH').value);
   var x = parseFloat(document.getElementById('slX').value);
+  if (!isFinite(M)) M = 2; if (!isFinite(c)) c = 343;
+  if (!isFinite(h)) h = 1000; if (!isFinite(x)) x = 0;
   return { M: M, c: c, h: h, x: x };
 }
 
@@ -253,268 +313,254 @@ function resizeCanvases() {
   });
 }
 
-function drawCone(p) {
+// Emission interval (sim seconds between wavefronts) and how many to keep.
+var EMIT_DT = 0.12;
+var MAX_WAVES = 90;
+
+function resetSim() {
+  var p = getParams();
+  sim.t = 0;
+  sim.srcX = 0;
+  sim.emits = [];
+  sim.lastEmit = -1e9;
+  sim.boomFired = false;
+  sim.boomX = null;
+  // Pre-seed a few wavefronts so the picture is not empty at t=0.
+  seedWaves(p);
+  drawScene(p);
+}
+
+// Seed wavefronts as if the source had been flying for ~ MAX_WAVES*EMIT_DT before t=0,
+// so the cone/bunching is visible immediately. Source assumed at x=srcX at time t.
+function seedWaves(p) {
+  var V = p.M * p.c;
+  var nBack = 24;
+  for (var i = nBack; i >= 1; i--) {
+    var te = sim.t - i * EMIT_DT;
+    var xe = sim.srcX - V * (i * EMIT_DT);
+    sim.emits.push({ x: xe, t0: te });
+  }
+  sim.lastEmit = sim.t;
+}
+
+function stepSim(dt, p) {
+  var V = p.M * p.c;
+  sim.t += dt;
+  sim.srcX += V * dt;
+  // Emit new wavefronts at fixed sim-time intervals.
+  while (sim.t - sim.lastEmit >= EMIT_DT) {
+    sim.lastEmit += EMIT_DT;
+    var xe = sim.srcX - V * (sim.t - sim.lastEmit);
+    sim.emits.push({ x: xe, t0: sim.lastEmit });
+  }
+  if (sim.emits.length > MAX_WAVES) sim.emits.splice(0, sim.emits.length - MAX_WAVES);
+}
+
+// ---- World->canvas mapping. Camera follows the source so it stays ~70% across. ----
+function makeView(p, W, H) {
+  var mx = 54, myTop = 18, myBot = 26;
+  var x0 = mx, x1 = W - 14, y0 = H - myBot, y1 = myTop;
+  var gw = x1 - x0, gh = y0 - y1;
+  // Vertical world span: 0..worldH (altitude). Source sits at altitude h.
+  var worldH = Math.max(p.h * 1.7, 200);
+  // metres per pixel (uniform scale so circles are round)
+  var mpp = worldH / gh;
+  var worldW = gw * mpp;
+  // Source horizontal pixel target = 70% from left.
+  var srcPxX = x0 + 0.70 * gw;
+  // world x at left edge so that source maps to srcPxX:
+  var leftWX = sim.srcX - (srcPxX - x0) * mpp;
+  function tx(wx) { return x0 + (wx - leftWX) / mpp; }
+  function ty(wy) { return y0 - wy / mpp; }   // wy = altitude
+  return { x0:x0, x1:x1, y0:y0, y1:y1, gw:gw, gh:gh, mpp:mpp, worldH:worldH, worldW:worldW, tx:tx, ty:ty, leftWX:leftWX };
+}
+
+function drawScene(p) {
   var ctx = coneCtx, W = __novaCanvasCssW(coneCanvas), H = __novaCanvasCssH(coneCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
-  var mx = 60, my = 30;
-  var x0 = mx, x1 = W - 18, y0 = H - my, y1 = my + 4;
-  var gw = x1 - x0, gh = y0 - y1;
+  var v = makeView(p, W, H);
+  var grad = ctx.createLinearGradient(0, v.y1, 0, v.y0);
+  grad.addColorStop(0, '#0a1929'); grad.addColorStop(1, '#0d2440');
+  ctx.fillStyle = grad; ctx.fillRect(v.x0, v.y1, v.gw, v.gh);
 
-  // World coordinates: aircraft at horizontal position px_air, altitude h.
-  // We display from x = -3*scaleX to +scaleX horizontal, and 0 to ~1.5*h vertical.
-  // Pick world scale so that h fills ~60% of vertical, and horizontal range matches aspect.
-  var worldH = Math.max(p.h * 1.6, 200);
-  var worldW = worldH * (gw / gh);
-  // Aircraft at right side: world x = 0.6 * worldW from left, altitude h
-  var airWX = 0.65 * worldW;
-  // The cone extends backwards (negative x) from aircraft.
-  function tx(wx) { return x0 + (wx / worldW) * gw; }
-  function ty(wy) { return y0 - (wy / worldH) * gh; }
-
-  // Sky background subtle gradient
-  var grad = ctx.createLinearGradient(0, y1, 0, y0);
-  grad.addColorStop(0, '#0a1929');
-  grad.addColorStop(1, '#0d2440');
-  ctx.fillStyle = grad;
-  ctx.fillRect(x0, y1, gw, gh);
-
-  // Draw axes / ground
+  // Ground line + hatching
+  ctx.strokeStyle = 'rgba(143,184,224,0.55)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(v.x0, v.ty(0)); ctx.lineTo(v.x1, v.ty(0)); ctx.stroke();
+  ctx.strokeStyle = 'rgba(143,184,224,0.28)';
+  for (var gx = v.x0; gx < v.x1; gx += 14) {
+    ctx.beginPath(); ctx.moveTo(gx, v.ty(0)); ctx.lineTo(gx - 6, v.ty(0) + 8); ctx.stroke();
+  }
+  // Left axis
   ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1;
-  // Ground line
-  ctx.beginPath(); ctx.moveTo(x0, ty(0)); ctx.lineTo(x1, ty(0)); ctx.stroke();
-  // Vertical axis (left)
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(v.x0, v.y0); ctx.lineTo(v.x0, v.y1); ctx.stroke();
 
-  // Ground hatching
-  ctx.strokeStyle = 'rgba(143,184,224,0.3)';
-  ctx.lineWidth = 1;
-  for (var gx = x0; gx < x1; gx += 14) {
+  var V = p.M * p.c;
+  var srcAlt = p.h;
+  var srcPx = v.tx(sim.srcX), srcPy = v.ty(srcAlt);
+
+  // ---- Wavefront circles (expanding at speed c) ----
+  ctx.lineWidth = 1.2;
+  for (var i = 0; i < sim.emits.length; i++) {
+    var e = sim.emits[i];
+    var age = sim.t - e.t0;
+    if (age <= 0) continue;
+    var r = p.c * age;              // metres
+    var rPx = r / v.mpp;
+    var cxp = v.tx(e.x), cyp = v.ty(srcAlt);
+    // cull offscreen-ish huge circles
+    if (rPx > v.gw * 2.5) continue;
+    var fade = Math.max(0.12, 1 - age / (MAX_WAVES * EMIT_DT));
+    ctx.strokeStyle = 'rgba(74,198,255,' + (0.55 * fade).toFixed(3) + ')';
     ctx.beginPath();
-    ctx.moveTo(gx, ty(0));
-    ctx.lineTo(gx - 6, ty(0) + 8);
+    ctx.arc(cxp, cyp, rPx, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  // Y ticks (altitude)
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  var hStep = worldH / 4;
-  var pow10 = Math.pow(10, Math.floor(Math.log10(hStep)));
-  var nm = hStep / pow10;
-  var niceMul = nm < 1.5 ? 1 : nm < 3 ? 2 : nm < 7 ? 5 : 10;
-  hStep = niceMul * pow10;
-  for (var hv = 0; hv <= worldH; hv += hStep) {
-    var yy = ty(hv);
-    if (yy < y1 - 1 || yy > y0 + 1) continue;
-    ctx.strokeStyle = 'rgba(143,184,224,0.15)';
-    ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    ctx.fillText(Math.round(hv) + 'm', x0 - 4, yy + 3);
-  }
-
-  // X ticks (horizontal)
-  ctx.textAlign = 'center';
-  var xStep = worldW / 6;
-  var pow10x = Math.pow(10, Math.floor(Math.log10(xStep)));
-  var nmx = xStep / pow10x;
-  var niceMulx = nmx < 1.5 ? 1 : nmx < 3 ? 2 : nmx < 7 ? 5 : 10;
-  xStep = niceMulx * pow10x;
-  for (var xv = 0; xv <= worldW; xv += xStep) {
-    var xx = tx(xv);
-    if (xx < x0 - 1 || xx > x1 + 1) continue;
-    ctx.fillText(Math.round(xv) + 'm', xx, y0 + 14);
-  }
-
-  // Draw cone or spherical waves depending on regime
+  // ---- Mach lines (envelope tangent) for M>1 ----
+  var mu = null;
   if (p.M > 1) {
-    // Mach cone: half-angle mu
-    var mu = Math.asin(1 / p.M); // radians
-    // Cone lines from aircraft going backwards (negative x direction relative to aircraft motion)
-    // Aircraft moves to the right; cone trails behind, opening downward toward the ground.
-    // Cone half-angle from velocity vector (horizontal). So the cone surface in 2D is two lines
-    // making angle mu with the horizontal, going to the left (behind aircraft).
-    var coneLen = worldW * 1.2; // length of cone lines
-    var ax = airWX, ay = p.h;
-    // Line 1 (down-back): direction (-cos mu, -sin mu)
-    var dx1 = -Math.cos(mu) * coneLen, dy1 = -Math.sin(mu) * coneLen;
-    // Line 2 (up-back): direction (-cos mu, +sin mu)
-    var dx2 = -Math.cos(mu) * coneLen, dy2 = Math.sin(mu) * coneLen;
-
-    // Filled translucent cone
+    mu = Math.asin(1 / p.M);
+    var coneLen = (v.worldW + v.worldH) * 1.5;
+    var ax = sim.srcX, ay = srcAlt;
+    // Two tangent lines trailing behind (toward -x), opening by mu from horizontal.
+    var dirs = [ {dx:-Math.cos(mu), dy:-Math.sin(mu)}, {dx:-Math.cos(mu), dy:Math.sin(mu)} ];
+    // translucent fill between them
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(tx(ax), ty(ay));
-    ctx.lineTo(tx(ax + dx1), ty(ay + dy1));
-    ctx.lineTo(tx(ax + dx2), ty(ay + dy2));
+    ctx.moveTo(v.tx(ax), v.ty(ay));
+    ctx.lineTo(v.tx(ax + dirs[0].dx*coneLen), v.ty(ay + dirs[0].dy*coneLen));
+    ctx.lineTo(v.tx(ax + dirs[1].dx*coneLen), v.ty(ay + dirs[1].dy*coneLen));
     ctx.closePath();
-    ctx.fillStyle = 'rgba(74,198,255,0.15)';
+    ctx.fillStyle = 'rgba(255,209,102,0.10)';
     ctx.fill();
     ctx.restore();
-
-    // Cone edges
-    ctx.strokeStyle = 'rgba(74,198,255,0.95)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255,209,102,0.95)'; ctx.lineWidth = 2;
+    for (var k = 0; k < 2; k++) {
+      ctx.beginPath();
+      ctx.moveTo(v.tx(ax), v.ty(ay));
+      ctx.lineTo(v.tx(ax + dirs[k].dx*coneLen), v.ty(ay + dirs[k].dy*coneLen));
+      ctx.stroke();
+    }
+    // Mach angle arc + label (measured from rear horizontal)
+    ctx.strokeStyle = 'rgba(255,209,102,0.9)'; ctx.lineWidth = 1.5;
+    var arcR = 34;
     ctx.beginPath();
-    ctx.moveTo(tx(ax), ty(ay));
-    ctx.lineTo(tx(ax + dx1), ty(ay + dy1));
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(tx(ax), ty(ay));
-    ctx.lineTo(tx(ax + dx2), ty(ay + dy2));
-    ctx.stroke();
-
-    // Mach angle arc indicator
-    ctx.strokeStyle = 'rgba(255,209,102,0.9)';
-    ctx.lineWidth = 1.5;
-    var arcR = 36;
-    ctx.beginPath();
-    // angle from horizontal back-direction (180°) downward by mu
-    ctx.arc(tx(ax), ty(ay), arcR, Math.PI - mu, Math.PI, false);
+    ctx.arc(v.tx(ax), v.ty(ay), arcR, Math.PI - mu, Math.PI, false);
     ctx.stroke();
     ctx.fillStyle = 'rgba(255,209,102,0.95)';
-    ctx.font = '12px "Roboto Mono",monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText('μ', tx(ax) - arcR - 4, ty(ay) + 4);
-
-    // Compute ground intersection: from aircraft at (ax, h),
-    // line going in direction (-cos mu, -sin mu) toward ground.
-    // Reaches y=0 at distance t = h / sin mu; x_ground = ax - h * cos(mu)/sin(mu) = ax - h/tan(mu)
-    var lDist = p.h / Math.tan(mu);
-    var groundHitX = ax - lDist;
-    if (groundHitX > 0 && groundHitX < worldW) {
-      ctx.fillStyle = 'rgba(255,90,90,0.95)';
-      ctx.font = 'bold 16px "Roboto Mono",monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('×', tx(groundHitX), ty(0) - 4);
-      ctx.font = '10px "Roboto Mono",monospace';
-      ctx.fillText('ブーム到達', tx(groundHitX), ty(0) + 22);
-    }
-
-    // Vertical drop line from aircraft
-    ctx.save();
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(tx(ax), ty(ay));
-    ctx.lineTo(tx(ax), ty(0));
-    ctx.stroke();
-    ctx.restore();
-    ctx.fillStyle = '#cfe3f7';
-    ctx.font = '10px "Roboto Mono",monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('h=' + Math.round(p.h) + 'm', tx(ax) + 30, ty(p.h / 2));
-  } else if (Math.abs(p.M - 1) < 0.01) {
-    // Plane wave (M = 1)
-    var ax = airWX, ay = p.h;
-    ctx.strokeStyle = 'rgba(74,198,255,0.95)';
-    ctx.lineWidth = 2;
-    // Vertical plane through aircraft
-    ctx.beginPath();
-    ctx.moveTo(tx(ax), y1);
-    ctx.lineTo(tx(ax), ty(0));
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(74,198,255,0.9)';
-    ctx.font = '11px "Roboto Mono",monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('M=1: 平面波 (μ=90°)', tx(ax) + 8, ty(p.h * 0.5));
-  } else {
-    // Subsonic: concentric spherical waves
-    var ax = airWX, ay = p.h;
-    ctx.strokeStyle = 'rgba(74,198,255,0.6)';
-    ctx.lineWidth = 1.4;
-    // Draw 4 expanding circles at past times
-    for (var i = 1; i <= 4; i++) {
-      var dt = i * 0.4; // seconds
-      var radius = p.c * dt;
-      // emission point: aircraft was at (ax - V*dt, h)
-      var V = p.M * p.c;
-      var emitX = ax - V * dt;
-      // Convert radius to canvas units (use horizontal scale)
-      var rPx = (radius / worldW) * gw;
-      ctx.beginPath();
-      ctx.arc(tx(emitX), ty(ay), rPx, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.fillStyle = 'rgba(74,198,255,0.9)';
-    ctx.font = '11px "Roboto Mono",monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('M<1: 球面波 (円錐なし)', tx(ax) - 200, ty(p.h * 1.4));
+    ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'right';
+    ctx.fillText('mu=' + (mu*180/Math.PI).toFixed(1) + 'deg', v.tx(ax) - arcR - 4, v.ty(ay) + 4);
+  } else if (Math.abs(p.M - 1) < 0.02) {
+    // M=1: wall (vertical plane through source)
+    ctx.strokeStyle = 'rgba(255,90,90,0.9)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(srcPx, v.y1); ctx.lineTo(srcPx, v.ty(0)); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,150,150,0.95)';
+    ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+    ctx.fillText('M=1 ' + LANG.wall, srcPx + 8, v.ty(srcAlt*0.6));
   }
 
-  // Draw aircraft (orange triangle)
-  var axp = tx(airWX), ayp = ty(p.h);
-  ctx.save();
-  ctx.translate(axp, ayp);
-  ctx.fillStyle = '#FFA94D';
-  ctx.strokeStyle = '#FF6B00';
-  ctx.lineWidth = 1;
+  // ---- Source trail ----
+  ctx.strokeStyle = 'rgba(255,169,77,0.5)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([3,4]);
   ctx.beginPath();
-  ctx.moveTo(10, 0);
-  ctx.lineTo(-8, -5);
-  ctx.lineTo(-5, 0);
-  ctx.lineTo(-8, 5);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(v.tx(sim.srcX - V * (MAX_WAVES*EMIT_DT)), v.ty(srcAlt));
+  ctx.lineTo(srcPx, srcPy);
   ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ---- Ground boom intersection (cone hits ground) ----
+  if (mu !== null) {
+    var lDist = p.h / Math.tan(mu);
+    var groundHitWX = sim.srcX - lDist;
+    var ghx = v.tx(groundHitWX);
+    if (ghx > v.x0 && ghx < v.x1) {
+      ctx.fillStyle = 'rgba(255,90,90,0.95)';
+      ctx.font = 'bold 16px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+      ctx.fillText('x', ghx, v.ty(0) - 4);
+      ctx.font = '10px "Roboto Mono",monospace';
+      ctx.fillText(LANG.boomHit, ghx, v.ty(0) + 22);
+    }
+    // altitude drop line
+    ctx.save(); ctx.setLineDash([4,4]);
+    ctx.strokeStyle = 'rgba(143,184,224,0.5)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(srcPx, srcPy); ctx.lineTo(srcPx, v.ty(0)); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillText('h=' + Math.round(p.h) + 'm', srcPx + 28, v.ty(p.h/2));
+  }
+
+  // ---- Observer: fixed ground point. Defined as the point the source will reach
+  //      such that, when the cone trails by l=h/tan(mu), the boom lands here.
+  //      We anchor it relative to the source so it scrolls with the world frame. ----
+  if (p.x >= 0) {
+    if (sim.startObsWX == null) sim.startObsWX = sim.srcX + p.x; // ahead of current source by x
+    var obsWXfixed = sim.startObsWX;
+    var oxp = v.tx(obsWXfixed), oyp = v.ty(0);
+    if (oxp > v.x0 - 30 && oxp < v.x1 + 30) {
+      ctx.fillStyle = '#4FD1A6';
+      ctx.beginPath(); ctx.arc(oxp, oyp - 4, 5, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#2a8a64'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = '#4FD1A6'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+      ctx.fillText(LANG.observer, oxp, oyp + 16);
+    }
+    // Detect boom arrival: cone ground intersection reaches observer x.
+    if (mu !== null) {
+      var lDist2 = p.h / Math.tan(mu);
+      var coneGroundWX = sim.srcX - lDist2;
+      if (!sim.boomFired && coneGroundWX >= obsWXfixed) {
+        sim.boomFired = true;
+        sim.boomX = obsWXfixed;
+      }
+    }
+  }
+
+  // ---- Source (orange triangle pointing in flight direction) ----
+  ctx.save();
+  ctx.translate(srcPx, srcPy);
+  ctx.fillStyle = '#FFA94D'; ctx.strokeStyle = '#FF6B00'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(11, 0); ctx.lineTo(-9, -6); ctx.lineTo(-5, 0); ctx.lineTo(-9, 6); ctx.closePath();
+  ctx.fill(); ctx.stroke();
   ctx.restore();
 
-  // Draw observer at (x, 0)
-  if (p.x >= 0) {
-    // World x of observer relative to coordinate: aircraft is at airWX, observer at airWX - p.x (behind aircraft).
-    // Actually observer is at horizontal position from origin. We measure x as distance from aircraft directly below.
-    var obsWX = airWX - p.x;
-    if (obsWX >= 0 && obsWX <= worldW) {
-      var oxp = tx(obsWX), oyp = ty(0);
-      ctx.fillStyle = '#4FD1A6';
-      ctx.beginPath();
-      ctx.arc(oxp, oyp - 4, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#2a8a64';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-      ctx.fillStyle = '#4FD1A6';
-      ctx.font = '10px "Roboto Mono",monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('観測者 x=' + Math.round(p.x) + 'm', oxp, oyp + 16);
-    }
+  // ---- HUD readouts (top-left, large) ----
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 14px "Roboto Mono",monospace';
+  ctx.fillStyle = '#FFD166';
+  var muTxt = (p.M >= 1) ? ('mu=' + (Math.asin(1/Math.max(1,p.M))*180/Math.PI).toFixed(1) + 'deg') : ('mu=' + LANG.undef);
+  ctx.fillText('M=' + p.M.toFixed(2) + '  ' + muTxt, v.x0 + 8, v.y1 + 16);
+  ctx.font = '11px "Roboto Mono",monospace'; ctx.fillStyle = '#9fd0ff';
+  ctx.fillText('V=' + Math.round(V) + ' m/s   a=' + Math.round(p.c) + ' m/s', v.x0 + 8, v.y1 + 32);
+  // regime tag
+  var rg = (p.M < 0.98) ? LANG.subsonic : (p.M <= 1.02 ? LANG.sonic : LANG.supersonic);
+  var rgcol = (p.M < 0.98) ? '#FFB347' : (p.M <= 1.02 ? '#FF8080' : '#4FD1A6');
+  ctx.fillStyle = rgcol; ctx.font = 'bold 11px "Roboto Mono",monospace';
+  ctx.fillText(rg, v.x0 + 8, v.y1 + 48);
+  if (sim.boomFired) {
+    ctx.fillStyle = '#FF6B6B'; ctx.font = 'bold 12px "Roboto Mono",monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(LANG.boomArrived, v.x1 - 8, v.y1 + 16);
   }
 
   // Axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('水平距離', (x0 + x1) / 2, H - 6);
-  ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('高度', 0, 0);
-  ctx.restore();
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(LANG.axX, (v.x0 + v.x1) / 2, H - 6);
+  ctx.save(); ctx.translate(13, (v.y0 + v.y1) / 2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(LANG.axY, 0, 0); ctx.restore();
 }
 
 function drawMu(p) {
   var ctx = muCtx, W = __novaCanvasCssW(muCanvas), H = __novaCanvasCssH(muCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
   var mx = 50, my = 30;
   var x0 = mx, x1 = W - 18, y0 = H - my, y1 = my + 4;
   var gw = x1 - x0, gh = y0 - y1;
-
-  // X axis: M from 1.0 to 5.0
-  var Mmin = 1.0, Mmax = 5.0;
-  var muMin = 0, muMax = 90;
-
+  var Mmin = 1.0, Mmax = 5.0, muMin = 0, muMax = 90;
   function px(M) { return x0 + ((M - Mmin) / (Mmax - Mmin)) * gw; }
   function py(mu) { return y0 - ((mu - muMin) / (muMax - muMin)) * gh; }
-
-  // Gridlines
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.lineWidth = 1;
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-
+  ctx.strokeStyle = 'rgba(143,184,224,0.18)'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#8fb8e0'; ctx.font = '10px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
   for (var Mv = 1; Mv <= 5; Mv += 1) {
     var xx = px(Mv);
@@ -522,25 +568,18 @@ function drawMu(p) {
     ctx.fillText('M=' + Mv, xx, y0 + 14);
   }
   ctx.textAlign = 'right';
-  for (var mu = 0; mu <= 90; mu += 15) {
-    var yy = py(mu);
+  for (var mug = 0; mug <= 90; mug += 15) {
+    var yy = py(mug);
     if (yy < y1 - 1 || yy > y0 + 1) continue;
     ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    ctx.fillText(mu + '°', x0 - 4, yy + 3);
+    ctx.fillText(mug + 'deg', x0 - 4, yy + 3);
   }
-
-  // Axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(143,184,224,0.55)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-
-  // Plot mu(M) = arcsin(1/M) in degrees
-  ctx.strokeStyle = 'rgba(74,198,255,0.95)';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(74,198,255,0.95)'; ctx.lineWidth = 2;
   ctx.beginPath();
-  var first = true;
-  var samples = 200;
+  var first = true, samples = 200;
   for (var i = 0; i <= samples; i++) {
     var Mi = Mmin + (Mmax - Mmin) * (i / samples);
     var muDeg = Math.asin(1 / Mi) * 180 / Math.PI;
@@ -548,138 +587,136 @@ function drawMu(p) {
     if (first) { ctx.moveTo(X, Y); first = false; } else ctx.lineTo(X, Y);
   }
   ctx.stroke();
-
-  // Current M marker (only if M >= 1.0; if M < 1.0 mark M=1)
   var Mcur = Math.max(1.0, Math.min(5.0, p.M));
-  var muCurDeg;
-  if (p.M >= 1) muCurDeg = Math.asin(1 / Mcur) * 180 / Math.PI;
-  else muCurDeg = 90;
+  var muCurDeg = (p.M >= 1) ? Math.asin(1 / Mcur) * 180 / Math.PI : 90;
   var Xc = px(Mcur), Yc = py(muCurDeg);
-  ctx.fillStyle = '#FFD166';
-  ctx.beginPath();
-  ctx.arc(Xc, Yc, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  // Label
-  ctx.fillStyle = '#FFD166';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  var lbl = 'M=' + p.M.toFixed(2) + ', μ=' + muCurDeg.toFixed(1) + '°';
-  ctx.fillText(lbl, Math.min(Xc + 10, x1 - 120), Yc - 6);
-
-  // Asymptote labels
-  ctx.fillStyle = 'rgba(143,184,224,0.7)';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('M→1: μ→90° (平面波)', x0 + 8, y1 + 12);
-  ctx.textAlign = 'right';
-  ctx.fillText('M→∞: μ→0° (鋭い円錐)', x1 - 4, y0 - 8);
-
-  // Axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('マッハ数 M', (x0 + x1) / 2, H - 6);
-  ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('マッハ角 μ (度)', 0, 0);
-  ctx.restore();
+  ctx.fillStyle = '#FFD166'; ctx.beginPath(); ctx.arc(Xc, Yc, 6, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#FFD166'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('M=' + p.M.toFixed(2) + ', mu=' + muCurDeg.toFixed(1) + 'deg', Math.min(Xc + 10, x1 - 140), Yc - 6);
+  ctx.fillStyle = 'rgba(143,184,224,0.7)'; ctx.font = '10px "Roboto Mono",monospace';
+  ctx.textAlign = 'left'; ctx.fillText(LANG.asym1, x0 + 8, y1 + 12);
+  ctx.textAlign = 'right'; ctx.fillText(LANG.asym2, x1 - 4, y0 - 8);
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(LANG.muAxX, (x0 + x1) / 2, H - 6);
+  ctx.save(); ctx.translate(14, (y0 + y1) / 2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(LANG.muAxY, 0, 0); ctx.restore();
 }
 
 function compute() {
   var p = getParams();
   if (!isFinite(p.M) || !isFinite(p.c) || !isFinite(p.h) || !isFinite(p.x)) return;
-
   var V = p.M * p.c;
   document.getElementById('statV').textContent = Math.round(V) + ' m/s';
-
   var regimeEl = document.getElementById('statRegime');
-  if (p.M < 1) {
-    document.getElementById('statMu').textContent = '—';
+  if (p.M < 0.98) {
+    document.getElementById('statMu').textContent = LANG.undef;
     document.getElementById('statDelay').textContent = '—';
     document.getElementById('statL').textContent = '—';
-    regimeEl.textContent = '亜音速 (M<1): 円錐は形成されません';
-    regimeEl.style.color = '#FFB347';
-  } else if (Math.abs(p.M - 1) < 0.005) {
-    document.getElementById('statMu').textContent = '90.0°';
+    regimeEl.textContent = LANG.regSub; regimeEl.style.color = '#FFB347';
+  } else if (p.M <= 1.02) {
+    document.getElementById('statMu').textContent = '90.0deg';
     document.getElementById('statDelay').textContent = '—';
     document.getElementById('statL').textContent = '—';
-    regimeEl.textContent = '遷音速 (M=1): 平面波 (μ=90°)';
-    regimeEl.style.color = '#FFD166';
+    regimeEl.textContent = LANG.regSonic; regimeEl.style.color = '#FFD166';
   } else {
     var muRad = Math.asin(1 / p.M);
     var muDeg = muRad * 180 / Math.PI;
     var l = p.h / Math.tan(muRad);
     var tDelay = l / V;
-    document.getElementById('statMu').textContent = muDeg.toFixed(1) + '°';
+    document.getElementById('statMu').textContent = muDeg.toFixed(1) + 'deg';
     document.getElementById('statDelay').textContent = tDelay.toFixed(2) + ' s';
     document.getElementById('statL').textContent = Math.round(l) + ' m';
-    regimeEl.textContent = '超音速 (M>1): マッハ円錐が形成されています';
-    regimeEl.style.color = '#4FD1A6';
+    regimeEl.textContent = LANG.regSuper; regimeEl.style.color = '#4FD1A6';
   }
-
-  drawCone(p);
+  drawScene(p);
   drawMu(p);
 }
 
-function animationStep() {
-  if (!playing) return;
-  var sl = document.getElementById('slM');
-  var cur = parseFloat(sl.value);
-  if (!isFinite(cur)) cur = 2.0;
-  cur += 0.05;
-  if (cur > 5.0) {
-    cur = 2.0;
-    playing = false;
-    document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> M をスイープ';
-    sl.value = cur.toFixed(2);
-    updateSlider(sl, 'slMVal', 2, '');
-    compute();
-    return;
+// ===== Animation loop (real-time rAF) =====
+function loop(ts) {
+  if (!playing) { animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dtReal = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  var p = getParams();
+  // Scale sim time: pick so the source crosses the view in a comfortable few seconds.
+  // dt scaled so motion is visible regardless of absolute V.
+  var V = Math.max(p.M * p.c, 1);
+  // target: source advances ~ (worldW/6) per second of wall time at 1x
+  var simDt = dtReal * speedMult * 1.0;
+  stepSim(simDt, p);
+  // Recycle the source when it has flown far enough so the animation is continuous.
+  if (sim.srcX > V * (MAX_WAVES * EMIT_DT) * 1.2 + 50000) {
+    // keep numbers bounded; shift frame back
+    var shift = sim.srcX;
+    sim.srcX = 0;
+    sim.emits.forEach(function(e){ e.x -= shift; });
+    if (sim.startObsWX != null) sim.startObsWX -= shift;
   }
-  sl.value = cur.toFixed(2);
-  updateSlider(sl, 'slMVal', 2, '');
-  compute();
-  animId = requestAnimationFrame(function(){ setTimeout(animationStep, 80); });
+  drawScene(p);
+  animId = requestAnimationFrame(loop);
 }
 
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    var sl = document.getElementById('slM');
-    sl.value = '0.50';
-    updateSlider(sl, 'slMVal', 2, '');
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> M をスイープ';
-    if (animId) cancelAnimationFrame(animId);
-  }
+function startPlay() {
+  if (prefersReduced) { compute(); return; }
+  playing = true; lastTs = 0;
+  document.getElementById('playBtn').innerHTML = '<i class="fas fa-pause"></i> ' + LANG.pause;
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay() {
+  playing = false;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> ' + LANG.play;
+}
+function togglePlay() { playing ? stopPlay() : startPlay(); }
+
+function setSpeed(s) {
+  speedMult = s;
+  document.querySelectorAll('.speed-btn').forEach(function(b){
+    var a = parseFloat(b.dataset.speed) === s;
+    b.classList.toggle('active', a);
+    b.style.borderColor = a ? 'var(--accent)' : '';
+    b.style.color = a ? 'var(--accent)' : '';
+  });
+}
+
+function applyPreset(M) {
+  var sl = document.getElementById('slM');
+  sl.value = M.toFixed(2);
+  if (typeof syncToNum === 'function') syncToNum('slM','slMVal');
+  if (typeof updateSlider === 'function') updateSlider(sl, 'slMVal', 2, '');
+  sim.startObsWX = null;
+  resetSim();
+  compute();
 }
 
 function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> M をスイープ';
+  stopPlay();
   var defs = { slM: 2.00, slC: 343, slH: 1000, slX: 0 };
-  Object.keys(defs).forEach(function(id){
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slM'), 'slMVal', 2, '');
-  updateSlider(document.getElementById('slC'), 'slCVal', 0, 'm/s');
-  updateSlider(document.getElementById('slH'), 'slHVal', 0, 'm');
-  updateSlider(document.getElementById('slX'), 'slXVal', 0, 'm');
+  Object.keys(defs).forEach(function(id){ document.getElementById(id).value = defs[id]; });
+  if (typeof updateSlider === 'function') {
+    updateSlider(document.getElementById('slM'), 'slMVal', 2, '');
+    updateSlider(document.getElementById('slC'), 'slCVal', 0, 'm/s');
+    updateSlider(document.getElementById('slH'), 'slHVal', 0, 'm');
+    updateSlider(document.getElementById('slX'), 'slXVal', 0, 'm');
+  }
+  sim.startObsWX = null;
+  setSpeed(1);
+  resetSim();
   compute();
 }
 
-window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
+// When the observer x slider changes we re-anchor the observer & boom state.
+var _slX = document.getElementById('slX');
+if (_slX) _slX.addEventListener('input', function(){ sim.startObsWX = null; sim.boomFired = false; sim.boomX = null; });
+
+window.addEventListener('resize', function(){ resizeCanvases(); drawMu(getParams()); drawScene(getParams()); });
 
 resizeCanvases();
+resetSim();
 compute();
+if (!prefersReduced) startPlay();
 </script>
 
 <section class="explanation">
@@ -701,7 +738,7 @@ compute();
       <div class="bub">高度を 12000m にして M=2 にしたら、円錐到達距離が 20km くらいになりました。コンコルドって地上から見えなかったのに音だけ聞こえたのはこういう理由ですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大正解。コンコルドは大西洋を高度 18000m、M=2.04 で巡航していた。マッハ角は約 29.4°、円錐到達距離は 18000/tan(29.4°)≒32km。つまり機体が真上を通過してから 32km 後ろに地表ブームが届く、時間にして約 56 秒遅れだ。観測者が真下にいる瞬間には何も起きず、機体が水平線の彼方に消えた頃に「ドン」と聞こえる。これがコンコルドの陸上ルートを禁止した理由で、衝撃過圧 (Δp) が約 100 Pa、人間の聴覚閾値の 10^7 倍だから建物の窓ガラスを振動させ、家畜を驚かせる。NASA の X-59 QueSST はこの Δp を 25 Pa 以下に抑える設計で、2026 年現在試験飛行中だね。</div>
+      <div class="bub">大正解。コンコルドは大西洋を高度 18000m、M=2.04 で巡航していた。マッハ角は約 29.4°、円錐到達距離は 18000/tan(29.4°)≒32km。つまり機体が真上を通過してから 32km 後ろに地表ブームが届く、時間にして約 46 秒遅れだ。観測者が真下にいる瞬間には何も起きず、機体が水平線の彼方に消えた頃に「ドン」と聞こえる。これがコンコルドの陸上ルートを禁止した理由で、衝撃過圧 (Δp) が約 100 Pa、人間の聴覚閾値の 10^7 倍だから建物の窓ガラスを振動させ、家畜を驚かせる。NASA の X-59 QueSST はこの Δp を 25 Pa 以下に抑える設計で、2026 年現在試験飛行中だね。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">M=5 にしたらマッハ角が 11.5° まで小さくなって、円錐が針みたいに鋭くなりました。極超音速ってこういう世界なんですね。</div>
@@ -758,6 +795,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="mach-cone.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -800,12 +840,22 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>高度12,000mでマッハ2.5で飛行するコンコルド型機体：音速C=295m/s、マッハ数M=2.5より飛行速度V=737.5m/s、マッハ角μ=arcsin(1/2.5)=23.6度。観測地点が高度500m、水平距離8km地点の場合、円錐到達遅延=15秒程度、ソニックブーム圧力変化ΔP≈500Pa（客室窓ガラスに作用）。F-15イーグルのマッハ2.5高度では衝撃波円錐半角が約24度となり、地表ブーム帯幅は約45km。</p>
+<p>高度12,000mでマッハ2.5で飛行するコンコルド型機体：音速C=295m/s、マッハ数M=2.5より飛行速度V=737.5m/s、マッハ角μ=arcsin(1/2.5)=23.6度。飛行体直下（x=0）の地表観測者には、機体が真上を通過してから t=ℓ/V 秒遅れてブームが届きます。円錐到達水平距離 ℓ=h/tanμ=12000/tan(23.6°)≒27,495m、時間遅延 t=27495/737.5≒37.3秒。マッハ数を上げると円錐が鋭くなり ℓ と遅延はさらに伸びます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol><li>マッハ1未満では円錐が形成されず、計算結果は無効：必ずM≥1.0を設定</li><li>高度変化による音速変動は気温低下率を正確に入力しないと飛行速度計算が狂う（高度1000m上昇で気温約6.5度低下）</li><li>ソニックブーム被害評価ではPNLdB値で判定：90PNLdB以上で住宅損傷リスク、商用超音速機はこのため陸上飛行が禁止</li><li>水平距離計算では地形遮蔽を考慮せず、実際には山岳地帯で衝撃波が減衰：平原条件での数値のみ信頼度が高い</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

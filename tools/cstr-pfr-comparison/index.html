@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "CSTR vs PFR 性能比較シミュレーター",
       "description": "1次反応 A→B における連続槽型反応器（CSTR）と管型反応器（PFR）の出口濃度・転化率・体積比をリアルタイムに計算・可視化する化学工学の教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/cstr-pfr-comparison.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["1次反応 A→B の CSTR・PFR 出口濃度の計算","ダムケラー数 Da と転化率の表示","PFR 内の濃度プロファイルの可視化","同一転化率を達成する CSTR/PFR 体積比"],
       "keywords": "CSTR,PFR,反応器設計,ダムケラー数,転化率,1次反応,化学工学,反応工学",
       "datePublished": "2026-05-16",
@@ -169,6 +169,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">滞留時間 τ = V/v、ダムケラー数 Da = k·τ。CSTR・PFR とも等温・定容・1次反応 A→B を仮定しています。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4759820477?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4759820477.09._SCMZZZZZZ_.jpg" alt="化学工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">化学工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -179,13 +188,17 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <div class="stat-card"><div class="sv" id="statPFR">0.135</div><div class="sl">PFR 出口 [A] (mol/L)</div></div>
         <div class="stat-card"><div class="sv" id="statXCSTR">66.7</div><div class="sl">CSTR 転化率 (%)</div></div>
         <div class="stat-card"><div class="sv" id="statXPFR">86.5</div><div class="sl">PFR 転化率 (%)</div></div>
+        <div class="stat-card"><div class="sv" id="statVCSTR">—</div><div class="sl">同一X必要体積 V<sub>CSTR</sub> (L)</div></div>
+        <div class="stat-card"><div class="sv" id="statVPFR">—</div><div class="sl">同一X必要体積 V<sub>PFR</sub> (L)</div></div>
+        <div class="stat-card"><div class="sv" id="statRatio">—</div><div class="sl">体積比 V<sub>CSTR</sub>/V<sub>PFR</sub></div></div>
+        <div class="stat-card"><div class="sv" id="statTau">—</div><div class="sl">滞留時間 τ (min)</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 反応器内の濃度プロファイル</div>
+      <div class="chart-title"><i class="fas fa-flask"></i> 反応器内の様子（ライブ・アニメーション）</div>
       <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">横軸＝反応器内位置 z/L（PFR は連続変化、CSTR は単一槽）／縦軸＝[A]/[A]<sub>0</sub>。青実線＝PFR の指数減衰、緑破線＝CSTR の一定値。</p>
+      <p class="canvas-hint">左＝CSTR（完全混合＝槽内が均一な色／粒子が撹拌で乱流運動）、右＝PFR（入口から出口へ色が薄くなる濃度勾配／粒子がプラグ流で前進）。下段＝レベンシュピール線図 1/(−r<sub>A</sub>) vs X の面積比較（同一転化率に必要な体積に比例。PFRの面積＜CSTRの面積）。</p>
     </div>
 
     <div class="chart-card">
@@ -207,167 +220,257 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== CSTR vs PFR Comparison Simulator ==========
+// ========== CSTR vs PFR Comparison Simulator (v2) ==========
+(function(){
+"use strict";
 var cv = document.getElementById('cv');
+if (!cv) return;
 var ctx = cv.getContext('2d');
+var cssW = 600, cssH = 400;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var rafId = null, phase = 0;
 
-function getParams() {
-  var CA0 = parseFloat(document.getElementById('slCA0').value);
-  var k = parseFloat(document.getElementById('slK').value);
-  var V = parseFloat(document.getElementById('slV').value);
-  var q = parseFloat(document.getElementById('slQ').value);
+function el(id){ return document.getElementById(id); }
+function fmt(v, d){ if (!isFinite(v)) return '—'; return v.toFixed(d == null ? 3 : d); }
+
+function getParams(){
+  var CA0 = parseFloat(el('slCA0').value);
+  var k = parseFloat(el('slK').value);
+  var V = parseFloat(el('slV').value);
+  var q = parseFloat(el('slQ').value);
   var tau = q > 0 ? V / q : 0;
   var Da = k * tau;
   return { CA0: CA0, k: k, V: V, q: q, tau: tau, Da: Da };
 }
 
-function fmt(v, d) {
-  if (!isFinite(v)) return '—';
-  return v.toFixed(d == null ? 3 : d);
+// Volume ratio for equal conversion X (1st order): V_CSTR/V_PFR = -X/((1-X)ln(1-X))
+function volRatio(X){
+  if (X <= 0 || X >= 1) return NaN;
+  return (-X) / ((1 - X) * Math.log(1 - X));
 }
 
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var h = Math.round(w * 0.6);
+function resizeCanvas(){
+  var w = Math.max(280, Math.min((cv.parentElement.clientWidth || 600) - 40, 900));
+  var h = Math.round(w * 0.66);
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cssW = w; cssH = h;
   cv.style.width = w + 'px';
   cv.style.height = h + 'px';
   cv.width = Math.round(w * dpr);
   cv.height = Math.round(h * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cv.dataset.cssW = String(w);
-  cv.dataset.cssH = String(h);
 }
 
-function drawProfile(p) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
+// concentration -> color (high [A]=warm orange, low [A]=cool teal)
+function concColor(frac, a){
+  frac = Math.max(0, Math.min(1, frac));
+  var r = Math.round(20 + frac * 215);
+  var g = Math.round(160 - frac * 50);
+  var b = Math.round(180 - frac * 150);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + (a == null ? 1 : a) + ')';
+}
+
+// deterministic pseudo-random for particle layout
+function rnd(i){ var x = Math.sin(i * 12.9898) * 43758.5453; return x - Math.floor(x); }
+
+var NP_CSTR = 26, NP_PFR = 22;
+
+function drawReactors(p, t){
+  var W = cssW, H = cssH;
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
 
-  var mx = 56, my = 36;
-  var x0 = mx, x1 = W - 18, y0 = H - my, y1 = my;
-  var gw = x1 - x0, gh = y0 - y1;
+  var topH = H * 0.52;       // reactor visual zone
+  var botY = topH + 8;       // levenspiel chart zone start
+  var pad = 14;
 
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+  var fCSTR = 1 / (1 + p.Da);            // [A]/[A0] uniform in tank
+  var X_CSTR = 1 - fCSTR;
+  var X_PFR = 1 - Math.exp(-p.Da);
 
-  // grid (y=0,0.25,0.5,0.75,1.0)
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  for (var i = 1; i <= 4; i++) {
-    var y = y0 - (i / 4) * gh;
-    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
-    var x = x0 + (i / 4) * gw;
-    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
-  }
-  ctx.setLineDash([]);
-
-  function px(z) { return x0 + z * gw; }
-  function py(f) { return y0 - f * gh; }
-
-  // PFR exponential decay: f(x) = exp(-Da*x)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
+  // ---- CSTR (left): well-mixed uniform tank ----
+  var tankX = pad, tankW = (W - pad * 3) * 0.42, tankY = 30, tankH = topH - 44;
+  ctx.fillStyle = concColor(fCSTR, 0.30);
   ctx.beginPath();
-  var N = 200;
-  for (var j = 0; j <= N; j++) {
-    var z = j / N;
-    var f = Math.exp(-p.Da * z);
-    if (j === 0) ctx.moveTo(px(z), py(f)); else ctx.lineTo(px(z), py(f));
-  }
-  ctx.stroke();
-
-  // CSTR constant value: f = 1/(1+Da)
-  var fCSTR = 1 / (1 + p.Da);
-  ctx.strokeStyle = '#27ae60';
-  ctx.lineWidth = 2.2;
-  ctx.setLineDash([8, 5]);
-  ctx.beginPath();
-  ctx.moveTo(px(0), py(fCSTR));
-  ctx.lineTo(px(1), py(fCSTR));
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('z / L  (反応器内位置)', (x0 + x1) / 2, H - 8);
+  if (ctx.roundRect) ctx.roundRect(tankX, tankY, tankW, tankH, 10); else ctx.rect(tankX, tankY, tankW, tankH);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(143,184,224,0.55)'; ctx.lineWidth = 1.6; ctx.stroke();
+  // stirrer
+  var cxS = tankX + tankW / 2, cyS = tankY + tankH / 2;
   ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('[A] / [A]₀', 0, 0);
+  ctx.translate(cxS, cyS);
+  ctx.rotate(phase * 2.2);
+  ctx.strokeStyle = 'rgba(207,227,247,0.5)'; ctx.lineWidth = 2.4;
+  ctx.beginPath(); ctx.moveTo(-tankW*0.22, 0); ctx.lineTo(tankW*0.22, 0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -tankW*0.18); ctx.lineTo(0, tankW*0.18); ctx.stroke();
   ctx.restore();
+  ctx.strokeStyle = 'rgba(207,227,247,0.55)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cxS, tankY - 12); ctx.lineTo(cxS, cyS); ctx.stroke();
+  // turbulent particles (uniform color = uniform concentration)
+  for (var i = 0; i < NP_CSTR; i++){
+    var a1 = phase * (0.7 + rnd(i) * 1.6) + rnd(i + 7) * 6.28;
+    var rad = (0.12 + rnd(i + 3) * 0.34) * Math.min(tankW, tankH);
+    var pxp = cxS + Math.cos(a1) * rad * (0.8 + 0.2*Math.sin(phase + i));
+    var pyp = cyS + Math.sin(a1 * 1.1) * rad * 0.7;
+    ctx.beginPath(); ctx.arc(pxp, pyp, 3.1, 0, 6.2832);
+    ctx.fillStyle = concColor(fCSTR, 0.95); ctx.fill();
+  }
+  // inlet/outlet flow
+  ctx.fillStyle = concColor(1, 0.95);
+  var fin = (phase * 0.9) % 1;
+  ctx.beginPath(); ctx.arc(tankX - 8 + fin*8, tankY + tankH*0.25, 3, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = concColor(fCSTR, 0.95);
+  ctx.beginPath(); ctx.arc(tankX + tankW + fin*8, tankY + tankH*0.75, 3, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = '#cfe3f7'; ctx.font = 'bold 13px "Noto Sans JP",sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('CSTR（完全混合）', tankX + tankW/2, tankY - 16);
+  ctx.font = '11px "Roboto Mono",monospace'; ctx.fillStyle = '#FFD166';
+  ctx.fillText('X = ' + fmt(X_CSTR*100, 1) + '%', tankX + tankW/2, tankY + tankH + 18);
 
-  ctx.textAlign = 'left';
-  ctx.fillText('0', x0 - 4, y0 + 14);
-  ctx.fillText('1', x0 - 8, y1 + 4);
+  // ---- PFR (right): tube with moving concentration gradient ----
+  var tubeX = tankX + tankW + pad, tubeW = (W - pad * 3) * 0.58 - pad, tubeY = tankY + tankH*0.30, tubeH = tankH*0.40;
+  // gradient fill along length: [A]/[A0] = exp(-Da*z)
+  var grad = ctx.createLinearGradient(tubeX, 0, tubeX + tubeW, 0);
+  for (var gs = 0; gs <= 6; gs++){
+    var z = gs / 6;
+    grad.addColorStop(z, concColor(Math.exp(-p.Da * z), 0.85));
+  }
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(tubeX, tubeY, tubeW, tubeH, tubeH/2); else ctx.rect(tubeX, tubeY, tubeW, tubeH);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(143,184,224,0.55)'; ctx.lineWidth = 1.6; ctx.stroke();
+  // plug-flow particles advancing left->right, colored by local conc
+  for (var j = 0; j < NP_PFR; j++){
+    var off = (phase * 0.55 + j / NP_PFR) % 1;
+    var zz = off;
+    var ppx = tubeX + 6 + zz * (tubeW - 12);
+    var ppy = tubeY + tubeH/2 + (rnd(j)*2 - 1) * tubeH * 0.22;
+    ctx.beginPath(); ctx.arc(ppx, ppy, 3.1, 0, 6.2832);
+    ctx.fillStyle = concColor(Math.exp(-p.Da * zz), 0.98); ctx.fill();
+  }
+  ctx.fillStyle = '#cfe3f7'; ctx.font = 'bold 13px "Noto Sans JP",sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('PFR（プラグ流＝濃度勾配）', tubeX + tubeW/2, tubeY - 14);
+  // inlet/outlet labels
+  ctx.font = '10px "Roboto Mono",monospace'; ctx.fillStyle = '#cfe3f7'; ctx.textAlign = 'left';
+  ctx.fillText('入口[A]₀', tubeX, tubeY + tubeH + 14);
   ctx.textAlign = 'right';
-  ctx.fillText('1', x1, y0 + 14);
+  ctx.fillText('出口', tubeX + tubeW, tubeY + tubeH + 14);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#FFD166'; ctx.font = '11px "Roboto Mono",monospace';
+  ctx.fillText('X = ' + fmt(X_PFR*100, 1) + '%', tubeX + tubeW/2, tubeY + tubeH + 30);
 
-  // legend top-right
-  var lx = x1 - 150, ly = y1 + 8;
-  ctx.fillStyle = 'rgba(10,30,55,0.85)';
-  ctx.fillRect(lx, ly, 150, 48);
-  ctx.strokeStyle = 'rgba(143,184,224,0.4)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(lx, ly, 150, 48);
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.moveTo(lx + 10, ly + 16); ctx.lineTo(lx + 38, ly + 16); ctx.stroke();
-  ctx.fillStyle = '#cfe3f7';
-  ctx.textAlign = 'left';
-  ctx.fillText('PFR  exp(-Da·z)', lx + 44, ly + 20);
-  ctx.strokeStyle = '#27ae60';
-  ctx.lineWidth = 2.2;
-  ctx.setLineDash([8, 5]);
-  ctx.beginPath(); ctx.moveTo(lx + 10, ly + 36); ctx.lineTo(lx + 38, ly + 36); ctx.stroke();
+  // ---- Levenspiel plot: 1/(-rA) vs X, area = V/(Q*CA0) ----
+  var gx0 = pad + 44, gx1 = W - pad - 8, gy0 = H - 22, gy1 = botY + 26;
+  var gw = gx1 - gx0, gh = gy0 - gy1;
+  // target conversion = PFR conversion at current Da (the design conversion both must reach)
+  var Xt = X_PFR;
+  if (!(Xt > 0.001)) Xt = 0.5;
+  // f(X) = 1/(k*CA0*(1-X)) ; scale to chart so the curve fits
+  function invRate(X){ return 1 / (1 - X); }   // normalized 1/(k CA0 (1-X)) * (k CA0)
+  var ymax = invRate(Math.min(Xt, 0.92)) * 1.15;
+  if (!isFinite(ymax) || ymax < 2) ymax = 2;
+  function GX(X){ return gx0 + (X / Math.max(Xt, 0.05)) * gw; }
+  function GY(y){ return gy0 - Math.min(y, ymax) / ymax * gh; }
+  // axes
+  ctx.strokeStyle = 'rgba(143,184,224,0.5)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx1, gy0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx0, gy1); ctx.stroke();
+  // CSTR area = rectangle f(Xt)*Xt (shaded, larger)
+  var fXt = invRate(Xt);
+  ctx.fillStyle = 'rgba(39,174,96,0.22)';
+  ctx.fillRect(gx0, GY(fXt), GX(Xt) - gx0, gy0 - GY(fXt));
+  // PFR area = integral under curve (shaded, smaller, on top)
+  ctx.fillStyle = 'rgba(0,180,216,0.32)';
+  ctx.beginPath(); ctx.moveTo(gx0, gy0);
+  var NN = 60;
+  for (var n = 0; n <= NN; n++){
+    var Xv = Xt * n / NN;
+    ctx.lineTo(GX(Xv), GY(invRate(Xv)));
+  }
+  ctx.lineTo(GX(Xt), gy0); ctx.closePath(); ctx.fill();
+  // curve outline 1/(1-X)
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (var m = 0; m <= NN; m++){
+    var Xc = Xt * m / NN;
+    if (m === 0) ctx.moveTo(GX(Xc), GY(invRate(Xc))); else ctx.lineTo(GX(Xc), GY(invRate(Xc)));
+  }
+  ctx.stroke();
+  // CSTR rectangle outline
+  ctx.strokeStyle = '#27ae60'; ctx.lineWidth = 1.6; ctx.setLineDash([6,4]);
+  ctx.strokeRect(gx0, GY(fXt), GX(Xt) - gx0, gy0 - GY(fXt));
   ctx.setLineDash([]);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.fillText('CSTR  1/(1+Da)', lx + 44, ly + 40);
-
-  // Da and tau text bottom-left
-  ctx.fillStyle = '#FFD166';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('Da = ' + fmt(p.Da, 3), x0 + 8, y0 - 24);
-  ctx.fillText('τ = ' + fmt(p.tau, 3) + ' min', x0 + 8, y0 - 8);
+  // labels
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('レベンシュピール線図: 1/(−r_A) vs X  （面積 ∝ 体積）', (gx0+gx1)/2, gy1 - 8);
+  ctx.fillText('X', gx1 - 6, gy0 + 14);
+  ctx.save(); ctx.translate(gx0 - 30, (gy0+gy1)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('1/(−r_A)', 0, 0); ctx.restore();
+  // area legend
+  ctx.textAlign = 'left'; ctx.font = '10px "Roboto Mono",monospace';
+  ctx.fillStyle = '#27ae60'; ctx.fillRect(gx0 + 6, gy1 + 2, 12, 8);
+  ctx.fillStyle = '#cfe3f7'; ctx.fillText('CSTR 面積（大）', gx0 + 22, gy1 + 10);
+  ctx.fillStyle = '#00B4D8'; ctx.fillRect(gx0 + 130, gy1 + 2, 12, 8);
+  ctx.fillStyle = '#cfe3f7'; ctx.fillText('PFR 面積（小）', gx0 + 146, gy1 + 10);
 }
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.Da)) return;
+function updateStats(p){
   var CA_CSTR = p.CA0 / (1 + p.Da);
   var CA_PFR = p.CA0 * Math.exp(-p.Da);
-  var X_CSTR = p.CA0 > 0 ? (1 - CA_CSTR / p.CA0) * 100 : 0;
-  var X_PFR = p.CA0 > 0 ? (1 - CA_PFR / p.CA0) * 100 : 0;
-  document.getElementById('statCSTR').textContent = fmt(CA_CSTR, 3);
-  document.getElementById('statPFR').textContent = fmt(CA_PFR, 3);
-  document.getElementById('statXCSTR').textContent = fmt(X_CSTR, 1);
-  document.getElementById('statXPFR').textContent = fmt(X_PFR, 1);
-  drawProfile(p);
+  var X_CSTR = p.CA0 > 0 ? (1 - CA_CSTR / p.CA0) : 0;
+  var X_PFR = p.CA0 > 0 ? (1 - CA_PFR / p.CA0) : 0;
+  el('statCSTR').textContent = fmt(CA_CSTR, 3);
+  el('statPFR').textContent = fmt(CA_PFR, 3);
+  el('statXCSTR').textContent = fmt(X_CSTR * 100, 1);
+  el('statXPFR').textContent = fmt(X_PFR * 100, 1);
+  // Required volumes to reach the design conversion X = X_PFR for each reactor type
+  // V_PFR = -(Q/k) ln(1-X) ; V_CSTR = Q*X/(k(1-X))
+  var Xt = X_PFR;
+  var VPFR = (p.k > 0 && Xt > 0 && Xt < 1) ? -(p.q / p.k) * Math.log(1 - Xt) : NaN;
+  var VCSTR = (p.k > 0 && Xt > 0 && Xt < 1) ? (p.q * Xt) / (p.k * (1 - Xt)) : NaN;
+  var ratio = volRatio(Xt);
+  el('statVCSTR').textContent = fmt(VCSTR, 2);
+  el('statVPFR').textContent = fmt(VPFR, 2);
+  el('statRatio').textContent = isFinite(ratio) ? fmt(ratio, 2) + '×' : '—';
+  el('statTau').textContent = fmt(p.tau, 2);
 }
 
-function resetParams() {
+function compute(){
+  var p = getParams();
+  if (!isFinite(p.Da)) return;
+  updateStats(p);
+  if (reduceMotion){
+    drawReactors(p, 0);    // single static frame
+  }
+}
+
+// rAF loop that advances phase + redraws
+function loop(){
+  if (reduceMotion) return;
+  phase += 0.02;
+  var p = getParams();
+  if (isFinite(p.Da)) drawReactors(p, phase);
+  rafId = requestAnimationFrame(loop);
+}
+
+function resetParams(){
   var defs = { slCA0: 1.00, slK: 1.00, slV: 10.0, slQ: 5.0 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slCA0'), 'slCA0Num', 2, '');
-  updateSlider(document.getElementById('slK'), 'slKNum', 2, '');
-  updateSlider(document.getElementById('slV'), 'slVNum', 1, '');
-  updateSlider(document.getElementById('slQ'), 'slQNum', 1, '');
+  Object.keys(defs).forEach(function(id){ el(id).value = defs[id]; });
+  updateSlider(el('slCA0'), 'slCA0Num', 2, '');
+  updateSlider(el('slK'), 'slKNum', 2, '');
+  updateSlider(el('slV'), 'slVNum', 1, '');
+  updateSlider(el('slQ'), 'slQNum', 1, '');
   compute();
 }
+window.resetParams = resetParams;
+window.compute = compute;
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+window.addEventListener('resize', function(){ resizeCanvas(); compute(); });
 
 resizeCanvas();
 compute();
+if (!reduceMotion){ rafId = requestAnimationFrame(loop); }
+})();
 </script>
 
 <section class="explanation">
@@ -435,6 +538,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="cstr-pfr-comparison.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -488,14 +594,14 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>入口濃度 CA0（mol/L）を0.5～2.0の範囲で設定します。例えば酢酸エステル加水分解では初期濃度1.0 mol/Lが標準値です。</li>
-<li>速度定数 k（min⁻¹）を0.01～0.5の範囲で入力します。温度25℃の1次反応なら0.1 min⁻¹程度が目安です。</li>
+<li>入口濃度 CA0（mol/L）を0.01～10の範囲で設定します。例えば酢酸エステル加水分解では初期濃度1.0 mol/Lが標準値です。</li>
+<li>速度定数 k（min⁻¹）を0.01～10の範囲で入力します。温度25℃の1次反応なら0.1 min⁻¹程度が目安です。</li>
 <li>反応器体積 V（L）と流量 Q（L/min）を変更し、リアルタイムで CSTR と PFR の出口濃度と転化率を比較します。同じ転化率達成時の体積比を確認してください。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>酢酸エステルの加水分解（1次反応）で CA0=1.0 mol/L、k=0.15 min⁻¹、目標転化率60%の場合：CSTR では V=9.3 L、Q=1.0 L/min で出口濃度0.4 mol/L を達成します。同じ転化率を PFR で得るには V=5.5 L で十分です。PFR は約59%体積削減できます。</p>
+<p>酢酸エステルの加水分解（1次反応）で CA0=1.0 mol/L、k=0.15 min⁻¹、目標転化率60%の場合：CSTR では Da=1.5（τ=10 min）すなわち Q=1.0 L/min で V=10.0 L、出口濃度0.4 mol/L を達成します。同じ転化率を PFR で得るには Da=−ln(0.4)=0.92（τ=6.1 min）で V=6.1 L で十分です。PFR は約39%体積削減でき、必要体積比 V_CSTR/V_PFR≈1.64 です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -505,6 +611,16 @@ compute();
 <li>スケール変更時は層流・乱流の判定（Re数）を確認し、同じ k 値を適用できるか検証してください。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4759820477?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4759820477.09._SCMZZZZZZ_.jpg" alt="化学工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">化学工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

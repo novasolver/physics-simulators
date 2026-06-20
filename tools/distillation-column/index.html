@@ -130,14 +130,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "蒸留塔設計計算機（マッケーブ・シール法）",
       "description": "マッケーブ・シール法による二成分蒸留塔の理論段数・還流比・最小段数を計算。VLE曲線と操作線をリアルタイム描画し、フェンスケ式・アンダーウッド式で最小段数・最小還流比を算出。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/distillation-column.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -276,7 +276,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="btn-group">
       <button class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4759820477?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4759820477.09._SCMZZZZZZ_.jpg" alt="化学工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">化学工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -316,7 +324,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> McCabe-Thiele 線図</div><canvas id="mcCanvas" class="sim-canvas" height="420"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-industry"></i> 蒸留塔ライブ — 向流の物質移動と組成勾配</div><canvas id="colCanvas" class="sim-canvas" height="460"></canvas></div>
+
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> McCabe-Thiele 線図（補助）</div><canvas id="mcCanvas" class="sim-canvas" height="420"></canvas></div>
 
       <div class="canvas-wrap">
         <h2><i class="fas fa-chart-line"></i> 還流比 vs 理論段数</h2>
@@ -336,10 +346,27 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 
 <script>
+(function(){
+'use strict';
+var L = {
+  cap: '蒸留塔ライブ — 向流の物質移動と組成勾配',
+  cond: '凝縮器', reb: 'リボイラー', feed: 'フィード段',
+  rect: '精留部', strip: 'ストリッピング部',
+  vapor: '蒸気 ↑（軽質に富む）', liquid: '液 ↓（重質に富む）',
+  light: '軽質成分（軽沸点）', heavy: '重質成分（高沸点）',
+  dist: '留出液 x', bot: '缶出液 x', stage: '段', xLiq: 'x（液相モル分率）', yVap: 'y（気相モル分率）',
+  legVle: 'VLE曲線', legRect: '精留部操作線', legStrip: 'ストリッピング操作線', legQ: 'q線', legStep: '段数ステップ',
+  press: '「リセット」で標準条件に戻ります', purity: '純度プロファイル'
+};
 
-const mcCanvas = document.getElementById('mcCanvas');
-const ctx = mcCanvas.getContext('2d');
-let chartStages = null;
+var mcCanvas = document.getElementById('mcCanvas');
+var ctx = mcCanvas.getContext('2d');
+var colCanvas = document.getElementById('colCanvas');
+var cctx = colCanvas.getContext('2d');
+var chartStages = null;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var anim = { stages: [], N: 0, xprof: [], yprof: [], feedStage: 1, xD: 0.95, xB: 0.05, R: 2 };
+var flow = 0, animId = null;
 
 function vle(x, alpha){
   return alpha * x / (1 + (alpha - 1) * x);
@@ -377,7 +404,6 @@ function vle(x, alpha){
   return Math.log((xD / (1 - xD)) * ((1 - xB) / xB)) / Math.log(alpha);
 }function stepOff(xD, xB, R, alpha, q, zF){
   const stages = [];
-  let x = xD;
   const maxStages = 100;
   let feedStage = -1;
 
@@ -398,20 +424,23 @@ function vle(x, alpha){
   }const sStrip = (yi - xB) / (xi - xB);
   const bStrip = xB - sStrip * xB;
 
+  // Staircase from distillate (xD) down to bottoms (xB).
+  // Start on the y=x diagonal, step left to the equilibrium curve (inverse VLE),
+  // then drop vertically to the active operating line.
+  let x = xD, y = xD;
+  let nStages = 0;
+  stages.push({ x, y });
   for (let i = 0; i < maxStages; i++){
-    const y = vle(x, alpha);
-    stages.push({ x, y });
-    // step horizontally to operating line
-    let xNew;
-    if (x > xi){
-      xNew = (y - bRect) / sRect;
-    }else{
-      if (feedStage < 0) feedStage = i + 1;
-      xNew = (y - bStrip) / sStrip;
-    }stages.push({ x: xNew, y });
-    x = xNew;
-    if (x <= xB + 0.001) break;
-  }return{ stages, feedStage: feedStage < 0 ? Math.ceil(stages.length / 4) : feedStage, xi, yi, sStrip, bStrip };
+    const xeq = y / (alpha - (alpha - 1) * y);   // liquid in equilibrium with vapor y
+    stages.push({ x: xeq, y });                  // horizontal step to equilibrium curve
+    x = xeq;
+    nStages++;
+    if (x <= xB + 1e-9) break;
+    const yop = (x > xi) ? (sRect * x + bRect) : (sStrip * x + bStrip);
+    if (x <= xi && feedStage < 0) feedStage = i + 1;
+    stages.push({ x, y: yop });                  // vertical drop to operating line
+    y = yop;
+  }return{ stages, N: nStages, feedStage: feedStage < 0 ? Math.max(1, Math.ceil(nStages / 2)) : feedStage, xi, yi, sStrip, bStrip };
 }
 
 function resizeMcCanvas() {
@@ -542,8 +571,7 @@ function resizeMcCanvas() {
   const Rmin = calcRmin(xD, xB, zF, q, alpha);
   const R = Rmin * rrMult;
 
-  const { stages, feedStage } = stepOff(xD, xB, R, alpha, q, zF);
-  const N = Math.ceil(stages.length / 2);
+  const { stages, feedStage, N } = stepOff(xD, xB, R, alpha, q, zF);
 
   document.getElementById('statN').textContent = N;
   document.getElementById('statNmin').textContent = Nmin.toFixed(1);
@@ -554,15 +582,176 @@ function resizeMcCanvas() {
   document.getElementById('statXB').textContent = xB.toFixed(3);
   document.getElementById('statAlpha').textContent = alpha.toFixed(2);
 
+  // Per-stage liquid/vapor composition profile, top (distillate) -> bottom (reboiler).
+  // From the staircase: each "tray" = one equilibrium liquid xeq with the vapor y it
+  // contacts. Index 0 = condenser/top (richest in light component), last = reboiler.
+  var xprof = [xD], yprof = [xD];
+  for (var s = 0; s < stages.length; s++){
+    var p = stages[s];
+    // equilibrium-curve touch points carry the per-tray liquid composition
+    if (s % 2 === 1){ xprof.push(p.x); yprof.push(p.y); }
+  }
+  xprof.push(xB); yprof.push(vle(xB, alpha));
+  anim.stages = stages; anim.N = N; anim.feedStage = feedStage;
+  anim.xprof = xprof; anim.yprof = yprof;
+  anim.xD = xD; anim.xB = xB; anim.R = R; anim.alpha = alpha;
+
   drawMcCabe(xD, xB, zF, q, R, alpha);
   updateChart(xD, xB, zF, q, alpha, Rmin);
+  startColumnAnim();
+}/* ===== Column hero: counter-current flow + composition gradient ===== */
+function resizeColCanvas(){
+  var w = colCanvas.parentElement.clientWidth - 44;
+  var cssW = Math.max(280, w);
+  var cssH = 460;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  colCanvas.style.width = cssW + 'px';
+  colCanvas.style.height = cssH + 'px';
+  colCanvas.width = Math.round(cssW * dpr);
+  colCanvas.height = Math.round(cssH * dpr);
+  colCanvas.dataset.cssW = String(cssW);
+  colCanvas.dataset.cssH = String(cssH);
+  cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+// composition -> color: light (high x) = warm cyan/teal, heavy (low x) = deep orange/red
+function compColor(x, a){
+  a = (a == null) ? 1 : a;
+  // x in [0,1]; interpolate orange(heavy) -> cyan(light)
+  var r = Math.round(225 + (0 - 225) * x);
+  var g = Math.round(110 + (180 - 110) * x);
+  var b = Math.round(85 + (216 - 85) * x);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+function drawColumn(){
+  resizeColCanvas();
+  var W = __novaCanvasCssW(colCanvas), H = __novaCanvasCssH(colCanvas);
+  cctx.clearRect(0,0,W,H);
+  cctx.fillStyle = '#0a1628'; cctx.fillRect(0,0,W,H);
+
+  var xp = anim.xprof, N = anim.N;
+  if (!xp || xp.length < 2){
+    cctx.fillStyle = 'rgba(255,255,255,0.3)'; cctx.font = '13px Noto Sans JP'; cctx.textAlign='center';
+    cctx.fillText(L.press, W/2, H/2); cctx.textAlign='left'; return;
+  }
+
+  var padT = 34, padB = 30;
+  var colX = 70, colW = Math.min(150, W * 0.30);
+  var top = padT, bot = H - padB;
+  var colH = bot - top;
+  var nTray = Math.max(2, xp.length);
+  var trayH = colH / nTray;
+  var feedIdx = Math.min(nTray - 1, Math.max(1, anim.feedStage));
+
+  // ---- trays colored by composition (the gradient up the column) ----
+  for (var i = 0; i < nTray; i++){
+    var yT = top + i * trayH;
+    var xcomp = xp[Math.min(i, xp.length - 1)];
+    cctx.fillStyle = compColor(xcomp, 0.9);
+    cctx.fillRect(colX, yT, colW, trayH - 1.5);
+  }
+  // column wall
+  cctx.strokeStyle = 'rgba(255,255,255,0.35)'; cctx.lineWidth = 2;
+  cctx.strokeRect(colX, top, colW, colH);
+  // tray plates
+  cctx.strokeStyle = 'rgba(10,22,40,0.55)'; cctx.lineWidth = 1;
+  for (var t = 1; t < nTray; t++){
+    var yy = top + t * trayH;
+    cctx.beginPath(); cctx.moveTo(colX, yy); cctx.lineTo(colX + colW, yy); cctx.stroke();
+  }
+
+  // ---- counter-current animated streams ----
+  var ph = flow % 1;
+  // vapor bubbles rising (light, bright) on left half of trays
+  for (var v = 0; v < nTray; v++){
+    var yBase = bot - ((v + ph) % nTray) * trayH;
+    var rise = yBase;
+    if (rise < top) rise += colH;
+    var vx = colX + colW * 0.30;
+    cctx.beginPath(); cctx.arc(vx, rise, 3.2, 0, 7);
+    cctx.fillStyle = 'rgba(180,240,255,0.85)'; cctx.fill();
+  }
+  // liquid droplets descending (heavy, darker) on right half
+  for (var d = 0; d < nTray; d++){
+    var yL = top + ((d + ph) % nTray) * trayH;
+    var lx = colX + colW * 0.70;
+    cctx.beginPath(); cctx.arc(lx, yL, 3.0, 0, 7);
+    cctx.fillStyle = 'rgba(255,170,110,0.85)'; cctx.fill();
+  }
+  // direction arrows
+  cctx.fillStyle = 'rgba(180,240,255,0.9)'; cctx.font = '11px Roboto Mono'; cctx.textAlign='center';
+  cctx.fillText('▲', colX + colW * 0.30, top - 6);
+  cctx.fillStyle = 'rgba(255,170,110,0.9)';
+  cctx.fillText('▼', colX + colW * 0.70, bot + 14);
+
+  // ---- top: condenser + distillate, bottom: reboiler + bottoms ----
+  cctx.fillStyle = '#00B4D8'; cctx.font = 'bold 11px Noto Sans JP'; cctx.textAlign='left';
+  cctx.fillText(L.cond, colX + colW + 10, top + 6);
+  cctx.fillStyle = compColor(anim.xD, 1);
+  cctx.fillText(L.dist + 'D=' + anim.xD.toFixed(3), colX + colW + 10, top + 22);
+  cctx.fillStyle = '#e17055';
+  cctx.fillText(L.reb, colX + colW + 10, bot - 6);
+  cctx.fillStyle = compColor(anim.xB, 1);
+  cctx.fillText(L.bot + 'B=' + anim.xB.toFixed(3), colX + colW + 10, bot - 22);
+
+  // feed arrow
+  var yFeed = top + feedIdx * trayH;
+  cctx.strokeStyle = '#fdcb6e'; cctx.lineWidth = 2;
+  cctx.beginPath(); cctx.moveTo(colX - 34, yFeed); cctx.lineTo(colX, yFeed); cctx.stroke();
+  cctx.fillStyle = '#fdcb6e';
+  cctx.beginPath(); cctx.moveTo(colX, yFeed); cctx.lineTo(colX - 7, yFeed - 4); cctx.lineTo(colX - 7, yFeed + 4); cctx.closePath(); cctx.fill();
+  cctx.textAlign='right'; cctx.font = '10px Noto Sans JP';
+  cctx.fillText(L.feed, colX - 6, yFeed - 6); cctx.textAlign='left';
+
+  // section labels
+  cctx.fillStyle = 'rgba(255,255,255,0.55)'; cctx.font = '10px Noto Sans JP';
+  cctx.save(); cctx.translate(colX - 50, top + feedIdx*trayH/2); cctx.rotate(-Math.PI/2); cctx.textAlign='center';
+  cctx.fillText(L.rect, 0, 0); cctx.restore();
+  cctx.save(); cctx.translate(colX - 50, yFeed + (colH - feedIdx*trayH)/2); cctx.rotate(-Math.PI/2); cctx.textAlign='center';
+  cctx.fillText(L.strip, 0, 0); cctx.restore();
+
+  // ---- composition-vs-stage profile curve on the right ----
+  var gx0 = colX + colW + 118, gx1 = W - 16, gw = gx1 - gx0;
+  if (gw > 60){
+    cctx.strokeStyle = 'rgba(255,255,255,0.15)'; cctx.lineWidth = 1;
+    cctx.strokeRect(gx0, top, gw, colH);
+    cctx.fillStyle = 'rgba(255,255,255,0.5)'; cctx.font = '9px Roboto Mono'; cctx.textAlign='left';
+    cctx.fillText(L.purity, gx0, top - 6);
+    cctx.beginPath();
+    for (var k = 0; k < xp.length; k++){
+      var fy = top + (k/(xp.length-1)) * colH;
+      var fx = gx0 + xp[k] * gw;
+      if (k===0) cctx.moveTo(fx, fy); else cctx.lineTo(fx, fy);
+    }
+    cctx.strokeStyle = '#00B4D8'; cctx.lineWidth = 2; cctx.stroke();
+    for (var k2 = 0; k2 < xp.length; k2++){
+      var fy2 = top + (k2/(xp.length-1)) * colH;
+      var fx2 = gx0 + xp[k2] * gw;
+      cctx.beginPath(); cctx.arc(fx2, fy2, 2.4, 0, 7); cctx.fillStyle = compColor(xp[k2],1); cctx.fill();
+    }
+    cctx.fillStyle = 'rgba(255,255,255,0.4)'; cctx.font='9px Roboto Mono';
+    cctx.fillText('0', gx0-2, bot+12); cctx.fillText('1', gx1-6, bot+12);
+    cctx.fillText('x', gx0 + gw/2, bot+12);
+  }
+
+  // header readout
+  cctx.fillStyle = 'rgba(255,255,255,0.75)'; cctx.font = 'bold 12px Roboto Mono'; cctx.textAlign='right';
+  cctx.fillText('N=' + N + '  R=' + anim.R.toFixed(2), W - 12, 18); cctx.textAlign='left';
+}
+function colLoop(){
+  flow += 0.018;
+  drawColumn();
+  animId = requestAnimationFrame(colLoop);
+}
+function startColumnAnim(){
+  if (reduceMotion){ drawColumn(); return; }
+  if (!animId) animId = requestAnimationFrame(colLoop);
 }function updateChart(xD, xB, zF, q, alpha, Rmin){
   const labels = [], dataN = [];
   for (let mult = 1.1; mult <= 4.0; mult += 0.1) {
     const R = Rmin * mult;
-    const { stages } = stepOff(xD, xB, R, alpha, q, zF);
+    const { N } = stepOff(xD, xB, R, alpha, q, zF);
     labels.push((mult).toFixed(1));
-    dataN.push(Math.ceil(stages.length / 2));
+    dataN.push(N);
   }if (chartStages) chartStages.destroy();
   chartStages = new Chart(document.getElementById('chartStages'),{
     type: 'line',
@@ -606,8 +795,11 @@ function resizeMcCanvas() {
   var _qn=document.getElementById('qNum');if(_qn)_qn.value='1.0';
   var _rrn=document.getElementById('rrNum');if(_rrn)_rrn.value='1.5';
   compute();
-}window.addEventListener('resize', () =>{ compute(); });
+}window.addEventListener('resize', function(){ compute(); });
+window.compute = compute;
+window.resetParams = resetParams;
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -670,6 +862,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="distillation-column.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -723,17 +918,27 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>エタノール・水系蒸留でα=1.8、xD=0.95、xB=0.05、zF=0.40、還流比R=2.5Rminの場合：理論段数N≒12段、最小段数Nmin≒3.2段、最小還流比Rmin≒0.68が得られます。VLE曲線上でステップオフを繰り返すことで、実際の分離に必要な理論段数12段がグラフ上で視覚的に確認できます。実際の装置設計では段効率80%を考慮し、実段数は約15段となります</p>
+<p>α=1.8、xD=0.95、xB=0.05、zF=0.40、還流比R=2.5Rminの場合：最小段数Nmin≒10.0段、最小還流比Rmin≒2.78、理論段数N≒14段が得られます。VLE曲線上でステップオフを繰り返すことで、実際の分離に必要な理論段数がグラフ上で視覚的に確認できます。実際の装置設計では段効率80%を考慮し、実段数は約18段となります</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
 <li>相対揮発度αは温度変化により変動します。常圧蒸留と減圧蒸留では異なる値を使用してください</li>
-<li>フィード段位置はギラム線交点から決定されます。フィード組成がzF=0.40の場合、通常中段付近（N/2～N/3）に設定するのが最適です</li>
+<li>フィード段位置はq線（フィード線）と操作線の交点から決定されます。フィード組成がzF=0.40の場合、通常中段付近（N/2～N/3）に設定するのが最適です</li>
 <li>最小還流比以下では蒸留が不可能になるため、実装置では通常1.3～1.5倍のRminで設計します</li>
-<li>二成分以上の混合物や非理想系ではアンスイット法などの補正が必要となります</li>
+<li>二成分以上の混合物や非理想系では活量係数モデル（NRTL・Wilson 等）による補正が必要となります</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4759820477?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4759820477.09._SCMZZZZZZ_.jpg" alt="化学工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">化学工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

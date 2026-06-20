@@ -43,7 +43,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "光ファイバーリンク損失・帯域幅計算ツール",
       "description": "SMF-28・OM3対応の光ファイバーリンク損失・受信電力・帯域幅リアルタイム計算ツール。リンクパワーマージンと最大伝送距離を算出。",
       "url": "https://novasolver.jp/tools/optical-fiber.html",
@@ -53,7 +53,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["SMF-28（シングルモード）・OM3（マルチモード）対応","損失計算：減衰・スプライス・コネクタ","色分散による帯域幅制限","リンクパワーマージンと最大到達距離"],
       "keywords": "光ファイバー,伝送損失,帯域幅,SMF,OM3,色分散,リンクパワーマージン,光通信",
       "datePublished": "2026-04-09",
@@ -232,10 +232,22 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="divider"></div>
 
     <div class="panel-title">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-wave-square"></i> 光信号の伝搬とリンクパワーバジェット（ライブ）</div>
+      <canvas id="fiberHeroCanvas" style="width:100%;display:block;border-radius:8px;background:#05101f"></canvas>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="sc_prec">—</div><div class="sl">P_received (dBm)</div></div>
@@ -272,139 +284,300 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-// Fiber presets
+(function(){
+  "use strict";
+  // ===== 光ファイバー リンクバジェット V2 =====
+  var FIBERS = {
+    smf:    { alpha: 0.20, D: 17,  BW_MM: null, label: 'SMF-28 @ 1550nm' },
+    om3:    { alpha: 2.50, D: 0,   BW_MM: 2.0,  label: 'OM3 @ 850nm' },
+    custom: { alpha: 0.50, D: 3.5, BW_MM: null, label: 'カスタム' }
+  };
+  var L_SPLICE = 0.1, L_CONN = 0.5; // dB
+  var fiberKey = 'smf';
+  var TXT = {
+    rxPower:'受信電力 (dBm)', rxSens:'受信感度', dist:'距離 L (km)',
+    powW:'電力 (dBm)', bw:'帯域幅 (GHz)',
+    tx:'送信', rx:'受信', splice:'スプライス', conn:'コネクタ', sens:'感度', margin:'マージン', linkdn:'リンク不成立'
+  };
+  function $(id){ return document.getElementById(id); }
+  function val(id){ return parseFloat($(id).value); }
 
-const FIBERS = {
-  smf:    { alpha: 0.20, D: 17,  BW_MM: null, label: 'SMF-28 @ 1550nm' },
-  om3:{ alpha: 2.50, D: 0,   BW_MM: 2.0,  label: 'OM3 @ 850nm' },  // BW_MM in GHz·km
-  custom:{ alpha: 0.50, D: 3.5, BW_MM: null, label: 'カスタム' }
-};
-let fiberKey = 'smf';
-
-function setFiber(k, btn){
-  fiberKey = k;
-  document.querySelectorAll('.fib-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const f = FIBERS[k];
-  document.getElementById('alpha_sl').value = f.alpha;
-  updateSlider('alpha_sl');
-  syncToNum('alpha_sl','alphaSLNum');
-  update();
-}function setPct(id){
-  const el = document.getElementById(id);
-  const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
-  el.style.setProperty('--pct', ((val-min)/(max-min)*100)+'%');
-}function calcLink(L){
-  const alpha = parseFloat(document.getElementById('alpha_sl').value);
-  const pin = parseFloat(document.getElementById('pin_sl').value);
-  const ns = parseFloat(document.getElementById('ns_sl').value);
-  const nc = parseFloat(document.getElementById('nc_sl').value);
-  const ls = 0.1, lc = 0.5;
-  const loss = alpha * L + ns * ls + nc * lc;
-  return pin - loss;
-}function calcBW(L){
-  const fiber = FIBERS[fiberKey];
-  const dlambda = parseFloat(document.getElementById('dlambda_sl').value);
-  if (fiber.BW_MM !== null) {
-    // Multimode: BW_link = BW_fiber / sqrt(L)
-    return fiber.BW_MM / Math.sqrt(Math.max(L, 0.001));
-  }else{
-    // SMF chromatic dispersion
-    const D = fiber.D; // ps/(nm·km)
-    const sigma_t = D * dlambda * L; // ps
+  window.setFiber = function(k, btn){
+    fiberKey = k;
+    document.querySelectorAll('.fib-btn').forEach(function(b){ b.classList.remove('active'); });
+    if(btn) btn.classList.add('active');
+    var f = FIBERS[k];
+    $('alpha_sl').value = f.alpha;
+    if (typeof updateSlider === 'function') updateSlider('alpha_sl');
+    if (typeof syncToNum === 'function') syncToNum('alpha_sl','alphaSLNum');
+    update();
+  };
+  function setPct(id){
+    var el = $(id);
+    var min = parseFloat(el.min), max = parseFloat(el.max), v = parseFloat(el.value);
+    el.style.setProperty('--pct', ((v-min)/(max-min)*100)+'%');
+  }
+  // 受信電力 P(dBm) = Pin - αL - Ns·ls - Nc·lc
+  function calcLink(L){
+    var alpha = val('alpha_sl'), pin = val('pin_sl'), ns = val('ns_sl'), nc = val('nc_sl');
+    return pin - (alpha*L + ns*L_SPLICE + nc*L_CONN);
+  }
+  // 帯域幅 (GHz): SMF=色分散 BW=0.44/σt, MMF=BW_MM/√L
+  function calcBW(L){
+    var fiber = FIBERS[fiberKey];
+    var dlambda = val('dlambda_sl');
+    if (fiber.BW_MM !== null){
+      return fiber.BW_MM / Math.sqrt(Math.max(L, 0.001));
+    }
+    var sigma_t = fiber.D * dlambda * L; // ps
     if (sigma_t < 1e-9) return 9999;
     return 0.44 / (sigma_t * 1e-12) / 1e9; // GHz
   }
-}let powerChart, bwChart;
 
-function initCharts(){
-  const ctx1 = document.getElementById('powerChart').getContext('2d');
-  powerChart = new Chart(ctx1, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        { label: 'P_received (dBm)', data: [], borderColor: '#007BFF', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.2 },{ label: '受信感度', data: [], borderColor: '#e74c3c', borderWidth: 1.5, borderDash: [6,4], pointRadius: 0, fill: false }
-      ]
-    },
-    options:{
-      responsive: true, animation: false,
-      scales: {
-        x: { title:{display:true,text:'距離 L (km)',font:{size:11}}, ticks:{maxTicksLimit:8} },
-        y:{ title:{display:true,text:'電力 (dBm)',font:{size:11}} }
-      },
-      plugins:{ legend:{display:true,position:'top',labels:{font:{size:10}}} }
-    }
-  });
-
-  const ctx2 = document.getElementById('bwChart').getContext('2d');
-  bwChart = new Chart(ctx2,{
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        { label: '帯域幅 (GHz)', data: [], borderColor: '#00B4D8', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.2 }
-      ]
-    },
-    options:{
-      responsive: true, animation: false,
-      scales: {
-        x: { title:{display:true,text:'距離 L (km)',font:{size:11}}, ticks:{maxTicksLimit:8} },
-        y:{ title:{display:true,text:'帯域幅 (GHz)',font:{size:11}}, min:0 }
-      },
-      plugins:{ legend:{display:true,position:'top',labels:{font:{size:10}}} }
-    }
-  });
-}function update(){
-  const alpha = parseFloat(document.getElementById('alpha_sl').value);
-  const pin = parseFloat(document.getElementById('pin_sl').value);
-  const ns = parseFloat(document.getElementById('ns_sl').value);
-  const nc = parseFloat(document.getElementById('nc_sl').value);
-  const rxSens = parseFloat(document.getElementById('rx_sl').value);
-  const Lmax = parseFloat(document.getElementById('L_sl').value);
-
-  const steps = 100;
-  const labels = [], powerData = [], sensData = [], bwData = [];
-  for (let i = 0; i <= steps; i++) {
-    const L = Lmax * i / steps;
-    labels.push(L.toFixed(1));
-    powerData.push(calcLink(L));
-    sensData.push(rxSens);
-    const bw = calcBW(L);
-    bwData.push(Math.min(bw, 1000)); // cap display at 1 THz
+  // ===== Chart.js 静的グラフ =====
+  var powerChart, bwChart;
+  function initCharts(){
+    var ctx1 = $('powerChart').getContext('2d');
+    powerChart = new Chart(ctx1, {
+      type:'line',
+      data:{ labels:[], datasets:[
+        { label:TXT.rxPower, data:[], borderColor:'#007BFF', borderWidth:2, pointRadius:0, fill:false, tension:0.2 },
+        { label:TXT.rxSens, data:[], borderColor:'#e74c3c', borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false }
+      ]},
+      options:{ responsive:true, animation:false,
+        scales:{ x:{ title:{display:true,text:TXT.dist,font:{size:11}}, ticks:{maxTicksLimit:8} },
+                 y:{ title:{display:true,text:TXT.powW,font:{size:11}} } },
+        plugins:{ legend:{display:true,position:'top',labels:{font:{size:10}}} } }
+    });
+    var ctx2 = $('bwChart').getContext('2d');
+    bwChart = new Chart(ctx2, {
+      type:'line',
+      data:{ labels:[], datasets:[
+        { label:TXT.bw, data:[], borderColor:'#00B4D8', borderWidth:2, pointRadius:0, fill:false, tension:0.2 }
+      ]},
+      options:{ responsive:true, animation:false,
+        scales:{ x:{ title:{display:true,text:TXT.dist,font:{size:11}}, ticks:{maxTicksLimit:8} },
+                 y:{ title:{display:true,text:TXT.bw,font:{size:11}}, min:0 } },
+        plugins:{ legend:{display:true,position:'top',labels:{font:{size:10}}} } }
+    });
   }
 
-  powerChart.data.labels = labels;
-  powerChart.data.datasets[0].data = powerData;
-  powerChart.data.datasets[1].data = sensData;
-  powerChart.update('none');
+  // ===== 現在状態（ライブアニメ用） =====
+  var S = { alpha:0.2, pin:0, ns:5, nc:2, rxSens:-18, Lmax:10, prec:-2.2, margin:15.8, bw:100, maxReach:90 };
 
-  bwChart.data.labels = labels;
-  bwChart.data.datasets[0].data = bwData;
-  bwChart.update('none');
+  function update(){
+    S.alpha = val('alpha_sl'); S.pin = val('pin_sl'); S.ns = val('ns_sl');
+    S.nc = val('nc_sl'); S.rxSens = val('rx_sl'); S.Lmax = val('L_sl');
 
-  // Stats at current L
-  const L = Lmax;
-  const prec = calcLink(L);
-  const margin = prec - rxSens;
-  const bw = calcBW(L);
+    var steps = 100, labels=[], powerData=[], sensData=[], bwData=[];
+    for (var i=0;i<=steps;i++){
+      var L = S.Lmax*i/steps;
+      labels.push(L.toFixed(1));
+      powerData.push(calcLink(L));
+      sensData.push(S.rxSens);
+      bwData.push(Math.min(calcBW(L), 1000));
+    }
+    powerChart.data.labels = labels;
+    powerChart.data.datasets[0].data = powerData;
+    powerChart.data.datasets[1].data = sensData;
+    powerChart.update('none');
+    bwChart.data.labels = labels;
+    bwChart.data.datasets[0].data = bwData;
+    bwChart.update('none');
 
-  // Max reach: when P_received = rx_sens
-  const ls = 0.1, lc = 0.5;
-  const fixedLoss = ns * ls + nc * lc;
-  const maxReach = alpha > 0 ? (pin - rxSens - fixedLoss) / alpha : 9999;
+    S.prec = calcLink(S.Lmax);
+    S.margin = S.prec - S.rxSens;
+    S.bw = calcBW(S.Lmax);
+    var fixedLoss = S.ns*L_SPLICE + S.nc*L_CONN;
+    S.maxReach = S.alpha > 0 ? (S.pin - S.rxSens - fixedLoss)/S.alpha : 9999;
 
-  document.getElementById('sc_prec').textContent = prec.toFixed(1);
-  document.getElementById('sc_margin').textContent = margin.toFixed(1);
-  document.getElementById('sc_bw').textContent = bw > 100 ? '>100' : bw.toFixed(2);
-  document.getElementById('sc_maxreach').textContent = Math.max(maxReach, 0).toFixed(1);
+    $('sc_prec').textContent = S.prec.toFixed(1);
+    $('sc_margin').textContent = S.margin.toFixed(1);
+    $('sc_bw').textContent = S.bw > 100 ? '>100' : S.bw.toFixed(2);
+    $('sc_maxreach').textContent = Math.max(S.maxReach, 0).toFixed(1);
 
-  const mCard = document.getElementById('sc_margin_card');
-  mCard.className = 'stat-card ' + (margin >= 3 ? 'ok' : margin >= 0 ? '' : 'warn');
+    var mCard = $('sc_margin_card');
+    mCard.className = 'stat-card ' + (S.margin >= 3 ? 'ok' : S.margin >= 0 ? '' : 'warn');
 
-  ['alpha_sl','L_sl','pin_sl','ns_sl','nc_sl','rx_sl','dlambda_sl'].forEach(setPct);
-}initCharts();
-update();
+    ['alpha_sl','L_sl','pin_sl','ns_sl','nc_sl','rx_sl','dlambda_sl'].forEach(setPct);
+  }
+
+  // ===== ヒーローアニメ：パルスがファイバーを進みながら減衰 + パワーバジェットバー =====
+  var hero = $('fiberHeroCanvas');
+  var hctx = hero ? hero.getContext('2d') : null;
+  var cssW = 0, cssH = 0;
+  function resizeHero(){
+    if (!hero) return;
+    var rect = hero.parentElement.getBoundingClientRect();
+    cssW = Math.max(280, Math.floor(rect.width - 44));
+    cssH = 300;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    hero.style.width = cssW + 'px';
+    hero.style.height = cssH + 'px';
+    hero.width = Math.round(cssW * dpr);
+    hero.height = Math.round(cssH * dpr);
+    hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // dBm を線形パワー(mW)へ
+  function mW(dbm){ return Math.pow(10, dbm/10); }
+
+  // 損失イベント（スプライス/コネクタ）の位置を距離0..Lmaxへ配置
+  function lossEvents(){
+    var ev = [];
+    var i;
+    // コネクタは両端寄り、スプライスは内部に等間隔
+    for (i=0;i<S.nc;i++){
+      var fc = S.nc <= 1 ? 0.0 : (i/(S.nc-1));
+      ev.push({ pos: 0.02 + 0.96*fc, loss: L_CONN, type:'conn' });
+    }
+    for (i=0;i<S.ns;i++){
+      var fs = (i+1)/(S.ns+1);
+      ev.push({ pos: fs, loss: L_SPLICE, type:'splice' });
+    }
+    ev.sort(function(a,b){ return a.pos-b.pos; });
+    return ev;
+  }
+
+  function drawHero(t){
+    if (!hctx) return;
+    var W = cssW, H = cssH;
+    hctx.clearRect(0,0,W,H);
+    hctx.fillStyle = '#05101f'; hctx.fillRect(0,0,W,H);
+
+    var padL = 46, padR = 18, fiberY = 78, fiberH = 30;
+    var x0 = padL, x1 = W - padR, fiberW = x1 - x0;
+
+    // --- ファイバー本体（コア） ---
+    hctx.fillStyle = 'rgba(0,180,216,0.10)';
+    hctx.fillRect(x0, fiberY, fiberW, fiberH);
+    hctx.strokeStyle = 'rgba(0,180,216,0.35)'; hctx.lineWidth = 1;
+    hctx.strokeRect(x0, fiberY, fiberW, fiberH);
+
+    // 端子ラベル
+    hctx.font = '11px Roboto Mono'; hctx.textAlign = 'center';
+    hctx.fillStyle = '#00B4D8';
+    hctx.fillText('TX '+TXT.tx, x0+2, fiberY-12);
+    hctx.fillText('RX '+TXT.rx, x1-2, fiberY-12);
+
+    var ev = lossEvents();
+    var Lmax = S.Lmax, alpha = S.alpha, pin = S.pin;
+
+    // 受信電力プロファイル P(x) を曲線で（減衰＋階段状損失）
+    // 各xでの累積損失
+    function lossAt(frac){
+      var L = Lmax*frac;
+      var fl = 0;
+      for (var k=0;k<ev.length;k++){ if (ev[k].pos <= frac) fl += ev[k].loss; }
+      return alpha*L + fl;
+    }
+    // 表示用の電力→Y（pin .. rxSens-余白 を上下にマップ）
+    var pTop = pin + 2;
+    var pBot = Math.min(S.rxSens - 4, pin - alpha*Lmax - 4);
+    var graphTop = 132, graphBot = H - 60;
+    function pY(dbm){
+      var f = (dbm - pBot)/(pTop - pBot);
+      f = Math.max(0, Math.min(1, f));
+      return graphBot - f*(graphBot-graphTop);
+    }
+
+    // 感度ライン
+    hctx.strokeStyle = 'rgba(231,76,60,0.8)'; hctx.lineWidth = 1.2;
+    hctx.setLineDash([6,4]);
+    hctx.beginPath(); hctx.moveTo(x0, pY(S.rxSens)); hctx.lineTo(x1, pY(S.rxSens)); hctx.stroke();
+    hctx.setLineDash([]);
+    hctx.fillStyle = 'rgba(231,76,60,0.95)'; hctx.textAlign = 'left'; hctx.font='10px Roboto Mono';
+    hctx.fillText(TXT.sens+' '+S.rxSens.toFixed(0)+' dBm', x0+4, pY(S.rxSens)-4);
+
+    // 電力プロファイル曲線
+    hctx.beginPath();
+    var N = 120, px, py;
+    for (var i=0;i<=N;i++){
+      var frac = i/N;
+      var dbm = pin - lossAt(frac);
+      px = x0 + frac*fiberW; py = pY(dbm);
+      if (i===0) hctx.moveTo(px,py); else hctx.lineTo(px,py);
+    }
+    var endLow = (pin - lossAt(1)) < S.rxSens;
+    hctx.strokeStyle = endLow ? '#e74c3c' : '#00B4D8'; hctx.lineWidth = 2.4;
+    hctx.stroke();
+
+    // 損失イベントのマーカー（縦線）
+    for (var m=0;m<ev.length;m++){
+      var ex = x0 + ev[m].pos*fiberW;
+      hctx.strokeStyle = ev[m].type==='conn' ? 'rgba(245,158,11,0.55)' : 'rgba(255,255,255,0.22)';
+      hctx.lineWidth = ev[m].type==='conn' ? 1.6 : 1;
+      hctx.beginPath(); hctx.moveTo(ex, fiberY-6); hctx.lineTo(ex, graphBot); hctx.stroke();
+    }
+
+    // --- 進行するパルス（減衰しながら移動） ---
+    var motion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var frac2 = motion ? 0.62 : ((t*0.18) % 1);
+    var pdbm = pin - lossAt(frac2);
+    var brightness = Math.max(0.06, Math.min(1, mW(pdbm)/mW(pin))); // 0..1 相対パワー
+    var pxp = x0 + frac2*fiberW;
+    var glowR = 7 + 16*brightness;
+    var grad = hctx.createRadialGradient(pxp, fiberY+fiberH/2, 1, pxp, fiberY+fiberH/2, glowR);
+    grad.addColorStop(0, 'rgba(120,230,255,'+ (0.35+0.6*brightness) +')');
+    grad.addColorStop(1, 'rgba(120,230,255,0)');
+    hctx.fillStyle = grad;
+    hctx.beginPath(); hctx.arc(pxp, fiberY+fiberH/2, glowR, 0, Math.PI*2); hctx.fill();
+    hctx.fillStyle = 'rgba(160,245,255,'+(0.4+0.6*brightness)+')';
+    hctx.beginPath(); hctx.arc(pxp, fiberY+fiberH/2, 4, 0, Math.PI*2); hctx.fill();
+    // パルスの現在電力ラベル
+    hctx.fillStyle = 'rgba(160,245,255,0.9)'; hctx.font='10px Roboto Mono'; hctx.textAlign='center';
+    hctx.fillText(pdbm.toFixed(1)+' dBm', pxp, pY(pdbm)-8);
+    var dotpy = pY(pdbm);
+    hctx.fillStyle = endLow ? '#e74c3c' : '#00B4D8';
+    hctx.beginPath(); hctx.arc(pxp, dotpy, 3, 0, Math.PI*2); hctx.fill();
+
+    // --- パワーバジェットバー（下部） ---
+    var barY = H - 34, barH = 16, barX0 = x0, barW = fiberW;
+    var totalLoss = lossAt(1);
+    var span = Math.max(totalLoss + Math.abs(pin - S.rxSens) + 4, 8);
+    function bx(db){ return barX0 + (db/span)*barW; }
+    hctx.fillStyle='rgba(255,255,255,0.06)'; hctx.fillRect(barX0, barY, barW, barH);
+    // 受信電力までの「届いた」部分（緑/赤）
+    var prec = pin - totalLoss;
+    var marginNow = prec - S.rxSens;
+    var rxFrac = Math.max(0, Math.min(1, (pin - S.rxSens - totalLoss)/span));
+    // 損失帯
+    hctx.fillStyle = 'rgba(245,158,11,0.5)';
+    hctx.fillRect(barX0, barY, (totalLoss/span)*barW, barH);
+    // マージン帯
+    if (marginNow > 0){
+      hctx.fillStyle = 'rgba(0,184,148,0.6)';
+      hctx.fillRect(barX0 + (totalLoss/span)*barW, barY, (marginNow/span)*barW, barH);
+    }
+    hctx.strokeStyle='rgba(255,255,255,0.25)'; hctx.lineWidth=1; hctx.strokeRect(barX0, barY, barW, barH);
+    hctx.fillStyle='#cfd8e3'; hctx.font='10px Roboto Mono'; hctx.textAlign='left';
+    hctx.fillText(TXT.tx+' '+pin.toFixed(1)+' / '+TXT.rx+' '+prec.toFixed(1)+' dBm  ·  '+TXT.margin+' '+marginNow.toFixed(1)+' dB'
+       + (marginNow<0 ? '  ✕'+TXT.linkdn : ''), barX0, barY-6);
+  }
+
+  // ===== ループ =====
+  var rafId = null, t0 = null;
+  function loop(ts){
+    if (t0===null) t0 = ts;
+    var t = (ts - t0)/1000;
+    drawHero(t);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function start(){
+    initCharts();
+    update();
+    resizeHero();
+    drawHero(0);
+    var motion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!motion){ rafId = requestAnimationFrame(loop); }
+  }
+
+  window.addEventListener('resize', function(){ resizeHero(); if (!rafId) drawHero(0); });
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', start);
+  } else { start(); }
+})();
 </script>
 
 <section class="explanation">
@@ -458,11 +631,14 @@ update();
 </div>
 <h2>よくある誤解と注意点</h2>
 <div class="fblock">
-<p>まず、<strong>「dBm」と「dB」を混同しない</strong>でください。dBmは「1mWを0dBmとする絶対的な電力値」、dBは「2つの電力の比を示す相対値」です。ツールで「送信電力 0 dBm」と設定し、「コネクタ損失 0.5 dB」と入力した場合、受信電力は -0.5 dBm になります。0.5 dBmではないんです。次に、<strong>パラメータの典型値は状況で変わる</strong>という点。例えば、コネクタ損失のデフォルト0.5dBは、清掃が行き届いた新品のLCコネクタなら現実的ですが、汚れたSCコネクタでは1dBを超えることも珍しくありません。ツールで「余裕を持って設計しよう」と思ったら、各損失値に1.5倍程度のマージンを乗せて計算するのが実務の知恵です。最後に、<strong>帯域幅計算は「損失」とは独立した別の制約</strong>であることを理解しましょう。損失計算だけではリンクが成立しても、帯域幅が足りなければ所定の速度で通信できません。例えば10GbEでOM3ファイバーを使う場合、損失的には数百m伝送可能でも、規格で定められた最大伝送距離は300m程度です。ツールではこの「2つの異なる制約（損失と帯域幅）のうち、厳しい方が最終的な最大距離を決める」様子を確認できます。</p>
+<p>まず、<strong>「dBm」と「dB」を混同しない</strong>でください。dBmは「1mWを0dBmとする絶対的な電力値」、dBは「2つの電力の比を示す相対値」です。ツールで「送信電力 0 dBm」と設定し、「コネクタ損失 0.5 dB」と入力した場合、受信電力は -0.5 dBm になります。0.5 dBmではないんです。次に、<strong>パラメータの典型値は状況で変わる</strong>という点。例えば、コネクタ損失のデフォルト0.5dBは、清掃が行き届いた新品のLCコネクタなら現実的ですが、汚れたSCコネクタでは1dBを超えることも珍しくありません。ツールで「余裕を持って設計しよう」と思ったら、各損失値に1.5倍程度のマージンを乗せて計算するのが実務の知恵です。最後に、<strong>帯域幅計算は「損失」とは独立した別の制約</strong>であることを理解しましょう。損失計算だけではリンクが成立しても、帯域幅が足りなければ所定の速度で通信できません。例えば10GbEでOM3ファイバーを使う場合、損失的には数百m伝送可能でも、規格で定められた最大伝送距離は300m程度です。本ツールの「最大到達距離」は損失バジェットのみから算出した値で、帯域幅制約は別途「帯域幅 vs 距離」グラフで確認します。実システムでは損失と帯域幅の両制約のうち厳しい方が最終的な最大距離を決めるため、両グラフを併せて読む必要があります。</p>
 
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="optical-fiber.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -513,6 +689,16 @@ update();
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

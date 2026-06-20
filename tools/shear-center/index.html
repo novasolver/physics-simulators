@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "せん断中心計算ツール",
       "description": "チャンネル・Z形・T形・L形・I形断面のせん断中心位置をリアルタイム計算し、せん断流れ分布を可視化するCAEツール。",
       "url": "https://novasolver.jp/tools/shear-center.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["5種類の薄肉断面プリセット","せん断中心位置の計算","せん断流れq=VQ/Iの分布可視化","断面2次モーメント・静モーメント計算"],
       "keywords": "せん断中心,薄肉断面,せん断流れ,チャンネル断面,構造解析,CAE,曲げねじり",
       "datePublished": "2026-04-09",
@@ -69,7 +69,7 @@
         },{
           "@type": "Question",
           "name": "チャンネル断面のせん断中心の位置はどこですか？",
-          "acceptedAnswer": {"@type": "Answer", "text": "チャンネル（C形）断面のせん断中心は、ウェブの外側（断面の外部）に位置します。近似式 e ≈ b²h²tf/(4Iz) でウェブ中心からのオフセット距離 e が求まります。例えばフランジ幅60mm・ウェブ高さ120mm程度の一般的なC形鋼では e は30〜40mm程度になります。"}
+          "acceptedAnswer": {"@type": "Answer", "text": "チャンネル（C形）断面のせん断中心は、ウェブの外側（断面の外部）に位置します。近似式 e ≈ b²h²tf/(4Iz) でウェブ中心からのオフセット距離 e が求まります。例えばフランジ幅60mm・ウェブ高さ120mm、tf=5mm、tw=4mmの既定条件では e は約23.7mmです。"}
         },{
           "@type": "Question",
           "name": "FEMでせん断中心を考慮しないとどうなりますか？",
@@ -185,6 +185,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="param-label"><span class="param-name">ウェブ板厚 tw (mm)</span><div class="num-wrap"><input type="number" class="num-input" id="twVal" value="4" min="2" max="20" step="1" oninput="syncFromNum('tw','twVal')"><span class="num-unit">mm</span></div></div>
       <input type="range" id="tw" min="2" max="20" value="4" oninput="syncToNum('tw','twVal');update()">
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -307,7 +316,7 @@ function setSection(t) {
     ycg = (A_f * y_f + A_w * y_w) / (A_f + A_w);
     Iz = (b * tf*tf*tf)/12 + A_f*(h - tf/2 - ycg)**2
        + (tw * (h-tf)**3)/12 + A_w*((h-tf)/2 - ycg)**2;
-    e = 0; // T section SC on axis of symmetry
+    e = Math.abs(ycg - (h - tf/2)); // distance from centroid to web/flange centerline junction
     const y_bot_flange = h - tf - ycg;
     Qmax = tw * (h - tf - ycg) * (h - tf - ycg) / 2 + b * tf * (h - tf/2 - ycg);
     qProfile = buildTProfile(b, h, tf, tw, Iz, V, ycg);
@@ -320,7 +329,7 @@ function setSection(t) {
     const xcg = (A_h * x_h + A_v * x_v) / (A_h + A_v);
     Iz = (b * tf*tf*tf)/12 + A_h*(y_h - ycg)**2
        + (tw * (h-tf)**3)/12 + A_v*(y_v - ycg)**2;
-    e = 0; // simplified
+    e = Math.hypot(xcg - tw/2, ycg - (h - tf/2));
     Qmax = A_h * Math.abs(y_h - ycg);
     qProfile = buildLProfile(b, h, tf, tw, Iz, V, ycg);
   }else{ // I
@@ -330,7 +339,7 @@ function setSection(t) {
     Qmax = Qf + tw * (h/2)*(h/2)/2;
     qProfile = buildIProfile(b, h, tf, tw, Iz, V);
   }const qmax = V * Qmax / Iz;
-  return{Iz, e, Qmax, qmax, qProfile, ycg};
+  return{Iz, e, Qmax, qmax, qProfile, ycg, xcg};
 }function buildCProfile(b, h, tf, tw, Iz, V){
   const pts = [];
   const n = 30;
@@ -393,7 +402,7 @@ function setSection(t) {
     const s = b/2 * i/n;
     const Q = tf * s * h/2;
     pts.push({s: s, q: V*Q/Iz, seg: 0});
-  }const Qf = tf * (b/2) * h/2;
+  }const Qf = tf * b * h/2;
   for (let i = 0; i <= n; i++){
     const s = h * i/n;
     const Q = Qf + tw * s * (h/2 - s/2);
@@ -455,12 +464,16 @@ const W = __novaDims0.w, H = __novaDims0.h;
   }else if (type === 'T'){
     drawRect(-b/2 + tw/2, h - tf, b, tf, col);
     drawRect(0, 0, tw, h - tf, col);
-    const sc_y = h - tf - (h - tf - res.ycg) * 0; // on centroidal axis
-    drawMarker(ctx, ox + tw/2 * scale, oy - res.ycg * scale, 'SC/G', '#e74c3c');
+    const sc_y = h - tf/2;
+    drawMarker(ctx, ox + tw/2 * scale, oy - sc_y * scale, 'SC', '#e74c3c');
+    drawMarker(ctx, ox + tw/2 * scale, oy - res.ycg * scale, 'G', '#2ecc71');
   }else if (type === 'L'){
     drawRect(0, h - tf, b, tf, col);
     drawRect(0, 0, tw, h - tf, col);
-    drawMarker(ctx, ox + tw/2 * scale, oy - res.ycg * scale, 'SC', '#e74c3c');
+    const sc_x = tw/2;
+                const sc_y = h - tf/2;
+                drawMarker(ctx, ox + sc_x * scale, oy - sc_y * scale, 'SC', '#e74c3c');
+                drawMarker(ctx, ox + res.xcg * scale, oy - res.ycg * scale, 'G', '#2ecc71');
   }else{ // I
     drawRect(-b/2 + tw/2, h - tf, b, tf, col);
     drawRect(0, 0, tw, h, col);
@@ -647,6 +660,9 @@ const W = __novaDims1.w, H = __novaDims1.h;
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="shear-center.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -700,23 +716,30 @@ const W = __novaDims1.w, H = __novaDims1.h;
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>チャンネル断面の寸法を入力：フランジ幅b(mm)、全高h(mm)、フランジ厚tf(mm)、ウェブ厚tw(mm)を設定</li>
-<li>計算ボタンを押すとせん断中心eの位置がウェブから測定される距離(mm)で出力される</li>
-<li>モーメント慣性積I_z、最大せん断流量Q_max、単位せん断力時のq_maxを確認し、構造設計に反映</li>
+<li>断面タイプ（C形鋼、L形鋼、T形鋼、I形鋼）を選択します</li>
+<li>幅b、高さh、フランジ厚tf、ウェブ厚twをmmで入力します。値は入力中に自動更新されます</li>
+<li>せん断力VをkNで入力すると、せん断流q=VQ/IがN/mmで表示されます</li>
+<li>赤いSCマーカーがせん断中心、緑のGマーカーが重心です。eは重心からせん断中心までの距離です</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
-<h3>具体的な計算例</h3>
-<p>鋼製C形チャンネル(SS400)で実例計算：b=80mm、h=100mm、tf=6mm、tw=5mmの場合、せん断中心はウェブから約e=16.8mmオフセットします。この時I_z=2.84×10⁵mm⁴、Q_max=8,400mm³となり、V=10kN荷重時のせん断流量はq_max=84N/mmに達します。このオフセットを無視して中立軸に荷重を加えるとねじり変形が発生し、実測たわみが計算値の120%に増加する実例が報告されています。</p>
+<h3>計算例</h3>
+<p>例：C形鋼 b=80mm、h=100mm、tf=6mm、tw=5mm、V=1kN では Iz=2.82×10^6mm^4、e=34.1mm、Qmax=30,250mm^3、qmax=10.7N/mmです。</p>
 </div>
 <div class="howto-card howto-notes">
-<h3>実務での注意点</h3>
-<ul>
-<li>Z形断面(スタンディングシーム用)では左右非対称のため、せん断中心が幾何学的中心から大きく乖離し、設計荷重位置の誤りで局部ねじり座屈を招く</li>
-<li>薄肉開断面のL形アングル材(L-50×50×4mm)では、せん断中心と重心が10mm以上離れるケースが多く、フープ応力を過小評価しやすい</li>
-<li>I形梁のウェブ厚が6mm未満の場合、せん断流量の非線形性が顕著になるため、このツールの線形計算結果に15%の余裕係数を適用推奨</li>
-</ul>
+<h3>注意点</h3>
+<p>検算例：L60×60×6では、せん断中心は脚中心線の交点SC=(3.0,57.0)mm、重心G=(17.2,42.8)mm、offset=20.1mmです。T形鋼のSCはウェブ中心線とフランジ中心線の交点付近に表示されます。</p>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

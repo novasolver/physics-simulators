@@ -43,7 +43,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "LC回路振動シミュレーター",
       "description": "インダクタンスL・キャパシタンスC・抵抗Rを入力してRLC回路の減衰振動波形とインピーダンス特性をリアルタイム可視化するWebツール。",
       "url": "https://novasolver.jp/tools/lc-oscillation.html",
@@ -53,7 +53,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["RLC減衰振動波形の可視化","共振周波数・Q値・減衰時定数の計算","インピーダンス|Z(f)|対周波数グラフ","不足制動・臨界制動・過制動の判定"],
       "keywords": "LC回路,RLC回路,共振周波数,Q値,減衰振動,インピーダンス,電気回路シミュレーター",
       "datePublished": "2026-04-09",
@@ -200,10 +200,94 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div id="dampBadge" class="damping-badge under">不足制動（振動あり）</div>
 <div class="divider"></div>
-    
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+
+    <style>
+    .lcs-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+    .lcs-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+    .lcs-ro .rv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.1}
+    .lcs-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:3px;letter-spacing:.02em}
+    .lcs-ro.eC .rv{color:#4aa3ff}.lcs-ro.eL .rv{color:#ffd54a}
+    @media(max-width:600px){.lcs-readouts{grid-template-columns:repeat(2,1fr)}}
+    .lcs-energy{display:flex;gap:14px;align-items:flex-end;margin-top:10px}
+    .lcs-ecol{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+    .lcs-etrack{width:100%;height:96px;background:rgba(0,0,0,.05);border-radius:6px;position:relative;overflow:hidden;border:1px solid var(--border)}
+    .lcs-efill{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 5px 5px}
+    .lcs-efill.ec{background:linear-gradient(180deg,#4aa3ff,#007BFF)}
+    .lcs-efill.el{background:linear-gradient(180deg,#ffe27a,#f39c12)}
+    .lcs-efill.et{background:linear-gradient(180deg,#00d4a0,#00b894)}
+    .lcs-elbl{font-size:0.72rem;font-weight:600}.lcs-eval{font-family:'Roboto Mono',monospace;font-size:0.7rem;color:var(--muted)}
+    .lcs-play{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+    .lcs-presets{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+    @media (prefers-reduced-motion: reduce){.lcs-efill{transition:none}}
+    </style>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-wave-square"></i> LC振動アニメーション（エネルギーの行き来）</div>
+
+      <div class="lcs-readouts">
+        <div class="lcs-ro"><div class="rv" id="lcsRoPhase">0.00</div><div class="rl">位相 ωt [rad]</div></div>
+        <div class="lcs-ro"><div class="rv" id="lcsRoQ">—</div><div class="rl">電荷 q [µC]</div></div>
+        <div class="lcs-ro"><div class="rv" id="lcsRoI">—</div><div class="rl">電流 I [mA]</div></div>
+        <div class="lcs-ro"><div class="rv" id="lcsRoTot">—</div><div class="rl">全エネルギー [µJ]</div></div>
+      </div>
+
+      <canvas id="lcsCanvas" height="300" tabindex="0" role="img" aria-label="LC回路の振動アニメーション。コンデンサの充放電とインダクタの電流、エネルギーの行き来を表示します。"></canvas>
+
+      <div class="lcs-energy">
+        <div class="lcs-ecol">
+          <div class="lcs-etrack"><div class="lcs-efill ec" id="lcsBarC" style="height:0%"></div></div>
+          <div class="lcs-elbl" style="color:#007BFF">電場 E_C</div>
+          <div class="lcs-eval" id="lcsValC">0.0 µJ</div>
+        </div>
+        <div class="lcs-ecol">
+          <div class="lcs-etrack"><div class="lcs-efill el" id="lcsBarL" style="height:0%"></div></div>
+          <div class="lcs-elbl" style="color:#f39c12">磁場 E_L</div>
+          <div class="lcs-eval" id="lcsValL">0.0 µJ</div>
+        </div>
+        <div class="lcs-ecol">
+          <div class="lcs-etrack"><div class="lcs-efill et" id="lcsBarT" style="height:0%"></div></div>
+          <div class="lcs-elbl" style="color:#00b894">合計 E</div>
+          <div class="lcs-eval" id="lcsValT">0.0 µJ</div>
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:8px" id="lcsEnergyNote">理想LCでは E_C+E_L は一定。電荷が最大のとき電流は0（全エネルギーがC）、1/4周期後に電荷0・電流最大（全エネルギーがL）。</div>
+
+      <div class="lcs-presets">
+        <button class="preset-btn" type="button" onclick="lcsSetPreset('am')">AMラジオ同調</button>
+        <button class="preset-btn" type="button" onclick="lcsSetPreset('slow')">大きなLCでゆっくり</button>
+        <button class="preset-btn" type="button" onclick="lcsSetPreset('fast')">小さなLCで高速</button>
+      </div>
+
+      <div class="param-group" style="margin:6px 0">
+        <div class="param-label">
+          <label class="param-name" for="lcsDamp">減衰抵抗 R<sub>d</sub>（任意）</label>
+          <span class="param-value"><span id="lcsDampVal">0.0</span> Ω</span>
+        </div>
+        <input type="range" id="lcsDamp" min="0" max="50" step="0.5" value="0" oninput="lcsOnDamp()" aria-label="減衰抵抗 オーム">
+      </div>
+
+      <div class="lcs-play">
+        <button class="btn" type="button" id="lcsBtnPlay" onclick="lcsTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="lcsReset()"><i class="fas fa-rotate-left"></i> リセット</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn lcs-speed" type="button" data-spd="0.25" onclick="lcsSetSpeed(0.25)">0.25×</button>
+          <button class="preset-btn lcs-speed" type="button" data-spd="1" onclick="lcsSetSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn lcs-speed" type="button" data-spd="2" onclick="lcsSetSpeed(2)">2×</button>
+        </div>
+      </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -406,6 +490,247 @@ updateLabels();
 compute();
 </script>
 
+<script>
+(function(){
+  "use strict";
+  var cv = document.getElementById('lcsCanvas');
+  if(!cv) return;
+  var ctx = cv.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // physics state
+  var L = 1e-3, C = 1e-6, V0 = 10, Rd = 0;   // Rd = optional damping resistance
+  var Q0 = C*V0;                              // initial charge (Coulomb)
+  var w0 = 1/Math.sqrt(L*C), wd = w0, alpha = 0;
+  var Etot0 = 0.5*Q0*Q0/C;                    // initial total energy (Joule)
+  var t = 0, playing = !reduce, speed = 1, animId = null, lastTs = 0;
+
+  function recompute(){
+    // pull from the calculator sliders so the animation tracks the same L, C, V0
+    var sL = document.getElementById('slL'), sC = document.getElementById('slC'), sV = document.getElementById('slV0');
+    if(sL && sC){
+      L = Math.pow(10, parseFloat(sL.value)) * 1e-3;
+      C = Math.pow(10, parseFloat(sC.value)) * 1e-6;
+    }
+    if(sV) V0 = parseFloat(sV.value);
+    Q0 = C*V0;
+    w0 = 1/Math.sqrt(L*C);
+    alpha = Rd>0 ? Rd/(2*L) : 0;
+    wd = (alpha < w0) ? Math.sqrt(w0*w0 - alpha*alpha) : w0;
+    Etot0 = 0.5*Q0*Q0/C;
+  }
+
+  function stateAt(tt){
+    // q(t)=Q0 e^{-a t} cos(wd t); I = dq/dt
+    var env = Math.exp(-alpha*tt);
+    var q = Q0*env*Math.cos(wd*tt);
+    var I = Q0*env*(-alpha*Math.cos(wd*tt) - wd*Math.sin(wd*tt));
+    var Ec = 0.5*q*q/C;
+    var El = 0.5*L*I*I;
+    return {q:q, I:I, Ec:Ec, El:El, tot:Ec+El, phase:(w0*tt)%(2*Math.PI)};
+  }
+
+  // HiDPI sizing
+  var cssW=0, cssH=0;
+  function resize(){
+    var rect = cv.parentElement.getBoundingClientRect();
+    cssW = Math.max(280, Math.floor(rect.width - (window.innerWidth<640?24:44)));
+    cssH = 300;
+    var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    cv.style.width = cssW+'px'; cv.style.height = cssH+'px';
+    cv.width = Math.round(cssW*dpr); cv.height = Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function draw(){
+    resize();
+    var W=cssW, H=cssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+
+    var s = stateAt(t);
+    var qN = Q0>0 ? s.q/Q0 : 0;          // normalized charge [-1,1]
+    var iMax = Q0*wd;
+    var iN = iMax>0 ? s.I/iMax : 0;      // normalized current [-1,1]
+
+    // circuit geometry: a loop with capacitor on left, inductor on right
+    var cx=W*0.30, ix=W*0.70, topY=H*0.30, botY=H*0.72;
+    ctx.strokeStyle='rgba(180,210,255,.55)'; ctx.lineWidth=2.5;
+    // top & bottom wires
+    ctx.beginPath();
+    ctx.moveTo(cx, topY); ctx.lineTo(ix, topY);
+    ctx.moveTo(cx, botY); ctx.lineTo(ix, botY);
+    ctx.stroke();
+
+    // ---- Capacitor (left vertical branch) ----
+    var plateGap=14, plLen=46, plX=cx;
+    var topPlateY=H*0.46, botPlateY=topPlateY+plateGap;
+    ctx.lineWidth=2.5; ctx.strokeStyle='rgba(180,210,255,.55)';
+    ctx.beginPath(); ctx.moveTo(plX, topY); ctx.lineTo(plX, topPlateY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(plX, botPlateY); ctx.lineTo(plX, botY); ctx.stroke();
+    // plates colored by charge polarity & magnitude
+    var aC = Math.min(1, Math.abs(qN));
+    var topPos = qN>=0;
+    ctx.lineWidth=5;
+    ctx.strokeStyle = topPos ? 'rgba(255,90,90,'+(0.35+0.65*aC)+')' : 'rgba(90,160,255,'+(0.35+0.65*aC)+')';
+    ctx.beginPath(); ctx.moveTo(plX-plLen/2, topPlateY); ctx.lineTo(plX+plLen/2, topPlateY); ctx.stroke();
+    ctx.strokeStyle = topPos ? 'rgba(90,160,255,'+(0.35+0.65*aC)+')' : 'rgba(255,90,90,'+(0.35+0.65*aC)+')';
+    ctx.beginPath(); ctx.moveTo(plX-plLen/2, botPlateY); ctx.lineTo(plX+plLen/2, botPlateY); ctx.stroke();
+    // E-field lines between plates
+    var nf = Math.round(aC*5);
+    ctx.strokeStyle='rgba(255,210,90,'+(0.25+0.5*aC)+')'; ctx.lineWidth=1;
+    for(var f=0; f<nf; f++){
+      var fx = plX-plLen/2 + plLen*(f+0.5)/nf;
+      ctx.beginPath(); ctx.moveTo(fx, topPlateY+1); ctx.lineTo(fx, botPlateY-1); ctx.stroke();
+    }
+    ctx.fillStyle='rgba(255,255,255,.65)'; ctx.font='bold 11px Roboto Mono'; ctx.textAlign='center';
+    ctx.fillText(topPos?'+':'−', plX-plLen/2-10, topPlateY+4);
+    ctx.fillText(topPos?'−':'+', plX-plLen/2-10, botPlateY+4);
+    ctx.fillStyle='rgba(120,200,255,.9)'; ctx.fillText('C', plX, botY+18);
+
+    // ---- Inductor (right vertical branch) as coil ----
+    var coilTop=H*0.40, coilBot=H*0.62, loops=4, r=8;
+    ctx.strokeStyle='rgba(180,210,255,.55)'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(ix, topY); ctx.lineTo(ix, coilTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ix, coilBot); ctx.lineTo(ix, botY); ctx.stroke();
+    var aL = Math.min(1, Math.abs(iN));
+    ctx.strokeStyle='rgba(255,210,90,'+(0.4+0.6*aL)+')'; ctx.lineWidth=2.5;
+    for(var c=0;c<loops;c++){
+      var y0 = coilTop + (coilBot-coilTop)*c/loops;
+      var y1 = coilTop + (coilBot-coilTop)*(c+1)/loops;
+      ctx.beginPath(); ctx.arc(ix, (y0+y1)/2, r, -Math.PI/2, Math.PI/2, false); ctx.stroke();
+    }
+    ctx.fillStyle='rgba(255,210,90,.9)'; ctx.font='bold 12px Roboto Mono'; ctx.fillText('L', ix+22, (coilTop+coilBot)/2+4);
+
+    // ---- current-direction dots animating around the loop ----
+    if(Math.abs(iN)>0.02){
+      var dir = iN>0 ? 1 : -1;
+      var perim = 2*(ix-cx) + 2*(botY-topY);
+      var ndots=10;
+      var off = (Date.now()*0.0008*speed*dir) % 1;
+      for(var d=0; d<ndots; d++){
+        var u = ((d/ndots)+off+1)%1;
+        var pos = loopPoint(u, cx, ix, topY, botY);
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, 2.6, 0, 7);
+        ctx.fillStyle='rgba(0,212,160,'+(0.4+0.6*aL)+')'; ctx.fill();
+      }
+    }
+
+    // labels / live overlay
+    ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText('q = '+(s.q*1e6).toFixed(2)+' µC', 12, 20);
+    ctx.fillText('I = '+(s.I*1e3).toFixed(2)+' mA', 12, 38);
+    ctx.textAlign='right';
+    ctx.fillStyle='rgba(120,200,255,.95)'; ctx.fillText('E_C='+(s.Ec*1e6).toFixed(2)+' µJ', W-12, 20);
+    ctx.fillStyle='rgba(255,210,90,.95)'; ctx.fillText('E_L='+(s.El*1e6).toFixed(2)+' µJ', W-12, 38);
+    ctx.textAlign='left';
+
+    // annotation: integrative note
+    var note='';
+    if(Math.abs(qN)>0.92) note='電荷最大 → 全エネルギーがC（I≈0）';
+    else if(Math.abs(iN)>0.92) note='電流最大 → 全エネルギーがL（q≈0）';
+    if(note){
+      ctx.font='bold 11px Noto Sans JP'; ctx.textAlign='center';
+      ctx.fillStyle='rgba(255,213,74,.95)'; ctx.fillText(note, W/2, H-12); ctx.textAlign='left';
+    }
+
+    updateReadouts(s);
+  }
+
+  function loopPoint(u, cx, ix, topY, botY){
+    // walk the rectangle clockwise: top(cx->ix), right(top->bot), bottom(ix->cx), left(bot->top)
+    var wTop=ix-cx, hR=botY-topY, wBot=ix-cx, hL=botY-topY;
+    var tot=wTop+hR+wBot+hL, dpos=u*tot;
+    if(dpos<wTop) return {x:cx+dpos, y:topY};
+    dpos-=wTop;
+    if(dpos<hR) return {x:ix, y:topY+dpos};
+    dpos-=hR;
+    if(dpos<wBot) return {x:ix-dpos, y:botY};
+    dpos-=wBot;
+    return {x:cx, y:botY-dpos};
+  }
+
+  function updateReadouts(s){
+    document.getElementById('lcsRoPhase').textContent = s.phase.toFixed(2);
+    document.getElementById('lcsRoQ').textContent = (s.q*1e6).toFixed(2);
+    document.getElementById('lcsRoI').textContent = (s.I*1e3).toFixed(2);
+    document.getElementById('lcsRoTot').textContent = (s.tot*1e6).toFixed(2);
+    var ref = Etot0>0 ? Etot0 : 1e-30;
+    document.getElementById('lcsBarC').style.height = Math.min(100, s.Ec/ref*100)+'%';
+    document.getElementById('lcsBarL').style.height = Math.min(100, s.El/ref*100)+'%';
+    document.getElementById('lcsBarT').style.height = Math.min(100, s.tot/ref*100)+'%';
+    document.getElementById('lcsValC').textContent = (s.Ec*1e6).toFixed(2)+' µJ';
+    document.getElementById('lcsValL').textContent = (s.El*1e6).toFixed(2)+' µJ';
+    document.getElementById('lcsValT').textContent = (s.tot*1e6).toFixed(2)+' µJ';
+  }
+
+  function loop(ts){
+    if(!playing){ animId=null; return; }
+    if(!lastTs) lastTs=ts;
+    var dtReal = Math.min(0.05, (ts-lastTs)/1000); lastTs=ts;
+    // scale animation time so a period spans ~2.5 s at 1x regardless of real frequency
+    var T = 2*Math.PI/w0;
+    t += dtReal*speed*(T/2.5);
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+  function start(){ if(reduce){ draw(); return; } playing=true; lastTs=0; setPlayIcon(); if(!animId) animId=requestAnimationFrame(loop); }
+  function stop(){ playing=false; if(animId){ cancelAnimationFrame(animId); animId=null; } setPlayIcon(); }
+  function setPlayIcon(){
+    var b=document.getElementById('lcsBtnPlay');
+    if(b) b.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+  }
+
+  window.lcsTogglePlay = function(){ playing ? stop() : start(); };
+  window.lcsReset = function(){ t=0; recompute(); draw(); if(!playing && !reduce) start(); };
+  window.lcsSetSpeed = function(sp){
+    speed=sp;
+    var btns=document.querySelectorAll('.lcs-speed');
+    for(var i=0;i<btns.length;i++){
+      var on = parseFloat(btns[i].dataset.spd)===sp;
+      btns[i].style.borderColor = on?'var(--accent)':'';
+      btns[i].style.color = on?'var(--accent)':'';
+    }
+  };
+  window.lcsOnDamp = function(){
+    Rd = parseFloat(document.getElementById('lcsDamp').value);
+    document.getElementById('lcsDampVal').textContent = Rd.toFixed(1);
+    var n=document.getElementById('lcsEnergyNote');
+    if(n) n.textContent = Rd>0
+      ? '減衰抵抗ありでは合計エネルギーが抵抗で散逸し、振幅が徐々に減衰します。'
+      : '理想LCでは E_C+E_L は一定。電荷が最大のとき電流は0（全エネルギーがC）、1/4周期後に電荷0・電流最大（全エネルギーがL）。';
+    t=0; recompute(); draw();
+  };
+  window.lcsSetPreset = function(name){
+    var P = {
+      am:   {l:-1.0, c:-1.0, v0:10},   // L~0.1mH, C~0.1µF -> tank-ish
+      slow: {l: 3.0, c: 3.0, v0:10},   // big L,C -> slow
+      fast: {l:-1.0, c:-3.0, v0:10}    // small L,C -> fast
+    }[name];
+    if(!P) return;
+    var sL=document.getElementById('slL'), sC=document.getElementById('slC'), sV=document.getElementById('slV0');
+    if(sL){ sL.value=P.l; sL.dispatchEvent(new Event('input',{bubbles:true})); }
+    if(sC){ sC.value=P.c; sC.dispatchEvent(new Event('input',{bubbles:true})); }
+    if(sV){ sV.value=P.v0; sV.dispatchEvent(new Event('input',{bubbles:true})); }
+    t=0; recompute(); draw();
+  };
+
+  // keep animation in sync when calculator sliders move
+  ['slL','slC','slV0'].forEach(function(id){
+    var e=document.getElementById(id);
+    if(e) e.addEventListener('input', function(){ recompute(); if(!playing) draw(); });
+  });
+  cv.addEventListener('keydown', function(e){
+    if(e.key===' '||e.key==='Enter'){ e.preventDefault(); window.lcsTogglePlay(); }
+  });
+  window.addEventListener('resize', function(){ draw(); });
+
+  recompute();
+  if(reduce){ t = (Math.PI/4)/w0; setPlayIcon(); draw(); }   // representative frame: energy split
+  else { draw(); start(); }
+})();
+</script>
+
 <section class="explanation">
   <h2>LC回路振動シミュレーターとは</h2>
   <div class="chat">
@@ -428,7 +753,29 @@ compute();
       <div class="bub">いいところに気がついたね。共振周波数 $f_0$ は、回路が最も振動しやすい「固有のリズム」だ。LやCのスライダーを動かすと、リアルタイムで計算された $f_0$ の値が変わるのが見えるはず。例えば、ラジオのチューニングは、この共振周波数を変えて目的の電波だけを拾う仕組みなんだ。</div>
     </div>
   </div>
-  <h2>よくある質問</h2>
+  <h2>LC振動の周期とエネルギー</h2>
+<div class="fblock">
+<p>コイル（インダクタンス $L$）とコンデンサ（容量 $C$）をつなぐと、電荷と電流が周期的にやり取りされる<strong>電気振動（LC振動）</strong>が起こります。固有角周波数と周期は次式です。</p>
+<p style="text-align:center">$\omega_0 = \dfrac{1}{\sqrt{LC}}, \qquad T = 2\pi\sqrt{LC}, \qquad f_0 = \dfrac{1}{2\pi\sqrt{LC}}$</p>
+<p>振動の間、エネルギーは<strong>コンデンサの電場エネルギー $\tfrac{1}{2}CV^2$ とコイルの磁場エネルギー $\tfrac{1}{2}LI^2$ の間を往復</strong>し、総和は一定に保たれます（抵抗がない理想の場合）。これは、ばね振り子で位置エネルギーと運動エネルギーが交換されるのと数学的に同じ構造です。</p>
+</div>
+
+<h2>力学振動とのアナロジー・応用</h2>
+<div class="fblock">
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">電気系（LC）</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">力学系（ばね-質量）</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">電荷 $Q$</td><td style="border:1px solid #d0d7de;padding:6px 8px">変位 $x$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">インダクタンス $L$</td><td style="border:1px solid #d0d7de;padding:6px 8px">質量 $m$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">$1/C$（弾性）</td><td style="border:1px solid #d0d7de;padding:6px 8px">ばね定数 $k$</td></tr>
+</tbody>
+</table>
+</div>
+<p>実際の回路には抵抗があり、振動は徐々に減衰します（減衰振動）。LC振動は<strong>ラジオ・無線の同調回路、発振回路、クロック生成</strong>などの基礎で、$\omega_0=1/\sqrt{LC}$ を目的の周波数に合わせて設計します。本シミュレーターで $L, C$ を変え、周波数やエネルギーの振動を確認できます。</p>
+</div>
+
+<h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">抵抗Rを0に設定するとどうなりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -464,6 +811,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="lc-oscillation.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -525,16 +875,26 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>L=100mH、C=10μFの直列LC回路で共振周波数はf₀=1/(2π√(0.1×10⁻⁵))≈1591Hzです。R=10Ωを追加するとQ値=2π×1591×0.1/10≈100となり、高いQ値で鋭い共振ピークが得られます。初期電圧V₀=12Vから開始した場合、減衰時定数τ=2×0.1/10=0.02秒で振動が減衰し、約100ms後には振動がほぼ消滅します</p>
+<p>L=100mH、C=10μFの直列LC回路で共振周波数はf₀=1/(2π√(0.1×10⁻⁵))≈159Hzです。R=10Ωを追加するとQ値=2π×159×0.1/10≈10となり、共振ピークが得られます。初期電圧V₀=12Vから開始した場合、減衰時定数τ=2×0.1/10=0.02秒で振動が減衰し、約100ms後には振動がほぼ消滅します</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>電源フィルタ設計時、L=1mH、C=100μFで共振周波数が約1.6kHzになる場合、この周波数付近での過電圧を避けるためR減衰を20Ω以上確保してください</li>
+<li>電源フィルタ設計時、L=1mH、C=100μFで共振周波数が約503Hzになる場合、この周波数付近での過電圧を避けるためR減衰を20Ω以上確保してください</li>
 <li>高周波スイッチング電源のLCフィルタでは、PCB配線インダクタンスの寄生成分がシミュレーション値に数%の誤差を生じるため、プロトタイプ検証では実測値との比較が必須です</li>
 <li>共振周波数付近でのインピーダンスが最小値R となるため、過電流リスク管理が重要です</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

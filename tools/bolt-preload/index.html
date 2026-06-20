@@ -43,14 +43,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ボルト締め付け・軸力・疲労設計計算機",
       "description": "ボルト締め付けトルク・軸力・疲労安全率をリアルタイム計算。強度区分4.6〜12.9、ナット係数・外部荷重・グッドマン線図による疲労評価。M6〜M48対応。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/bolt-preload.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true
     },{
@@ -162,6 +162,25 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* v2 bolt-preload animated hero */
+#boltHeroCanvas{width:100%;background:#0a1628;border-radius:8px;display:block;margin-top:8px;touch-action:none}
+.bh-readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+@media(max-width:560px){.bh-readouts{grid-template-columns:repeat(2,1fr)}}
+.bh-ro{background:rgba(0,123,255,.06);border:1px solid var(--border);border-radius:8px;padding:7px 9px;display:flex;flex-direction:column;gap:2px}
+.bh-rol{font-size:.62rem;color:var(--muted);letter-spacing:.02em}
+.bh-rov{font-size:.92rem;font-weight:700;font-family:'Roboto Mono',monospace;color:var(--accent)}
+.bh-ro.sep .bh-rov{color:var(--orange)}
+.bh-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.bh-speed{display:inline-flex;gap:4px;margin-left:auto}
+.bh-spd{padding:5px 10px;font-size:.74rem;border:1px solid var(--border);background:var(--bg);border-radius:6px;cursor:pointer;font-family:inherit;color:var(--text)}
+.bh-spd.active{border-color:var(--accent);color:var(--accent);font-weight:700}
+.bh-presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.preset-btn.bh-preset{padding:5px 11px;font-size:.74rem;border:1px solid var(--border);background:var(--bg);border-radius:6px;cursor:pointer;font-family:inherit;color:var(--text)}
+.preset-btn.bh-preset:hover{border-color:var(--accent);color:var(--accent)}
+.bh-hint{font-size:.76rem;line-height:1.6;color:var(--muted);margin-top:10px;background:rgba(0,180,216,.06);border:1px solid rgba(0,180,216,.2);border-radius:8px;padding:9px 11px}
+.bh-hint strong{color:var(--orange)}
+@media (prefers-reduced-motion: reduce){.bh-spd,.bh-controls .btn{opacity:.85}}
+
 </style>
 </head>
 <body>
@@ -250,7 +269,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -284,6 +311,39 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
+    <!-- v2 animated hero: bolt preload & joint diagram -->
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-compress-arrows-alt"></i> ボルト軸力ライブ可視化 — 締付け・荷重分担・分離</div>
+      <div class="bh-readouts" id="bhReadouts">
+        <div class="bh-ro"><span class="bh-rol">締付けトルク T</span><span class="bh-rov" id="bhT">—</span></div>
+        <div class="bh-ro"><span class="bh-rol">軸力 F_i</span><span class="bh-rov" id="bhFi">—</span></div>
+        <div class="bh-ro"><span class="bh-rol">外部荷重 P</span><span class="bh-rov" id="bhP">—</span></div>
+        <div class="bh-ro"><span class="bh-rol">ボルト荷重 F_b</span><span class="bh-rov" id="bhFb">—</span></div>
+        <div class="bh-ro"><span class="bh-rol">被締結体荷重 F_m</span><span class="bh-rov" id="bhFm">—</span></div>
+        <div class="bh-ro"><span class="bh-rol">残留クランプ力</span><span class="bh-rov" id="bhClamp">—</span></div>
+        <div class="bh-ro"><span class="bh-rol">荷重分担比 C</span><span class="bh-rov" id="bhC">—</span></div>
+        <div class="bh-ro"><span class="bh-rol">分離荷重</span><span class="bh-rov" id="bhSep">—</span></div>
+        <div class="bh-ro" id="bhStateRo"><span class="bh-rol">状態</span><span class="bh-rov" id="bhState">—</span></div>
+      </div>
+      <canvas id="boltHeroCanvas" class="diagram" height="340" role="img" aria-label="ボルト締付けと荷重分担・分離のアニメーション図"></canvas>
+      <div class="bh-controls">
+        <button class="btn" type="button" id="bhPlay" onclick="bhTogglePlay()" aria-label="再生・一時停止"><i class="fas fa-play"></i> 再生</button>
+        <button class="btn secondary" type="button" onclick="bhReset()" aria-label="リセット"><i class="fas fa-redo"></i> リセット</button>
+        <span class="bh-speed" role="group" aria-label="再生速度">
+          <button class="bh-spd" data-spd="0.5" onclick="bhSetSpeed(0.5,this)">0.5x</button>
+          <button class="bh-spd active" data-spd="1" onclick="bhSetSpeed(1,this)">1x</button>
+          <button class="bh-spd" data-spd="2" onclick="bhSetSpeed(2,this)">2x</button>
+        </span>
+      </div>
+      <div class="bh-presets" role="group" aria-label="プリセット">
+        <button class="preset-btn bh-preset" onclick="bhPreset('typical')">標準継手</button>
+        <button class="preset-btn bh-preset" onclick="bhPreset('soft')">軟ガスケット（高ボルト負担）</button>
+        <button class="preset-btn bh-preset" onclick="bhPreset('stiff')">剛性継手（低ボルト負担）</button>
+        <button class="preset-btn bh-preset" onclick="bhPreset('separation')">分離</button>
+      </div>
+      <div class="bh-hint">ボルトは伸び（引張）、被締結体は縮む（圧縮）。外部荷重 P はボルト剛性 k_b と被締結体剛性 k_m の比 C=k_b/(k_b+k_m) で分担され、ボルトは ΔF_b=C·P しか受けません。P が分離荷重 F_i/(1−C) を超えると継手が<strong>分離</strong>します。</div>
+    </div>
+
       <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('diagram',this)">断面図・バネモデル</button>
         <button class="tab-btn" onclick="switchTab('loading',this)">荷重分担チャート</button>
@@ -303,7 +363,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
         <p>締め付けトルク：$T = K \cdot d \cdot F_{pre}$</p>
-        <p style="margin-top:6px;">ボルト剛性：$k_b = \dfrac{A_t \cdot E_b}{L_g}$，　被締結体剛性：$k_j \approx \dfrac{0.577\pi E_j d}{2[\ln(\frac{2.86L+0.577d}{2.86L+2.5d})]^{-1}}$（Rotscher錐）</p>
+        <p style="margin-top:6px;">ボルト剛性：$k_b = \dfrac{A_t \cdot E_b}{L_g}$，　被締結体剛性：$k_j = \dfrac{0.577\pi E_j d}{2\ln\left(\frac{5(0.577L_g+0.5d)}{0.577L_g+2.5d}\right)}$（Rotscher錐）</p>
         <p style="margin-top:6px;">荷重分担比：$\Phi = \dfrac{k_b}{k_b + k_j}$</p>
         <p style="margin-top:6px;">振幅応力：$\sigma_a = \dfrac{\Phi \cdot F_{ext}}{2A_t}$，　グッドマン：$\dfrac{\sigma_a}{\sigma_e}+ \dfrac{\sigma_m}{\sigma_u}= \dfrac{1}{n_f}$</p>
       
@@ -379,9 +439,8 @@ function setGrade(g, btn){
   const Eb = 206000; // MPa
   const Ej = 206000; // MPa (same material assumed)
   const kb = (At * Eb) / (Lg); // N/mm per mm length
-  // Simplified joint stiffness (Rotscher cone approximation)
-  const kj_factor = 5.0; // kj typically 3-10x kb for metallic joints
-  const kj = kj_factor * kb;
+  // Joint stiffness: Rotscher cone (two-frustum model, half-apex 30 deg, washer dia 1.5d)
+  const kj = (0.5774 * Math.PI * Ej * d_mm) / (2 * Math.log(5 * (0.5774 * Lg + 0.5 * d_mm) / (0.5774 * Lg + 2.5 * d_mm)));
   const Phi = kb / (kb + kj);
 
   // Stresses
@@ -562,11 +621,237 @@ updateSlider(document.getElementById('fextSlider'), 'fextVal', 1, 'kN');
 compute();
 </script>
 
+<script>
+/* === v2 animated hero: bolt preload, load sharing & joint separation (self-contained IIFE) === */
+(function(){
+  var L = {
+    play:'<i class="fas fa-play"></i> 再生', pause:'<i class="fas fa-pause"></i> 一時停止',
+    tighten:'締付け中…', hold:'保持', loading:'外部荷重サイクル', separated:'分離（ギャップ発生）', clamped:'クランプ維持',
+    boltLbl:'ボルト（引張）', memberLbl:'被締結体（圧縮）', gapLbl:'ギャップ', extLbl:'外部荷重 P',
+    jdTitle:'継手線図（F vs δ）', jdBolt:'ボルト線', jdMember:'被締結体線', sepWarn:'分離！'
+  };
+  var canvas = document.getElementById('boltHeroCanvas');
+  if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var BOLTS_H = (typeof BOLTS!=='undefined') ? BOLTS : [[6,1,20.1],[8,1.25,36.6],[10,1.5,58],[12,1.75,84.3],[16,2,157],[20,2.5,245],[24,3,353],[30,3.5,561],[36,4,817],[48,5,1470]];
+  var animId=null, playing=false, lastTs=0, speed=1, phase=0; // phase: 0..1 tighten, 1..2 hold, 2..4 load cycle
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function rd(id){ return document.getElementById(id); }
+  function num(id){ var e=document.getElementById(id); return e?parseFloat(e.value):0; }
+
+  // Physics derived from existing controls (independent of grade for clarity)
+  function model(){
+    var idx = Math.round(num('dSlider')); if(isNaN(idx)) idx=3;
+    var b = BOLTS_H[Math.max(0,Math.min(BOLTS_H.length-1,idx))];
+    var d_mm=b[0], At=b[2];
+    var K = num('kSlider')||0.2;
+    var Lg = num('lgSlider')||30;
+    var fprePct = (num('fpreSlider')||70)/100;
+    var Pext = (num('fextSlider')||5)*1000; // N
+    // proof ~ use 600 MPa baseline so preload is representative; clamp realistic
+    var sp = 600;
+    var F_i = fprePct * sp * At; // preload N
+    var Eb=206000, Ej=206000;
+    var kb = (At*Eb)/Lg;
+    var kj = (0.5774*Math.PI*Ej*d_mm)/(2*Math.log(5*(0.5774*Lg+0.5*d_mm)/(0.5774*Lg+2.5*d_mm)));
+    if(!(kj>0)) kj = kb*4;
+    var C = kb/(kb+kj);
+    var d = d_mm/1000;
+    var T = K*d*F_i; // N·m
+    var F_sep = F_i/(1-C);
+    return {d_mm:d_mm, K:K, F_i:F_i, kb:kb, kj:kj, C:C, T:T, Pext:Pext, F_sep:F_sep};
+  }
+
+  function fmtN(n){ return Math.abs(n)>=1000 ? (n/1000).toFixed(1)+' kN' : Math.round(n)+' N'; }
+
+  function setRO(m, t, P, Fb, Fm, clamp, sep, state, isSep){
+    rd('bhT').textContent = m.T.toFixed(1)+' N·m';
+    rd('bhFi').textContent = (m.F_i/1000).toFixed(1)+' kN';
+    rd('bhP').textContent = (P/1000).toFixed(1)+' kN';
+    rd('bhFb').textContent = (Fb/1000).toFixed(1)+' kN';
+    rd('bhFm').textContent = (Fm/1000).toFixed(1)+' kN';
+    rd('bhClamp').textContent = (Math.max(0,clamp)/1000).toFixed(1)+' kN';
+    rd('bhC').textContent = m.C.toFixed(3);
+    rd('bhSep').textContent = (sep/1000).toFixed(1)+' kN';
+    rd('bhState').textContent = state;
+    rd('bhStateRo').classList.toggle('sep', !!isSep);
+  }
+
+  function draw(t){
+    var m = model();
+    var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    var cssW = canvas.clientWidth || canvas.parentElement.clientWidth || 600;
+    var cssH = 340;
+    canvas.setAttribute('data-ux-no-scale','1');
+    canvas.style.width=cssW+'px'; canvas.style.height=cssH+'px';
+    canvas.width=Math.round(cssW*dpr); canvas.height=Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    var W=cssW, H=cssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+
+    // ---- timeline ----
+    // 0..1 tighten (preload 0->F_i); 1..2 hold; 2..4 external load 0->Pext->0 (cycle)
+    var tightFrac, P;
+    if(t<1){ tightFrac=t; P=0; }
+    else if(t<2){ tightFrac=1; P=0; }
+    else { tightFrac=1; var u=(t-2)/2; P = m.Pext * Math.sin(Math.min(u,1)*Math.PI)*0.999 + 0; if(u>1) P=0; }
+    var F_i_now = m.F_i*tightFrac;
+
+    // Load sharing (only valid once preloaded). Separation when P > F_i/(1-C)
+    var separated = (tightFrac>=1) && (P > m.F_sep);
+    var Fb, Fm, clamp;
+    if(separated){
+      Fb = P;                 // bolt carries full external load after separation
+      Fm = 0;
+      clamp = 0;
+    } else {
+      Fb = F_i_now + m.C*P;             // bolt load
+      clamp = F_i_now - (1-m.C)*P;      // remaining clamp on members
+      Fm = clamp;                       // member compressive load
+    }
+
+    // ===== left: bolted joint cross-section =====
+    var jx = W*0.27, topY=44, gripH=150;
+    var boltW = Math.max(m.d_mm*1.3,14);
+    var plateW = Math.max(boltW*4, 96);
+    var stretch = tightFrac* (8) + (separated? (P/m.F_sep-1)*18 : 0);
+    var gap = separated ? Math.min(22, (P/m.F_sep-1)*40) : 0;
+
+    // members (two plates), compress slightly with clamp
+    var comp = (clamp/m.F_i)*4*tightFrac; if(isNaN(comp)) comp=0;
+    var p1y=topY, p1h=gripH/2 - comp, p2y=topY+gripH/2 + gap, p2h=gripH/2 - comp;
+    ctx.fillStyle='#1e3a5f'; ctx.fillRect(jx-plateW/2, p1y, plateW, p1h);
+    ctx.fillStyle='#1a3050'; ctx.fillRect(jx-plateW/2, p2y, plateW, p2h);
+    ctx.strokeStyle='#2d5986'; ctx.lineWidth=1;
+    ctx.strokeRect(jx-plateW/2,p1y,plateW,p1h); ctx.strokeRect(jx-plateW/2,p2y,plateW,p2h);
+    // gap highlight
+    if(gap>0.5){
+      ctx.fillStyle='rgba(225,112,85,.28)'; ctx.fillRect(jx-plateW/2, topY+gripH/2, plateW, gap);
+      ctx.fillStyle='#e17055'; ctx.font='11px Roboto Mono,monospace'; ctx.textAlign='center';
+      ctx.fillText(L.gapLbl, jx, topY+gripH/2+gap+12);
+    }
+
+    // bolt shank (tension color by stress fraction)
+    var stressFrac = Math.min(1, Fb/(m.F_i||1));
+    var bc = separated ? '#e17055' : (stressFrac>0.95?'#fdcb6e':'#00b894');
+    var shTop=topY-22, shBot=p2y+p2h+22+stretch;
+    ctx.fillStyle='#c0c0d0'; ctx.fillRect(jx-boltW*0.3, shTop, boltW*0.6, shBot-shTop); // shank
+    ctx.fillStyle=bc; ctx.fillRect(jx-boltW/2, shTop-14, boltW, 14); // head
+    ctx.fillStyle='#a0a0b0'; ctx.fillRect(jx-boltW/2, shBot, boltW, 14); // nut
+    // tension arrows on bolt
+    ctx.strokeStyle=bc; ctx.lineWidth=2;
+    arrow(jx, shTop-16, jx, shTop-16-22*tightFrac, bc);
+    arrow(jx, shBot+14, jx, shBot+14+22*tightFrac, bc);
+    ctx.fillStyle=bc; ctx.font='10px Noto Sans JP,sans-serif'; ctx.textAlign='left';
+    ctx.fillText(L.boltLbl, jx+boltW/2+6, topY+10);
+    ctx.fillStyle='#7fb0ff';
+    ctx.fillText(L.memberLbl, jx+boltW/2+6, topY+gripH-6);
+
+    // external load arrows (pull plates apart) when P>0
+    if(P>0){
+      ctx.strokeStyle='#e17055'; ctx.lineWidth=2;
+      arrow(jx-plateW/2-18, p1y+6, jx-plateW/2-18, p1y-18, '#e17055');
+      arrow(jx-plateW/2-18, p2y+p2h-6, jx-plateW/2-18, p2y+p2h+18, '#e17055');
+      ctx.fillStyle='#e17055'; ctx.font='10px Roboto Mono,monospace'; ctx.textAlign='right';
+      ctx.fillText(L.extLbl, jx-plateW/2-22, topY+gripH/2);
+    }
+
+    // ===== right: joint diagram triangle (F vs deflection) =====
+    var gx0=W*0.55, gy0=H-46, gW=W*0.40, gH=H-90;
+    ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(gx0,gy0-gH); ctx.lineTo(gx0,gy0); ctx.lineTo(gx0+gW,gy0); ctx.stroke();
+    ctx.fillStyle='#8aa0c0'; ctx.font='10px Noto Sans JP,sans-serif'; ctx.textAlign='left';
+    ctx.fillText('F', gx0-4, gy0-gH-6); ctx.fillText('δ', gx0+gW+2, gy0+4);
+    ctx.textAlign='center'; ctx.fillStyle='#aac8ff'; ctx.font='11px Noto Sans JP,sans-serif';
+    ctx.fillText(L.jdTitle, gx0+gW/2, gy0-gH-6);
+    // joint diagram: bolt line (slope kb, up-right from origin), member line (slope -km, down-right meeting)
+    var mid=gx0+gW*0.5;
+    var fScale=(gH*0.85)/(m.F_i||1);
+    var yi = gy0 - m.F_i*fScale; // preload height
+    // member line (left triangle): from (gx0, gy0) up to (mid, yi)
+    ctx.strokeStyle='#00b894'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(gx0,gy0); ctx.lineTo(mid,yi); ctx.stroke();
+    // bolt line: from (gx0+gW, gy0) up to (mid, yi)
+    ctx.strokeStyle='#007BFF';
+    ctx.beginPath(); ctx.moveTo(gx0+gW,gy0); ctx.lineTo(mid,yi); ctx.stroke();
+    // external load shifts the operating point: bolt rises by C*P, member drops by (1-C)*P
+    var dx = (P/m.F_sep)*(gW*0.5*0.92);
+    var opx = mid + dx;
+    var boltY = yi - m.C*P*fScale;
+    var memY = yi + (1-m.C)*P*fScale; // member load drops -> line value down toward gy0
+    if(memY>gy0) memY=gy0;
+    // markers
+    ctx.fillStyle='#007BFF'; dot(opx, separated?gy0-Fb*fScale:boltY);
+    ctx.fillStyle='#00b894'; if(!separated) dot(opx, gy0-(clamp>0?clamp:0)*fScale*0+memY);
+    // preload point
+    ctx.fillStyle='#fff'; dot(mid,yi);
+    ctx.fillStyle='#cfe0ff'; ctx.font='9px Roboto Mono,monospace'; ctx.textAlign='center';
+    ctx.fillText('F_i', mid, yi-7);
+    if(separated){
+      ctx.fillStyle='#e17055'; ctx.font='bold 12px Noto Sans JP,sans-serif';
+      ctx.fillText(L.sepWarn, gx0+gW*0.5, gy0-gH+14);
+    }
+
+    // top-left state badge
+    var state = t<1? L.tighten : (t<2? L.hold : (separated? L.separated : L.loading));
+    ctx.fillStyle = separated? '#e17055' : '#aac8ff';
+    ctx.font='12px Noto Sans JP,sans-serif'; ctx.textAlign='left';
+    ctx.fillText('● '+state, 12, 18);
+
+    setRO(m, t, P, Fb, Fm, clamp, m.F_sep, state, separated);
+  }
+
+  function arrow(x1,y1,x2,y2,c){
+    var a=Math.atan2(y2-y1,x2-x1), hl=7;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.strokeStyle=c; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-hl*Math.cos(a-0.4),y2-hl*Math.sin(a-0.4));
+    ctx.lineTo(x2-hl*Math.cos(a+0.4),y2-hl*Math.sin(a+0.4));
+    ctx.closePath(); ctx.fillStyle=c; ctx.fill();
+  }
+  function dot(x,y){ ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke(); }
+
+  function loop(ts){
+    if(!playing){ animId=null; return; }
+    if(!lastTs) lastTs=ts;
+    var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+    phase += dt*speed*0.6;
+    if(phase>=4) phase=2; // loop the loading cycle
+    draw(phase);
+    animId=requestAnimationFrame(loop);
+  }
+  function startPlay(){ if(reduce){ draw(phase); return;} playing=true; lastTs=0; rd('bhPlay').innerHTML=L.pause; if(!animId) animId=requestAnimationFrame(loop); }
+  function stopPlay(){ playing=false; if(animId){cancelAnimationFrame(animId);animId=null;} rd('bhPlay').innerHTML=L.play; }
+  window.bhTogglePlay=function(){ playing?stopPlay():startPlay(); };
+  window.bhReset=function(){ stopPlay(); phase=0; draw(0); };
+  window.bhSetSpeed=function(s,btn){ speed=s; document.querySelectorAll('.bh-spd').forEach(function(b){b.classList.toggle('active',b===btn);}); };
+  window.bhPreset=function(name){
+    function set(id,v){ var e=rd(id); if(e){ e.value=v; } }
+    if(name==='typical'){ set('dSlider',3); set('kSlider',0.20); set('fpreSlider',70); set('lgSlider',30); set('fextSlider',5); }
+    else if(name==='soft'){ set('dSlider',4); set('kSlider',0.20); set('fpreSlider',70); set('lgSlider',120); set('fextSlider',12); }
+    else if(name==='stiff'){ set('dSlider',3); set('kSlider',0.18); set('fpreSlider',75); set('lgSlider',15); set('fextSlider',8); }
+    else if(name==='separation'){ set('dSlider',2); set('kSlider',0.20); set('fpreSlider',50); set('lgSlider',60); set('fextSlider',60); }
+    if(typeof updateDiam==='function') updateDiam();
+    if(typeof compute==='function') compute();
+    phase=0; if(reduce){ draw(2.5); } else { startPlay(); }
+  };
+
+  ['dSlider','kSlider','fpreSlider','lgSlider','fextSlider'].forEach(function(id){
+    var e=rd(id); if(e) e.addEventListener('input', function(){ if(!playing) draw(phase); });
+  });
+  window.addEventListener('resize', function(){ draw(phase); });
+  // initial static frame
+  draw(reduce?2.5:0);
+})();
+</script>
+
 <section class="explanation">
   <h2>ボルト締め付け・軸力・疲労設計計算機とは</h2>
   <div class="chat">
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">「ナット係数K」って何ですか？上のスライダーで0.1から0.3まで変えられますけど、これが変わると何が変わるんですか？</div>
+      <div class="bub">「ナット係数K」って何ですか？上のスライダーで0.10から0.25まで変えられますけど、これが変わると何が変わるんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
       <div class="bub">大まかに言うと、摩擦の影響を全部ひっくるめた係数だね。例えば、ボルトやナットの表面が錆びていたり、潤滑油が塗ってなかったりすると、摩擦が大きくてKの値も大きくなる。このシミュレーターでKを大きくすると、同じ軸力（F_pre）を発生させるのに必要な「締め付けトルク（T）」が一気に大きくなるのがわかるよ。現場で多いのは、黒皮ボルトでK=0.2、潤滑状態でK=0.15くらいだね。</div>
@@ -601,7 +886,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">このツールで計算できるボルトサイズの範囲を教えてください。 <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">本ツールは強度区分4.6〜12.9に対応しており、呼び径M3〜M30程度までの標準的なメートルねじを想定しています。ただし、計算式自体は任意の径に適用可能です。極端に小径（M3未満）や大径（M30超）の場合は、ナット係数やディスクモデルの適用性に注意が必要です。</div>
+    <div class="faq-a">本ツールは強度区分4.6〜12.9に対応しており、呼び径M6〜M48の標準的なメートルねじを想定しています。ただし、計算式自体は任意の径に適用可能です。極端に小径（M6未満）や大径（M48超）の場合は、ナット係数やディスクモデルの適用性に注意が必要です。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -621,6 +906,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="bolt-preload.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -676,14 +964,14 @@ compute();
 <h3>使い方ガイド</h3>
 <ol>
 <li>ボルト径(M6～M48)と強度区分(4.6～12.9)を選択します</li>
-<li>ナット係数k値(0.12～0.20)と目標締め付け軸力F_preを入力します。標準値はk=0.16、F_pre=設計軸力の60～80%です</li>
-<li>外部荷重と荷重係数を設定し、シミュレータが締め付けトルクT、ボルト応力σ_b、疲労安全率n_f(グッドマン線図)、過負荷安全率n_oを自動算出します</li>
+<li>ナット係数K値(0.10～0.25)と軸力率（保証荷重の50～90%）を設定します。標準値はK=0.16～0.20、軸力率60～80%です</li>
+<li>外部荷重と把持長さL_gを設定すると、シミュレータが締め付けトルクT、ボルト応力σ_b、荷重係数Φ、疲労安全率n_f(グッドマン線図)、過負荷安全率n_oを自動算出します</li>
 <li>結果がJIS B 1083およびVDI 2230の基準値内か確認してください</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>M16強度区分8.8のボルト(降伏点640 MPa、引張強さ800 MPa)をフランジ接合に使用する場合：ナット係数k=0.16、目標軸力F_pre=80 kNを設定すると、締め付けトルクT≈19.2 N·mが算出されます。外部引張荷重20 kN、荷重分担比Φ=0.3が作用するとボルト応力σ_b=446 MPaとなり、疲労安全率n_f=2.1(グッドマン線図による)、過負荷安全率n_o=1.8が得られ、JIS基準(n_f≥1.5、n_o≥1.5)を満たします</p>
+<p>M16強度区分8.8のボルト(降伏点660 MPa、引張強さ800 MPa、保証応力600 MPa)をフランジ接合に使用する場合：ナット係数K=0.16、軸力率85%（F_pre=0.85×600×157≈80.1 kN）を設定すると、締め付けトルクT=K·d·F_pre=0.16×0.016×80100≈205 N·mが算出されます。把持長さL_g=30 mmではRotscher錐モデルにより荷重係数Φ≈0.22となり、外部引張荷重20 kNでボルト応力σ_b=510 MPa、振幅応力σ_a≈14 MPaとなります。疲労安全率n_f≈1.26(グッドマン線図による)、過負荷安全率n_o=660/510≈1.29で、JIS基準(n_f≥1.5、n_o≥1.5)を満たしません。強度区分10.9への変更や軸力率・外部荷重の見直しなどの対策が必要です</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -694,7 +982,17 @@ compute();
 <li>締め付け後48時間以内に再確認作業を実施し、緩みによる軸力低下を防止してください</li>
 </ul>
 </div>
-<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
+<div class="howto-card"><h3>準拠規格・前提条件</h3><p><strong>準拠/参考：</strong>VDI 2230 / JIS B 1083 ねじ締結。締付けトルク \(T = K\,d\,F_{pre}\)、目標軸力 \(F_{pre} = \text{（保証荷重率）}\times \sigma_p A_s\)（保証応力基準。\(\sigma_p\approx0.75\,\sigma_y\) 相当）、有効断面積 \(A_s\)。荷重係数はRotscherコーンによるばねモデルでΦ = k_b/(k_b+k_j)。疲労はGoodman線図。</p><p><strong>モデルの前提：</strong>弾性域・等温・常温。ナット係数Kは潤滑/表面状態を1値に集約（一般0.12〜0.20）。継手剛性はRotscher二重円錐（半頂角30°）の単一近似で、ガスケット・座面陥没・クリープは無視。</p><p><strong>適用範囲・限界：</strong>教育・初期設計用。検証例M16・8.8（K=0.16、軸力率85%）で T≈205 N·m、F_pre≈80.1 kN、Φ≈0.22 と本ツール出力が一致。実機の最終締付けは超音波軸力計や角度法での実測・VDI 2230 詳細計算を推奨。</p></div><footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
   <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">

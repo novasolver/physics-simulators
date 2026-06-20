@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "SFD・BMD シミュレーター",
       "description": "単純支持梁に集中荷重・等分布荷重・モーメントを組み合わせて作用させ、反力・せん断力図 SFD・曲げモーメント図 BMD と最大値の位置をリアルタイムに計算・可視化する材料力学シミュレーター。",
       "url": "https://novasolver.jp/tools/shear-and-moment-diagram.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["単純支持梁の反力 R_A, R_B の自動計算","集中・分布・モーメントの組合せ荷重に対応した SFD・BMD 描画","最大曲げモーメント M_max とその発生位置の数値探索","梁モデル・荷重・支点反力の同時可視化"],
       "keywords": "SFD,BMD,せん断力図,曲げモーメント図,単純支持梁,反力,材料力学,構造解析",
       "datePublished": "2026-05-16",
@@ -122,8 +122,8 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 <div class="hero">
   <div class="hero-inner">
     <div class="hero-badge"><i class="fas fa-ruler-combined"></i> 構造解析シミュレーター</div>
-    <h1>SFD・BMD シミュレーター — 単純支持梁の複合荷重</h1>
-    <p class="hero-sub">単純支持梁に集中荷重・等分布荷重を組み合わせたときの反力・せん断力図・曲げモーメント図をリアルタイム描画。最大曲げモーメントとその発生位置を自動算出します。</p>
+    <h1>SFD・BMD シミュレーター — 単純支持梁・片持ち梁のせん断力図と曲げモーメント図</h1>
+    <p class="hero-sub">単純支持梁・片持ち梁に集中荷重・等分布荷重を組み合わせたときの反力・せん断力図(SFD)・曲げモーメント図(BMD)をリアルタイム描画。最大曲げモーメントとその発生位置、片持ち梁では固定端モーメントまで自動算出します。</p>
   </div>
 </div>
 
@@ -131,6 +131,13 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">支持条件</span></div>
+      <select id="beamKind" onchange="compute()" style="width:100%;padding:7px 8px;border-radius:6px;border:1px solid #ccd;background:#fff;font-size:.95em">
+        <option value="ss">単純支持梁（両端支持）</option>
+        <option value="cant">片持ち梁（左端固定）</option>
+      </select>
+    </div>
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">梁長 L</span>
@@ -169,6 +176,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">梁は両端単純支持。集中荷重 P は位置 a で下向き、等分布荷重 w は全長で下向き、外力モーメント M_0 は本シミュレーターでは 0 として固定しています（解説の式中にのみ残しています）。a が L を超えるとスライダーは自動で L 内にクランプされます。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -176,7 +192,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statRa">—</div><div class="sl">左支点反力 R_A</div></div>
-        <div class="stat-card"><div class="sv" id="statRb">—</div><div class="sl">右支点反力 R_B</div></div>
+        <div class="stat-card"><div class="sv" id="statRb">—</div><div class="sl" id="lblRb">右支点反力 R_B</div></div>
         <div class="stat-card"><div class="sv" id="statMmax">—</div><div class="sl">最大曲げモーメント M_max</div></div>
         <div class="stat-card"><div class="sv" id="statXmax">—</div><div class="sl">M_max 発生位置</div></div>
       </div>
@@ -234,23 +250,31 @@ function getParams() {
   if (a > L - 0.01) a = L - 0.01;
   var M0 = 0; // fixed for this simulator
   var b = L * 0.5; // unused while M0 = 0
-  return { L: L, P: P, a: a, w: w, M0: M0, b: b };
+  var kEl = document.getElementById('beamKind');
+  var kind = kEl ? kEl.value : 'ss';
+  return { L: L, P: P, a: a, w: w, M0: M0, b: b, kind: kind };
 }
 
 // Heaviside step (1 if x>=0)
 function H(x) { return x >= 0 ? 1 : 0; }
 
 function reactions(p) {
+  if (p.kind === 'cant') {
+    // 片持ち梁（左端固定）: 鉛直反力 RA=P+wL, 固定端モーメント Mr=-(Pa+wL²/2)
+    var RAc = p.P + p.w * p.L;
+    var Mr = -(p.P * p.a + p.w * p.L * p.L / 2);
+    return { RA: RAc, RB: 0, Mr: Mr };
+  }
   var RB = (p.P * p.a + p.w * p.L * p.L / 2 + p.M0) / p.L;
   var RA = p.P + p.w * p.L - RB;
-  return { RA: RA, RB: RB };
+  return { RA: RA, RB: RB, Mr: 0 };
 }
 
 function shearAt(p, r, x) {
   return r.RA - p.w * x - p.P * H(x - p.a);
 }
 function momentAt(p, r, x) {
-  return r.RA * x - p.w * x * x / 2 - p.P * (x - p.a) * H(x - p.a) + p.M0 * H(x - p.b);
+  return r.RA * x - p.w * x * x / 2 - p.P * (x - p.a) * H(x - p.a) + p.M0 * H(x - p.b) + (r.Mr || 0);
 }
 
 function sampleArrays(p, r, N) {
@@ -332,7 +356,14 @@ function drawBeamAndLoads(p, r, region) {
     c.fillStyle = '#3d567a';
     c.fillRect(px - 12, beamY + 16, 24, 3);
   }
-  support(x0); support(x1);
+  if (p.kind === 'cant') {
+    c.strokeStyle = '#3d567a'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(x0, beamY - 16); c.lineTo(x0, beamY + 16); c.stroke();
+    c.lineWidth = 1;
+    for (var _hi = 0; _hi < 5; _hi++) { var _yy = beamY - 14 + _hi*7; c.beginPath(); c.moveTo(x0, _yy); c.lineTo(x0 - 8, _yy + 6); c.stroke(); }
+  } else {
+    support(x0); support(x1);
+  }
   // distributed load arrows (top)
   if (p.w > 0) {
     var nArr = 14;
@@ -485,7 +516,13 @@ function compute() {
   var samples = sampleArrays(p, r, 200);
   var mmax = findMmax(p, r);
   document.getElementById('statRa').textContent = r.RA.toFixed(1) + ' kN';
-  document.getElementById('statRb').textContent = r.RB.toFixed(1) + ' kN';
+  if (p.kind === 'cant') {
+    document.getElementById('statRb').textContent = Math.abs(r.Mr).toFixed(2) + ' kN·m';
+    var _l1 = document.getElementById('lblRb'); if (_l1) _l1.textContent = '固定端モーメント M_A';
+  } else {
+    document.getElementById('statRb').textContent = r.RB.toFixed(1) + ' kN';
+    var _l2 = document.getElementById('lblRb'); if (_l2) _l2.textContent = '右支点反力 R_B';
+  }
   document.getElementById('statMmax').textContent = mmax.M.toFixed(2) + ' kN·m';
   document.getElementById('statXmax').textContent = mmax.x.toFixed(2) + ' m';
   resizeCanvas();
@@ -538,7 +575,48 @@ compute();
     </div>
   </div>
 
-  <h2>よくある質問</h2>
+  <h2>SFD・BMDの覚えておくべき5つの特徴</h2>
+<div class="fblock">
+<p>せん断力図（SFD）と曲げモーメント図（BMD）は、次の5つの性質を押さえると手早く正確に描け、検算もできます。</p>
+<ol>
+<li><strong>微分関係：</strong>せん断力は曲げモーメントの傾きに等しく、$V = dM/dx$ が成り立ちます。<strong>BMDを微分するとSFD</strong>になります。</li>
+<li><strong>極値条件：</strong><strong>せん断力が0になる位置で曲げモーメントが極値（最大）</strong>になります。$M_{max}$ を探すときは $V=0$ の点に注目します。</li>
+<li><strong>集中荷重の段差：</strong>集中荷重の作用点で<strong>SFDは荷重の大きさだけ段差（ジャンプ）</strong>し、BMDはその点で折れ曲がります（尖る）。</li>
+<li><strong>荷重次数と図の形：</strong>荷重のない区間はSFDが一定・BMDが直線、<strong>等分布荷重の区間はSFDが直線（1次）・BMDが2次曲線（放物線）</strong>です。荷重の次数より1つずつ次数が上がります。</li>
+<li><strong>境界での値：</strong>単純支持の支点と自由端では<strong>曲げモーメント＝0</strong>、片持ち梁の<strong>固定端では曲げモーメントが最大</strong>（ホギング）になります。上のシミュレーターで「支持条件」を切り替え、この違いを確認できます。</li>
+</ol>
+</div>
+
+<h2>SFD・BMDの描き方（5ステップ）</h2>
+<div class="fblock">
+<ol>
+<li><strong>反力を求める：</strong>鉛直方向とモーメントの釣合い（$\sum V = 0$, $\sum M = 0$）から支点反力 $R_A, R_B$（片持ちは固定端反力と固定端モーメント）を計算します。</li>
+<li><strong>区間を分ける：</strong>集中荷重の位置、分布荷重の始端・終端、支点を境に梁をいくつかの区間に分けます。</li>
+<li><strong>せん断力を求める：</strong>各区間で左端から任意位置 $x$ で切断し、左側部分の鉛直釣合いから $V(x)$ を求めてSFDを描きます。</li>
+<li><strong>曲げモーメントを求める：</strong>同じ切断面まわりのモーメント釣合いから $M(x)$ を求めてBMDを描きます。$M(x)=\int V\,dx$ の関係も使えます。</li>
+<li><strong>検算する：</strong>$V=0$ の位置で $M$ が極値になること、支点・自由端で $M=0$ になることを確認します。</li>
+</ol>
+<p>このツールは上の手順を自動化したものです。手計算の答え合わせや、荷重・スパンを変えたときの図形の変化を直感的に確認するのに使えます。</p>
+</div>
+
+<h2>反力・せん断力・曲げモーメントの公式一覧</h2>
+<div class="fblock">
+<p>代表的な梁と荷重に対する反力・最大せん断力・最大曲げモーメントの公式です（$P$＝集中荷重、$w$＝等分布荷重強度、$L$＝スパン）。</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">梁・荷重</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">反力</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">最大せん断力 V<sub>max</sub></th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">最大曲げモーメント M<sub>max</sub></th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">単純梁・中央集中荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$R_A=R_B=P/2$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$P/2$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL/4$（中央）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">単純梁・等分布荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$R_A=R_B=wL/2$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL/2$（支点）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL^2/8$（中央）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">片持ち梁・先端集中荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$R=P,\ M_A=PL$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$P$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$PL$（固定端）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">片持ち梁・等分布荷重</td><td style="border:1px solid #d0d7de;padding:6px 8px">$R=wL,\ M_A=wL^2/2$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL$（固定端）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$wL^2/2$（固定端）</td></tr>
+</tbody>
+</table>
+</div>
+<p>単純梁は曲げモーメントが中央（径間内）で最大になるのに対し、片持ち梁は<strong>固定端で最大</strong>になるのが大きな違いです。同じ荷重なら片持ち梁のほうが最大モーメントが大きく、不利になります。</p>
+</div>
+
+<h2>よくある質問</h2>
   <div class="faq-section">
     <div class="faq-item">
       <button type="button" class="faq-q" onclick="toggleFaq(this)">符号の規約はどうなっていますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -573,6 +651,9 @@ compute();
     <p>最後に、<strong>「両端単純支持＝両端ヒンジ」と「両端固定」の区別を曖昧にしない</strong>ことです。本シミュレーターは両端単純支持（左ピン、右ローラー）を仮定しています。両端固定梁では端部に固定モーメントが発生し、最大曲げモーメントは固定端側に移動します。同じ荷重でも、両端固定にすると中央のモーメントは単純支持の 1/3 程度に下がりますが、端部に最大値が現れます。境界条件は構造設計で最も基本的かつ重要な仮定なので、現物の支持状態が「単純支持に近いのか固定に近いのか」を慎重に判断する必要があります。</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="shear-and-moment-diagram.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -624,17 +705,23 @@ compute();
 </section>
 <!-- codex-static-related-tools:end -->
 
+<div class="howto-card">
+<h3>準拠規格・前提条件</h3>
+<p><strong>準拠/参考：</strong> 梁の静力学（オイラー・ベルヌーイ梁）。単純支持梁で静的平衡 \(\sum F = 0,\ \sum M = 0\) より支点反力 \(R_B = (P\,a + wL^2/2 + M_0)/L\)、\(R_A = P + wL - R_B\)。せん断力 \(V(x)=R_A - wx - P\,H(x-a)\)、曲げモーメント \(M(x)=\int V\,dx\)。</p>
+<p><strong>モデルの前提：</strong> 線形弾性・小変形、単純支持（ピン＋ローラー）、集中荷重Pと等分布荷重wを扱います。符号規約はたわみ正（下に凸）を正のM、下向き荷重を正とします。せん断変形・自重は無視。</p>
+<p><strong>適用範囲・限界：</strong> 反力・SFD・BMDは厳密です（例：\(L{=}6\text{m}, P{=}30\text{kN}\,@\,a{=}2.5\text{m}, w{=}10\text{kN/m}\) で \(R_A{=}47.5, R_B{=}42.5\text{kN}\)、\(M_\text{max}{=}87.50\text{kN·m}\,@\,x{=}2.5\text{m}\)、\(R_A{+}R_B{=}\) 全荷重90kN）。断面性能に依存する応力・たわみ量は別途必要です。</p>
+</div>
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>梁の長さ L（mm）をスライダーで設定します。例：2000 mm の鋼製梁を想定する場合、slL を 2000 に設定してください。</li>
-<li>集中荷重 P（kN）と作用位置 A（mm、左支点からの距離）を入力します。例えば P = 15 kN、A = 800 mm とすれば、左支点から 800 mm の位置に 15 kN の荷重が下向きに作用します。</li>
+<li>梁の長さ L（m）をスライダーで設定します。例：2 m の鋼製梁を想定する場合、L を 2 に設定してください。</li>
+<li>集中荷重 P（kN）と作用位置 a（m、左支点からの距離）を入力します。例えば P = 15 kN、a = 0.8 m とすれば、左支点から 0.8 m の位置に 15 kN の荷重が下向きに作用します。</li>
 <li>等分布荷重 W（kN/m）を設定します。全長に均等に分布する場合、例えば W = 5 kN/m を入力すると、梁全体に 5 kN/m の荷重が加わります。シミュレーターは反力 R_A、R_B、最大曲げモーメント M_max とその発生位置を自動計算し、SFD と BMD をリアルタイム表示します。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>長さ 4000 mm、ヤング係数 E = 200 GPa の H形鋼に、左支点から 1500 mm の位置に集中荷重 P = 20 kN、等分布荷重 W = 3 kN/m が作用する場合を想定します。左支点での反力 R_A = 16 kN、右支点での反力 R_B = 16 kN となります。最大曲げモーメント M_max は梁の中央付近で約 28 kN・m となり、発生位置は約 2000 mm（梁の中央）です。断面二次モーメント I = 8450 cm4 の場合、最大たわみ δ = M_max × L² / (48 × E × I) により約 3.5 mm と計算できます。</p>
+<p>長さ L = 4 m の単純支持梁に、左支点から a = 1.5 m の位置に集中荷重 P = 20 kN、全長に等分布荷重 W = 3 kN/m が作用する場合を想定します。反力は R_B = (20×1.5 + 3×4²/2)/4 = 13.5 kN、R_A = 20 + 3×4 − 13.5 = 18.5 kN となります。せん断力は荷重点 x = 1.5 m で +14 kN から −6 kN へ符号が変わるため、最大曲げモーメントはこの位置で生じ、M_max = 18.5×1.5 − 3×1.5²/2 ≈ 24.4 kN・m です。SFD と BMD で、せん断力の不連続位置とモーメントの最大位置が一致することを確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -645,6 +732,16 @@ compute();
 <li>曲げひび割れ判定には、許容曲げモーメント（材質による）との比較が必須です。鋼材 F値 235 N/mm²、断面係数 Z = 650 cm³ の場合、許容 M = 235 × 650 / 1000 = 152.75 kN・m です。</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

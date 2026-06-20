@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "キルヒホッフの法則 シミュレーター",
       "description": "キルヒホッフの法則（KVL/KCL）を直並列抵抗回路でリアルタイム計算するシミュレーター。電圧V・抵抗R_1・R_2・R_3を変えて全電流・各分岐電流・並列部電圧を可視化し、電流分配と電圧降下の関係を解析できます。",
       "url": "https://novasolver.jp/tools/kirchhoff-laws.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["直並列抵抗回路 (R_1 直列 + R_2//R_3 並列) の模式図表示","全電流 I_total と分岐電流 I_2, I_3 のリアルタイム計算","並列部両端電圧 V_par と各部電圧降下の表示","I_total = I_2 + I_3 を確認する KCL バーチャート"],
       "keywords": "キルヒホッフの法則,KVL,KCL,直並列回路,電流分配,電圧降下,並列抵抗,合成抵抗,直流回路",
       "datePublished": "2026-05-15",
@@ -102,6 +102,27 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #circuitCanvas,#chartCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1929,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.62rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.03em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.topo-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.toggle-btn,.preset-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.78rem;font-family:inherit;cursor:pointer;transition:all .2s}
+.toggle-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.preset-btn:hover,.toggle-btn:hover{border-color:var(--accent);color:var(--accent)}
+.speed-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+.scrub-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.scrub-row input[type=range]{flex:1}
+.scrub-time{font-family:'Roboto Mono',monospace;font-size:0.78rem;color:var(--accent);min-width:54px;text-align:right}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:10px;border-radius:3px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.toggle-btn,.preset-btn{transition:none}}
 </style>
 </head>
 <body>
@@ -131,68 +152,120 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
-    <div class="param-group">
-      <div class="param-label">
-        <span class="param-name">電源電圧 V</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slVVal" value="12" min="1" max="100" step="1" oninput="syncFromNum('slV','slVVal')"><span class="num-unit">V</span></div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">回路トポロジー</div>
+      <div class="topo-row">
+        <button type="button" class="toggle-btn topo-btn" data-topo="series" onclick="kirSetTopo('series')">直列</button>
+        <button type="button" class="toggle-btn topo-btn" data-topo="parallel" onclick="kirSetTopo('parallel')">並列</button>
+        <button type="button" class="toggle-btn topo-btn active" data-topo="combined" onclick="kirSetTopo('combined')">直並列</button>
       </div>
-      <input type="range" id="slV" min="1" max="100" step="1" value="12" oninput="syncToNum('slV','slVVal');updateSlider(this,'slVVal',0,'');compute()">
     </div>
 
-    <div class="param-group">
-      <div class="param-label">
-        <span class="param-name">直列抵抗 R_1</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slR1Val" value="100" min="1" max="1000" step="1" oninput="syncFromNum('slR1','slR1Val')"><span class="num-unit">Ω</span></div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="kirPreset('series')">直列分圧</button>
+        <button type="button" class="preset-btn" onclick="kirPreset('parallel')">並列</button>
+        <button type="button" class="preset-btn" onclick="kirPreset('bridge')">ブリッジ風</button>
+        <button type="button" class="preset-btn" onclick="kirPreset('ladder')">ラダー</button>
       </div>
-      <input type="range" id="slR1" min="1" max="1000" step="1" value="100" oninput="syncToNum('slR1','slR1Val');updateSlider(this,'slR1Val',0,'');compute()">
-    </div>
-
-    <div class="param-group">
-      <div class="param-label">
-        <span class="param-name">並列抵抗 R_2</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slR2Val" value="200" min="1" max="1000" step="1" oninput="syncFromNum('slR2','slR2Val')"><span class="num-unit">Ω</span></div>
-      </div>
-      <input type="range" id="slR2" min="1" max="1000" step="1" value="200" oninput="syncToNum('slR2','slR2Val');updateSlider(this,'slR2Val',0,'');compute()">
-    </div>
-
-    <div class="param-group">
-      <div class="param-label">
-        <span class="param-name">並列抵抗 R_3</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slR3Val" value="300" min="1" max="1000" step="1" oninput="syncFromNum('slR3','slR3Val')"><span class="num-unit">Ω</span></div>
-      </div>
-      <input type="range" id="slR3" min="1" max="1000" step="1" value="300" oninput="syncToNum('slR3','slR3Val');updateSlider(this,'slR3Val',0,'');compute()">
     </div>
 
     <div class="divider"></div>
 
-    <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> R_3 スイープ</button>
-      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">電源電圧 V</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slVVal" value="12" min="1" max="100" step="1" oninput="syncFromNum('slV','slVVal');kirCompute()" aria-label="電源電圧 V"><span class="num-unit">V</span></div>
+      </div>
+      <input type="range" id="slV" min="1" max="100" step="1" value="12" oninput="syncToNum('slV','slVVal');updateSlider(this,'slVVal',0,'');kirCompute()" aria-label="電源電圧 スライダー">
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値で全電流 54.5 mA、I_2 = 32.7 mA、I_3 = 21.8 mA、V_par = 6.55 V。スイープは R_3 を 1 Ω から 1000 Ω へ自動で動かします。</p>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">抵抗 R_1</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slR1Val" value="100" min="1" max="1000" step="1" oninput="syncFromNum('slR1','slR1Val');kirCompute()" aria-label="抵抗 R1"><span class="num-unit">Ω</span></div>
+      </div>
+      <input type="range" id="slR1" min="1" max="1000" step="1" value="100" oninput="syncToNum('slR1','slR1Val');updateSlider(this,'slR1Val',0,'');kirCompute()" aria-label="抵抗 R1 スライダー">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">抵抗 R_2</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slR2Val" value="200" min="1" max="1000" step="1" oninput="syncFromNum('slR2','slR2Val');kirCompute()" aria-label="抵抗 R2"><span class="num-unit">Ω</span></div>
+      </div>
+      <input type="range" id="slR2" min="1" max="1000" step="1" value="200" oninput="syncToNum('slR2','slR2Val');updateSlider(this,'slR2Val',0,'');kirCompute()" aria-label="抵抗 R2 スライダー">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">抵抗 R_3</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slR3Val" value="300" min="1" max="1000" step="1" oninput="syncFromNum('slR3','slR3Val');kirCompute()" aria-label="抵抗 R3"><span class="num-unit">Ω</span></div>
+      </div>
+      <input type="range" id="slR3" min="1" max="1000" step="1" value="300" oninput="syncToNum('slR3','slR3Val');updateSlider(this,'slR3Val',0,'');kirCompute()" aria-label="抵抗 R3 スライダー">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="play-row">
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+      <div style="display:flex;gap:4px;margin-left:auto">
+        <button type="button" class="preset-btn speed-btn" data-speed="0.5" onclick="kirSetSpeed(0.5)">0.5×</button>
+        <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="kirSetSpeed(1)">1×</button>
+        <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="kirSetSpeed(2)">2×</button>
+      </div>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:8px;">流れる点が電流＝速度・密度が電流の大きさに比例します。直並列の既定値で全電流 54.5 mA、I_2 = 32.7 mA、I_3 = 21.8 mA、V_par = 6.55 V。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4816359281?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816359281.09._SCMZZZZZZ_.jpg" alt="電気回路の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電気回路 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roItot">—</div><div class="rl">全電流 I_total</div></div>
+        <div class="live-ro"><div class="rv" id="roRtot">—</div><div class="rl">合成抵抗 R_total</div></div>
+        <div class="live-ro"><div class="rv" id="roVa">—</div><div class="rl">節点電圧 V_a</div></div>
+        <div class="live-ro"><div class="rv" id="roPwr">—</div><div class="rl">消費電力 P</div></div>
+        <div class="live-ro"><div class="rv" id="roI1">—</div><div class="rl">分岐電流 I_1</div></div>
+        <div class="live-ro"><div class="rv" id="roI2">—</div><div class="rl">分岐電流 I_2</div></div>
+        <div class="live-ro"><div class="rv" id="roI3">—</div><div class="rl">分岐電流 I_3</div></div>
+        <div class="live-ro"><div class="rv" id="roD2">—</div><div class="rl">電圧降下 ΔV_2</div></div>
+      </div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statI_tot">—</div><div class="sl">全電流 I_total</div></div>
         <div class="stat-card"><div class="sv" id="statI2">—</div><div class="sl">分岐電流 I_2</div></div>
         <div class="stat-card"><div class="sv" id="statI3">—</div><div class="sl">分岐電流 I_3</div></div>
         <div class="stat-card"><div class="sv" id="statV_par">—</div><div class="sl">並列部電圧 V_par</div></div>
       </div>
+      <div style="display:none"><span id="roD1">—</span><span id="roD3">—</span></div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-microchip"></i> 直並列回路図</div>
-      <canvas id="circuitCanvas"></canvas>
-      <p class="canvas-hint">電圧源 V → R_1（直列）→ ノード a → R_2 と R_3（並列）→ GND。電流方向は矢印で、各部の電圧降下を表示します。</p>
+      <div class="chart-title"><i class="fas fa-microchip"></i> 回路アニメーション（電流の流れ）</div>
+      <canvas id="circuitCanvas" role="img" aria-label="回路図と電流の流れのアニメーション。電池と抵抗、移動する電荷で電流を表示します。"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#FFD166"></i>I_total / I_1</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>I_2</span>
+        <span><i class="swatch" style="background:#28d17c"></i>I_3</span>
+        <span><i class="swatch" style="background:linear-gradient(90deg,#5090e0,#ffd24a)"></i>節点電圧（色＝高低）</span>
+      </div>
+      <p class="canvas-hint">移動する点が電流。点が速く・密なほど電流が大きい。節点で電流が分かれて合流（KCL）、ループで電圧降下の和が EMF に一致（KVL）します。</p>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-bar"></i> KCL バーチャート: I_total = I_2 + I_3</div>
-      <canvas id="chartCanvas"></canvas>
-      <p class="canvas-hint">青=全電流 I_total / 緑=分岐電流 I_2 / 橙=分岐電流 I_3 / I_total の高さが I_2 + I_3 と一致することを目視で確認できます。</p>
+      <div class="chart-title"><i class="fas fa-chart-bar"></i> 電流・電圧分布（KCL / KVL）</div>
+      <canvas id="chartCanvas" role="img" aria-label="各抵抗の電流または電圧降下の棒グラフ。総和のマーカーで KCL・KVL を確認できます。"></canvas>
+      <p class="canvas-hint">直列＝電圧降下（KVL：ΣΔV=V）、並列・直並列＝分岐電流（KCL：分岐の和＝I_total）。黄色の破線が総和の基準です。</p>
     </div>
 
     <div class="chart-card">
@@ -206,392 +279,444 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         $$V_{par} = V - I_{total}\,R_1,\qquad I_2 = \frac{V_{par}}{R_2},\quad I_3 = \frac{V_{par}}{R_3}$$
         <p style="margin-top:6px;">キルヒホッフ電流則 (KCL) による検証：</p>
         $$I_{total} = I_2 + I_3$$
-        <p style="margin-top:8px;">電流は抵抗に反比例して分配されるため、R_2 &lt; R_3 のとき I_2 &gt; I_3 となります。</p>
+        <p style="margin-top:8px;">電流は抵抗に反比例して分配されるため、R_2 &lt; R_3 のとき I_2 &gt; I_3 となります。直列プリセット (R=10Ω×3, V=12) では R_total=30Ω, I=0.4 A, 各降下4 V (KVL: 4+4+4=12)。並列プリセット (10Ω×3) では R_total=3.33Ω, I_total=3.6 A, 各分岐1.2 A (KCL: 1.2×3=3.6) を確認できます。</p>
       </div>
     </div>
   </div>
 </div>
 
+<script>window.__KIR_I18N__={kcl:"KCL",kvl:"KVL",play:"再生",pause:"一時停止",emf:"EMF V",voltage:"電圧 (V)",current:"電流 (mA)"};</script>
 <script>
-// ========== Kirchhoff Laws Simulator — Series-Parallel Resistor Circuit ==========
+/* ===== Kirchhoff Laws Simulator v2 — animated current flow (KCL/KVL visible) ===== */
+(function(){
+"use strict";
+var T = (window.__KIR_I18N__ || {});
+function t(k, d){ return (T[k] !== undefined) ? T[k] : d; }
+
 var circuitCanvas = document.getElementById('circuitCanvas');
-var circuitCtx = circuitCanvas.getContext('2d');
-var chartCanvas = document.getElementById('chartCanvas');
-var chartCtx = chartCanvas.getContext('2d');
-var playing = false;
-var animId = null;
+var chartCanvas   = document.getElementById('chartCanvas');
+if (!circuitCanvas || !chartCanvas) return;
+var cctx = circuitCanvas.getContext('2d');
+var hctx = chartCanvas.getContext('2d');
 
-function getParams() {
-  var V = parseFloat(document.getElementById('slV').value);
-  var R1 = parseFloat(document.getElementById('slR1').value);
-  var R2 = parseFloat(document.getElementById('slR2').value);
-  var R3 = parseFloat(document.getElementById('slR3').value);
-  return { V: V, R1: R1, R2: R2, R3: R3 };
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var playing = false, rafId = null, lastTs = 0, speed = 1, phase = 0;
+var topo = 'combined';
+
+function el(id){ return document.getElementById(id); }
+function num(id){ var e = el(id); return e ? parseFloat(e.value) : NaN; }
+
+function getParams(){
+  return { V: num('slV'), R1: num('slR1'), R2: num('slR2'), R3: num('slR3') };
 }
 
-function solveCircuit(p) {
-  var Rpar = (p.R2 * p.R3) / (p.R2 + p.R3);
-  var Rtot = p.R1 + Rpar;
-  var Itot = p.V / Rtot;
-  var Vr1 = Itot * p.R1;
-  var Vpar = p.V - Vr1;
-  var I2 = Vpar / p.R2;
-  var I3 = Vpar / p.R3;
-  return { Rpar: Rpar, Rtot: Rtot, Itot: Itot, Vr1: Vr1, Vpar: Vpar, I2: I2, I3: I3 };
+function solve(p){
+  var V=p.V, R1=p.R1, R2=p.R2, R3=p.R3;
+  if (topo === 'series'){
+    var Rt = R1+R2+R3, I = V/Rt;
+    return {
+      topo:'series', Rtot:Rt, Itot:I,
+      branches:[
+        {key:'R1',R:R1,I:I,drop:I*R1},
+        {key:'R2',R:R2,I:I,drop:I*R2},
+        {key:'R3',R:R3,I:I,drop:I*R3}
+      ],
+      nodeV:{ src:V, a:V-I*R1, b:V-I*R1-I*R2, gnd:0 }
+    };
+  }
+  if (topo === 'parallel'){
+    var Rt2 = 1/(1/R1+1/R2+1/R3), It2 = V/Rt2;
+    return {
+      topo:'parallel', Rtot:Rt2, Itot:It2,
+      branches:[
+        {key:'R1',R:R1,I:V/R1,drop:V},
+        {key:'R2',R:R2,I:V/R2,drop:V},
+        {key:'R3',R:R3,I:V/R3,drop:V}
+      ],
+      nodeV:{ src:V, a:V, gnd:0 }
+    };
+  }
+  var Rpar = (R2*R3)/(R2+R3);
+  var Rt3 = R1+Rpar, It3 = V/Rt3;
+  var Vpar = V - It3*R1;
+  return {
+    topo:'combined', Rtot:Rt3, Itot:It3, Rpar:Rpar, Vpar:Vpar,
+    branches:[
+      {key:'R1',R:R1,I:It3,drop:It3*R1},
+      {key:'R2',R:R2,I:Vpar/R2,drop:Vpar},
+      {key:'R3',R:R3,I:Vpar/R3,drop:Vpar}
+    ],
+    nodeV:{ src:V, a:Vpar, gnd:0 }
+  };
 }
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
+function fmtI(I){
+  if (!isFinite(I)) return '—';
+  if (Math.abs(I) >= 1) return I.toFixed(3)+' A';
+  return (I*1000).toFixed(1)+' mA';
 }
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
+function fmtV(v){ return (isFinite(v)? v.toFixed(2):'—')+' V'; }
+function fmtR(r){
+  if (!isFinite(r)) return '—';
+  if (r>=1000) return (r/1000).toFixed(2)+' kΩ';
+  return r.toFixed(r<10?2:1)+' Ω';
 }
 
-function resizeCanvases() {
-  [circuitCanvas, chartCanvas].forEach(function (cv) {
-    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+function sizeCanvas(cv, ctx, ratio){
+  var w = Math.max(280, Math.min((cv.parentElement.clientWidth||600)-40, 900));
+  var h = Math.round(w*ratio);
+  var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  cv.style.width = w+'px'; cv.style.height = h+'px';
+  cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  cv._cssW = w; cv._cssH = h;
+}
+function resizeAll(){
+  sizeCanvas(circuitCanvas, cctx, 0.62);
+  sizeCanvas(chartCanvas, hctx, 0.5);
+}
+
+function voltColor(v, vmax){
+  var f = vmax>0 ? Math.max(0, Math.min(1, v/vmax)) : 0;
+  var r = Math.round(80 + 175*f);
+  var g = Math.round(140 + 70*f);
+  var b = Math.round(230 - 110*f);
+  return 'rgb('+r+','+g+','+b+')';
+}
+
+function drawFlow(ctx, pts, I, color){
+  var len = 0, i;
+  for (i=1;i<pts.length;i++){ len += Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]); }
+  if (len<=0) return;
+  var Imag = Math.abs(I);
+  var spacing = Math.max(16, 60 - Imag*1000*0.18);
+  spacing = Math.min(spacing, 70);
+  var nDots = Math.max(1, Math.floor(len/spacing));
+  var travel = (phase * (0.4 + Imag*1000*0.05)) % 1;
+  ctx.fillStyle = color;
+  for (var d=0; d<nDots; d++){
+    var frac = ((d/nDots) + travel) % 1;
+    var target = frac*len, acc=0;
+    for (i=1;i<pts.length;i++){
+      var seg = Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
+      if (acc+seg >= target){
+        var u = (target-acc)/seg;
+        var x = pts[i-1][0] + u*(pts[i][0]-pts[i-1][0]);
+        var y = pts[i-1][1] + u*(pts[i][1]-pts[i-1][1]);
+        ctx.beginPath(); ctx.arc(x,y, 2.8, 0, 6.2832); ctx.fill();
+        break;
+      }
+      acc += seg;
+    }
+  }
+}
+
+function wire(ctx, pts, color){
+  ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (var i=1;i<pts.length;i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.stroke();
+}
+
+function resistorOnSeg(ctx, x1,y1,x2,y2, color, label, value){
+  var mx=(x1+x2)/2, my=(y1+y2)/2;
+  var ang=Math.atan2(y2-y1,x2-x1), L=42, n=6;
+  ctx.save(); ctx.translate(mx,my); ctx.rotate(ang);
+  ctx.fillStyle='#0a1929'; ctx.fillRect(-L/2-3,-12,L+6,24);
+  ctx.strokeStyle=color; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(-L/2,0);
+  var dx=L/(n*2);
+  for (var i=0;i<n;i++){ ctx.lineTo(-L/2+dx*(2*i+1),-7); ctx.lineTo(-L/2+dx*(2*i+2),7); }
+  ctx.lineTo(L/2,0); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle=color; ctx.font='12px "Roboto Mono",monospace'; ctx.textAlign='center';
+  if (Math.abs(y2-y1)>Math.abs(x2-x1)){ ctx.textAlign='left'; ctx.fillText(label,mx+30,my-2); ctx.fillText(value,mx+30,my+13); }
+  else { ctx.fillText(label,mx,my-16); ctx.fillText(value,mx,my+25); }
+}
+
+function chargeColors(){ return ['#FFD166','#00B4D8','#28d17c']; }
+
+function drawCircuit(p, s){
+  var ctx=cctx, W=circuitCanvas._cssW, H=circuitCanvas._cssH;
+  ctx.setLineDash([]);
+  ctx.fillStyle='#0a1929'; ctx.fillRect(0,0,W,H);
+  var vmax = p.V;
+  var L=58, Rr=W-58, Tp=46, Bt=H-54;
+  var midY=(Tp+Bt)/2;
+  var srcX=L;
+
+  function drawSource(){
+    ctx.fillStyle='#0a1929'; ctx.fillRect(srcX-18, midY-26, 36, 52);
+    ctx.strokeStyle='#FFD166'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(srcX-14, midY-10); ctx.lineTo(srcX+14, midY-10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(srcX-7, midY+10); ctx.lineTo(srcX+7, midY+10); ctx.stroke();
+    ctx.fillStyle='#FFD166'; ctx.font='bold 13px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('+', srcX+22, midY-8); ctx.fillText('−', srcX+22, midY+16);
+    ctx.font='12px "Roboto Mono",monospace'; ctx.textAlign='right';
+    ctx.fillText('V='+p.V.toFixed(1)+' V', srcX-10, midY+4);
+  }
+
+  ctx.font='12px "Roboto Mono",monospace';
+  var colors=chargeColors();
+
+  if (topo === 'series'){
+    var y=Tp, x0=L+30, x3=Rr-10;
+    var seg=(x3-x0)/3;
+    var rx=[x0, x0+seg, x0+2*seg, x3];
+    wire(ctx, [[srcX,midY-10],[srcX,y],[x0,y]], '#cfe3f7');
+    for (var i=0;i<3;i++){ wire(ctx, [[rx[i],y],[rx[i+1],y]], '#cfe3f7'); }
+    wire(ctx, [[x3,y],[x3,Bt],[srcX,Bt],[srcX,midY+10]], '#cfe3f7');
+    var loop=[[srcX,midY-10],[srcX,y],[x3,y],[x3,Bt],[srcX,Bt],[srcX,midY+10]];
+    drawFlow(ctx, loop, s.Itot, '#FFD166');
+    for (i=0;i<3;i++){
+      var br=s.branches[i];
+      resistorOnSeg(ctx, rx[i]+seg*0.18, y, rx[i+1]-seg*0.18, y, ['#4dabff','#00B4D8','#28d17c'][i], 'R'+(i+1), fmtR(br.R));
+      ctx.fillStyle='#9ad0ff'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+      ctx.fillText('ΔV='+br.drop.toFixed(2)+' V', (rx[i]+rx[i+1])/2, y-30);
+    }
+    drawSource();
+    ctx.fillStyle='#FFD166'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('I = '+fmtI(s.Itot), (x0+x3)/2, Bt+16);
+    ctx.fillStyle='#cfe3f7'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='left';
+    var sumDrop=s.branches[0].drop+s.branches[1].drop+s.branches[2].drop;
+    ctx.fillText(t('kvl','KVL')+': ΔV1+ΔV2+ΔV3 = '+sumDrop.toFixed(2)+' V = V', L, H-12);
+  }
+  else if (topo === 'parallel'){
+    var yTop=Tp, yBot=Bt;
+    var bx=[L+90, (L+Rr)/2, Rr-40];
+    wire(ctx, [[srcX,midY-10],[srcX,yTop],[bx[2],yTop]], voltColor(s.nodeV.a, vmax));
+    wire(ctx, [[srcX,midY+10],[srcX,yBot],[bx[2],yBot]], voltColor(0, vmax));
+    var rcol=['#4dabff','#00B4D8','#28d17c'];
+    for (var b=0;b<3;b++){
+      wire(ctx, [[bx[b],yTop],[bx[b],yBot]], '#cfe3f7');
+      var brp=s.branches[b];
+      drawFlow(ctx, [[bx[b],yTop],[bx[b],yBot]], brp.I, colors[b]);
+      resistorOnSeg(ctx, bx[b], yTop+(yBot-yTop)*0.30, bx[b], yTop+(yBot-yTop)*0.70, rcol[b], 'R'+(b+1), fmtR(brp.R));
+      ctx.fillStyle=colors[b]; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+      ctx.fillText('I'+(b+1)+'='+fmtI(brp.I), bx[b], yBot+16);
+    }
+    drawFlow(ctx, [[srcX,midY-10],[srcX,yTop],[bx[2],yTop]], s.Itot, '#FFD166');
+    drawSource();
+    ctx.fillStyle='#9ad0ff'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('node a: V='+s.nodeV.a.toFixed(2)+' V', (L+Rr)/2, yTop-8);
+    ctx.fillStyle='#cfe3f7'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText(t('kcl','KCL')+': I1+I2+I3 = '+fmtI(s.Itot)+' = I_total', L, H-12);
+  }
+  else {
+    var yTop2=Tp, yBot2=Bt;
+    var aX=(L+Rr)*0.52;
+    var r2X=aX+(Rr-aX)*0.30, r3X=Rr-30;
+    wire(ctx, [[srcX,midY-10],[srcX,yTop2],[aX,yTop2]], '#cfe3f7');
+    wire(ctx, [[aX,yTop2],[r3X,yTop2]], voltColor(s.nodeV.a, vmax));
+    wire(ctx, [[srcX,midY+10],[srcX,yBot2],[r3X,yBot2]], voltColor(0, vmax));
+    var br1=s.branches[0];
+    resistorOnSeg(ctx, L+70, yTop2, aX-26, yTop2, '#4dabff', 'R1', fmtR(br1.R));
+    ctx.fillStyle='#9ad0ff'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('ΔV1='+br1.drop.toFixed(2)+' V', (L+70+aX-26)/2, yTop2-30);
+    drawFlow(ctx, [[srcX,midY-10],[srcX,yTop2],[aX,yTop2]], s.Itot, '#FFD166');
+    var br2=s.branches[1], br3=s.branches[2];
+    wire(ctx, [[r2X,yTop2],[r2X,yBot2]], '#cfe3f7');
+    wire(ctx, [[r3X,yTop2],[r3X,yBot2]], '#cfe3f7');
+    drawFlow(ctx, [[r2X,yTop2],[r2X,yBot2]], br2.I, '#00B4D8');
+    drawFlow(ctx, [[r3X,yTop2],[r3X,yBot2]], br3.I, '#28d17c');
+    resistorOnSeg(ctx, r2X, yTop2+(yBot2-yTop2)*0.32, r2X, yTop2+(yBot2-yTop2)*0.68, '#00B4D8', 'R2', fmtR(br2.R));
+    resistorOnSeg(ctx, r3X, yTop2+(yBot2-yTop2)*0.32, r3X, yTop2+(yBot2-yTop2)*0.68, '#28d17c', 'R3', fmtR(br3.R));
+    ctx.font='10px "Roboto Mono",monospace';
+    ctx.fillStyle='#00B4D8'; ctx.textAlign='center'; ctx.fillText('I2='+fmtI(br2.I), r2X, yBot2+16);
+    ctx.fillStyle='#28d17c'; ctx.fillText('I3='+fmtI(br3.I), r3X, yBot2+16);
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(aX,yTop2,3.5,0,6.2832); ctx.fill();
+    ctx.fillStyle='#9ad0ff'; ctx.textAlign='center';
+    ctx.fillText('a: V_par='+s.Vpar.toFixed(2)+' V', aX+30, yTop2-8);
+    drawSource();
+    ctx.fillStyle='#FFD166'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('I_total='+fmtI(s.Itot), (srcX+aX)/2, yTop2+18);
+    ctx.fillStyle='#cfe3f7'; ctx.textAlign='left'; ctx.font='11px "Roboto Mono",monospace';
+    ctx.fillText(t('kcl','KCL')+' @a: I2+I3 = '+fmtI(br2.I+br3.I)+' = I_total', L, H-12);
+  }
+}
+
+function drawChart(p, s){
+  var ctx=hctx, W=chartCanvas._cssW, H=chartCanvas._cssH;
+  ctx.setLineDash([]);
+  ctx.fillStyle='#0a1929'; ctx.fillRect(0,0,W,H);
+  var mx=58, my=40;
+  var x0=mx, x1=W-24, y0=H-my-14, y1=my, gw=x1-x0, gh=y0-y1;
+
+  var vals, sumLabel, sumVal, maxV;
+  if (topo==='series'){
+    vals=[
+      {label:'ΔV1', value:s.branches[0].drop, color:'#4dabff'},
+      {label:'ΔV2', value:s.branches[1].drop, color:'#00B4D8'},
+      {label:'ΔV3', value:s.branches[2].drop, color:'#28d17c'}
+    ];
+    sumVal=s.branches[0].drop+s.branches[1].drop+s.branches[2].drop;
+    sumLabel=t('kvl','KVL')+': ΣΔV = '+sumVal.toFixed(2)+' V';
+    maxV=Math.max(p.V, sumVal, 1)*1.18;
+    drawBars(ctx, vals, x0,x1,y0,y1,gw,gh, maxV, ' V', sumVal, sumLabel, p.V, t('emf','EMF V'));
+    yTitle(ctx, x0,y0,y1, t('voltage','Voltage (V)'));
+  } else {
+    var toMa=function(x){return x*1000;};
+    vals=[
+      {label:'I1', value:toMa(s.branches[0].I), color:'#4dabff'},
+      {label:'I2', value:toMa(s.branches[1].I), color:'#00B4D8'},
+      {label:'I3', value:toMa(s.branches[2].I), color:'#28d17c'}
+    ];
+    var It=toMa(s.Itot);
+    if (topo==='parallel'){ sumVal=vals[0].value+vals[1].value+vals[2].value; sumLabel=t('kcl','KCL')+': ΣI = '+sumVal.toFixed(1)+' mA'; }
+    else { sumVal=vals[1].value+vals[2].value; sumLabel=t('kcl','KCL')+': I2+I3 = '+sumVal.toFixed(1)+' mA'; }
+    maxV=Math.max(It, sumVal, vals[0].value, 1)*1.18;
+    drawBars(ctx, vals, x0,x1,y0,y1,gw,gh, maxV, ' mA', sumVal, sumLabel, It, 'I_total');
+    yTitle(ctx, x0,y0,y1, t('current','Current (mA)'));
+  }
+}
+
+function drawBars(ctx, vals, x0,x1,y0,y1,gw,gh, maxV, unit, sumVal, sumLabel, markerVal, markerLbl){
+  ctx.strokeStyle='rgba(143,184,224,0.12)'; ctx.lineWidth=1;
+  for (var gi=0;gi<=5;gi++){ var gy=y0-gi/5*gh; ctx.beginPath(); ctx.moveTo(x0,gy); ctx.lineTo(x1,gy); ctx.stroke(); }
+  ctx.strokeStyle='rgba(143,184,224,0.6)';
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y1); ctx.stroke();
+  ctx.fillStyle='#cfe3f7'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='right';
+  for (var pl=0;pl<=5;pl++){ var v=maxV*pl/5; ctx.fillText(v.toFixed(1), x0-4, y0-pl/5*gh+3); }
+  var slot=gw/vals.length, barW=slot*0.5;
+  for (var i=0;i<vals.length;i++){
+    var cx=x0+slot*(i+0.5), bx=cx-barW/2;
+    var bh=Math.max(0, vals[i].value)/maxV*gh, by=y0-bh;
+    ctx.fillStyle=vals[i].color; ctx.fillRect(bx,by,barW,bh);
+    ctx.fillStyle='#fff'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText(vals[i].value.toFixed(1)+unit, cx, by-5);
+    ctx.fillStyle=vals[i].color; ctx.font='11px "Roboto Mono",monospace';
+    ctx.fillText(vals[i].label, cx, y0+16);
+  }
+  var mY=y0-Math.min(markerVal,maxV)/maxV*gh;
+  ctx.strokeStyle='rgba(255,209,102,0.85)'; ctx.lineWidth=1.6; ctx.setLineDash([6,5]);
+  ctx.beginPath(); ctx.moveTo(x0,mY); ctx.lineTo(x1,mY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#FFD166'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='right';
+  ctx.fillText(markerLbl+'='+markerVal.toFixed(1)+unit, x1-2, mY-4);
+  ctx.fillStyle='#FFD166'; ctx.textAlign='left';
+  ctx.fillText(sumLabel, x0+4, y1+10);
+}
+
+function yTitle(ctx, x0,y0,y1, txt){
+  ctx.save(); ctx.translate(13,(y0+y1)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='#cfe3f7'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='center';
+  ctx.fillText(txt,0,0); ctx.restore();
+}
+
+function updateReadouts(p, s){
+  var setTxt=function(id,v){ var e=el(id); if(e) e.textContent=v; };
+  setTxt('statI_tot', fmtI(s.Itot));
+  setTxt('statI2', fmtI(s.branches[1].I));
+  setTxt('statI3', fmtI(s.branches[2].I));
+  var vparEl=el('statV_par');
+  if (vparEl){
+    if (topo==='combined') vparEl.textContent = fmtV(s.Vpar);
+    else if (topo==='parallel') vparEl.textContent = fmtV(s.nodeV.a);
+    else vparEl.textContent = fmtV(s.branches[1].drop);
+  }
+  setTxt('roRtot', fmtR(s.Rtot));
+  setTxt('roItot', fmtI(s.Itot));
+  setTxt('roI1', fmtI(s.branches[0].I));
+  setTxt('roI2', fmtI(s.branches[1].I));
+  setTxt('roI3', fmtI(s.branches[2].I));
+  setTxt('roVa', fmtV(s.nodeV.a));
+  var P = s.Itot*p.V;
+  setTxt('roPwr', (isFinite(P)? P.toFixed(P<1?3:2):'—')+' W');
+  setTxt('roD1', s.branches[0].drop.toFixed(2)+' V');
+  setTxt('roD2', s.branches[1].drop.toFixed(2)+' V');
+  setTxt('roD3', s.branches[2].drop.toFixed(2)+' V');
+}
+
+function compute(){
+  var p=getParams();
+  if (!isFinite(p.V)||!isFinite(p.R1)||!isFinite(p.R2)||!isFinite(p.R3)) return;
+  if (p.R1<=0||p.R2<=0||p.R3<=0) return;
+  var s=solve(p);
+  updateReadouts(p,s);
+  drawCircuit(p,s);
+  drawChart(p,s);
+  return s;
+}
+
+function loop(ts){
+  if (!playing){ rafId=null; return; }
+  if (!lastTs) lastTs=ts;
+  var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+  phase += dt*speed*0.6;
+  if (phase>1e6) phase=0;
+  compute();
+  rafId=requestAnimationFrame(loop);
+}
+function startPlay(){
+  if (reduceMotion){ compute(); return; }
+  playing=true; lastTs=0;
+  var b=el('playBtn'); if(b) b.innerHTML='<i class="fas fa-pause"></i> '+t('pause','Pause');
+  if (!rafId) rafId=requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing=false;
+  if (rafId){ cancelAnimationFrame(rafId); rafId=null; }
+  var b=el('playBtn'); if(b) b.innerHTML='<i class="fas fa-play"></i> '+t('play','Play');
+}
+function togglePlay(){ playing?stopPlay():startPlay(); }
+
+function setSpeed(v){
+  speed=v;
+  var btns=document.querySelectorAll('.speed-btn');
+  for (var i=0;i<btns.length;i++){ btns[i].classList.toggle('active', parseFloat(btns[i].dataset.speed)===v); }
+}
+
+function setTopo(name){
+  topo=name;
+  var btns=document.querySelectorAll('.topo-btn');
+  for (var i=0;i<btns.length;i++){ btns[i].classList.toggle('active', btns[i].dataset.topo===name); }
+  compute();
+}
+
+function setSliders(v,r1,r2,r3){
+  var map={slV:v, slR1:r1, slR2:r2, slR3:r3};
+  Object.keys(map).forEach(function(id){
+    var e=el(id); if(e){ e.value=map[id]; }
+    var ve=el(id+'Val'); if(ve){ ve.value=map[id]; }
+    if (window.updateSlider){ try{ window.updateSlider(e,id+'Val',0,''); }catch(_){} }
   });
 }
 
-// Draw a zig-zag resistor symbol horizontally between (x1, y) and (x2, y)
-function drawResistor(ctx, x1, x2, y, color, label, value) {
-  var n = 6;
-  var dx = (x2 - x1) / (n * 2);
-  ctx.strokeStyle = color; ctx.lineWidth = 2;
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.moveTo(x1, y);
-  for (var i = 0; i < n; i++) {
-    var xa = x1 + dx * (2 * i + 1);
-    var xb = x1 + dx * (2 * i + 2);
-    ctx.lineTo(xa, y - 9);
-    ctx.lineTo(xb, y + 9);
-  }
-  ctx.lineTo(x2, y);
-  ctx.stroke();
-  ctx.fillStyle = color; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'center';
-  ctx.fillText(label, (x1 + x2) / 2, y - 16);
-  ctx.fillText(value, (x1 + x2) / 2, y + 26);
-}
-
-// Draw a vertical resistor symbol between (x, y1) and (x, y2)
-function drawResistorV(ctx, x, y1, y2, color, label, value, labelSide) {
-  ctx.save();
-  ctx.translate(x, (y1 + y2) / 2);
-  ctx.rotate(Math.PI / 2);
-  var len = y2 - y1;
-  var n = 6;
-  var dx = len / (n * 2);
-  ctx.strokeStyle = color; ctx.lineWidth = 2;
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.moveTo(-len / 2, 0);
-  for (var i = 0; i < n; i++) {
-    var xa = -len / 2 + dx * (2 * i + 1);
-    var xb = -len / 2 + dx * (2 * i + 2);
-    ctx.lineTo(xa, -9);
-    ctx.lineTo(xb, +9);
-  }
-  ctx.lineTo(len / 2, 0);
-  ctx.stroke();
-  ctx.restore();
-  // Labels next to the vertical resistor
-  ctx.fillStyle = color; ctx.font = '12px "Roboto Mono",monospace';
-  if (labelSide === 'left') {
-    ctx.textAlign = 'right';
-    ctx.fillText(label, x - 14, (y1 + y2) / 2 - 4);
-    ctx.fillText(value, x - 14, (y1 + y2) / 2 + 12);
-  } else {
-    ctx.textAlign = 'left';
-    ctx.fillText(label, x + 14, (y1 + y2) / 2 - 4);
-    ctx.fillText(value, x + 14, (y1 + y2) / 2 + 12);
-  }
-}
-
-function drawArrow(ctx, x, y, dir, color, label) {
-  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x - 8 * dir, y - 5);
-  ctx.lineTo(x + 4 * dir, y);
-  ctx.lineTo(x - 8 * dir, y + 5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(label, x, y - 10);
-}
-
-function drawArrowV(ctx, x, y, dir, color, label) {
-  // dir = +1 means downward arrow head, -1 means upward
-  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x - 5, y - 8 * dir);
-  ctx.lineTo(x, y + 4 * dir);
-  ctx.lineTo(x + 5, y - 8 * dir);
-  ctx.closePath();
-  ctx.fill();
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText(label, x + 8, y + 4);
-}
-
-function fmtCurrentLabel(I) {
-  if (Math.abs(I) >= 1) return I.toFixed(3) + ' A';
-  return (I * 1000).toFixed(1) + ' mA';
-}
-
-function drawCircuit(p, s) {
-  var ctx = circuitCtx, W = __novaCanvasCssW(circuitCanvas), H = __novaCanvasCssH(circuitCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-
-  // Layout boundaries
-  var mx = 60, my = 50;
-  var L = mx, R = W - mx;
-  var T = my, B = H - my;
-
-  // Geometry: source on left (vertical),
-  // top wire from source(+) -> R_1 -> node a -> split into R_2 and R_3 (both vertical, going down) -> bottom wire back
-  var srcX = L;
-  var srcY = (T + B) / 2;
-  var srcR = 22;
-  var aX = R - 140;  // node a
-  var r2X = aX + 50; // R_2 vertical column
-  var r3X = R - 30;  // R_3 vertical column
-
-  // Wires (cyan)
-  ctx.strokeStyle = '#cfe3f7'; ctx.lineWidth = 2;
-  ctx.beginPath();
-  // top horizontal wire from source(+) at top to node a
-  ctx.moveTo(L, T); ctx.lineTo(aX, T);
-  // top wire continues to R_3 column top
-  ctx.moveTo(aX, T); ctx.lineTo(r3X, T);
-  // left vertical from source(+) to source body (will be redrawn after source)
-  ctx.moveTo(L, T); ctx.lineTo(L, B);
-  // bottom wire from R_3 column to R_2 column to source(-)
-  ctx.moveTo(L, B); ctx.lineTo(r3X, B);
-  ctx.stroke();
-
-  // R_1 on top wire between source and node a
-  var r1X1 = L + 70, r1X2 = aX - 30;
-  if (r1X2 - r1X1 < 80) { r1X2 = r1X1 + 80; }
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(r1X1 - 4, T - 14, r1X2 - r1X1 + 8, 28);
-  drawResistor(ctx, r1X1, r1X2, T, '#4dabff', 'R_1', p.R1.toFixed(0) + ' Ω');
-  // V_R1 label
-  ctx.fillStyle = '#9ad0ff'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
-  ctx.fillText('V_R1=' + s.Vr1.toFixed(2) + ' V', (r1X1 + r1X2) / 2, T - 28);
-
-  // I_total arrow on top wire between R_1 and node a
-  var arrX = (r1X2 + aX) / 2;
-  drawArrow(ctx, arrX, T, +1, '#FFD166', 'I_total=' + fmtCurrentLabel(s.Itot));
-
-  // Vertical branches: r2X column (R_2), r3X column (R_3)
-  // Branch tops at T, branch bottoms at B; place resistor in the middle
-  ctx.strokeStyle = '#cfe3f7'; ctx.lineWidth = 2;
-  // wire from top to top of R_2
-  ctx.beginPath();
-  ctx.moveTo(aX, T); ctx.lineTo(r2X, T);
-  ctx.stroke();
-  // R_2 vertical column (between T and B)
-  var rTop = T + 30, rBot = B - 30;
-  // clear background for vertical resistors
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(r2X - 14, rTop - 6, 28, rBot - rTop + 12);
-  ctx.fillRect(r3X - 14, rTop - 6, 28, rBot - rTop + 12);
-  // small wire segments from T to rTop and from rBot to B at each column
-  ctx.strokeStyle = '#cfe3f7'; ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(r2X, T); ctx.lineTo(r2X, rTop);
-  ctx.moveTo(r2X, rBot); ctx.lineTo(r2X, B);
-  ctx.moveTo(r3X, T); ctx.lineTo(r3X, rTop);
-  ctx.moveTo(r3X, rBot); ctx.lineTo(r3X, B);
-  ctx.stroke();
-  // Draw vertical resistors
-  drawResistorV(ctx, r2X, rTop, rBot, '#00B4D8', 'R_2', p.R2.toFixed(0) + ' Ω', 'left');
-  drawResistorV(ctx, r3X, rTop, rBot, '#FFD166', 'R_3', p.R3.toFixed(0) + ' Ω', 'right');
-
-  // Branch current arrows (downward)
-  drawArrowV(ctx, r2X, (rTop + rBot) / 2 - 4, +1, '#00B4D8', 'I_2=' + fmtCurrentLabel(s.I2));
-  drawArrowV(ctx, r3X, (rTop + rBot) / 2 - 4, +1, '#FFD166', 'I_3=' + fmtCurrentLabel(s.I3));
-
-  // Node 'a' label
-  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('a', aX, T - 8);
-  ctx.fillText('b', L + 8, B + 14);
-
-  // V_par label between two columns near top
-  ctx.fillStyle = '#9ad0ff'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
-  ctx.fillText('V_par=' + s.Vpar.toFixed(2) + ' V', (r2X + r3X) / 2, T - 28);
-
-  // Voltage source circle at left side
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(srcX - srcR - 2, srcY - srcR - 2, (srcR + 2) * 2, (srcR + 2) * 2);
-  ctx.beginPath(); ctx.arc(srcX, srcY, srcR, 0, Math.PI * 2);
-  ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 2.5; ctx.stroke();
-  ctx.fillStyle = '#FFD166'; ctx.font = 'bold 14px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('+', srcX, srcY - 6);
-  ctx.fillText('−', srcX, srcY + 14);
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText('V', srcX - srcR - 6, srcY - 4);
-  ctx.fillText(p.V.toFixed(1) + ' V', srcX - srcR - 6, srcY + 12);
-
-  // Legend
-  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('電圧源 V + R_1（直列）+ R_2//R_3（並列）', L, H - 14);
-}
-
-function drawBarChart(s) {
-  var ctx = chartCtx, W = __novaCanvasCssW(chartCanvas), H = __novaCanvasCssH(chartCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-
-  var mx = 60, my = 40;
-  var x0 = mx, x1 = W - 30, y0 = H - my - 14, y1 = my;
-  var gw = x1 - x0, gh = y0 - y1;
-
-  // Convert currents to mA for the chart
-  var vals = [
-    { label: 'I_total', value: s.Itot * 1000, color: '#00B4D8' },
-    { label: 'I_2',     value: s.I2  * 1000, color: '#28d17c' },
-    { label: 'I_3',     value: s.I3  * 1000, color: '#FFD166' }
-  ];
-  var maxV = Math.max(vals[0].value, vals[1].value + vals[2].value, 1) * 1.15;
-
-  // grid
-  ctx.strokeStyle = 'rgba(143,184,224,0.12)'; ctx.lineWidth = 1;
-  for (var gi = 0; gi <= 5; gi++) {
-    var gy = y0 - gi / 5 * gh;
-    ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x1, gy); ctx.stroke();
-  }
-
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.6)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-
-  // y-axis labels (mA)
-  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  for (var pl = 0; pl <= 5; pl++) {
-    var v = maxV * pl / 5;
-    ctx.fillText(v.toFixed(1) + ' mA', x0 - 4, y0 - pl / 5 * gh + 4);
-  }
-
-  // bars
-  var nBars = vals.length;
-  var slot = gw / nBars;
-  var barW = slot * 0.5;
-  for (var i = 0; i < nBars; i++) {
-    var cx = x0 + slot * (i + 0.5);
-    var bx = cx - barW / 2;
-    var bh = Math.max(0, vals[i].value) / maxV * gh;
-    var by = y0 - bh;
-    ctx.fillStyle = vals[i].color;
-    ctx.fillRect(bx, by, barW, bh);
-    // value label above each bar
-    ctx.fillStyle = '#fff'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
-    ctx.fillText(vals[i].value.toFixed(1) + ' mA', cx, by - 6);
-    // x-axis label
-    ctx.fillStyle = vals[i].color; ctx.font = '12px "Roboto Mono",monospace';
-    ctx.fillText(vals[i].label, cx, y0 + 16);
-  }
-
-  // KCL annotation: sum line on top
-  var sum = vals[1].value + vals[2].value;
-  var sumY = y0 - sum / maxV * gh;
-  ctx.strokeStyle = 'rgba(255,209,102,0.6)'; ctx.lineWidth = 1.5;
-  ctx.setLineDash([6, 5]);
-  ctx.beginPath(); ctx.moveTo(x0, sumY); ctx.lineTo(x1, sumY); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#FFD166'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
-  ctx.fillText('KCL: I_2 + I_3 = ' + sum.toFixed(1) + ' mA', x0 + 6, sumY - 6);
-
-  // y-axis title
-  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
-  ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.textAlign = 'center';
-  ctx.fillText('電流 (mA)', 0, 0);
-  ctx.restore();
-}
-
-function formatI(I) {
-  if (Math.abs(I) >= 1) return I.toFixed(3) + ' A';
-  return (I * 1000).toFixed(1) + ' mA';
-}
-
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.V) || !isFinite(p.R1) || !isFinite(p.R2) || !isFinite(p.R3)) return;
-  if (p.R1 <= 0 || p.R2 <= 0 || p.R3 <= 0) return;
-  var s = solveCircuit(p);
-  document.getElementById('statI_tot').textContent = formatI(s.Itot);
-  document.getElementById('statI2').textContent    = formatI(s.I2);
-  document.getElementById('statI3').textContent    = formatI(s.I3);
-  document.getElementById('statV_par').textContent = s.Vpar.toFixed(2) + ' V';
-  drawCircuit(p, s);
-  drawBarChart(s);
-}
-
-function animationStep() {
-  if (!playing) return;
-  var slR3 = document.getElementById('slR3');
-  var v = parseFloat(slR3.value) + 5;
-  if (v > 1000) v = 1;
-  slR3.value = v;
-  updateSlider(slR3, 'slR3Val', 0, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
-}
-
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> R_3 スイープ';
-    if (animId) cancelAnimationFrame(animId);
-  }
-}
-
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> R_3 スイープ';
-  var defs = { slV: 12, slR1: 100, slR2: 200, slR3: 300 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slV'),  'slVVal',  0, '');
-  updateSlider(document.getElementById('slR1'), 'slR1Val', 0, '');
-  updateSlider(document.getElementById('slR2'), 'slR2Val', 0, '');
-  updateSlider(document.getElementById('slR3'), 'slR3Val', 0, '');
+function applyPreset(name){
+  if (name==='series'){ setTopo('series'); setSliders(12,10,10,10); }
+  else if (name==='parallel'){ setTopo('parallel'); setSliders(12,10,10,10); }
+  else if (name==='bridge'){ setTopo('combined'); setSliders(12,100,200,300); }
+  else if (name==='ladder'){ setTopo('combined'); setSliders(24,50,150,450); }
   compute();
 }
 
-window.addEventListener('resize', function () { resizeCanvases(); compute(); });
+function resetParams(){
+  stopPlay(); phase=0;
+  setTopo('combined');
+  setSliders(12,100,200,300);
+  setSpeed(1);
+  compute();
+}
 
-resizeCanvases();
+window.togglePlay = togglePlay;
+window.resetParams = resetParams;
+window.kirSetTopo = setTopo;
+window.kirPreset = applyPreset;
+window.kirSetSpeed = setSpeed;
+window.kirCompute = compute;
+
+window.addEventListener('resize', function(){ resizeAll(); compute(); });
+
+circuitCanvas.setAttribute('tabindex','0');
+circuitCanvas.addEventListener('keydown', function(e){
+  if (e.key===' '||e.key==='Enter'){ e.preventDefault(); togglePlay(); }
+});
+
+resizeAll();
+setTopo('combined');
+setSpeed(1);
 compute();
+if (!reduceMotion) startPlay();
+})();
 </script>
 
 <section class="explanation">
@@ -666,6 +791,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="kirchhoff-laws.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -711,16 +839,26 @@ compute();
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>電源電圧スライダー(slVVal)を0～24V範囲で設定し、回路の駆動電圧を決定します</li><li>直列抵抗R1(slR1Val)を10～1000Ω範囲で調整し、全体の電流制限値を決めます</li><li>並列抵抗R2・R3(slR2Val・slR3Val)をそれぞれ設定すると、リアルタイムでKCL検証が動作し、全電流I_total、分岐電流I_2、I_3、並列部電圧V_parが自動計算されます</li></ol>
+<ol><li>電源電圧スライダー(slVVal)を1～100V範囲で設定し、回路の駆動電圧を決定します</li><li>直列抵抗R1(slR1Val)を1～1000Ω範囲で調整し、全体の電流制限値を決めます</li><li>並列抵抗R2・R3(slR2Val・slR3Val)をそれぞれ1～1000Ωで設定すると、リアルタイムでKCL検証が動作し、全電流I_total、分岐電流I_2、I_3、並列部電圧V_parが自動計算されます</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>電源12V、直列抵抗R1=100Ω、並列抵抗R2=200Ω・R3=300Ωの場合：並列合成抵抗は120Ω、並列部電圧V_par=120÷(100+120)×12=6.67Vとなります。全電流I_total=12÷220=54.5mA、分岐電流I_2=6.67÷200=33.4mA、I_3=6.67÷300=22.2mAです。KCL検証：33.4+22.2≒54.5mAが成立し、KVL検証：R1圧降5.45V+V_par6.67V=12.12V≒12Vで閉ループが確認できます。</p>
+<p>電源12V、直列抵抗R1=100Ω、並列抵抗R2=200Ω・R3=300Ωの場合：並列合成抵抗は120Ω、並列部電圧V_par=120÷(100+120)×12=6.55Vとなります。全電流I_total=12÷220=54.5mA、分岐電流I_2=6.55÷200=32.7mA、I_3=6.55÷300=21.8mAです。KCL検証：32.7+21.8≒54.5mAが成立し、KVL検証：R1圧降5.45V+V_par6.55V=12.0V≒12Vで閉ループが確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol><li>実装基板で並列抵抗の配線長差により寄生インダクタンスが発生する場合、高周波域ではシミュレーション値と測定値に誤差が生じるため、低周波DC解析に限定してください</li><li>抵抗の温度係数(例：金属皮膜抵抗±0.1%/℃)を考慮し、25℃基準値からの温度補正が必要な高精度回路では補正式を導入してください</li><li>直列抵抗R1に流れる全電流が大きい場合、定格電力(例：1/4W抵抗の場合最大250mW)を超えないよう設計してください</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4816359281?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816359281.09._SCMZZZZZZ_.jpg" alt="電気回路の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電気回路 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

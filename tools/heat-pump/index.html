@@ -43,14 +43,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ヒートポンプ・冷凍サイクル計算機",
       "description": "蒸発温度・凝縮温度・過熱度・過冷却度・圧縮機効率からCOP・圧縮仕事・熱負荷を計算。R-410A・R-134a・R-32・R-22対応。P-hモリエル線図とCOP曲線をリアルタイム描画。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/heat-pump.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": ["COP（暖房・冷房）計算", "P-hモリエル線図描画", "R-410A/R-134a/R-32/R-22対応", "カルノーCOP・第2法則効率", "COP vs 温度曲線プロット"]
@@ -162,6 +162,24 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* Heat-pump hero animation */
+.hp-hero-canvas{width:100%;height:auto;display:block;border-radius:10px;background:#071427;margin:4px 0 10px;}
+.hp-hero-readouts{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 8px;}
+.hp-ro{display:flex;flex-direction:column;align-items:flex-start;background:rgba(0,123,255,.06);border:1px solid var(--border);border-radius:8px;padding:5px 9px;min-width:74px;}
+.hp-ro b{font-family:'Roboto Mono',monospace;font-size:0.96rem;font-weight:700;color:var(--accent);line-height:1.1;}
+.hp-ro i{font-size:0.62rem;color:var(--muted);font-style:normal;margin-top:2px;letter-spacing:.02em;}
+.hp-ro-hi{background:rgba(225,112,85,.1);border-color:rgba(225,112,85,.4);}
+.hp-ro-hi b{color:var(--orange);}
+.hp-hero-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px;}
+.hp-btn{font-family:inherit;font-size:0.76rem;padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;transition:all .15s;}
+.hp-btn:hover{border-color:var(--accent);color:var(--accent);}
+.hp-speed{display:flex;align-items:center;gap:6px;font-size:0.74rem;color:var(--muted);}
+.hp-speed input[type=range]{width:90px;}
+.hp-presets{display:flex;flex-wrap:wrap;gap:6px;}
+.hp-preset{font-size:0.7rem;padding:4px 9px;}
+.hp-hero-note{font-size:0.78rem;line-height:1.6;color:var(--muted);margin-top:10px;background:rgba(0,180,216,.06);border:1px solid rgba(0,180,216,.2);border-radius:8px;padding:9px 12px;}
+.hp-hero-note b{color:var(--accent2);}
+@media(max-width:640px){.hp-ro{min-width:64px;padding:4px 7px;}.hp-ro b{font-size:0.84rem;}.hp-speed input[type=range]{width:64px;}}
 </style>
 </head>
 <body>
@@ -252,11 +270,45 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="eta" min="0.60" max="0.90" step="0.01" value="0.75" oninput="syncToNum('eta','etaValNum');updateSlider(this);compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
 <div class="viz-panel">
+    <div class="chart-card" id="hpHeroCard"><div class="chart-title"><i class="fas fa-house-chimney-window"></i> ヒートポンプ暖房ライブ — 寒い外気から暖かい室内へ熱を運ぶ</div>
+      <div class="hp-hero-readouts" id="hpReadouts">
+        <span class="hp-ro"><b id="hpRoTout">—</b><i>外気温</i></span>
+        <span class="hp-ro"><b id="hpRoTin">—</b><i>室内温</i></span>
+        <span class="hp-ro"><b id="hpRoLift">—</b><i>温度リフト</i></span>
+        <span class="hp-ro hp-ro-hi"><b id="hpRoCop">—</b><i>COP（暖房）</i></span>
+        <span class="hp-ro"><b id="hpRoCarnot">—</b><i>カルノーCOP</i></span>
+        <span class="hp-ro"><b id="hpRoQh">—</b><i>供給熱 Q_H</i></span>
+        <span class="hp-ro"><b id="hpRoW">—</b><i>仕事 W</i></span>
+        <span class="hp-ro"><b id="hpRoQl">—</b><i>吸熱 Q_L</i></span>
+      </div>
+      <canvas id="hpHeroCanvas" class="hp-hero-canvas" aria-label="ヒートポンプが寒い外気から熱を吸収し、圧縮機の仕事を加えて暖かい室内へより多くの熱を供給するアニメーション"></canvas>
+      <div class="hp-hero-bar" role="group" aria-label="アニメーション操作">
+        <button type="button" class="hp-btn" id="hpPlay" aria-label="再生／一時停止"><i class="fas fa-pause"></i> 一時停止</button>
+        <button type="button" class="hp-btn" id="hpReset" aria-label="最初から"><i class="fas fa-rotate-left"></i> リセット</button>
+        <label class="hp-speed">速度 <input type="range" id="hpSpeed" min="0.25" max="2.5" step="0.25" value="1" aria-label="アニメーション速度"></label>
+        <span class="hp-presets">
+          <button type="button" class="hp-btn hp-preset" data-out="10" data-in="20">穏やかな日（高COP）</button>
+          <button type="button" class="hp-btn hp-preset" data-out="-2" data-in="20">寒い日（低COP）</button>
+          <button type="button" class="hp-btn hp-preset" data-out="8" data-in="22">地中熱源</button>
+          <button type="button" class="hp-btn hp-preset" data-out="-15" data-in="20">極寒</button>
+        </span>
+      </div>
+      <p class="hp-hero-note">小さな電気仕事 <b>W</b> ＋ 外気から吸い上げた熱 <b>Q_L</b> ＝ より大きな供給熱 <b>Q_H = W + Q_L</b>。だからCOP &gt; 1（通常300〜400%）。外気が冷たいほどリフトが大きくCOPは下がります。</p>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -552,6 +604,210 @@ function setMode(m){
 window.addEventListener('resize', compute);
 </script>
 
+<script>window.HP_HERO_LABELS={outdoor:'外気',indoor:'室内',house:'暖かい室内',unit:'圧縮機',plug:'電力',play:'再生',pause:'一時停止'};</script>
+<script>
+/* Heat-pump heating-mode hero animation (self-contained IIFE) */
+(function(){
+  "use strict";
+  var canvas = document.getElementById('hpHeroCanvas');
+  if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var playing = !reduce, speed = 1, phase = 0;
+  var ro = {
+    Tout:document.getElementById('hpRoTout'), Tin:document.getElementById('hpRoTin'),
+    Lift:document.getElementById('hpRoLift'), Cop:document.getElementById('hpRoCop'),
+    Carnot:document.getElementById('hpRoCarnot'), Qh:document.getElementById('hpRoQh'),
+    W:document.getElementById('hpRoW'), Ql:document.getElementById('hpRoQl')
+  };
+
+  function val(id, d){ var el=document.getElementById(id); var v=el?parseFloat(el.value):NaN; return isFinite(v)?v:d; }
+
+  // Derive heating-mode physics from the existing calculator inputs.
+  // Outdoor (cold source) tracks evaporator temp; indoor (warm space) tracks condenser delivery side.
+  function physics(){
+    var Tevap = val('tevap', 5);      // refrigerant evap temp ~ cold-side
+    var Tcond = val('tcond', 45);     // refrigerant cond temp ~ hot-side
+    var eta   = val('eta', 0.75);     // compressor / 2nd-law fraction proxy
+    // Outdoor air ~ a few K above evap refrigerant; indoor air ~ a few K below cond refrigerant.
+    var Tout = Tevap + 5;
+    var Tin  = Math.max(Tout + 4, Tcond - 25);
+    var Th = Tin + 273.15, Tc = Tout + 273.15;
+    var lift = Th - Tc;
+    var carnot = lift > 0.5 ? Th / lift : 99;
+    // Real heating COP ~ second-law fraction of Carnot (eta scaled into a realistic 0.4-0.6 band).
+    var frac = 0.35 + (eta - 0.6) * (0.25/0.3);
+    frac = Math.max(0.3, Math.min(0.62, frac));
+    var cop = Math.max(1.05, carnot * frac);
+    var W = 1, Qh = cop * W, Ql = Qh - W;   // per unit work
+    return {Tout:Tout, Tin:Tin, lift:lift, carnot:carnot, cop:cop, W:W, Qh:Qh, Ql:Ql};
+  }
+
+  function fmt(x,n){ return x.toFixed(n===undefined?1:n); }
+  function refreshReadouts(p){
+    if(ro.Tout) ro.Tout.textContent = fmt(p.Tout,0)+'°C';
+    if(ro.Tin)  ro.Tin.textContent  = fmt(p.Tin,0)+'°C';
+    if(ro.Lift) ro.Lift.textContent = fmt(p.lift,0)+' K';
+    if(ro.Cop)  ro.Cop.textContent  = fmt(p.cop,2);
+    if(ro.Carnot) ro.Carnot.textContent = fmt(p.carnot,1);
+    if(ro.Qh)   ro.Qh.textContent   = fmt(p.Qh,2);
+    if(ro.W)    ro.W.textContent    = fmt(p.W,2);
+    if(ro.Ql)   ro.Ql.textContent   = fmt(p.Ql,2);
+  }
+
+  function colColdHot(t){ // map temp to blue->red
+    var k = Math.max(0, Math.min(1, (t + 20) / 60));
+    var r = Math.round(40 + k*200), b = Math.round(220 - k*180), g = Math.round(80 + (0.5-Math.abs(k-0.5))*120);
+    return 'rgb('+r+','+g+','+b+')';
+  }
+
+  var W=0,H=0,dpr=1;
+  function resize(){
+    var cssW = canvas.clientWidth || canvas.parentElement.clientWidth || 480;
+    var cssH = Math.max(240, Math.round(cssW * 0.52));
+    dpr = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+    canvas.style.height = cssH+'px';
+    canvas.width = Math.round(cssW*dpr); canvas.height = Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    W=cssW; H=cssH;
+  }
+
+  function arrow(x1,y1,x2,y2,wd,col){
+    ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=wd;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    var a=Math.atan2(y2-y1,x2-x1), hl=Math.max(7,wd*2.2);
+    ctx.beginPath(); ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-hl*Math.cos(a-0.4),y2-hl*Math.sin(a-0.4));
+    ctx.lineTo(x2-hl*Math.cos(a+0.4),y2-hl*Math.sin(a+0.4));
+    ctx.closePath(); ctx.fill();
+  }
+
+  function draw(p){
+    ctx.clearRect(0,0,W,H);
+    // background split: left = cold outdoors, right = warm indoors
+    var midX = W*0.5;
+    var gOut = ctx.createLinearGradient(0,0,midX,0);
+    gOut.addColorStop(0,'#06203a'); gOut.addColorStop(1,'#0a2a4d');
+    ctx.fillStyle=gOut; ctx.fillRect(0,0,midX,H);
+    var gIn = ctx.createLinearGradient(midX,0,W,0);
+    gIn.addColorStop(0,'#3a1410'); gIn.addColorStop(1,'#5a1d12');
+    ctx.fillStyle=gIn; ctx.fillRect(midX,0,W-midX,H);
+
+    var p2=physics();
+    // labels
+    ctx.font='600 12px sans-serif'; ctx.textAlign='left';
+    ctx.fillStyle='rgba(160,210,255,.95)'; ctx.fillText(HP_T.outdoor+' '+fmt(p2.Tout,0)+'°C', 12, 20);
+    ctx.textAlign='right';
+    ctx.fillStyle='rgba(255,180,160,.95)'; ctx.fillText(HP_T.indoor+' '+fmt(p2.Tin,0)+'°C', W-12, 20);
+    ctx.textAlign='left';
+
+    // house outline on indoor side
+    var hx=W*0.62, hy=H*0.30, hw=W*0.30, hh=H*0.5;
+    ctx.fillStyle='rgba(255,255,255,.06)'; ctx.fillRect(hx,hy,hw,hh);
+    ctx.strokeStyle='rgba(255,150,120,.55)'; ctx.lineWidth=2;
+    ctx.strokeRect(hx,hy,hw,hh);
+    ctx.beginPath(); ctx.moveTo(hx-6,hy); ctx.lineTo(hx+hw/2,hy-H*0.13); ctx.lineTo(hx+hw+6,hy); ctx.closePath();
+    ctx.fillStyle='rgba(255,150,120,.18)'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle='rgba(255,200,180,.9)'; ctx.font='600 11px sans-serif';
+    ctx.fillText(HP_T.house, hx+10, hy+hh-12);
+
+    // heat-pump unit centered on the boundary
+    var ux=midX-34, uy=H*0.46, uw=68, uh=H*0.26;
+    ctx.fillStyle='#11324f'; ctx.strokeStyle='#3da7e0'; ctx.lineWidth=2;
+    ctx.beginPath(); if(ctx.roundRect){ctx.roundRect(ux,uy,uw,uh,8);}else{ctx.rect(ux,uy,uw,uh);} ctx.fill(); ctx.stroke();
+    // spinning compressor
+    var cx=midX, cy=uy+uh*0.5, cr=Math.min(uw,uh)*0.28;
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(phase);
+    ctx.strokeStyle='#ffd166'; ctx.lineWidth=3;
+    for(var i=0;i<3;i++){ ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(cr*Math.cos(i*2.094),cr*Math.sin(i*2.094)); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle='#9fd8ff'; ctx.font='600 9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(HP_T.unit, cx, uy-6); ctx.textAlign='left';
+
+    // arrow widths proportional to energy
+    var wQl=Math.max(3,p2.Ql*3.2), wW=Math.max(3,p2.W*3.2), wQh=Math.max(3,p2.Qh*3.2);
+
+    // Q_L absorbed from cold outdoors (left -> unit), blue
+    arrow(W*0.06, cy, ux-6, cy, wQl, '#36b6ff');
+    // W in from plug (bottom -> unit), yellow
+    arrow(cx, H-8, cx, uy+uh+4, wW, '#ffd166');
+    // Q_H delivered to warm house (unit -> right), red
+    arrow(ux+uw+6, cy, hx-4, cy, wQh, '#ff6b4a');
+
+    // moving refrigerant particles along the loop to show circulation
+    var loop=[[W*0.10,cy],[ux,cy],[cx,uy+uh],[ux+uw,cy],[hx,cy]];
+    for(var s=0;s<6;s++){
+      var t=(phase*0.12 + s/6)%1;
+      // simple param across the three flow arrows
+      var seg = t*3, x,y,col;
+      if(seg<1){ x=W*0.06+(ux-6-W*0.06)*seg; y=cy; col='#36b6ff'; }
+      else if(seg<2){ x=cx; y=(H-8)+(uy+uh+4-(H-8))*(seg-1); col='#ffd166'; }
+      else { x=(ux+uw+6)+(hx-4-(ux+uw+6))*(seg-2); y=cy; col='#ff6b4a'; }
+      ctx.fillStyle=col; ctx.globalAlpha=0.85;
+      ctx.beginPath(); ctx.arc(x,y,3,0,6.283); ctx.fill(); ctx.globalAlpha=1;
+    }
+
+    // energy balance readout overlay
+    ctx.font='700 12px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillStyle='#ffd166'; ctx.fillText('W='+fmt(p2.W,2), cx, H-12);
+    ctx.fillStyle='#36b6ff'; ctx.textAlign='left'; ctx.fillText('Q_L='+fmt(p2.Ql,2), W*0.05, cy-10);
+    ctx.fillStyle='#ff6b4a'; ctx.textAlign='right'; ctx.fillText('Q_H='+fmt(p2.Qh,2), hx-6, cy-10);
+    ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='700 13px sans-serif';
+    ctx.fillText('COP = '+fmt(p2.cop,2)+'  >  1', midX, uy-uh*0.55);
+    ctx.textAlign='left';
+
+    refreshReadouts(p2);
+  }
+
+  var last=0;
+  function frame(ts){
+    if(!last) last=ts; var dt=(ts-last)/1000; last=ts;
+    if(playing){ phase += dt*1.6*speed; }
+    draw(physics());
+    requestAnimationFrame(frame);
+  }
+
+  var HP_T = window.HP_HERO_LABELS || {outdoor:'外気',indoor:'室内',house:'暖かい室内',unit:'圧縮機',plug:'電力',play:'再生',pause:'一時停止'};
+
+  var playBtn=document.getElementById('hpPlay');
+  if(playBtn) playBtn.addEventListener('click', function(){
+    playing=!playing;
+    playBtn.innerHTML = playing ? '<i class="fas fa-pause"></i> '+HP_T.pause : '<i class="fas fa-play"></i> '+HP_T.play;
+  });
+  var resetBtn=document.getElementById('hpReset');
+  if(resetBtn) resetBtn.addEventListener('click', function(){ phase=0; draw(physics()); });
+  var speedEl=document.getElementById('hpSpeed');
+  if(speedEl) speedEl.addEventListener('input', function(){ speed=parseFloat(speedEl.value)||1; });
+
+  // presets set outdoor/indoor by writing back into the calculator sliders
+  function setSlider(id,numId,v){
+    var el=document.getElementById(id); if(!el) return;
+    el.value=v; if(el.dispatchEvent) el.dispatchEvent(new Event('input',{bubbles:true}));
+    var n=document.getElementById(numId); if(n) n.value=v;
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.hp-preset'), function(b){
+    b.addEventListener('click', function(){
+      var out=parseFloat(b.getAttribute('data-out')), inn=parseFloat(b.getAttribute('data-in'));
+      // map outdoor->evap (a few K below outdoor), indoor->cond (lift above indoor)
+      var evap=Math.max(-20,Math.min(20, Math.round(out-5)));
+      var cond=Math.max(30,Math.min(60, Math.round(inn+25)));
+      setSlider('tevap','tevapValNum',evap);
+      setSlider('tcond','tcondValNum',cond);
+      if(typeof compute==='function'){ try{ compute(); }catch(e){} }
+      draw(physics());
+    });
+  });
+
+  window.addEventListener('resize', function(){ resize(); draw(physics()); });
+  resize();
+  draw(physics());
+  if(reduce){ /* static frame only */ }
+  else { requestAnimationFrame(frame); }
+})();
+</script>
+
 <section class="explanation">
   <h2>ヒートポンプ・冷凍サイクル計算機とは</h2>
   <div class="chat">
@@ -611,6 +867,9 @@ window.addEventListener('resize', compute);
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-pump.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -653,6 +912,16 @@ window.addEventListener('resize', compute);
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

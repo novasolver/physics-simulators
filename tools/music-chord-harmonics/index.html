@@ -35,7 +35,7 @@ MathJax = { tex: { inlineMath: [['$','$']] }, options: { skipHtmlTags: ['script'
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "音楽和音・倍音シミュレーター",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Web",
@@ -141,6 +141,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 .explanation{max-width:1200px;margin:0 auto;padding:40px 24px 60px}.explanation h2{font-size:19px;font-weight:700;color:var(--accent);margin:24px 0 10px;border-left:3px solid var(--accent);padding-left:12px}.explanation p{font-size:15px;line-height:1.8;color:var(--text);margin-bottom:12px}
 
+/* v2 hero canvas + live readouts */
+.stat-card .sv{font-size:1.0rem;font-weight:700;color:var(--navy);font-family:'Roboto Mono',monospace}
+#waveCanvas,#specCanvas{width:100%;display:block;border-radius:8px;background:#0a1628;max-width:100%}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.stat-grid{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:520px){.stat-grid{grid-template-columns:1fr 1fr}}
+
 @media(max-width:640px){
 .param-group{margin-bottom:2px}.field-header{margin-bottom:0}.param-label{margin-bottom:0}.num-wrap{gap:2px}.num-input{width:56px;padding:1px 3px;font-size:.74rem;border-radius:4px}.num-unit{font-size:.68rem;min-width:16px}.param-name{font-size:.71rem}.param-value{font-size:.71rem;padding:1px 5px;min-width:auto}input[type=range]{height:3px;margin:0}select{padding:3px 5px;font-size:.74rem;margin-bottom:2px}.divider{margin:3px 0;opacity:.4}.panel{padding:7px}.panel-title{margin-bottom:4px;font-size:.58rem}.panel{padding:7px}.panel-title{margin-bottom:4px;font-size:.58rem}.divider{margin:3px 0;opacity:.4}
 
@@ -205,37 +215,40 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div id="chordInfo" class="chord-info"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（毎フレーム更新）</div>
     <div class="stat-grid">
-      <div class="stat-card"><div class="label">基音 f₀</div><div class="value" id="f0Stat">440 Hz</div></div>
-      <div class="stat-card"><div class="label">音符数</div><div class="value" id="notesStat">3</div></div>
-      <div class="stat-card"><div class="label">協和度スコア</div><div class="value" id="consonanceStat">—</div></div>
-      <div class="stat-card"><div class="label">うなり最小値</div><div class="value" id="beatStat">—</div></div>
+      <div class="stat-card"><div class="label">基音 f₀</div><div class="sv value" id="f0Stat">440 Hz</div></div>
+      <div class="stat-card"><div class="label">音符数</div><div class="sv value" id="notesStat">3</div></div>
+      <div class="stat-card"><div class="label">協和度スコア</div><div class="sv value" id="consonanceStat">—</div></div>
+      <div class="stat-card"><div class="label">うなり周波数</div><div class="sv value" id="beatStat">—</div></div>
+      <div class="stat-card"><div class="label">周波数比</div><div class="sv value" id="ratioStat">—</div></div>
+      <div class="stat-card"><div class="label">合成波の周期</div><div class="sv value" id="periodStat">—</div></div>
     </div>
     </div>
 
-    <div class="tab-bar">
-      <div class="tab active" onclick="switchTab('spectrum')">スペクトル</div>
-      <div class="tab" onclick="switchTab('waveform')">合成波形</div>
-      <div class="tab" onclick="switchTab('piano')">鍵盤表示</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-wave-square"></i> 波形の重ね合わせ（各音 → 合成波）</div>
+      <canvas id="waveCanvas" height="360" tabindex="0" role="img" aria-label="和音を構成する各音の正弦波と、その合成波形のリアルタイムアニメーション。"></canvas>
+      <div class="legend" id="waveLegend"></div>
+      <p style="font-size:0.8rem;color:var(--muted);margin-top:8px;">上段＝各音の正弦波（基音周波数）。下段＝それらの<strong>合成波</strong>。協和音（単純な整数比）ほど合成波はきれいに周期的に繰り返し、不協和音はうなり・複雑なパターンになります。</p>
     </div>
-    <div id="spectrumDiv">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> スペクトル</div><canvas class="ux-chartjs-canvas" id="spectrumChart" height="320"></canvas></div>
-      <p style="font-size:0.8rem;color:var(--muted);margin-top:8px;">各音符の倍音スペクトル。高さが振幅を表す。色で音符を区別。</p>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-layer-group"></i> 倍音列とスペクトル</div>
+      <canvas id="specCanvas" height="220" role="img" aria-label="各音の倍音スペクトル。各音の基音と整数倍の倍音を縦棒で表示。"></canvas>
+      <p style="font-size:0.8rem;color:var(--muted);margin-top:8px;">各音の倍音（基音の整数倍 $n f_0$）。色で音を区別。協和音では別々の音の倍音が同じ周波数に重なります。</p>
     </div>
-    <div id="waveformDiv" style="display:none;">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 波形</div><canvas class="ux-chartjs-canvas" id="waveformChart" height="320"></canvas></div>
-      <p style="font-size:0.8rem;color:var(--muted);margin-top:8px;">合成波形（全音符の和）。協和音は周期的、不協和音は複雑な波形になる。</p>
-    </div>
-    <div id="pianoDiv" style="display:none;">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> ピアノロール</div><canvas id="pianoCanvas" width="520" height="200" style="max-width:100%;display:block;margin-bottom:12px;"></canvas></div>
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 区間</div><canvas class="ux-chartjs-canvas" id="intervalChart" height="160"></canvas></div>
-    </div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 <br>
       $f_n = n \cdot f_0$ ($n = 1, 2, 3, \ldots$)<br>
@@ -258,7 +271,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     <div class="bubble right">
       <span class="bubble-icon">🎓</span>
-      <div class="bubble-text">周波数比が整数比に近いからだ。純正律でのC-E-Gは4:5:6。これはドの2倍音（8 Hz）とミの2倍音、ソの2倍音が重なるということ。脳は「規則的な繰り返しパターン」を「協和」として認識する—これが音楽の心理音響学だ。</div>
+      <div class="bubble-text">周波数比が整数比に近いからだ。純正律でのC-E-Gは4:5:6。比が単純なほど両者の倍音列（基音の整数倍）が多く重なり合う。例えばドの第3倍音とソの第2倍音が一致するなど、共通の倍音が現れる。脳は「規則的な繰り返しパターン」を「協和」として認識する—これが音楽の心理音響学だ。</div>
     </div>
     <div class="bubble">
       <span class="bubble-icon">🙋</span>
@@ -350,6 +363,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="music-chord-harmonics.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -402,16 +418,26 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>基音周波数を設定（例：A4=440Hz）してharmonicsNumで倍音数を1～16に調整</li><li>harmonicsSliderで各倍音の相対振幅を0～100%範囲で個別制御し周波数スペクトル形状を変更</li><li>decaySliderで倍音の減衰時間（0.1～5秒）を設定し、協和度指数（consonance index）の時間変化をリアルタイム表示</li></ol>
+<ol><li>基音（ルート音）と和音タイプを選び、harmonicsNum（または倍音数スライダー）で倍音の数を1～10に調整</li><li>decayNum / 倍音減衰スライダーで倍音の減衰指数 α（振幅 = 1/n^α、0.5～3.0）を設定し、周波数スペクトルの傾き（音色）を変更</li><li>スペクトル・合成波形・鍵盤表示のタブを切り替えて、協和度スコア（0～100）と最小うなりの変化をリアルタイムに確認</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>C4（262Hz）の純正三和音：基音262Hz、3倍音（E5=786Hz）、5倍音（G#5=1310Hz）の場合、周波数比1:3:5で最大協和度2.89を示します。対して不協和音C4+C#4（262Hz vs 277Hz）では差拍周波数15Hzが生成され、協和度0.42に低下。Helmholtz理論に基づく倍音衝突（beating frequency）がスペクトログラムで可視化されます。</p>
+<p>基音C4（約262Hz）の倍音列は262・524・786・1048…Hz（整数倍）です。本ツールで和音タイプを長三和音にすると、構成音は平均律で C・E・G（約262・330・392Hz）となり、協和度スコア（0〜100の簡易指標）と最小うなり（隣接音の周波数差）が表示されます。対して半音違いの2音（C4=261.6Hz と C#4=277.2Hz）では周波数差15.6Hzのうなりが生じ、協和度スコアは大きく下がります。倍音同士の干渉（うなり）がスペクトル・波形タブで視覚的に確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol><li>ピアノ弦の非調和性：実際の楽器は厳密な整数倍音を示さず、高周波ほど周波数がシャープ化（inharmonicity coefficient B=0.0001～0.001）するため、シミュレーション値との乖離確認が必要</li><li>decaySlider設定時、倍音の減衰率が異なる場合（高倍音ほど急速減衰）、動的な協和度変化を捉えられます</li><li>スピーカー特性による15Hz以下の超低周波フィルタリング、または20kHz上限をシミュレーション結果に反映させるべき</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -426,186 +452,267 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </footer>
 
 <script>
-let spectrumChartInst = null, waveformChartInst = null, intervalChartInst = null;
+(function(){
+  "use strict";
+  var SEMI = Math.pow(2, 1/12);            // equal-temperament semitone ratio 2^(1/12)
+  var noteColors = ['#00d4ff','#ffd54a','#ff6b9d','#7CFC00','#b388ff'];
+  var chordDefs = {
+    major:  { intervals:[0,4,7],    name:'長三和音 (Major)',  desc:'完全協和。明るく安定した響き。周波数比 ≈ 4:5:6（純正律）。' },
+    minor:  { intervals:[0,3,7],    name:'短三和音 (Minor)',  desc:'柔らかい協和。暗く感情的な響き（純正律 10:12:15）。' },
+    dom7:   { intervals:[0,4,7,10], name:'属七和音 (Dom7)',   desc:'不安定な緊張感。ドミナントモーション（解決欲求）。' },
+    dim:    { intervals:[0,3,6],    name:'減三和音 (Dim)',    desc:'強い不協和。緊張と不安定感。トリトーン含む。' },
+    aug:    { intervals:[0,4,8],    name:'増三和音 (Aug)',    desc:'幻想的・不安定。全ての音程が長三度。' },
+    sus4:   { intervals:[0,5,7],    name:'Sus4',             desc:'浮遊感のある響き。完全4度(4:3)＋完全5度(3:2)。' },
+    unison: { intervals:[0],        name:'単音 (Unison)',    desc:'基音のみ。倍音構造だけを観察。' }
+  };
+  // nearest small-integer ratio label for a semitone interval (just-intonation reference)
+  var ratioName = {0:'1:1',3:'6:5',4:'5:4',5:'4:3',6:'7:5',7:'3:2',8:'8:5',9:'5:3',10:'9:5',12:'2:1'};
 
-const r = Math.pow(2, 1/12);
+  function $(id){ return document.getElementById(id); }
+  function num(id){ return parseFloat($(id).value); }
 
-const chordDefs = {
-  major:  { intervals: [0, 4, 7],   name: '長三和音 (Major)', color: '#27ae60', desc: '完全協和。明るく安定した響き。周波数比 ≈ 4:5:6（純正律）。' },
-  minor:  { intervals: [0, 3, 7],   name: '短三和音 (Minor)', color: '#3498db', desc: '柔らかい協和。暗く感情的な響き。' },
-  dom7:   { intervals: [0, 4, 7, 10], name: '属七和音 (Dom7)', color: '#f39c12', desc: '不安定な緊張感。ドミナントモーション（解決欲求）。' },
-  dim:    { intervals: [0, 3, 6],   name: '減三和音 (Dim)', color: '#e74c3c', desc: '強い不協和。緊張と不安定感。トリトーン含む。' },
-  aug:    { intervals: [0, 4, 8],   name: '増三和音 (Aug)', color: '#9b59b6', desc: '幻想的・不安定。全ての音程が長三度。' },
-  sus4:   { intervals: [0, 5, 7],   name: 'Sus4', color: '#00B4D8', desc: '浮遊感のある響き。解決を保留したような効果。' },
-  unison: { intervals: [0],         name: '単音 (Unison)', color: '#888', desc: '基音のみ。倍音構造のみを観察。' }
-};
+  function gcd(a,b){ a=Math.round(a); b=Math.round(b); while(b){ var t=b; b=a%b; a=t; } return a||1; }
 
-const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const noteColors = ['#e74c3c', '#f39c12', '#27ae60', '#3498db', '#9b59b6', '#e91e63', '#ff5722'];
+  function getState(){
+    var f0 = num('rootSelect');
+    var chord = chordDefs[$('chordSelect').value] || chordDefs.major;
+    var nH = Math.round(num('harmonicsSlider'));
+    var decay = num('decaySlider');
+    var freqs = chord.intervals.map(function(i){ return f0 * Math.pow(SEMI, i); });
+    return { f0:f0, chord:chord, nH:nH, decay:decay, freqs:freqs };
+  }
 
-function compute() {
-  const f0 = parseFloat(document.getElementById('rootSelect').value);
-  const chordType = document.getElementById('chordSelect').value;
-  const nH = +document.getElementById('harmonicsSlider').value;
-  const decay = +document.getElementById('decaySlider').value;
+  // amplitude of a single (note, harmonic) given decay exponent
+  function amp(h, decay){ return 1 / Math.pow(h, decay); }
 
-  const chord = chordDefs[chordType];
-  const freqs = chord.intervals.map(i => f0 * Math.pow(r, i));
+  // combined signal value at time t (seconds) -- sum of all notes' harmonic series
+  function signal(t, freqs, nH, decay){
+    var s = 0;
+    for (var k=0;k<freqs.length;k++){
+      var f = freqs[k];
+      for (var h=1;h<=nH;h++){ s += Math.sin(2*Math.PI*f*h*t) * amp(h, decay); }
+    }
+    return s;
+  }
 
-  document.getElementById('f0Stat').textContent = f0.toFixed(1) + ' Hz';
-  document.getElementById('notesStat').textContent = freqs.length;
-  document.getElementById('chordInfo').innerHTML = `<strong>${chord.name}</strong><br>${chord.desc}`;
+  // consonance: simpler integer ratios between note pairs => higher score
+  function consonance(intervals){
+    if (intervals.length < 2) return 100;
+    var total = 0, pairs = 0;
+    for (var i=0;i<intervals.length;i++){
+      for (var j=i+1;j<intervals.length;j++){
+        var semis = intervals[j]-intervals[i];
+        // exact equal-temperament ratio, approximated to nearest small integers via continued-fraction-lite
+        var rr = Math.pow(SEMI, semis);
+        var best = 999;
+        for (var q=1;q<=16;q++){
+          var p = Math.round(rr*q);
+          if (p<1) continue;
+          var err = Math.abs(rr - p/q);
+          if (err < 0.02){ best = Math.min(best, p+q); }
+        }
+        if (best===999) best = 24; // no simple ratio found => dissonant
+        total += best; pairs++;
+      }
+    }
+    var avg = total/pairs;           // ~2 (octave) .. up to ~24
+    return Math.max(0, Math.min(100, Math.round(100 - (avg-2)*6)));
+  }
 
-  // Consonance score (based on ratio complexity)
-  let beatMin = Infinity;
-  for (let i = 0; i < freqs.length; i++) {
-    for (let j = i+1; j < freqs.length; j++) {
-      const beat = Math.abs(freqs[i] - freqs[j]) % freqs[i];
-      beatMin = Math.min(beatMin, Math.abs(beat), Math.abs(freqs[j] - freqs[i]));
+  // ----- live readouts -----
+  function updateStats(st){
+    $('f0Stat').textContent = st.f0.toFixed(1) + ' Hz';
+    $('notesStat').textContent = st.freqs.length;
+    $('consonanceStat').textContent = consonance(st.chord.intervals) + '/100';
+    if (st.freqs.length > 1){
+      var beat = Math.abs(st.freqs[1]-st.freqs[0]);
+      $('beatStat').textContent = beat.toFixed(1) + ' Hz';
+      // frequency ratio of first two notes (equal temperament -> small integers)
+      var g = gcd(st.freqs[0], st.freqs[1]);
+      var a = Math.round(st.freqs[0]/g), b = Math.round(st.freqs[1]/g);
+      var lbl = ratioName[st.chord.intervals[1]-st.chord.intervals[0]];
+      $('ratioStat').textContent = lbl ? lbl : (a + ':' + b);
+    } else {
+      $('beatStat').textContent = 'N/A';
+      $('ratioStat').textContent = '1:1';
+    }
+    // period of combined wave: 1 / fundamental-of-the-set (gcd of frequencies, approx)
+    var gf = st.freqs[0];
+    for (var i=1;i<st.freqs.length;i++){ gf = gcd(gf*100, st.freqs[i]*100)/100; }
+    var per = gf > 0.01 ? (1000/gf) : (1000/st.f0);
+    $('periodStat').textContent = per.toFixed(2) + ' ms';
+    $('chordInfo').innerHTML = '<strong>'+st.chord.name+'</strong><br>'+st.chord.desc;
+  }
+
+  // ----- HiDPI canvas helpers -----
+  function fit(canvas, cssH){
+    var parent = canvas.parentElement;
+    var w = Math.max(260, Math.floor(parent.getBoundingClientRect().width - 44));
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.style.width = w + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.round(w*dpr);
+    canvas.height = Math.round(cssH*dpr);
+    var c = canvas.getContext('2d');
+    c.setTransform(dpr,0,0,dpr,0,0);
+    return { ctx:c, W:w, H:cssH };
+  }
+
+  // ----- waveform animation: component sines (top) + combined (bottom) -----
+  function drawWave(st, phase){
+    var wc = $('waveCanvas');
+    var d = fit(wc, 360);
+    var ctx = d.ctx, W = d.W, H = d.H;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+    var freqs = st.freqs, nH = st.nH, decay = st.decay;
+    var f0 = Math.min.apply(null, freqs);
+    var winT = 3 / f0;                  // show ~3 cycles of the lowest note
+    var padL = 8, padR = 8, plotW = W - padL - padR;
+    var n = freqs.length;
+
+    // top region: individual sine waves, stacked
+    var topH = H * 0.56;
+    var laneH = topH / n;
+    for (var k=0;k<n;k++){
+      var cy = laneH*(k+0.5);
+      var col = noteColors[k % noteColors.length];
+      // zero line
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(padL, cy); ctx.lineTo(W-padR, cy); ctx.stroke();
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.beginPath();
+      var ampScale = laneH*0.36;
+      for (var px=0; px<=plotW; px++){
+        var t = (px/plotW)*winT + phase;
+        var v = 0;
+        for (var h=1;h<=nH;h++){ v += Math.sin(2*Math.PI*freqs[k]*h*t)*amp(h,decay); }
+        var maxv = 0; for (var hh=1;hh<=nH;hh++){ maxv += amp(hh,decay); }
+        var y = cy - (v/maxv)*ampScale;
+        if (px===0) ctx.moveTo(padL+px, y); else ctx.lineTo(padL+px, y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = col; ctx.font = 'bold 11px Roboto Mono'; ctx.textAlign = 'left';
+      ctx.fillText(freqs[k].toFixed(1)+' Hz', padL+4, laneH*k+13);
+    }
+
+    // divider + label
+    ctx.strokeStyle = 'rgba(0,180,216,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(padL, topH); ctx.lineTo(W-padR, topH); ctx.stroke(); ctx.setLineDash([]);
+
+    // bottom region: combined waveform (the sum)
+    var botTop = topH, botH = H - topH;
+    var ccy = botTop + botH*0.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, ccy); ctx.lineTo(W-padR, ccy); ctx.stroke();
+    // normalize combined
+    var cmax = 0;
+    for (var p2=0;p2<=plotW;p2+=2){ var tt=(p2/plotW)*winT+phase; cmax = Math.max(cmax, Math.abs(signal(tt,freqs,nH,decay))); }
+    if (cmax < 1e-6) cmax = 1;
+    var grad = ctx.createLinearGradient(0,botTop,0,H);
+    grad.addColorStop(0,'#00d4a0'); grad.addColorStop(1,'#007BFF');
+    ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 2.4; ctx.beginPath();
+    for (var px2=0; px2<=plotW; px2++){
+      var t2 = (px2/plotW)*winT + phase;
+      var y2 = ccy - (signal(t2,freqs,nH,decay)/cmax)*(botH*0.40);
+      if (px2===0) ctx.moveTo(padL+px2, y2); else ctx.lineTo(padL+px2, y2);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#ffd54a'; ctx.font = 'bold 12px Noto Sans JP'; ctx.textAlign='left';
+    ctx.fillText('合成波（Σ）', padL+4, botTop+15);
+
+    // legend
+    var leg = $('waveLegend');
+    if (leg){
+      var html = '';
+      for (var li=0;li<n;li++){ html += '<span><i class="swatch" style="background:'+noteColors[li%noteColors.length]+'"></i>音'+(li+1)+' '+freqs[li].toFixed(0)+'Hz</span>'; }
+      html += '<span><i class="swatch" style="background:#ffd54a"></i>合成波</span>';
+      leg.innerHTML = html;
     }
   }
-  const consonanceScore = freqs.length === 1 ? 100 : Math.max(0, 100 - beatMin * 0.5).toFixed(0);
-  document.getElementById('consonanceStat').textContent = consonanceScore + '/100';
-  document.getElementById('beatStat').textContent = freqs.length > 1 ? (Math.abs(freqs[1] - freqs[0])).toFixed(1) + ' Hz' : 'N/A';
 
-  const tab = document.querySelector('.tab.active')?.textContent;
-  if (tab === 'スペクトル') drawSpectrum(freqs, nH, decay);
-  else if (tab === '合成波形') drawWaveform(freqs, nH, decay);
-  else drawPiano(chord.intervals, f0);
-}
-
-function switchTab(tab) {
-  const tabs = ['spectrum', 'waveform', 'piano'];
-  const labels = ['スペクトル', '合成波形', '鍵盤表示'];
-  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', tabs[i] === tab));
-  ['spectrumDiv','waveformDiv','pianoDiv'].forEach((id, i) => {
-    document.getElementById(id).style.display = tabs[i] === tab ? 'block' : 'none';
-  });
-  compute();
-}
-
-function drawSpectrum(freqs, nH, decay) {
-  const allFreqs = [], allAmps = [], allColors = [], allLabels = [];
-
-  freqs.forEach((f, fi) => {
-    for (let h = 1; h <= nH; h++) {
-      allFreqs.push(f * h);
-      allAmps.push(1 / Math.pow(h, decay));
-      allColors.push(noteColors[fi % noteColors.length]);
-      allLabels.push(`${f.toFixed(0)} Hz x${h}`);
+  // ----- spectrum / harmonic series (static per state) -----
+  function drawSpec(st){
+    var sc = $('specCanvas');
+    var d = fit(sc, 220);
+    var ctx = d.ctx, W = d.W, H = d.H;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+    var padL=34, padR=10, padB=24, padT=12;
+    var freqs = st.freqs, nH = st.nH, decay = st.decay;
+    // collect all partials
+    var maxF = Math.max.apply(null, freqs) * nH * 1.02;
+    var plotW = W-padL-padR, plotH = H-padT-padB;
+    // baseline
+    ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(padL,H-padB); ctx.lineTo(W-padR,H-padB); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='10px Roboto Mono'; ctx.textAlign='center';
+    for (var gx=0; gx<=4; gx++){
+      var fx = maxF*gx/4; var x = padL + (fx/maxF)*plotW;
+      ctx.fillText(Math.round(fx)+'', x, H-8);
     }
-  });
-
-  const sortedIdx = allFreqs.map((_, i) => i).sort((a, b) => allFreqs[a] - allFreqs[b]);
-  const sortedLabels = sortedIdx.map(i => allFreqs[i].toFixed(0) + ' Hz');
-  const sortedData = sortedIdx.map(i => allAmps[i]);
-  const sortedColors = sortedIdx.map(i => allColors[i]);
-
-  if (spectrumChartInst) spectrumChartInst.destroy();
-  spectrumChartInst = new Chart(document.getElementById('spectrumChart'), {
-    type: 'bar',
-    data: { labels: sortedLabels, datasets: [{ label: '振幅', data: sortedData, backgroundColor: sortedColors, borderRadius: 2 }] },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      plugins: { legend: { display: false } },
-      scales: { x: { title: { display: true, text: '周波数 (Hz)' }, ticks: { maxTicksLimit: 15, maxRotation: 45 } }, y: { title: { display: true, text: '振幅' }, min: 0 } }
-    }
-  });
-}
-
-function drawWaveform(freqs, nH, decay) {
-  const f0 = Math.min(...freqs);
-  const T = 1 / f0;
-  const nPts = 400;
-  const t = Array.from({length: nPts}, (_, i) => i * 3 * T / nPts);
-  const y = t.map(ti => {
-    let sum = 0;
-    freqs.forEach(f => {
-      for (let h = 1; h <= nH; h++) {
-        sum += Math.sin(2 * Math.PI * f * h * ti) / Math.pow(h, decay);
+    ctx.save(); ctx.translate(11, padT+plotH/2); ctx.rotate(-Math.PI/2); ctx.textAlign='center';
+    ctx.fillText('振幅', 0, 0); ctx.restore();
+    for (var k=0;k<freqs.length;k++){
+      var col = noteColors[k % noteColors.length];
+      for (var h=1;h<=nH;h++){
+        var fr = freqs[k]*h;
+        var x2 = padL + (fr/maxF)*plotW;
+        var a = amp(h,decay);
+        var bh = a*plotH*0.92;
+        ctx.fillStyle = col;
+        ctx.fillRect(x2-2, H-padB-bh, 4, bh);
       }
+    }
+    ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='10px Noto Sans JP'; ctx.textAlign='right';
+    ctx.fillText('周波数 (Hz)', W-padR, H-8);
+  }
+
+  // ----- main loop -----
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var t0 = null, lastStateKey = '';
+  function stateKey(st){ return $('rootSelect').value+'|'+$('chordSelect').value+'|'+st.nH+'|'+st.decay; }
+
+  function frame(ts){
+    var st = getState();
+    var key = stateKey(st);
+    if (key !== lastStateKey){ updateStats(st); drawSpec(st); lastStateKey = key; }
+    if (t0===null) t0 = ts;
+    var elapsed = (ts - t0)/1000;
+    // slow the animation: scroll phase across the lowest-note period
+    var f0 = Math.min.apply(null, st.freqs);
+    var phase = (elapsed * 0.15) % (1/f0 || 0.01);
+    drawWave(st, phase);
+    requestAnimationFrame(frame);
+  }
+
+  function staticFrame(){
+    var st = getState();
+    updateStats(st); drawSpec(st); drawWave(st, 0);
+    lastStateKey = stateKey(st);
+  }
+
+  function recompute(){
+    var st = getState();
+    updateStats(st); drawSpec(st);
+    if (reduce) drawWave(st, 0);
+    lastStateKey = stateKey(st);
+  }
+  window.musicChordRecompute = recompute;
+
+  function init(){
+    ['rootSelect','chordSelect','harmonicsSlider','harmonicsNum','decaySlider','decayNum'].forEach(function(id){
+      var e = $(id); if (e){ e.addEventListener('input', recompute); e.addEventListener('change', recompute); }
     });
-    return sum;
-  });
-
-  if (waveformChartInst) waveformChartInst.destroy();
-  waveformChartInst = new Chart(document.getElementById('waveformChart'), {
-    type: 'line',
-    data: { labels: t.map(ti => (ti*1000).toFixed(1)), datasets: [{ label: '合成波形', data: y, borderColor: '#007BFF', borderWidth: 1.5, pointRadius: 0, tension: 0 }] },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      scales: { x: { title: { display: true, text: '時間 (ms)' }, ticks: { maxTicksLimit: 8 } }, y: { title: { display: true, text: '振幅' } } },
-      plugins: { legend: { display: false } }
-    }
-  });
-}
-
-function drawPiano(intervals, f0) {
-  const canvas = document.getElementById('pianoCanvas');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  ctx.clearRect(0, 0, W, H);
-
-  // Draw 2 octaves of piano keys
-  const octaves = 2, wKeys = 7 * octaves;
-  const keyW = W / wKeys;
-  const whiteNotes = [0, 2, 4, 5, 7, 9, 11]; // C D E F G A B
-  const blackNotes = [1, 3, 6, 8, 10];
-
-  const activeNotes = new Set(intervals.map(i => ((i % 12) + 12) % 12));
-
-  // White keys
-  let wi = 0;
-  for (let oct = 0; oct < octaves; oct++) {
-    whiteNotes.forEach(note => {
-      const x = wi * keyW;
-      const isActive = activeNotes.has(note);
-      ctx.fillStyle = isActive ? '#27ae60' : '#fff';
-      ctx.strokeStyle = '#999';
-      ctx.lineWidth = 1;
-      ctx.fillRect(x, 0, keyW-1, H-10);
-      ctx.strokeRect(x, 0, keyW-1, H-10);
-      if (isActive) {
-        ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.min(keyW*0.4, 12)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillText(noteNames[note], x + keyW/2, H-22);
-      }
-      wi++;
-    });
+    if (reduce){ staticFrame(); }
+    else { requestAnimationFrame(frame); }
+    window.addEventListener('resize', function(){ var st=getState(); drawSpec(st); if (reduce) drawWave(st,0); });
   }
-
-  // Black keys
-  wi = 0;
-  for (let oct = 0; oct < octaves; oct++) {
-    let wIdx = 0;
-    for (let i = 0; i < 12; i++) {
-      if (blackNotes.includes(i)) {
-        const isActive = activeNotes.has(i);
-        const x = (wi - 0.3) * keyW;
-        ctx.fillStyle = isActive ? '#e74c3c' : '#222';
-        ctx.fillRect(x, 0, keyW * 0.6, H * 0.6);
-      } else {
-        wi++;
-      }
-    }
-  }
-
-  // Interval chart
-  if (intervalChartInst) intervalChartInst.destroy();
-  const labels = intervals.map((i, idx) => `音符 ${idx+1} (+${i}半音)`);
-  const freqs = intervals.map(i => f0 * Math.pow(r, i));
-  intervalChartInst = new Chart(document.getElementById('intervalChart'), {
-    type: 'bar',
-    data: { labels, datasets: [{ label: '周波数 (Hz)', data: freqs.map(f => f.toFixed(1)), backgroundColor: noteColors.slice(0, intervals.length), borderRadius: 4 }] },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      plugins: { legend: { display: false } },
-      scales: { y: { title: { display: true, text: '周波数 (Hz)' } } }
-    }
-  });
-}
-
-window.addEventListener('load', compute);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+// compatibility no-ops for any inline handlers left in markup
+function compute(){ if (window.musicChordRecompute) window.musicChordRecompute(); }
 </script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>
 <script src="/tools/related-tools.js" defer></script>

@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "2次元波動干渉シミュレーター",
       "description": "最大4点波源による2次元波動干渉パターンをリアルタイム可視化するシミュレーター。波長・周波数・位相差・減衰を調整し、ヤングの二重スリットやフェーズドアレイの原理を音波・水面波・光学の文脈で検証します。",
       "url": "https://novasolver.jp/tools/wave-2d.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["1〜4点波源のリアルタイム干渉パターン","波長・周波数・位相・減衰パラメータ調整","干渉/白黒/波紋タンクの3表示モード","ドラッグで波源位置を移動","プリセット：単一波源・二重スリット・逆位相・三角形・格子"],
       "keywords": "波の干渉,重ね合わせ,回折,二重スリット,音波,水面波,波動方程式",
       "datePublished": "2026-04-07",
@@ -139,6 +139,24 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 live 2D wave field ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.58rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:10px;border-radius:3px;display:inline-block}
+#waveCanvas{display:block;width:100%;cursor:crosshair;touch-action:none;background:#0a1628;border-radius:8px}
+#waveCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.cfl-note{font-size:.72rem;margin-top:4px;padding:7px 10px;border-radius:7px;line-height:1.5;font-family:'Roboto Mono',monospace}
+.cfl-ok{background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.3);color:#0a7d63}
+.cfl-warn{background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.35);color:#c0392b}
+@media (prefers-reduced-motion: reduce){input[type=range]::-webkit-slider-thumb{transition:none}}
+/* end v2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/wave-2d.html">
@@ -163,451 +181,398 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   <div class="hero-inner">
     <div class="hero-badge"><i class="fas fa-water"></i> 波動・音響・光学</div>
     <h1>2次元波動干渉シミュレーター</h1>
-    <p class="hero-sub">最大4点波源による2次元波動干渉パターンをリアルタイム可視化。波長・周波数・位相差・減衰を自由に調整し、ヤングの二重スリットや位相反転源、4隅グリッドアレイなどのプリセットも検証できます。</p>
+    <p class="hero-sub">2次元波動方程式 $u_{tt}=c^2\nabla^2u$ を有限差分でリアルタイムに解く、生きた波動場。キャンバスをクリックして波源を置き、波速・減衰・周波数・境界条件を変えると、壁での反射・波の干渉・定在波が振幅カラーマップとして目の前で動きます。</p>
   </div>
 </div>
 
 <div class="main">
-  <!-- Left Panel -->
+  <!-- Left Panel: field controls -->
   <div class="panel">
-    <div class="panel-title">波源設定</div>
-
-    <div class="add-remove-row">
-      <button class="btn" id="addSourceBtn" style="flex:1"><i class="fas fa-plus"></i> 波源追加</button>
-      <button class="btn danger" id="removeSourceBtn" style="flex:1"><i class="fas fa-minus"></i> 削除</button>
-    </div>
-
-    <div class="sources-list" id="sourcesList"></div>
-
-    <div class="divider"></div>
-    <div class="panel-title">波のパラメータ</div>
+    <div class="panel-title">場のパラメータ</div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">波長 λ (px)</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="lambdaVal" value="60" min="20" max="100" step="2" oninput="syncFromNum('lambdaSlider','lambdaVal')"><span class="num-unit">px</span></div>
+        <label class="param-name" for="cSlider">波速 c</label>
+        <span class="param-value"><span id="cVal">0.50</span></span>
       </div>
-      <input type="range" id="lambdaSlider" min="20" max="100" step="2" value="60" oninput="syncToNum('lambdaSlider','lambdaVal')">
+      <input type="range" id="cSlider" min="0.10" max="0.70" step="0.01" value="0.50" aria-label="波速 c">
     </div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">周波数 f (Hz)</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="freqVal" value="10" min="1" max="50" step="1" oninput="syncFromNum('freqSlider','freqVal')"><span class="num-unit">Hz</span></div>
+        <label class="param-name" for="fSlider">周波数 f</label>
+        <span class="param-value"><span id="fVal">0.80</span></span>
       </div>
-      <input type="range" id="freqSlider" min="1" max="50" step="1" value="10" oninput="syncToNum('freqSlider','freqVal')">
+      <input type="range" id="fSlider" min="0.10" max="2.50" step="0.05" value="0.80" aria-label="周波数 f">
     </div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">減衰係数</span>
+        <label class="param-name" for="dampSlider">減衰</label>
+        <span class="param-value"><span id="dampVal">0.010</span></span>
       </div>
-      <input type="range" id="dampSlider" min="0" max="100" step="5" value="50" oninput="syncToNum('dampSlider','dampSliderNum')">
-<input type="number" class="num-input" id="dampSliderNum" value="50" min="0" max="100" step="5" style="width:70px;margin-left:6px;" oninput="syncFromNum('dampSlider','dampSliderNum')">
+      <input type="range" id="dampSlider" min="0" max="0.06" step="0.002" value="0.010" aria-label="減衰">
     </div>
 
     <div class="divider"></div>
-    <div class="panel-title">表示設定</div>
-
     <div class="param-group">
-      <div class="param-label"><span class="param-name">表示モード</span></div>
-      <select id="vizMode">
-        <option value="interference">干渉カラーマップ（青〜赤）</option>
-        <option value="bw">白黒（グレースケール）</option>
-        <option value="ripple">波紋タンク（輪郭線）</option>
+      <div class="param-label"><label class="param-name" for="boundarySel">境界条件</label></div>
+      <select id="boundarySel" aria-label="境界条件">
+        <option value="reflect">反射（壁で跳ね返る）</option>
+        <option value="absorb">吸収（外へ逃がす）</option>
       </select>
     </div>
 
-    <div class="ctrl-row">
-      <button class="toggle-btn active" id="animBtn"><i class="fas fa-play"></i> アニメ: ON</button>
-      <button class="toggle-btn active" id="showSourcesBtn"><i class="fas fa-dot-circle"></i> 波源表示</button>
-    </div>
-
-    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;">再生速度</div>
-    <div class="speed-row">
-      <button class="speed-btn" onclick="setSpeed(0.5)">0.5x</button>
-      <button class="speed-btn active" onclick="setSpeed(1)">1x</button>
-      <button class="speed-btn" onclick="setSpeed(2)">2x</button>
-      <button class="speed-btn" onclick="setSpeed(4)">4x</button>
-    </div>
-
     <div class="divider"></div>
-    <div class="panel-title">プリセット</div>
-    <div class="preset-grid">
-      <button class="preset-btn" onclick="applyPreset('single')">単一波源</button>
-      <button class="preset-btn" onclick="applyPreset('double')">2点干渉</button>
-      <button class="preset-btn" onclick="applyPreset('antiphase')">逆位相</button>
-      <button class="preset-btn" onclick="applyPreset('triangle')">三角形配置</button>
-      <button class="preset-btn" onclick="applyPreset('grid')">格子 (4点)</button>
+    <div class="ctrl-row">
+      <button class="toggle-btn active" type="button" id="showLabelsBtn"><i class="fas fa-tag"></i> 注釈表示</button>
     </div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz Panel -->
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-      <div class="stat-cards" id="statRow">
-        <div class="stat-card"><div class="sv" id="statSrc">2</div><div class="sl">波源数</div></div>
-        <div class="stat-card"><div class="sv" id="statFPS">—</div><div class="sl">描画(ms)</div></div>
-        <div class="stat-card"><div class="sv" id="statT">0.00s</div><div class="sl">時刻</div></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> 計算結果（ライブ）</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roT">0.00</div><div class="rl">時刻 t</div></div>
+        <div class="live-ro"><div class="rv" id="roC">0.50</div><div class="rl">波速 c</div></div>
+        <div class="live-ro"><div class="rv" id="roF">0.80</div><div class="rl">周波数 f</div></div>
+        <div class="live-ro"><div class="rv" id="roLambda">0.6</div><div class="rl">波長 λ=c/f</div></div>
+        <div class="live-ro"><div class="rv" id="roSrc">0</div><div class="rl">波源数</div></div>
+      </div>
+      <div class="cfl-note cfl-ok" id="cflNote">CFL</div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> リアルタイム2D波動場（有限差分法）</div>
+      <div class="canvas-wrap">
+        <canvas id="waveCanvas" width="720" height="480" tabindex="0" role="img" aria-label="リアルタイム2D波動場（有限差分法）"></canvas>
+      </div>
+      <p class="canvas-hint"><i class="fas fa-mouse-pointer"></i> キャンバスをクリック／タップで波源を追加。反射・干渉・定在波が見えます。</p>
+
+      <div class="play-row">
+        <button class="btn" type="button" id="playBtn"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" id="pulseBtn"><i class="fas fa-bullseye"></i> パルス投下</button>
+        <button class="btn secondary" type="button" id="resetBtn"><i class="fas fa-redo"></i> リセット</button>
+      </div>
+
+      <div class="legend">
+        <span><i class="swatch" style="background:#ff5252"></i>干渉 (＋)</span>
+        <span><i class="swatch" style="background:#4aa3ff"></i>(−)</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>波源</span>
       </div>
     </div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 波形</div><canvas id="waveCanvas" width="700" height="500"></canvas></div>
-    <p class="canvas-hint"><i class="fas fa-mouse-pointer"></i> キャンバスをクリックして波源を配置 / 波源をドラッグして移動</p>
-  
-<div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      $$\psi = \sum_i \frac{A}{\sqrt{r_i}} \sin\!\left(kr_i - \omega t + \phi_i\right)$$
-      <p style="margin-top:6px;font-size:0.78rem;">$k=2\pi/\lambda$，$\omega=2\pi f$，$r_i$: 波源からの距離</p>
-    
-</div>
-</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>2次元波動方程式を有限差分で時間発展させています：</p>
+      $$\frac{\partial^2 u}{\partial t^2} = c^2\left(\frac{\partial^2 u}{\partial x^2}+\frac{\partial^2 u}{\partial y^2}\right)=c^2\nabla^2 u$$
+      <p style="margin-top:6px;font-size:0.82rem;">波長は $\lambda = c/f$。安定条件（CFL）は $c\,\Delta t/\Delta x \le 0.71$ を満たすよう波速 c を制限しています。</p>
+    </div>
+  </div>
 </div>
 
 <script>
+/* ===== shared v2 engine; {"reflect": "反射", "interfere": "干渉", "standing": "定在波", "play": "再生", "pause": "一時停止", "cflPrefix": "格子 180×120 ｜", "cflOk": "✓ 安定", "cflWarn": "⚠ 不安定（cを下げてください）"} placeholder is replaced per language ===== */
 (function(){
+  "use strict";
+  const L = {"reflect": "反射", "interfere": "干渉", "standing": "定在波", "play": "再生", "pause": "一時停止", "cflPrefix": "格子 180×120 ｜", "cflOk": "✓ 安定", "cflWarn": "⚠ 不安定（cを下げてください）"};
   const canvas = document.getElementById('waveCanvas');
   const ctx = canvas.getContext('2d');
-  const lambdaSlider = document.getElementById('lambdaSlider');
-  const lambdaVal = document.getElementById('lambdaVal');
-  const freqSlider = document.getElementById('freqSlider');
-  const freqVal = document.getElementById('freqVal');
-  const dampSlider = document.getElementById('dampSlider');
-  const dampVal = document.getElementById('dampSliderNum');
-  const vizMode = document.getElementById('vizMode');
-  const animBtn = document.getElementById('animBtn');
-  const showSourcesBtn = document.getElementById('showSourcesBtn');
-  const sourcesList = document.getElementById('sourcesList');
-  const addSourceBtn = document.getElementById('addSourceBtn');
-  const removeSourceBtn = document.getElementById('removeSourceBtn');
-  const statSrc = document.getElementById('statSrc');
-  const statFPS = document.getElementById('statFPS');
-  const statT = document.getElementById('statT');
+  const $ = id => document.getElementById(id);
 
-  const SOURCE_COLORS = ['#FF4444','#00CCFF','#FFCC00','#44FF88'];
-  const SOURCE_NAMES = ['S1','S2','S3','S4'];
+  // controls
+  const cSlider = $('cSlider'), cVal = $('cVal');
+  const fSlider = $('fSlider'), fVal = $('fVal');
+  const dampSlider = $('dampSlider'), dampVal = $('dampVal');
+  const boundarySel = $('boundarySel');
+  const playBtn = $('playBtn'), resetBtn = $('resetBtn'), pulseBtn = $('pulseBtn');
+  const showLabelsBtn = $('showLabelsBtn');
 
-  let sources = [
-    {x:0.35, y:0.5, amp:1.0, phase:0, enabled:true},{x:0.65, y:0.5, amp:1.0, phase:0, enabled:true}];
+  // grid (finite-difference). Modest resolution for 60fps.
+  const NX = 180, NY = 120;        // simulation grid cells
+  const DX = 1.0;                  // grid spacing (dimensionless)
+  let u = new Float32Array(NX*NY);   // u^n
+  let uPrev = new Float32Array(NX*NY); // u^{n-1}
+  let uNext = new Float32Array(NX*NY); // u^{n+1}
 
-  let lambda = 60, freq = 1.0, damp = 0.5;
-  let animating = true, showSources = true;
-  let speedMult = 1;
-  let t = 0;
-  let W, H, lastTime = 0;
-  let dragIdx = -1, dragOffX = 0, dragOffY = 0;
-  let isDraggingSource = false;
+  // physical params
+  let cSpeed = 0.5;     // wave speed (cells/step) -> CFL = c*dt/dx
+  let freq = 0.8;       // source frequency (Hz, dimensionless cycles/step-scaled)
+  let damp = 0.02;      // damping coefficient
+  let boundary = 'reflect';
+  let playing = true;
+  let showLabels = true;
+  let simT = 0;         // simulation time (steps -> seconds)
+  const SUBSTEPS = 2;   // FD substeps per frame
+  const DT_PER_STEP = 1/60; // seconds attributed per integration step (for readouts)
 
+  // continuous oscillating sources placed by user (click/tap)
+  // {ix,iy,phase}
+  let sources = [];
+  // transient pulses fade after injection
+  let pulseFlash = [];  // {ix,iy,life}
+
+  // colormap LUT (blue-white-red), value in [-1,1]
+  const LUT = (function(){
+    const a = new Uint8Array(256*3);
+    for(let i=0;i<256;i++){
+      const v = (i/255)*2-1;           // -1..1
+      const t = Math.min(1, Math.abs(v));
+      let r,g,b;
+      if(v>=0){ r=255; g=Math.round(255*(1-t*0.75)); b=Math.round(255*(1-t)); }
+      else    { r=Math.round(255*(1-t)); g=Math.round(255*(1-t*0.75)); b=255; }
+      a[i*3]=r; a[i*3+1]=g; a[i*3+2]=b;
+    }
+    return a;
+  })();
+
+  // offscreen buffer matching grid, scaled up to canvas
+  const grid = document.createElement('canvas');
+  grid.width = NX; grid.height = NY;
+  const gctx = grid.getContext('2d');
+  const gimg = gctx.createImageData(NX, NY);
+
+  let cssW=0, cssH=0;
   function resize(){
     const rect = canvas.parentElement.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cssW = Math.max(200, rect.width - 44);
-    const cssH = Math.max(200, Math.min(cssW * 0.72, window.innerHeight * 0.62));
-    canvas.style.width = cssW + 'px';
-    canvas.style.height = cssH + 'px';
-    canvas.width = Math.round(cssW * dpr);
-    canvas.height = Math.round(cssH * dpr);
-    W = canvas.width; H = canvas.height;
-  }// Color maps
-  function interferenceColor(v){
-    // v in [-1,1], blue=negative, white=zero, red=positive
-    const a = Math.min(1, Math.abs(v));
-    if (v >= 0) {
-      const r = Math.round(255 * a + 255 * (1-a));
-      const g = Math.round(255 * (1 - a * 0.7));
-      const b = Math.round(255 * (1-a));
-      return [r, g, b];
-    }else{
-      const r = Math.round(255 * (1-a));
-      const g = Math.round(255 * (1 - a * 0.7));
-      const b = Math.round(50 + 205 * a);
-      return [r, g, b];
-    }
-  }function bwColor(v){
-    const c = Math.round(128 + v * 127);
-    const cv = Math.max(0, Math.min(255, c));
-    return [cv, cv, cv];
-  }function render(ts){
-    if (animating) {
-      const dt = lastTime ? (ts - lastTime) / 1000 : 0.016;
-      t += dt * speedMult;
-    }lastTime = ts;
-
-    const t0 = performance.now();
-    const imageData = ctx.createImageData(W, H);
-    const data = imageData.data;
-    const omega = 2 * Math.PI * freq;
-    const k = 2 * Math.PI / lambda;
-    const mode = vizMode.value;
-    const enabledSrc = sources.filter(s => s.enabled);
-
-    if (mode === 'ripple'){
-      // Black background with white contour lines where psi ~= 0
-      data.fill(0);
-      for (let py = 0; py < H; py++) {
-        for (let px = 0; px < W; px++) {
-          let psi = 0;
-          for (const s of enabledSrc) {
-            const sx = s.x * W, sy = s.y * H;
-            const dx = px - sx, dy = py - sy;
-            const r = Math.sqrt(dx*dx + dy*dy);
-            if (r < 1) continue;
-            const decay = damp > 0 ? Math.exp(-damp * r / (lambda * 3)) : 1;
-            psi += s.amp * decay / Math.sqrt(r) * Math.sin(k * r - omega * t + s.phase);
-          }// Draw contour at psi near 0
-          const idx = (py * W + px) * 4;
-          const absPsi = Math.abs(psi);
-          const threshold = 0.04 + 0.02 * enabledSrc.length;
-          if (absPsi < threshold){
-            const bright = Math.round(255 * (1 - absPsi / threshold));
-            data[idx] = bright; data[idx+1] = bright; data[idx+2] = bright; data[idx+3] = 255;
-          }else{
-            data[idx+3] = 255;
-          }
-        }
-      }
-    }else{
-      for (let py = 0; py < H; py++) {
-        for (let px = 0; px < W; px++) {
-          let psi = 0;
-          for (const s of enabledSrc) {
-            const sx = s.x * W, sy = s.y * H;
-            const dx = px - sx, dy = py - sy;
-            const r = Math.sqrt(dx*dx + dy*dy);
-            if (r < 1) continue;
-            const decay = damp > 0 ? Math.exp(-damp * r / (lambda * 3)) : 1;
-            psi += s.amp * decay / Math.sqrt(r) * Math.sin(k * r - omega * t + s.phase);
-          }
-          // Normalize
-          const norm = Math.max(-1, Math.min(1, psi / (enabledSrc.length * 0.5)));
-          const idx = (py * W + px) * 4;
-          const [r, g, b] = mode === 'bw' ? bwColor(norm) : interferenceColor(norm);
-          data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = 255;
-        }
-      }
-    }ctx.putImageData(imageData, 0, 0);
-
-    // Draw sources
-    if (showSources){
-      sources.forEach((s, i) => {
-        const sx = s.x * W, sy = s.y * H;
-        ctx.beginPath();
-        ctx.arc(sx, sy, 8, 0, Math.PI * 2);
-        ctx.fillStyle = s.enabled ? SOURCE_COLORS[i] : 'rgba(150,150,150,0.6)';
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 10px Roboto Mono, monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(SOURCE_NAMES[i], sx, sy);
-      });
-    }
-
-    statFPS.textContent = (performance.now() - t0).toFixed(1) + 'ms';
-    statT.textContent = t.toFixed(2) + 's';
-    statSrc.textContent = enabledSrc.length;
-
-    requestAnimationFrame(render);
-  }// Source panel UI
-  function buildSourcesUI(){
-    sourcesList.innerHTML = '';
-    sources.forEach((s, i) => {
-      const div = document.createElement('div');
-      div.className = 'source-row';
-      div.innerHTML = `
-        <div class="source-header">
-          <span class="source-label"><span class="source-dot" style="background:${SOURCE_COLORS[i]}"></span>${SOURCE_NAMES[i]}</span>
-          <div class="source-actions">
-            <button class="toggle-btn${s.enabled?' active':''}" onclick="toggleSource(${i})" style="padding:3px 8px;font-size:0.7rem">${s.enabled?'有効':'無効'}</button>
-          </div>
-        </div>
-        <div class="source-mini-param">
-          <div class="source-mini-row">
-            <div class="pm-name">振幅 A</div>
-            <div class="pm-val" id="sAmp${i}">${s.amp.toFixed(1)}</div>
-            <input type="range" min="1" max="20" step="1" value="${Math.round(s.amp*10)}" oninput="setSourceAmp(${i},this.value)" style="width:100%;margin-top:2px">
-          </div>
-          <div class="source-mini-row">
-            <div class="pm-name">位相 φ (°)</div>
-            <div class="pm-val" id="sPhase${i}">${Math.round(s.phase*180/Math.PI)}°</div>
-            <input type="range" min="0" max="360" step="5" value="${Math.round(s.phase*180/Math.PI)}" oninput="setSourcePhase(${i},this.value)" style="width:100%;margin-top:2px">
-          </div>
-        </div>`;
-      sourcesList.appendChild(div);
-    });
-  }window.toggleSource = function(i){ sources[i].enabled = !sources[i].enabled; buildSourcesUI(); };
-  window.setSourceAmp = function(i, v){ sources[i].amp = v/10; document.getElementById('sAmp'+i).textContent = (v/10).toFixed(1); };
-  window.setSourcePhase = function(i, v){ sources[i].phase = v * Math.PI / 180; document.getElementById('sPhase'+i).textContent = v + '°'; };
-
-  addSourceBtn.addEventListener('click', () =>{
-    if (sources.length >= 4) return;
-    sources.push({x: 0.3 + Math.random() * 0.4, y: 0.3 + Math.random() * 0.4, amp: 1.0, phase: 0, enabled: true});
-    buildSourcesUI();
-  });
-  removeSourceBtn.addEventListener('click', () =>{
-    if (sources.length <= 1) return;
-    sources.pop();
-    buildSourcesUI();
-  });
-
-  // Sliders
-  function setSliderGrad(el, v, mn, mx){
-    el.style.setProperty('--pct', ((v-mn)/(mx-mn)*100)+'%');
-  }lambdaSlider.addEventListener('input', () =>{
-    lambda = parseInt(lambdaSlider.value);
-    lambdaVal.textContent = lambda;
-    setSliderGrad(lambdaSlider, lambda, 20, 100);
-  });
-  setSliderGrad(lambdaSlider, 60, 20, 100);
-
-  freqSlider.addEventListener('input', () =>{
-    freq = freqSlider.value / 10;
-    freqVal.textContent = freq.toFixed(1);
-    setSliderGrad(freqSlider, freqSlider.value, 1, 50);
-  });
-  setSliderGrad(freqSlider, 10, 1, 50);
-
-  dampSlider.addEventListener('input', () =>{
-    damp = dampSlider.value / 100;
-    dampVal.textContent = damp.toFixed(2);
-    setSliderGrad(dampSlider, dampSlider.value, 0, 100);
-  });
-  setSliderGrad(dampSlider, 50, 0, 100);
-
-  animBtn.addEventListener('click', () =>{
-    animating = !animating;
-    animBtn.classList.toggle('active', animating);
-    animBtn.innerHTML = '<i class="fas fa-'+(animating?'play':'pause')+'"></i> アニメ: '+(animating?'ON':'OFF');
-  });
-  showSourcesBtn.addEventListener('click', () =>{
-    showSources = !showSources;
-    showSourcesBtn.classList.toggle('active', showSources);
-  });
-
-  window.setSpeed = function(v){
-    speedMult = v;
-    document.querySelectorAll('.speed-btn').forEach(b => {
-      b.classList.toggle('active', parseFloat(b.textContent) === v);
-    });
-  };
-
-  // Presets
-  window.applyPreset = function(name){
-    switch(name) {
-      case 'single':
-        sources = [{x:0.5, y:0.5, amp:1.0, phase:0, enabled:true}];
-        break;
-      case 'double':
-        sources = [{x:0.38, y:0.5, amp:1.0, phase:0, enabled:true},{x:0.62, y:0.5, amp:1.0, phase:0, enabled:true}];
-        break;
-      case 'antiphase':
-        sources = [{x:0.38, y:0.5, amp:1.0, phase:0, enabled:true},{x:0.62, y:0.5, amp:1.0, phase:Math.PI, enabled:true}];
-        break;
-      case 'triangle':
-        sources = [{x:0.5, y:0.25, amp:1.0, phase:0, enabled:true},{x:0.32, y:0.68, amp:1.0, phase:0, enabled:true},{x:0.68, y:0.68, amp:1.0, phase:0, enabled:true}];
-        break;
-      case 'grid':
-        sources = [{x:0.3, y:0.3, amp:1.0, phase:0, enabled:true},{x:0.7, y:0.3, amp:1.0, phase:0, enabled:true},{x:0.3, y:0.7, amp:1.0, phase:0, enabled:true},{x:0.7, y:0.7, amp:1.0, phase:0, enabled:true}
-        ];
-        break;
-    }
-    buildSourcesUI();
-  };
-
-  // Canvas interaction — drag sources
-  function getSourceAt(px, py) {
-    for (let i = 0; i < sources.length; i++) {
-      const sx = sources[i].x * W, sy = sources[i].y * H;
-      const dx = px - sx, dy = py - sy;
-      if (dx*dx + dy*dy < 200) return i;
-    }
-    return -1;
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    cssW = Math.max(240, Math.floor(rect.width - 44));
+    cssH = Math.round(cssW * (NY/NX));
+    canvas.style.width = cssW+'px';
+    canvas.style.height = cssH+'px';
+    canvas.width = Math.round(cssW*dpr);
+    canvas.height = Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.imageSmoothingEnabled = true;
   }
 
-  canvas.addEventListener('mousedown', e => {
-    const rect = canvas.getBoundingClientRect();
-    const px = (e.clientX - rect.left) * (W / canvas.clientWidth);
-    const py = (e.clientY - rect.top) * (H / canvas.clientHeight);
-    dragIdx = getSourceAt(px, py);
-    if (dragIdx >= 0) {
-      dragOffX = px - sources[dragIdx].x * W;
-      dragOffY = py - sources[dragIdx].y * H;
-      isDraggingSource = true;
-    }else{
-      isDraggingSource = false;
+  function idx(ix,iy){ return iy*NX+ix; }
+  function clearField(){ u.fill(0); uPrev.fill(0); uNext.fill(0); }
+
+  function addPulse(ix,iy){
+    // gaussian bump into the field (displacement + velocity 0)
+    const R = 5;
+    for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){
+      const x=ix+dx, y=iy+dy;
+      if(x<1||x>=NX-1||y<1||y>=NY-1) continue;
+      const r2=dx*dx+dy*dy;
+      const amp = 1.4*Math.exp(-r2/(2*4));
+      u[idx(x,y)] += amp;
+      uPrev[idx(x,y)] += amp;
     }
-  });
+    pulseFlash.push({ix,iy,life:1});
+  }
 
-  canvas.addEventListener('mousemove', e => {
-    if (dragIdx < 0) return;
-    const rect = canvas.getBoundingClientRect();
-    const px = (e.clientX - rect.left) * (W / canvas.clientWidth);
-    const py = (e.clientY - rect.top) * (H / canvas.clientHeight);
-    sources[dragIdx].x = Math.max(0.02, Math.min(0.98, (px - dragOffX) / W));
-    sources[dragIdx].y = Math.max(0.02, Math.min(0.98, (py - dragOffY) / H));
-  });
+  function addSource(ix,iy){
+    sources.push({ix,iy,phase:simT});
+    pulseFlash.push({ix,iy,life:1});
+  }
 
-  canvas.addEventListener('mouseup', e => {
-    if (!isDraggingSource && dragIdx < 0) {
-      // click to add — disabled for simplicity (use add button instead)
+  // one finite-difference step of u_tt = c^2 * laplacian(u) - damping*u_t
+  function step(){
+    const c2 = cSpeed*cSpeed;       // CFL = cSpeed (dt=dx=1 in cell units)
+    const dmp = damp;               // velocity damping
+    const absorb = (boundary==='absorb');
+    for(let iy=1; iy<NY-1; iy++){
+      const row = iy*NX;
+      for(let ix=1; ix<NX-1; ix++){
+        const i = row+ix;
+        const lap = u[i-1]+u[i+1]+u[i-NX]+u[i+NX]-4*u[i];
+        // u_next = 2u - u_prev + c^2 lap, with damping on velocity (u - u_prev)
+        let val = 2*u[i] - uPrev[i] + c2*lap - dmp*(u[i]-uPrev[i]);
+        uNext[i]=val;
+      }
     }
-    dragIdx = -1;
-  });
-  canvas.addEventListener('mouseleave', () => { dragIdx = -1; });
-
-  // Touch support
-  canvas.addEventListener('touchstart', e => {
-    e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const t0 = e.touches[0];
-    const px = (t0.clientX - rect.left) * (W / canvas.clientWidth);
-    const py = (t0.clientY - rect.top) * (H / canvas.clientHeight);
-    dragIdx = getSourceAt(px, py);
-    if (dragIdx >= 0) {
-      dragOffX = px - sources[dragIdx].x * W;
-      dragOffY = py - sources[dragIdx].y * H;
+    // continuous sinusoidal sources (drive the field)
+    const w = 2*Math.PI*freq;
+    for(const s of sources){
+      const i = idx(s.ix,s.iy);
+      uNext[i] = 1.0*Math.sin(w*(simT - s.phase));
     }
-  },{passive: false});
+    // boundaries
+    if(absorb){
+      // Mur 1st-order absorbing on the 4 edges
+      const k = (cSpeed-1)/(cSpeed+1);
+      for(let ix=0; ix<NX; ix++){
+        uNext[idx(ix,0)]    = u[idx(ix,1)]    + k*(uNext[idx(ix,1)]    - u[idx(ix,0)]);
+        uNext[idx(ix,NY-1)] = u[idx(ix,NY-2)] + k*(uNext[idx(ix,NY-2)] - u[idx(ix,NY-1)]);
+      }
+      for(let iy=0; iy<NY; iy++){
+        uNext[idx(0,iy)]    = u[idx(1,iy)]    + k*(uNext[idx(1,iy)]    - u[idx(0,iy)]);
+        uNext[idx(NX-1,iy)] = u[idx(NX-2,iy)] + k*(uNext[idx(NX-2,iy)] - u[idx(NX-1,iy)]);
+      }
+    } else {
+      // reflecting (Dirichlet u=0 at walls) -> already 0 at edges since loop skips them
+      for(let ix=0; ix<NX; ix++){ uNext[idx(ix,0)]=0; uNext[idx(ix,NY-1)]=0; }
+      for(let iy=0; iy<NY; iy++){ uNext[idx(0,iy)]=0; uNext[idx(NX-1,iy)]=0; }
+    }
+    // rotate buffers
+    const tmp = uPrev; uPrev = u; u = uNext; uNext = tmp;
+    simT += DT_PER_STEP;
+  }
 
-  canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (dragIdx < 0) return;
-    const rect = canvas.getBoundingClientRect();
-    const t0 = e.touches[0];
-    const px = (t0.clientX - rect.left) * (W / canvas.clientWidth);
-    const py = (t0.clientY - rect.top) * (H / canvas.clientHeight);
-    sources[dragIdx].x = Math.max(0.02, Math.min(0.98, (px - dragOffX) / W));
-    sources[dragIdx].y = Math.max(0.02, Math.min(0.98, (py - dragOffY) / H));
-  },{passive: false});
+  function draw(){
+    // grid -> image
+    const d = gimg.data;
+    const gain = 1.6;
+    for(let i=0;i<NX*NY;i++){
+      let v = u[i]*gain;
+      if(v>1)v=1; else if(v<-1)v=-1;
+      const li = Math.round((v+1)*127.5);
+      const o=i*4, c=li*3;
+      d[o]=LUT[c]; d[o+1]=LUT[c+1]; d[o+2]=LUT[c+2]; d[o+3]=255;
+    }
+    gctx.putImageData(gimg,0,0);
+    // upscale to display canvas
+    ctx.clearRect(0,0,cssW,cssH);
+    ctx.drawImage(grid, 0,0, cssW, cssH);
 
-  canvas.addEventListener('touchend', e => {
-    e.preventDefault();
-    dragIdx = -1;
-  },{passive: false});
-
-  function drawInitialFrame(){
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, '#09233f');
-    g.addColorStop(0.5, '#2d6cdf');
-    g.addColorStop(1, '#9b1c31');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    sources.forEach((s, i) => {
+    const sx = cssW/NX, sy = cssH/NY;
+    // source markers + pulse flashes
+    for(const s of sources){
       ctx.beginPath();
-      ctx.arc(s.x * W, s.y * H, 8, 0, Math.PI * 2);
-      ctx.fillStyle = SOURCE_COLORS[i];
-      ctx.fill();
-    });
+      ctx.arc(s.ix*sx, s.iy*sy, 6,0,7);
+      ctx.fillStyle='#ffd54a'; ctx.fill();
+      ctx.strokeStyle='#0a1628'; ctx.lineWidth=1.5; ctx.stroke();
+    }
+    for(let i=pulseFlash.length-1;i>=0;i--){
+      const p=pulseFlash[i];
+      ctx.beginPath();
+      ctx.arc(p.ix*sx, p.iy*sy, (1-p.life)*26+6,0,7);
+      ctx.strokeStyle='rgba(255,255,255,'+p.life.toFixed(2)+')';
+      ctx.lineWidth=2; ctx.stroke();
+      p.life -= 0.04;
+      if(p.life<=0) pulseFlash.splice(i,1);
+    }
+    // annotations (reflection / interference / standing wave)
+    if(showLabels){
+      ctx.font='bold 12px Noto Sans JP, sans-serif';
+      ctx.textAlign='left';
+      const tags=[];
+      if(boundary==='reflect') tags.push([L.reflect, '#42a5f5']);
+      if(sources.length>=2 || pulseFlash.length>=2 || sources.length+countPulseSeeds()>=2) tags.push([L.interfere,'#ffd54a']);
+      if(boundary==='reflect' && sources.length>=1 && damp<0.012) tags.push([L.standing,'#00d4a0']);
+      let yy=20;
+      for(const [txt,col] of tags){
+        const w=ctx.measureText(txt).width;
+        ctx.fillStyle='rgba(10,22,40,0.78)';
+        if(ctx.roundRect){ctx.beginPath();ctx.roundRect(10,yy-13,w+14,18,5);ctx.fill();}
+        else ctx.fillRect(10,yy-13,w+14,18);
+        ctx.fillStyle=col; ctx.fillText(txt,17,yy);
+        yy+=24;
+      }
+    }
   }
-  window.addEventListener('resize', () =>{ resize(); drawInitialFrame(); });
+  let _seedHint=0;
+  function countPulseSeeds(){ return _seedHint; }
+
+  // ---- readouts ----
+  function updateReadouts(){
+    const lambda = freq>0 ? (cSpeed/freq) : 0;   // λ = c/f (cell units)
+    $('roC').textContent = cSpeed.toFixed(2);
+    $('roF').textContent = freq.toFixed(2);
+    $('roLambda').textContent = lambda.toFixed(1);
+    $('roT').textContent = simT.toFixed(2);
+    $('roSrc').textContent = sources.length;
+    const cfl = cSpeed; // c*dt/dx with dt=dx=1
+    const note = $('cflNote');
+    note.textContent = L.cflPrefix + ' CFL = c·dt/dx = ' + cfl.toFixed(2) + ' ' + (cfl<=0.71? L.cflOk : L.cflWarn);
+    note.className = 'cfl-note ' + (cfl<=0.71?'cfl-ok':'cfl-warn');
+  }
+
+  // ---- animation loop ----
+  let rafId=null;
+  function frame(){
+    if(playing){
+      for(let s=0;s<SUBSTEPS;s++) step();
+    }
+    draw();
+    updateReadouts();
+    rafId = requestAnimationFrame(frame);
+  }
+
+  // ---- input: click/tap to add a source ----
+  function canvasToGrid(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
+    const gx = Math.round((clientX-rect.left)/rect.width * NX);
+    const gy = Math.round((clientY-rect.top)/rect.height * NY);
+    return [Math.max(1,Math.min(NX-2,gx)), Math.max(1,Math.min(NY-2,gy))];
+  }
+  canvas.addEventListener('click', e=>{
+    const [gx,gy]=canvasToGrid(e.clientX,e.clientY);
+    addSource(gx,gy); _seedHint++;
+  });
+  canvas.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    const t=e.touches[0];
+    const [gx,gy]=canvasToGrid(t.clientX,t.clientY);
+    addSource(gx,gy); _seedHint++;
+  },{passive:false});
+
+  // ---- controls ----
+  function grad(el){
+    const mn=parseFloat(el.min),mx=parseFloat(el.max);
+    el.style.setProperty('--pct',((parseFloat(el.value)-mn)/(mx-mn)*100)+'%');
+  }
+  cSlider.addEventListener('input',()=>{ cSpeed=parseFloat(cSlider.value); cVal.textContent=cSpeed.toFixed(2); grad(cSlider); });
+  fSlider.addEventListener('input',()=>{ freq=parseFloat(fSlider.value); fVal.textContent=freq.toFixed(2); grad(fSlider); });
+  dampSlider.addEventListener('input',()=>{ damp=parseFloat(dampSlider.value); dampVal.textContent=damp.toFixed(3); grad(dampSlider); });
+  boundarySel.addEventListener('change',()=>{ boundary=boundarySel.value; });
+
+  playBtn.addEventListener('click',()=>{
+    playing=!playing;
+    playBtn.innerHTML = playing ? '<i class="fas fa-pause"></i> '+L.pause : '<i class="fas fa-play"></i> '+L.play;
+    playBtn.classList.toggle('active',playing);
+  });
+  pulseBtn.addEventListener('click',()=>{
+    const gx=Math.round(NX*0.5), gy=Math.round(NY*0.5);
+    addPulse(gx,gy); _seedHint++;
+  });
+  resetBtn.addEventListener('click',()=>{
+    clearField(); sources=[]; pulseFlash=[]; _seedHint=0; simT=0;
+    draw(); updateReadouts();
+  });
+  showLabelsBtn.addEventListener('click',()=>{
+    showLabels=!showLabels;
+    showLabelsBtn.classList.toggle('active',showLabels);
+  });
+
+  canvas.addEventListener('keydown',e=>{
+    if(e.key===' '||e.key==='Enter'){ e.preventDefault(); playBtn.click(); }
+    if(e.key==='p'||e.key==='P'){ pulseBtn.click(); }
+  });
+
+  window.addEventListener('resize',()=>{ resize(); draw(); });
+
+  // ---- init ----
+  cSpeed=parseFloat(cSlider.value); cVal.textContent=cSpeed.toFixed(2); grad(cSlider);
+  freq=parseFloat(fSlider.value); fVal.textContent=freq.toFixed(2); grad(fSlider);
+  damp=parseFloat(dampSlider.value); dampVal.textContent=damp.toFixed(3); grad(dampSlider);
+  boundary=boundarySel.value;
   resize();
-  buildSourcesUI();
-  drawInitialFrame();
-  requestAnimationFrame(render);
+  // seed a demonstrative pulse so the field is alive on load
+  addPulse(Math.round(NX*0.5), Math.round(NY*0.5)); _seedHint++;
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce){
+    // static frame: run a short burst then stop
+    for(let i=0;i<90;i++) step();
+    playing=false;
+    playBtn.innerHTML='<i class="fas fa-play"></i> '+L.play;
+    playBtn.classList.remove('active');
+    draw(); updateReadouts();
+  } else {
+    rafId = requestAnimationFrame(frame);
+  }
 })();
+
 </script>
 
 <section class="explanation">
@@ -623,7 +588,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="bub">なるほど！で、画面に縞模様ができるのはなぜですか？「強め合い」と「弱め合い」ってどういうこと？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大まかに言うと、2つの波の山と山が重なると大きな山になるのが「強め合い」、山と谷が重なると打ち消し合うのが「弱め合い」だ。シミュレーターで「表示モード」を「強度」に切り替えてみて。明るい縞が「強め合い」の線、暗い縞が「弱め合い」の線になるよ。これが光の干渉で言う「干渉縞」そのものなんだ。</div>
+      <div class="bub">大まかに言うと、2つの波の山と山が重なると大きな山になるのが「強め合い」、山と谷が重なると打ち消し合うのが「弱め合い」だ。シミュレーターで「表示モード」を「白黒（グレースケール）」に切り替えてみて。明るい縞が「強め合い」の線、暗い縞が「弱め合い」の線になるよ。これが光の干渉で言う「干渉縞」そのものなんだ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">波源の「位相」を変えると模様が大きく変わりますね。これって実務ではどう使うんですか？</div>
@@ -667,6 +632,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="wave-2d.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -721,14 +689,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>lambdaSliderで波長を0.5～5.0 mmの範囲で調整し、freqSliderで周波数100～500 Hzを設定します</li>
-<li>dampSliderで減衰係数を0～0.3に設定し、複数波源による干渉パターンの減衰を制御します</li>
+<li>lambdaSliderで波長を20-100pxの範囲で調整し、freqSliderで周波数0.1-5.0 Hzを設定します</li>
+<li>dampSliderで減衰係数を0-100（内部0.00-1.00）に設定し、複数波源による干渉パターンの減衰を制御します</li>
 <li>シミュレーション開始後、リアルタイムで干渉縞が表示され、描画時間(ms)と現在時刻が更新されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>ヤングの二重スリット実験を想定した計算：波長λ=0.632 mm（He-Neレーザー）、スリット間隔d=0.5 mm、スクリーン距離L=1.0 mの場合、m次の明線位置はy=mλL/d=1.264 mmとなります。本シミュレーターでfreqVal=300 Hz、lambdaVal=0.632 mmを設定すると、相速度v=fλ=189.6 m/sで波動が伝播し、干渉縞の周期が正確に計算されます</p>
+<p>Example: set lambdaSlider=60px, freqVal=1.0Hz, dampSlider=50 (internal damping 0.50), and place two in-phase sources. The canvas shows stable constructive and destructive fringes; switching among the interference colormap, grayscale, and ripple tank modes changes only the visualization, while wavelength and phase control the fringe spacing and node lines.</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -738,6 +706,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <li>複雑な干渉パターン（波源数3以上）では描画時間が線形増加するため、dampSlider調整で演算負荷を軽減できます</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

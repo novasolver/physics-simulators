@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "沸騰曲線シミュレーター",
       "description": "過熱度に対するプール沸騰の熱流束を、自然対流・核沸騰・遷移沸騰・膜沸騰の4域でリアルタイムに計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/boiling-curve.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["過熱度に対する熱流束の4域モデル計算","CHF と Leidenfrost 点の可視化","沸騰熱伝達係数とCHFまでの余裕表示","対数スケールでの沸騰曲線描画"],
       "keywords": "沸騰曲線,Nukiyama 曲線,プール沸騰,核沸騰,膜沸騰,臨界熱流束,CHF,Leidenfrost,バーンアウト,熱伝達",
       "datePublished": "2026-05-16",
@@ -100,8 +100,15 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+.cv-boil{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.seg{ display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 2px; }
+.seg button{ flex:1 1 auto; padding:7px 8px; font-size:0.78rem; border:1px solid var(--border); background:#fff; color:var(--text); border-radius:6px; cursor:pointer; font-family:inherit; }
+.seg button.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.preset-row{ display:flex; gap:6px; flex-wrap:wrap; }
+.preset-row button{ flex:1 1 30%; padding:7px 6px; font-size:0.74rem; border:1px solid var(--border); background:#fff; color:var(--text); border-radius:6px; cursor:pointer; font-family:inherit; }
+.preset-row button:hover{ border-color:var(--accent); color:var(--accent); }
+@media (prefers-reduced-motion: reduce){ .cv-boil{ } }
 </style>
 </head>
 <body>
@@ -123,7 +130,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="hero-inner">
     <div class="hero-badge"><i class="fas fa-fire"></i> 伝熱シミュレーター</div>
     <h1>沸騰曲線シミュレーター — Nukiyama 曲線とプール沸騰</h1>
-    <p class="hero-sub">水・大気圧でのプール沸騰における熱流束を、過熱度の関数として4域モデルで可視化。CHF とバーンアウト現象を学べます。</p>
+    <p class="hero-sub">加熱を上げ下げすると動作点が Nukiyama 曲線をリアルタイムに動きます。熱流束制御では CHF 超えで膜沸騰へジャンプ（=バーンアウト）、温度制御ではS字曲線を滑らかに辿る——危険なヒステリシスを目で確かめられます。</p>
   </div>
 </div>
 
@@ -133,10 +140,22 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">過熱度 ΔT_e</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slDTVal" value="20" min="1" max="1000" step="1" oninput="syncFromNum('slDT','slDTVal')"><span class="num-unit">K</span></div>
+        <span class="param-name">制御方式</span>
       </div>
-      <input type="range" id="slDT" min="1" max="1000" step="1" value="20" oninput="syncToNum('slDT','slDTVal');updateSlider(this,'slDTVal',0,'');compute()">
+      <div class="seg" id="segMode" role="group" aria-label="制御方式">
+        <button type="button" id="modeQ" class="active" onclick="setMode('q')" aria-pressed="true">熱流束制御 q''</button>
+        <button type="button" id="modeT" onclick="setMode('t')" aria-pressed="false">温度制御 ΔT_e</button>
+      </div>
+      <p style="font-size:0.7rem;color:var(--muted);margin-top:4px;">熱流束制御＝CHF超えでバーンアウト（膜沸騰へジャンプ）。温度制御＝遷移域を含むS字曲線を連続的に辿る。</p>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">加熱の目標値（入力レベル）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slDriveVal" value="40" min="0" max="100" step="1" oninput="syncFromNum('slDrive','slDriveVal')"><span class="num-unit">%</span></div>
+      </div>
+      <input type="range" id="slDrive" min="0" max="100" step="1" value="40" oninput="syncToNum('slDrive','slDriveVal');updateSlider(this,'slDriveVal',0,'');onDrive()">
+      <p style="font-size:0.7rem;color:var(--muted);margin-top:4px;">アニメ中は動作点がこの目標へ向かって曲線上を移動します。0%=室温付近、100%=最大入力。</p>
     </div>
 
     <div class="param-group">
@@ -144,48 +163,71 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">核沸騰係数 C</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slCnbVal" value="100" min="10" max="1000" step="10" oninput="syncFromNum('slCnb','slCnbVal')"><span class="num-unit">—</span></div>
       </div>
-      <input type="range" id="slCnb" min="10" max="1000" step="10" value="100" oninput="syncToNum('slCnb','slCnbVal');updateSlider(this,'slCnbVal',0,'');compute()">
+      <input type="range" id="slCnb" min="10" max="1000" step="10" value="100" oninput="syncToNum('slCnb','slCnbVal');updateSlider(this,'slCnbVal',0,'');redraw()">
     </div>
 
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">臨界熱流束 CHF</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slCHFVal" value="1.0" min="0.5" max="3.0" step="0.1" oninput="syncFromNum('slCHF','slCHFVal')"><span class="num-unit">MW/m²</span></div>
+        <div class="num-wrap"><input type="number" class="num-input" id="slCHFVal" value="1.1" min="0.5" max="3.0" step="0.1" oninput="syncFromNum('slCHF','slCHFVal')"><span class="num-unit">MW/m²</span></div>
       </div>
-      <input type="range" id="slCHF" min="0.5" max="3.0" step="0.1" value="1.0" oninput="syncToNum('slCHF','slCHFVal');updateSlider(this,'slCHFVal',1,'');compute()">
+      <input type="range" id="slCHF" min="0.5" max="3.0" step="0.1" value="1.1" oninput="syncToNum('slCHF','slCHFVal');updateSlider(this,'slCHFVal',1,'');redraw()">
     </div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">放射放射率 ε（膜沸騰時）</span>
+        <span class="param-name">放射率 ε（膜沸騰時）</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slEmissVal" value="0.80" min="0.00" max="1.00" step="0.05" oninput="syncFromNum('slEmiss','slEmissVal')"><span class="num-unit">—</span></div>
       </div>
-      <input type="range" id="slEmiss" min="0.00" max="1.00" step="0.05" value="0.80" oninput="syncToNum('slEmiss','slEmissVal');updateSlider(this,'slEmissVal',2,'');compute()">
+      <input type="range" id="slEmiss" min="0.00" max="1.00" step="0.05" value="0.80" oninput="syncToNum('slEmiss','slEmissVal');updateSlider(this,'slEmissVal',2,'');redraw()">
     </div>
 
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+      <button type="button" class="btn" id="btnPlay" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+      <button type="button" class="btn secondary" onclick="resetSim()"><i class="fas fa-redo"></i> 最初から</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">水・大気圧（T_sat = 100°C）固定。自然対流域 h_nc ≈ 1000 W/(m²·K)、膜沸騰 h_fb ≈ 30 W/(m²·K) を仮定。</p>
+
+    <div class="param-group" style="margin-top:10px;">
+      <div class="param-label"><span class="param-name">プリセット</span></div>
+      <div class="preset-row">
+        <button type="button" onclick="loadPreset('burnout')">CHFまで上げてバーンアウト</button>
+        <button type="button" onclick="loadPreset('full')">温度制御で全S字曲線</button>
+        <button type="button" onclick="loadPreset('film')">膜沸騰（Leidenfrost）</button>
+      </div>
+    </div>
+
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:8px;">水・大気圧（T_sat = 100°C）固定。自然対流 h_nc ≈ 1000 W/(m²·K)、膜沸騰 h_fb ≈ 30 W/(m²·K) を仮定。Zuber の CHF は水・大気圧で約 1.1 MW/m²。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983372?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983372.09._SCMZZZZZZ_.jpg" alt="伝熱工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">伝熱工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（ライブ）</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statRegime">—</div><div class="sl">沸騰域</div></div>
-        <div class="stat-card"><div class="sv" id="statQ">—</div><div class="sl">熱流束 q</div></div>
-        <div class="stat-card"><div class="sv" id="statH">—</div><div class="sl">沸騰熱伝達係数 h_boil</div></div>
+        <div class="stat-card"><div class="sv" id="statDT">—</div><div class="sl">過熱度 ΔT_e</div></div>
+        <div class="stat-card"><div class="sv" id="statQ">—</div><div class="sl">熱流束 q''</div></div>
+        <div class="stat-card"><div class="sv" id="statTw">—</div><div class="sl">面温度 T_w</div></div>
+        <div class="stat-card"><div class="sv" id="statCHF">—</div><div class="sl">臨界熱流束 CHF</div></div>
+        <div class="stat-card"><div class="sv" id="statLeid">—</div><div class="sl">Leidenfrost 点 q_min</div></div>
         <div class="stat-card"><div class="sv" id="statMargin">—</div><div class="sl">CHF までの余裕</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 沸騰曲線（対数 q vs ΔT_e）</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">横軸＝過熱度 ΔT_e (K, 対数)／縦軸＝熱流束 q (W/m², 対数)／青実線＝4域モデル／赤水平線＝CHF と Leidenfrost 点／黄点＝現在状態</p>
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 沸騰曲線の走査と伝熱面の状態</div>
+      <canvas id="cv" class="cv-boil" width="600" height="400" role="img" aria-label="沸騰曲線上を動作点が移動し、伝熱面の気泡・蒸気膜の状態を可視化するアニメーション"></canvas>
+      <p class="canvas-hint">上＝沸騰曲線（対数 q'' vs ΔT_e）。黄点＝現在の動作点／赤破線＝CHF・Leidenfrost／橙矢印＝バーンアウトのジャンプ。下＝伝熱面（気泡→蒸気膜）。</p>
     </div>
 
     <div class="chart-card">
@@ -196,237 +238,474 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         $$q'' = h_{nc}\,\Delta T_e$$
         <p style="margin-top:6px;">核沸騰域（$5 \leq \Delta T_e &lt; 30$ K）。Rohsenow 式に基づく簡略形：</p>
         $$q'' = C\,\Delta T_e^{3}$$
-        <p style="margin-top:6px;">臨界熱流束（Zuber, 水・大気圧で約 1 MW/m²）：</p>
+        <p style="margin-top:6px;">臨界熱流束（Zuber, 水・大気圧で約 1.1 MW/m²）：</p>
         $$q''_\text{CHF} \approx 0.131\,\rho_v^{1/2}\,h_{fg}\,[\sigma g(\rho_l-\rho_v)]^{1/4}$$
         <p style="margin-top:6px;">膜沸騰域（Bromley 式 + 放射項）：</p>
         $$q'' = h_{fb}\,\Delta T_e + \varepsilon\sigma_{SB}(T_w^4 - T_\text{sat}^4)/2$$
+        <p style="margin-top:6px;">熱流束制御で $q''_\text{入力} > q''_\text{CHF}$ になると、核沸騰のまま存在できず膜沸騰枝へ不連続にジャンプし、面温度 $T_w$ が一気に数百〜千度上昇します（バーンアウト＝ヒステリシス）。</p>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-// ========== Boiling Curve (Nukiyama) Simulator ==========
-var cv = document.getElementById('cv');
-var ctx = cv.getContext('2d');
+// ========== Boiling Curve (Nukiyama) v2 — curve traversal, burnout & hysteresis ==========
+(function () {
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
 
-var T_SAT_C = 100;        // °C, water at 1 atm
-var T_SAT_K = 373.15;
-var H_NC = 1000;          // W/(m²·K), natural convection
-var H_FB = 30;            // W/(m²·K), film boiling
-var SIGMA_SB = 5.67e-8;   // Stefan-Boltzmann
-var Q_LEID = 0.2e6;       // Leidenfrost min ~0.2 MW/m²
+  var T_SAT_C = 100;        // °C, water at 1 atm
+  var T_SAT_K = 373.15;     // K
+  var H_NC = 1000;          // W/(m²·K), natural convection
+  var H_FB = 30;            // W/(m²·K), film boiling convection
+  var SIGMA_SB = 5.67e-8;   // Stefan-Boltzmann
+  var Q_LEID = 0.2e6;       // Leidenfrost minimum heat flux ~0.2 MW/m²
+  var DT_MIN = 1, DT_MAX = 1000;     // superheat axis (K)
+  var DT_BURN = 1000;       // burnout runaway cap (K) for visualization
 
-function getParams() {
-  var dT = parseFloat(document.getElementById('slDT').value);
-  var C = parseFloat(document.getElementById('slCnb').value);
-  var chf = parseFloat(document.getElementById('slCHF').value) * 1e6; // MW/m² -> W/m²
-  var em = parseFloat(document.getElementById('slEmiss').value);
-  return { dT: dT, C: C, chf: chf, em: em };
-}
-
-// Returns { q: W/m², regime: code } given ΔT_e (K) and params
-function boilingQ(dT, p) {
-  if (dT < 5) {
-    return { q: H_NC * dT, regime: 'natural' };
-  } else if (dT < 30) {
-    // Nucleate boiling: q = C * dT^3, clamped at CHF
-    var q = p.C * dT * dT * dT;
-    if (q > p.chf) q = p.chf;
-    return { q: q, regime: 'nucleate' };
-  } else if (dT < 120) {
-    // Transition: decreases from CHF down toward Leidenfrost
-    var qMin = Q_LEID;
-    var t = (dT - 30) / 90;             // 0..1
-    var q = p.chf * Math.exp(-3.0 * t);  // smooth decay
-    if (q < qMin) q = qMin;
-    return { q: q, regime: 'transition' };
-  } else {
-    // Film boiling: convection + radiation
-    var Tw = T_SAT_K + dT;
-    var qConv = H_FB * dT;
-    var qRad = p.em * SIGMA_SB * (Tw * Tw * Tw * Tw - T_SAT_K * T_SAT_K * T_SAT_K * T_SAT_K) * 0.5;
-    return { q: qConv + qRad, regime: 'film' };
+  // ---- physics: q''(ΔTe) on the static Nukiyama curve ----
+  function boilingQ(dT, p) {
+    if (dT < 5) {
+      return { q: H_NC * dT, regime: 'natural' };
+    } else if (dT < 30) {
+      var q = p.C * dT * dT * dT;
+      if (q > p.chf) q = p.chf;
+      return { q: q, regime: 'nucleate' };
+    } else if (dT < 120) {
+      var t = (dT - 30) / 90;
+      var qt = p.chf * Math.exp(-3.0 * t);
+      if (qt < Q_LEID) qt = Q_LEID;
+      return { q: qt, regime: 'transition' };
+    } else {
+      var Tw = T_SAT_K + dT;
+      var qConv = H_FB * dT;
+      var qRad = p.em * SIGMA_SB * (Tw * Tw * Tw * Tw - Math.pow(T_SAT_K, 4)) * 0.5;
+      return { q: qConv + qRad, regime: 'film' };
+    }
   }
-}
 
-function regimeLabel(code) {
-  switch (code) {
-    case 'natural': return '自然対流';
-    case 'nucleate': return '核沸騰';
-    case 'transition': return '遷移沸騰';
-    case 'film': return '膜沸騰';
-    default: return '—';
+  // ΔTe where nucleate boiling reaches CHF (burnout onset under q-control)
+  function dTatCHF(p) {
+    var d = Math.cbrt(p.chf / p.C);
+    if (d > 30) d = 30;        // nucleate model valid up to ~30 K
+    return d;
   }
-}
 
-function fmtQ(q) {
-  if (!isFinite(q)) return '—';
-  if (q >= 1e6) return (q / 1e6).toFixed(2) + ' MW/m²';
-  if (q >= 1e3) return (q / 1e3).toFixed(0) + ' kW/m²';
-  return q.toFixed(0) + ' W/m²';
-}
-
-function fmtH(h) {
-  if (!isFinite(h) || h <= 0) return '—';
-  if (h >= 1000) return (h / 1000).toFixed(1) + ' kW/(m²·K)';
-  return h.toFixed(0) + ' W/(m²·K)';
-}
-
-function fmtMargin(m) {
-  if (!isFinite(m)) return '—';
-  if (m >= 0) {
-    if (m >= 1e6) return '+' + (m / 1e6).toFixed(2) + ' MW/m²';
-    if (m >= 1e3) return '+' + (m / 1e3).toFixed(0) + ' kW/m²';
-    return '+' + m.toFixed(0) + ' W/m²';
-  } else {
-    if (-m >= 1e6) return (m / 1e6).toFixed(2) + ' MW/m²';
-    if (-m >= 1e3) return (m / 1e3).toFixed(0) + ' kW/m²';
-    return m.toFixed(0) + ' W/m²';
+  function getParams() {
+    return {
+      C: parseFloat(document.getElementById('slCnb').value),
+      chf: parseFloat(document.getElementById('slCHF').value) * 1e6,
+      em: parseFloat(document.getElementById('slEmiss').value)
+    };
   }
-}
 
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var h = Math.round(w * 0.66);
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
-  cv.width = Math.round(w * dpr);
-  cv.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cv.dataset.cssW = String(w);
-  cv.dataset.cssH = String(h);
-}
-
-function drawCurve(p, res) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 60, mr = 18, mt = 22, mb = 38;
-  var x0 = mx, x1 = W - mr, y0 = H - mb, y1 = mt;
-  var gw = x1 - x0, gh = y0 - y1;
-
-  // log-log axes: x: 1..1000, y: 1e3..1e7
-  var xMin = 1, xMax = 1000;
-  var yMin = 1e3, yMax = 1e7;
-  var lxMin = Math.log10(xMin), lxMax = Math.log10(xMax);
-  var lyMin = Math.log10(yMin), lyMax = Math.log10(yMax);
-  function px(dT) { return x0 + (Math.log10(dT) - lxMin) / (lxMax - lxMin) * gw; }
-  function py(q) { return y0 - (Math.log10(Math.max(q, yMin)) - lyMin) / (lyMax - lyMin) * gh; }
-
-  // grid lines (decades)
-  ctx.strokeStyle = 'rgba(143,184,224,0.15)';
-  ctx.lineWidth = 1;
-  for (var d = 0; d <= 3; d++) {
-    var xx = x0 + d / 3 * gw;
-    ctx.beginPath(); ctx.moveTo(xx, y1); ctx.lineTo(xx, y0); ctx.stroke();
+  function regimeLabel(code) {
+    switch (code) {
+      case 'natural': return '自然対流';
+      case 'nucleate': return '核沸騰';
+      case 'transition': return '遷移沸騰';
+      case 'film': return '膜沸騰';
+      case 'burnout': return 'バーンアウト';
+      default: return '—';
+    }
   }
-  for (var d = 0; d <= 4; d++) {
-    var yy = y0 - d / 4 * gh;
-    ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
+
+  function fmtQ(q) {
+    if (!isFinite(q)) return '—';
+    if (q >= 1e6) return (q / 1e6).toFixed(2) + ' MW/m²';
+    if (q >= 1e3) return (q / 1e3).toFixed(0) + ' kW/m²';
+    return q.toFixed(0) + ' W/m²';
   }
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.6)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-
-  // CHF and Leidenfrost horizontal lines
-  ctx.strokeStyle = 'rgba(231,76,60,0.7)';
-  ctx.setLineDash([5, 4]);
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(x0, py(p.chf)); ctx.lineTo(x1, py(p.chf)); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, py(Q_LEID)); ctx.lineTo(x1, py(Q_LEID)); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // boiling curve in 4 regimes (continuous sweep)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  var N = 240;
-  for (var i = 0; i <= N; i++) {
-    var lx = lxMin + (lxMax - lxMin) * i / N;
-    var dT = Math.pow(10, lx);
-    var r = boilingQ(dT, p);
-    var qv = r.q;
-    if (qv < yMin) qv = yMin;
-    if (qv > yMax) qv = yMax;
-    if (i === 0) ctx.moveTo(px(dT), py(qv)); else ctx.lineTo(px(dT), py(qv));
+  function fmtMargin(m) {
+    if (!isFinite(m)) return '—';
+    var s = m >= 0 ? '+' : '';
+    if (Math.abs(m) >= 1e6) return s + (m / 1e6).toFixed(2) + ' MW/m²';
+    if (Math.abs(m) >= 1e3) return s + (m / 1e3).toFixed(0) + ' kW/m²';
+    return s + m.toFixed(0) + ' W/m²';
   }
-  ctx.stroke();
 
-  // current point
-  var cx = px(p.dT), cy = py(Math.min(Math.max(res.q, yMin), yMax));
-  ctx.fillStyle = '#FFD166';
-  ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
-  ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 0;
+  // ---- simulation state ----
+  var mode = 'q';            // 'q' = heat-flux control, 't' = temperature control
+  var dT = 5;                // current operating superheat (K)
+  var burntOut = false;      // latched once q-control jumps past CHF
+  var playing = false;
+  var lastT = 0;
+  var rafId = null;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('1', x0, y0 + 14);
-  ctx.fillText('10', x0 + gw / 3, y0 + 14);
-  ctx.fillText('100', x0 + gw * 2 / 3, y0 + 14);
-  ctx.fillText('1000', x1, y0 + 14);
-  ctx.textAlign = 'right';
-  ctx.fillText('1e3', x0 - 4, y0 + 4);
-  ctx.fillText('1e4', x0 - 4, y0 - gh / 4 + 4);
-  ctx.fillText('1e5', x0 - 4, y0 - gh / 2 + 4);
-  ctx.fillText('1e6', x0 - 4, y0 - 3 * gh / 4 + 4);
-  ctx.fillText('1e7', x0 - 4, y1 + 4);
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(231,76,60,0.9)';
-  ctx.fillText('CHF', x0 + 30, py(p.chf) - 4);
-  ctx.fillText('Leidenfrost', x0 + 60, py(Q_LEID) - 4);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.fillText('ΔT_e (K)', x0 + gw / 2, y0 + 30);
-  ctx.save();
-  ctx.translate(14, y1 + gh / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText("q'' (W/m²)", 0, 0);
-  ctx.restore();
+  function driveTargetDT(p) {
+    // map drive % to a target superheat depending on mode
+    var d = parseFloat(document.getElementById('slDrive').value) / 100;
+    if (mode === 't') {
+      // temperature control: drive maps directly across full ΔTe span (log)
+      return Math.pow(10, Math.log10(DT_MIN) + d * (Math.log10(DT_MAX) - Math.log10(DT_MIN)));
+    } else {
+      // heat-flux control: drive maps to imposed q'' (0..1.4*CHF), invert to nucleate ΔTe
+      var qTarget = d * 1.4 * p.chf;
+      if (qTarget <= H_NC * 5) return Math.max(DT_MIN, qTarget / H_NC);
+      if (qTarget <= p.chf) return Math.cbrt(qTarget / p.C);
+      return dTatCHF(p); // capped at CHF onset; beyond triggers burnout
+    }
+  }
 
-  // regime labels along the curve
-  ctx.fillStyle = 'rgba(207,227,247,0.75)';
-  ctx.font = '10px "Noto Sans JP",sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('自然対流', px(2.5), py(boilingQ(2.5, p).q) - 8);
-  ctx.fillText('核沸騰', px(15), py(boilingQ(15, p).q) - 8);
-  ctx.fillText('遷移', px(60), py(boilingQ(60, p).q) + 14);
-  ctx.fillText('膜沸騰', px(400), py(boilingQ(400, p).q) - 8);
-}
+  function setMode(m) {
+    mode = m;
+    document.getElementById('modeQ').classList.toggle('active', m === 'q');
+    document.getElementById('modeT').classList.toggle('active', m === 't');
+    document.getElementById('modeQ').setAttribute('aria-pressed', m === 'q');
+    document.getElementById('modeT').setAttribute('aria-pressed', m === 't');
+    burntOut = false;
+    redraw();
+  }
+  window.setMode = setMode;
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.dT) || !isFinite(p.C) || !isFinite(p.chf)) return;
-  var r = boilingQ(p.dT, p);
-  var h = r.q / p.dT;
-  var margin = p.chf - r.q;
-  document.getElementById('statRegime').textContent = regimeLabel(r.regime);
-  document.getElementById('statQ').textContent = fmtQ(r.q);
-  document.getElementById('statH').textContent = fmtH(h);
-  document.getElementById('statMargin').textContent = fmtMargin(margin);
-  drawCurve(p, r);
-}
+  function onDrive() {
+    if (!playing) {
+      // snap toward target when paused (immediate feedback)
+      var p = getParams();
+      dT = driveTargetDT(p);
+      // if q-control and drive pushes past CHF, latch burnout
+      var dPct = parseFloat(document.getElementById('slDrive').value) / 100;
+      if (mode === 'q' && dPct * 1.4 * p.chf > p.chf) { burntOut = true; }
+      else if (mode === 'q') { burntOut = false; }
+      redraw();
+    }
+  }
+  window.onDrive = onDrive;
 
-function resetParams() {
-  var defs = { slDT: 20, slCnb: 100, slCHF: 1.0, slEmiss: 0.80 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slDT'), 'slDTVal', 0, '');
-  updateSlider(document.getElementById('slCnb'), 'slCnbVal', 0, '');
-  updateSlider(document.getElementById('slCHF'), 'slCHFVal', 1, '');
-  updateSlider(document.getElementById('slEmiss'), 'slEmissVal', 2, '');
-  compute();
-}
+  function step(dt, p) {
+    var target = driveTargetDT(p);
+    var dPct = parseFloat(document.getElementById('slDrive').value) / 100;
+    var imposedExceedsCHF = (mode === 'q' && dPct * 1.4 * p.chf > p.chf);
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
-resizeCanvas();
-compute();
+    if (mode === 'q' && imposedExceedsCHF && !burntOut && dT >= dTatCHF(p) - 0.5) {
+      // BURNOUT: jump from nucleate(CHF) up the film branch — surface T soars
+      burntOut = true;
+    }
+
+    if (burntOut) {
+      // run the operating point up toward the burnout cap (temperature runaway)
+      var goal = DT_BURN;
+      dT += (goal - dT) * Math.min(1, dt * 2.5);
+    } else {
+      var rate = 1.6;
+      dT += (target - dT) * Math.min(1, dt * rate);
+    }
+    if (dT < DT_MIN) dT = DT_MIN;
+    if (dT > DT_MAX && !burntOut) dT = DT_MAX;
+    if (dT > DT_BURN) dT = DT_BURN;
+  }
+
+  // ---- live stats ----
+  function updateStats(p) {
+    var r;
+    var dispRegime, q;
+    if (burntOut) {
+      r = boilingQ(dT, p);
+      q = r.q;
+      dispRegime = 'burnout';
+    } else {
+      r = boilingQ(dT, p);
+      q = r.q;
+      dispRegime = r.regime;
+    }
+    var Tw = T_SAT_C + dT;
+    document.getElementById('statRegime').textContent = regimeLabel(dispRegime);
+    document.getElementById('statDT').textContent = dT.toFixed(dT < 100 ? 1 : 0) + ' K';
+    document.getElementById('statQ').textContent = fmtQ(q);
+    document.getElementById('statTw').textContent = Tw.toFixed(0) + ' °C';
+    document.getElementById('statCHF').textContent = fmtQ(p.chf);
+    document.getElementById('statLeid').textContent = fmtQ(Q_LEID);
+    document.getElementById('statMargin').textContent = fmtMargin(p.chf - q);
+  }
+
+  // ---- HiDPI sizing ----
+  function resizeCanvas() {
+    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
+    var h = Math.round(w * 0.82);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    if (cv.dataset.cssW !== String(w) || cv.dataset.cssH !== String(h)) {
+      cv.style.width = w + 'px';
+      cv.style.height = h + 'px';
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+      cv.dataset.cssW = String(w);
+      cv.dataset.cssH = String(h);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ---- drawing ----
+  function draw(p) {
+    var W = parseFloat(cv.dataset.cssW) || cv.width, H = parseFloat(cv.dataset.cssH) || cv.height;
+    ctx.fillStyle = '#0a1929';
+    ctx.fillRect(0, 0, W, H);
+
+    // split: top = curve (62%), bottom = surface
+    var splitY = Math.round(H * 0.62);
+    drawCurvePanel(p, W, splitY);
+    drawSurfacePanel(p, 0, splitY, W, H - splitY);
+  }
+
+  function drawCurvePanel(p, W, H) {
+    var mx = 56, mr = 16, mt = 16, mb = 30;
+    var x0 = mx, x1 = W - mr, y0 = H - mb, y1 = mt;
+    var gw = x1 - x0, gh = y0 - y1;
+    var xMin = 1, xMax = 1000, yMin = 1e3, yMax = 1e7;
+    var lxMin = Math.log10(xMin), lxMax = Math.log10(xMax);
+    var lyMin = Math.log10(yMin), lyMax = Math.log10(yMax);
+    function px(d) { return x0 + (Math.log10(Math.max(d, xMin)) - lxMin) / (lxMax - lxMin) * gw; }
+    function py(q) { return y0 - (Math.log10(Math.min(Math.max(q, yMin), yMax)) - lyMin) / (lyMax - lyMin) * gh; }
+
+    // grid
+    ctx.strokeStyle = 'rgba(143,184,224,0.13)';
+    ctx.lineWidth = 1;
+    for (var d = 0; d <= 3; d++) { var xx = x0 + d / 3 * gw; ctx.beginPath(); ctx.moveTo(xx, y1); ctx.lineTo(xx, y0); ctx.stroke(); }
+    for (var e = 0; e <= 4; e++) { var yy = y0 - e / 4 * gh; ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke(); }
+    // axes
+    ctx.strokeStyle = 'rgba(143,184,224,0.55)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+
+    // CHF & Leidenfrost markers
+    ctx.strokeStyle = 'rgba(231,76,60,0.7)'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x0, py(p.chf)); ctx.lineTo(x1, py(p.chf)); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,180,216,0.65)';
+    ctx.beginPath(); ctx.moveTo(x0, py(Q_LEID)); ctx.lineTo(x1, py(Q_LEID)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // boiling curve
+    ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.4; ctx.beginPath();
+    var N = 240;
+    for (var i = 0; i <= N; i++) {
+      var lx = lxMin + (lxMax - lxMin) * i / N;
+      var dd = Math.pow(10, lx);
+      var q = boilingQ(dd, p).q;
+      if (i === 0) ctx.moveTo(px(dd), py(q)); else ctx.lineTo(px(dd), py(q));
+    }
+    ctx.stroke();
+
+    // burnout jump arrow (nucleate CHF -> film branch) when burnt out
+    var dOn = dTatCHF(p);
+    var qOn = p.chf;
+    if (burntOut) {
+      ctx.strokeStyle = '#FF8C42'; ctx.lineWidth = 2.2; ctx.setLineDash([6, 4]);
+      var ax0 = px(dOn), ay0 = py(qOn);
+      var ax1 = px(Math.min(dT, DT_BURN)), ay1 = py(boilingQ(Math.min(dT, DT_BURN), p).q);
+      ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax1, ay1); ctx.stroke();
+      ctx.setLineDash([]);
+      // arrowhead
+      var ang = Math.atan2(ay1 - ay0, ax1 - ax0);
+      ctx.fillStyle = '#FF8C42';
+      ctx.beginPath();
+      ctx.moveTo(ax1, ay1);
+      ctx.lineTo(ax1 - 9 * Math.cos(ang - 0.4), ay1 - 9 * Math.sin(ang - 0.4));
+      ctx.lineTo(ax1 - 9 * Math.cos(ang + 0.4), ay1 - 9 * Math.sin(ang + 0.4));
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#FF8C42'; ctx.font = 'bold 11px "Noto Sans JP",sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('バーンアウト', ax0 + 6, (ay0 + ay1) / 2);
+    }
+
+    // current operating point
+    var curQ = boilingQ(dT, p).q;
+    var cxp = px(dT), cyp = py(curQ);
+    ctx.fillStyle = burntOut ? '#FF5A36' : '#FFD166';
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(cxp, cyp, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // labels
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillText('1', x0, y0 + 12); ctx.fillText('10', x0 + gw / 3, y0 + 12);
+    ctx.fillText('100', x0 + gw * 2 / 3, y0 + 12); ctx.fillText('1000', x1, y0 + 12);
+    ctx.textAlign = 'right';
+    ctx.fillText('1e3', x0 - 4, y0 + 3); ctx.fillText('1e5', x0 - 4, y0 - gh / 2 + 3); ctx.fillText('1e7', x0 - 4, y1 + 7);
+    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(231,76,60,0.95)';
+    ctx.fillText('CHF', x0 + 24, py(p.chf) - 4);
+    ctx.fillStyle = 'rgba(0,180,216,0.95)';
+    ctx.fillText('Leidenfrost', x0 + 56, py(Q_LEID) + 13);
+    ctx.fillStyle = '#cfe3f7'; ctx.fillText('ΔT_e (K)', x0 + gw / 2, y0 + 26);
+    ctx.save(); ctx.translate(13, y1 + gh / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("q'' (W/m²)", 0, 0); ctx.restore();
+    // regime labels
+    ctx.fillStyle = 'rgba(207,227,247,0.7)'; ctx.font = '10px "Noto Sans JP",sans-serif';
+    ctx.fillText('自然対流', px(2.5), py(boilingQ(2.5, p).q) - 7);
+    ctx.fillText('核沸騰', px(15), py(boilingQ(15, p).q) - 7);
+    ctx.fillText('遷移', px(60), py(boilingQ(60, p).q) + 13);
+    ctx.fillText('膜沸騰', px(450), py(boilingQ(450, p).q) - 7);
+  }
+
+  function drawSurfacePanel(p, ox, oy, W, H) {
+    ctx.save();
+    ctx.translate(ox, oy);
+    // panel bg
+    ctx.fillStyle = '#0d2030'; ctx.fillRect(6, 6, W - 12, H - 10);
+    var sx = 16, sw = W - 32;
+    var heaterY = H - 22, heaterH = 12;
+    var curQ = boilingQ(dT, p).q;
+    var r = burntOut ? 'film' : boilingQ(dT, p).regime;
+
+    // heater surface colour by temperature (cool blue -> glowing orange/white at burnout)
+    var heat = Math.min(1, dT / 600);
+    var rr = Math.round(60 + 195 * heat), gg = Math.round(90 + 100 * heat * heat), bb = Math.round(140 - 120 * heat);
+    if (burntOut) { rr = 255; gg = Math.round(120 + 100 * Math.min(1, (dT - 120) / 600)); bb = 60; }
+    ctx.fillStyle = 'rgb(' + rr + ',' + gg + ',' + bb + ')';
+    ctx.fillRect(sx, heaterY, sw, heaterH);
+    if (heat > 0.4 || burntOut) {
+      ctx.shadowColor = 'rgba(255,140,40,0.8)'; ctx.shadowBlur = 16;
+      ctx.fillRect(sx, heaterY, sw, heaterH); ctx.shadowBlur = 0;
+    }
+
+    // water tint
+    ctx.fillStyle = 'rgba(40,120,180,0.12)';
+    ctx.fillRect(sx, 14, sw, heaterY - 14);
+
+    var t = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+
+    if (r === 'natural') {
+      // wavy convection currents, no bubbles
+      ctx.strokeStyle = 'rgba(120,180,230,0.5)'; ctx.lineWidth = 1.4;
+      for (var c = 0; c < 5; c++) {
+        ctx.beginPath();
+        var bx = sx + sw * (c + 0.5) / 5;
+        for (var yy = heaterY; yy > 18; yy -= 4) {
+          var off = Math.sin((yy * 0.06) + t * 1.2 + c) * 6;
+          if (yy === heaterY) ctx.moveTo(bx + off, yy); else ctx.lineTo(bx + off, yy);
+        }
+        ctx.stroke();
+      }
+    } else if (r === 'nucleate') {
+      // many rising bubbles, density scales with q/CHF
+      var nb = Math.round(14 + 40 * Math.min(1, curQ / p.chf));
+      for (var b = 0; b < nb; b++) {
+        var seed = b * 12.9898;
+        var phase = (t * (0.6 + (b % 5) * 0.12) + seed) % 1;
+        var bx2 = sx + ((Math.sin(seed) * 0.5 + 0.5) * sw);
+        var by = heaterY - phase * (heaterY - 18);
+        var rad = 2 + (b % 3);
+        ctx.fillStyle = 'rgba(220,240,255,' + (0.75 * (1 - phase) + 0.2) + ')';
+        ctx.beginPath(); ctx.arc(bx2, by, rad, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (r === 'transition') {
+      // unstable patches: mix of bubbles and forming vapor blobs
+      ctx.fillStyle = 'rgba(230,230,245,0.35)';
+      for (var k = 0; k < 6; k++) {
+        var px2 = sx + sw * (k + 0.5) / 6 + Math.sin(t * 2 + k) * 8;
+        var wbl = 18 + Math.sin(t * 3 + k) * 8;
+        ctx.beginPath();
+        ctx.ellipse(px2, heaterY - 10, wbl, 8 + Math.sin(t + k) * 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      // film boiling: continuous vapor blanket separating water from surface
+      var filmTop = heaterY - 12 - 5 * Math.abs(Math.sin(t * 2));
+      var grad = ctx.createLinearGradient(0, filmTop, 0, heaterY);
+      grad.addColorStop(0, 'rgba(255,200,140,0.25)');
+      grad.addColorStop(1, 'rgba(255,150,80,0.55)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(sx, heaterY);
+      for (var xv = sx; xv <= sx + sw; xv += 8) {
+        ctx.lineTo(xv, filmTop + Math.sin(xv * 0.08 + t * 3) * 3);
+      }
+      ctx.lineTo(sx + sw, heaterY);
+      ctx.closePath(); ctx.fill();
+      // occasional large vapor bubbles departing the film
+      ctx.fillStyle = 'rgba(255,210,170,0.4)';
+      for (var m2 = 0; m2 < 3; m2++) {
+        var ph = (t * 0.4 + m2 * 0.33) % 1;
+        var mx2 = sx + sw * (m2 + 0.5) / 3;
+        ctx.beginPath(); ctx.arc(mx2, filmTop - ph * (filmTop - 18), 6 + 3 * Math.sin(t + m2), 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // caption
+    ctx.fillStyle = 'rgba(207,227,247,0.85)'; ctx.font = 'bold 11px "Noto Sans JP",sans-serif'; ctx.textAlign = 'left';
+    var cap = { natural: '自然対流：気泡なし、対流のみ', nucleate: '核沸騰：気泡が活発に発生', transition: '遷移沸騰：蒸気の塊が断続的に付着', film: '膜沸騰：蒸気膜が伝熱面を覆う' }[r];
+    if (burntOut) cap = 'バーンアウト：蒸気膜が面を覆い温度暴走';
+    ctx.fillText(cap, sx, 22);
+    ctx.fillStyle = 'rgba(207,227,247,0.55)'; ctx.font = '10px "Noto Sans JP",sans-serif';
+    ctx.fillText('伝熱面（ヒーター）', sx, heaterY - 2);
+    ctx.restore();
+  }
+
+  function redraw() {
+    var p = getParams();
+    resizeCanvas();
+    updateStats(p);
+    draw(p);
+  }
+  window.redraw = redraw;
+
+  // ---- animation loop ----
+  function loop(ts) {
+    if (!playing) return;
+    var dt = lastT ? Math.min(0.05, (ts - lastT) / 1000) : 0.016;
+    lastT = ts;
+    var p = getParams();
+    step(dt, p);
+    updateStats(p);
+    resizeCanvas();
+    draw(p);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function play() {
+    if (playing) return;
+    if (reduceMotion) {
+      // reduced motion: jump straight to target state, no continuous rAF
+      var p = getParams();
+      for (var i = 0; i < 200; i++) step(0.05, p);
+      redraw();
+      return;
+    }
+    playing = true;
+    lastT = 0;
+    document.getElementById('btnPlay').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    rafId = requestAnimationFrame(loop);
+  }
+  function pause() {
+    playing = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    document.getElementById('btnPlay').innerHTML = '<i class="fas fa-play"></i> 再生';
+  }
+  function togglePlay() { if (playing) pause(); else play(); }
+  window.togglePlay = togglePlay;
+
+  function resetSim() {
+    pause();
+    dT = 5; burntOut = false;
+    redraw();
+  }
+  window.resetSim = resetSim;
+
+  function loadPreset(name) {
+    pause();
+    burntOut = false;
+    if (name === 'burnout') {
+      setMode('q');
+      document.getElementById('slDrive').value = 100;
+      document.getElementById('slCHF').value = 1.1;
+    } else if (name === 'full') {
+      setMode('t');
+      document.getElementById('slDrive').value = 100;
+      document.getElementById('slCHF').value = 1.1;
+    } else if (name === 'film') {
+      setMode('t');
+      document.getElementById('slDrive').value = 80;
+      document.getElementById('slCHF').value = 1.1;
+    }
+    updateSlider(document.getElementById('slDrive'), 'slDriveVal', 0, '');
+    updateSlider(document.getElementById('slCHF'), 'slCHFVal', 1, '');
+    dT = 5; burntOut = false;
+    redraw();
+    play();
+  }
+  window.loadPreset = loadPreset;
+
+  window.addEventListener('resize', function () { redraw(); });
+  // init
+  redraw();
+})();
 </script>
 
 <section class="explanation">
@@ -436,25 +715,25 @@ compute();
       <div class="bub">沸騰って、お湯がポコポコ沸くだけのことだと思ってたんですけど、シミュレーターを開いたら4つも領域があってびっくりしました。何がそんなに違うんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">いいところに気づいたね。1934年に日本の沼上（Nukiyama）博士が「沸騰には4つの顔がある」ことを実験で示したんだ。ざっくり言うと、伝熱面の温度をちょっとずつ上げていくと、まずは静かな自然対流、次にポコポコの核沸騰、急に伝熱が悪くなる遷移、最後は蒸気膜に覆われる膜沸騰、という4段階を経るんだよ。グラフで対数軸になっているのは、熱流束の値が桁違いに変わるからだ。</div>
+      <div class="bub">いいところに気づいたね。1934年に日本の沼上（Nukiyama）博士が「沸騰には4つの顔がある」ことを実験で示したんだ。ざっくり言うと、伝熱面の温度をちょっとずつ上げていくと、まずは静かな自然対流、次にポコポコの核沸騰、急に伝熱が悪くなる遷移、最後は蒸気膜に覆われる膜沸騰、という4段階を経るんだよ。シミュレーターで「再生」を押すと、黄色い動作点が曲線の上を実際に動いていく。下のパネルでは気泡が膜に変わる様子も見えるよ。グラフが対数軸なのは、熱流束が桁違いに変わるからだ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">えっ、核沸騰のところで急に上がって、そのあと急に下がってますね。これってどういう物理現象なんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">核沸騰域では、面の小さな凹み（キャビティ）から気泡が次々生まれて、激しく液体をかき混ぜるから伝熱が一気に良くなる。$q\propto\Delta T^3$ で増えるんだ。でも過熱度が30度くらいを超えると、気泡が多すぎて面に貼りついた蒸気の塊になり始める。これが遷移沸騰だ。蒸気は熱を通しにくいから、面温度が上がっているのに伝わる熱量はむしろ減る。シミュレーターで ΔT_e を20→50→100と動かすと、熱流束カードの値がいったん上がって減るのが見えるよ。</div>
+      <div class="bub">核沸騰域では、面の小さな凹み（キャビティ）から気泡が次々生まれて、激しく液体をかき混ぜるから伝熱が一気に良くなる。$q\propto\Delta T^3$ で増えるんだ。でも過熱度が30度くらいを超えると、気泡が多すぎて面に貼りついた蒸気の塊になり始める。これが遷移沸騰だ。蒸気は熱を通しにくいから、面温度が上がっているのに伝わる熱量はむしろ減る。「温度制御で全S字曲線」プリセットを再生すると、動作点が頂点（CHF）を越えていったん下り坂を辿るのがはっきり見えるよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">「CHF」って赤い線が引いてありますけど、これを超えたら何が起こるんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">それが恐ろしい「バーンアウト」だ。電気ヒーターのように熱流束（=入力電力）を一定に制御している場合、入力が CHF を超えた瞬間、システムは核沸騰のままでいられず、いきなり膜沸騰の対応点まで飛ぶ。グラフを縦に見て——CHF（約 1 MW/m²）の高さで、核沸騰側は ΔT_e≈30K、膜沸騰側は ΔT_e≈600K以上。つまり面温度が一気に数百度跳ね上がる。これでボイラチューブや原子炉燃料棒の被覆管が一瞬で溶けるんだ。実務では CHF の半分くらいまでしか運転しないように設計するよ。</div>
+      <div class="bub">それが恐ろしい「バーンアウト」だ。電気ヒーターのように熱流束（=入力電力）を一定に制御している場合、入力が CHF を超えた瞬間、システムは核沸騰のままでいられず、橙色の矢印のように一気に膜沸騰側へ飛ぶ。これがヒステリシスだ。「CHFまで上げてバーンアウト」プリセットを再生してごらん。動作点が核沸騰の頂点まで来た途端、面温度（T_w カード）が一気に数百度跳ね上がる。これでボイラチューブや原子炉燃料棒の被覆管が一瞬で溶ける。実務では CHF の半分くらいまでしか運転しないように設計するよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">フライパンで水滴がコロコロ転がるあれも、関係あるんですか？</div>
+      <div class="bub">熱流束制御と温度制御で挙動が違うんですね。温度制御だと飛ばないんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">まさに Leidenfrost 効果だ。グラフの右側の Leidenfrost 点が、その入口にあたる。水滴の底面が瞬時に気化して、水滴を蒸気の薄い膜が浮かべる状態だ。膜沸騰域では蒸気膜が断熱材として働くから、伝熱がガクッと落ちる。シミュレーターで ΔT_e=200K に設定すると、核沸騰域の同じ過熱度（実際は届かないけど）と比べて、熱流束が桁違いに小さくなることがわかるよ。極低温の液体窒素を素手に少しかけても凍傷にならないのも、皮膚との温度差が極端で Leidenfrost 状態になるからなんだ。</div>
+      <div class="bub">そう、そこが核心だ。壁の温度そのものを制御できる系（蒸気再加熱や太陽炉など）では、過熱度を上げると遷移域を「下り坂」として連続的に辿れる。だからジャンプは起きず、ゆっくり膜沸騰へ移る。一方、熱流束を制御する系では遷移域は不安定で存在できない——だからCHFで膜沸騰枝へ飛ぶしかない。同じ曲線でも、何を固定するかでバーンアウトするかどうかが変わるんだ。グラフ右側の Leidenfrost 点は膜沸騰の入口で、フライパンの上で水滴がコロコロ転がるあの状態。蒸気膜が断熱材になって伝熱がガクッと落ちるんだよ。</div>
     </div>
   </div>
 
@@ -488,11 +767,14 @@ compute();
 
   <h2>よくある誤解と注意点</h2>
   <div class="fblock">
-    <p>最も多い誤解は、<strong>「面温度を上げれば上げるほど熱がよく伝わる」と思ってしまう</strong>ことです。実際には核沸騰のピーク（CHF）を境に、過熱度を上げてもむしろ熱流束が減る「遷移沸騰」の領域が存在します。シミュレーターで ΔT_e を 30→60→90 と動かしてみてください。熱流束カードの値が増えるどころか減っていきます。この「面温度を上げたのに伝わる熱が減る」という直感に反する挙動こそ、沸騰熱伝達の最大の特徴であり、設計事故の温床でもあります。</p>
-    <p>次に多いのが、<strong>CHF を「物理的な絶対上限」と誤解する</strong>ことです。CHF は「核沸騰のまま安定して維持できる上限」であって、それを超えると突然焼損するわけではありません。「熱流束制御系（電気ヒーター等）」では超えた瞬間に膜沸騰へジャンプして焼損しますが、「壁温制御系（蒸気再加熱、太陽炉等）」では遷移域を経由してゆっくり膜沸騰に移行し、必ずしも焼損しません。シミュレーションを実機に当てはめる際は、制御方式が「熱流束系」か「温度系」かを必ず確認してください。</p>
+    <p>最も多い誤解は、<strong>「面温度を上げれば上げるほど熱がよく伝わる」と思ってしまう</strong>ことです。実際には核沸騰のピーク（CHF）を境に、過熱度を上げてもむしろ熱流束が減る「遷移沸騰」の領域が存在します。「温度制御で全S字曲線」プリセットを再生してみてください。動作点が頂点を越えると、熱流束カードの値が増えるどころか減っていきます。この「面温度を上げたのに伝わる熱が減る」という直感に反する挙動こそ、沸騰熱伝達の最大の特徴であり、設計事故の温床でもあります。</p>
+    <p>次に多いのが、<strong>CHF を「物理的な絶対上限」と誤解する</strong>ことです。CHF は「核沸騰のまま安定して維持できる上限」であって、それを超えると突然焼損するわけではありません。「熱流束制御系（電気ヒーター等）」では超えた瞬間に膜沸騰へジャンプして焼損しますが、「壁温制御系（蒸気再加熱、太陽炉等）」では遷移域を経由してゆっくり膜沸騰に移行し、必ずしも焼損しません。このシミュレーターで制御方式を切り替えると、同じ曲線でもバーンアウトするかどうかが変わることが確かめられます。実機に当てはめる際は、制御方式が「熱流束系」か「温度系」かを必ず確認してください。</p>
     <p>最後に、<strong>このシミュレーターの式は「水・大気圧の単純化モデル」であることに注意</strong>してください。係数 C・CHF・h_fb は教科書値に基づく代表値であり、実機の正確な予測には Rohsenow 相関の表面係数 $C_{sf}$、Zuber の CHF 式、強制対流補正、流路形状の影響などを個別に評価する必要があります。特に圧力が大気圧と異なる場合、CHF は急激に変化します（高圧で増え、極低圧で減る）。実プラントの設計は必ず Groeneveld の look-up table や、検証済みの subchannel コード（VIPRE、COBRA など）で評価します。</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="boiling-curve.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -547,15 +829,15 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>過熱度ΔT（℃）をスライダーで設定。水の飽和温度100℃からの温度差を入力します</li>
-<li>臨界熱流束CHF（MW/m²）を材料・圧力条件に応じて調整。軽水炉では約6.5MW/m²が標準値です</li>
-<li>核沸騰パラメータと放射率を最適化し、Nukiyama曲線上での動作点を確認</li>
-<li>出力される沸騰域（自然対流/核沸騰/遷移域/膜沸騰）とCHF余裕を監視</li>
+<li>制御方式（熱流束制御 / 温度制御）を選びます。熱流束制御はCHF超えでバーンアウト、温度制御は全S字曲線を連続的に辿ります</li>
+<li>「再生」を押すと、動作点が加熱の目標値へ向かって沸騰曲線上を移動します。下のパネルで気泡→蒸気膜の状態が同時に見えます</li>
+<li>臨界熱流束CHF（MW/m²）を材料・圧力条件に応じて調整。水・大気圧のプール沸騰では約1.1MW/m²が代表値です（Zuber式）</li>
+<li>核沸騰係数と放射率を変えて曲線形状を調整し、ライブ数値（ΔTe・q''・面温度・CHF余裕）を監視します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>大気圧下の水冷却系でΔT=25℃、CHF=1.2MW/m²に設定した場合：核沸騰域で熱流束q≈0.45MW/m²、沸騰熱伝達係数h_boil≈18,000W/(m²・K)を得ます。過熱度をΔT=60℃に上げるとq≈0.85MW/m²に増加し、CHFまでの余裕は29%低下します。圧力容器内（2.0MPa）では飽和温度が120℃となり、同じΔT=25℃でも沸騰開始条件が変わります</p>
+<p>水・大気圧、CHF=1.1MW/m²、核沸騰係数C=100の場合、核沸騰域が頂点（CHF）に達する過熱度はΔTe≈22Kです。熱流束制御で「CHFまで上げてバーンアウト」を再生すると、動作点がΔTe≈22Kに達した瞬間に膜沸騰枝へジャンプし、面温度T_wが100℃台から1000℃級へと一気に上昇します。一方、温度制御で同じ曲線を辿ると、ΔTe=22Kの頂点を越えても遷移沸騰域を連続的に下り、面温度を上げているのに熱流束q''が約1.1MW/m²から減少に転じます。この非単調性と、制御方式によるヒステリシスの有無が沸騰曲線の核心です</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -565,6 +847,16 @@ compute();
 <li>表面粗さ・材質（ステンレス鋼Ra=3.2μm vs 炭素鋼Ra=0.8μm）で核沸騰の開始温度差が5～15℃変動。機器仕様確認が必須です</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983372?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983372.09._SCMZZZZZZ_.jpg" alt="伝熱工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">伝熱工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

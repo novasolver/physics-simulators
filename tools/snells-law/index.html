@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "スネルの法則シミュレーター",
       "description": "スネルの法則による光の屈折と全反射を視覚化するWebシミュレーター。屈折率と入射角を操作し、屈折角・臨界角・全反射をリアルタイムで確認できる。",
       "url": "https://novasolver.jp/tools/snells-law.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["入射光・屈折光・反射光の光線図アニメーション","全反射の臨界角の自動計算","屈折角vs入射角のグラフ","空気・水・ガラス・ダイヤモンドのプリセット"],
       "keywords": "スネルの法則,光の屈折,全反射,臨界角,屈折率,光学,高校物理",
       "datePublished": "2026-04-09",
@@ -121,6 +121,34 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 Snell additions ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+.live-ro.tir .rv{color:#ff6b6b}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.ray-canvas-box{position:relative}
+#rayCanvas{background:#06101f;cursor:grab;touch-action:none}
+#rayCanvas.dragging{cursor:grabbing}
+.toggle-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.8rem;font-family:inherit;cursor:pointer;transition:all .2s}
+.toggle-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.84rem;font-family:inherit;font-weight:600;transition:background .2s}
+.btn:hover{background:#0056b3}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.ctrl-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.drag-hint{font-size:.72rem;color:var(--muted);margin-top:8px;display:flex;align-items:center;gap:6px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{transition:none}
+}
+/* end v2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/snells-law.html">
@@ -144,7 +172,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   <div class="hero-inner">
     <div class="hero-badge"><i class="fas fa-glasses"></i> 高校物理・光学</div>
     <h1>スネルの法則シミュレーター — 光の屈折・全反射</h1>
-    <p class="hero-sub">2媒質の屈折率と入射角を操作して光線図をリアルタイム描画。全反射の臨界角を自動計算し、屈折角−入射角グラフで屈折の特性を視覚化。</p>
+    <p class="hero-sub">2媒質の境界に当たる光線をドラッグして入射角を変え、屈折光・反射光がリアルタイムに曲がる様子を観察。波面の屈折オーバーレイ、全反射の臨界角、フレネル反射率も同時に可視化します。</p>
   </div>
 </div>
 
@@ -158,8 +186,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="preset-btn" onclick="setPreset(1,'diamond',this)">ダイヤ 2.42</button>
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">屈折率 n₁</span><div class="num-wrap"><input type="number" class="num-input" id="vN1" value="1.0" min="1.0" max="3.0" step="0.01" oninput="syncFromNum('sN1','vN1')"><span class="num-unit"></span></div></div>
-      <input type="range" id="sN1" min="1.0" max="3.0" step="0.01" value="1.0" oninput="syncToNum('sN1','vN1');_updateSliderSnell('N1',this);compute()">
+      <div class="param-label"><span class="param-name">屈折率 n₁</span><div class="num-wrap"><input type="number" class="num-input" id="vN1" value="1.0" min="1.0" max="3.0" step="0.01" oninput="syncNum('N1')"><span class="num-unit"></span></div></div>
+      <input type="range" id="sN1" min="1.0" max="3.0" step="0.01" value="1.0" oninput="onSlider('N1')" aria-label="媒質1の屈折率 n1">
     </div>
 
     <div class="panel-title">媒質2（下側）プリセット</div>
@@ -170,21 +198,58 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="preset-btn" onclick="setPreset(2,'diamond',this)">ダイヤ 2.42</button>
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">屈折率 n₂</span><div class="num-wrap"><input type="number" class="num-input" id="vN2" value="1.5" min="1.0" max="3.0" step="0.01" oninput="syncFromNum('sN2','vN2')"><span class="num-unit"></span></div></div>
-      <input type="range" id="sN2" min="1.0" max="3.0" step="0.01" value="1.5" oninput="syncToNum('sN2','vN2');_updateSliderSnell('N2',this);compute()">
+      <div class="param-label"><span class="param-name">屈折率 n₂</span><div class="num-wrap"><input type="number" class="num-input" id="vN2" value="1.5" min="1.0" max="3.0" step="0.01" oninput="syncNum('N2')"><span class="num-unit"></span></div></div>
+      <input type="range" id="sN2" min="1.0" max="3.0" step="0.01" value="1.5" oninput="onSlider('N2')" aria-label="媒質2の屈折率 n2">
     </div>
 
     <div class="param-group">
-      <div class="param-label"><span class="param-name">入射角 θ₁ (°)</span><div class="num-wrap"><input type="number" class="num-input" id="vTheta1" value="40" min="0" max="89" step="1" oninput="syncFromNum('sTheta1','vTheta1')"><span class="num-unit">°</span></div></div>
-      <input type="range" id="sTheta1" min="0" max="89" step="1" value="40" oninput="syncToNum('sTheta1','vTheta1');_updateSliderSnell('Theta1',this);compute()">
+      <div class="param-label"><span class="param-name">入射角 θ₁ (°)</span><div class="num-wrap"><input type="number" class="num-input" id="vTheta1" value="40" min="0" max="89" step="1" oninput="syncNum('Theta1')"><span class="num-unit">°</span></div></div>
+      <input type="range" id="sTheta1" min="0" max="89" step="1" value="40" oninput="onSlider('Theta1')" aria-label="入射角 シータ1 度">
     </div>
+
+    <div class="ctrl-row">
+      <button class="toggle-btn active" type="button" id="waveToggle" onclick="toggleWaves()"><i class="fas fa-water"></i> 波面 ON</button>
+      <button class="btn secondary" type="button" onclick="resetSim()"><i class="fas fa-redo"></i> リセット</button>
+    </div>
+    <div class="drag-hint"><i class="fas fa-hand-pointer"></i> 光線図の上半分をドラッグして入射角を変えられます</div>
 
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roT1">40°</div><div class="rl">入射角 θ₁</div></div>
+        <div class="live-ro" id="roT2card"><div class="rv" id="roT2">—</div><div class="rl">屈折角 θ₂</div></div>
+        <div class="live-ro" id="roTccard"><div class="rv" id="roTc">—</div><div class="rl">臨界角 θc</div></div>
+        <div class="live-ro"><div class="rv" id="roN">1.00→1.50</div><div class="rl">n₁ → n₂</div></div>
+        <div class="live-ro"><div class="rv" id="roR">—</div><div class="rl">反射率 R</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 光線図（ドラッグで入射角を変更）</div>
+      <div class="ray-canvas-box">
+        <canvas id="rayCanvas" width="760" height="360" tabindex="0" role="img" aria-label="スネルの法則の光線図。入射光・屈折光・反射光と波面を表示します。"></canvas>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#f39c12"></i>入射光</span>
+        <span><i class="swatch" style="background:#e74c3c"></i>反射光</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>屈折光</span>
+        <span><i class="swatch" style="background:#2ecc71"></i>臨界角 θc</span>
+        <span id="waveLeg"><i class="swatch" style="background:#9b8cff"></i>波面</span>
+      </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="svTheta2">—</div><div class="sl">屈折角 θ₂</div></div>
@@ -194,258 +259,428 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 光線</div><canvas id="rayCanvas" width="760" height="320"></canvas></div>
-    <div class="chart-gap"></div>
     <div class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 曲線</div><canvas id="curveCanvas" width="760" height="240"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 屈折角 vs 入射角の曲線</div><canvas id="curveCanvas" width="760" height="240"></canvas></div>
     </div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
       スネルの法則: $n_1 \sin\theta_1 = n_2 \sin\theta_2$<br><br>
       屈折角: $\theta_2 = \arcsin\!\left(\dfrac{n_1}{n_2}\sin\theta_1\right)$<br><br>
-      臨界角 $(n_1 \gt  n_2)$: $\theta_c = \arcsin\!\left(\dfrac{n_2}{n_1}\right)$
-    
+      臨界角 $(n_1 \gt  n_2)$: $\theta_c = \arcsin\!\left(\dfrac{n_2}{n_1}\right)$<br><br>
+      <span style="font-size:.8rem;color:var(--muted)">検証例：空気→水（1→1.33）で θ₁=45° のとき θ₂≈32.1°。ダイヤ→空気の臨界角 θc≈24.4°。</span>
+
 </div>
 </div>
 </div>
 
 <script>
+"use strict";
+/* ===== Snell's Law v2 simulator ===== */
 const presets = { air: 1.0, water: 1.33, glass: 1.5, diamond: 2.42 };
-let st ={ N1: 1.0, N2: 1.5, Theta1: 40 };
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+let st = { N1: 1.0, N2: 1.5, Theta1: 40 };
+let showWaves = true;
+
+const T = {
+  medium1: '媒質1', medium2: '媒質2',
+  incident: '入射光', reflected: '反射光', refracted: '屈折光',
+  tir: '全反射 (TIR)', tirShort: '全反射', refraction: '屈折',
+  normal: '法線', boundary: '境界面',
+  annRefr: '屈折: n₁sinθ₁ = n₂sinθ₂',
+  annTIR: '全反射: θ₁ > θc',
+  annDense: '密→疎で屈折角大',
+  annRare: '疎→密で屈折角小',
+  refrAxis: '屈折角 θ₂ (°)', incAxis: '入射角 θ₁ (°)',
+  grab: 'ドラッグ', drag: 'ここを掴んで角度変更'
+};
+
+function el(id){ return document.getElementById(id); }
+
+function updateSliderFill(id){
+  const e = el('s'+id);
+  const min = parseFloat(e.min), max = parseFloat(e.max);
+  const pct = (parseFloat(e.value) - min) / (max - min) * 100;
+  e.style.setProperty('--pct', pct + '%');
+}
+
+function onSlider(name){
+  const v = parseFloat(el('s'+name).value);
+  st[name] = v;
+  el('v'+name).value = (name === 'Theta1') ? v.toFixed(0) : v.toFixed(2);
+  if (name !== 'Theta1') clearPresetActive(name);
+  updateSliderFill(name);
+  compute();
+}
+
+function syncNum(name){
+  let v = parseFloat(el('v'+name).value);
+  if (isNaN(v)) return;
+  const s = el('s'+name);
+  v = Math.min(parseFloat(s.max), Math.max(parseFloat(s.min), v));
+  st[name] = v;
+  s.value = v;
+  if (name !== 'Theta1') clearPresetActive(name);
+  updateSliderFill(name);
+  compute();
+}
+
+function clearPresetActive(name){
+  const medium = name === 'N1' ? 1 : 2;
+  const rows = document.querySelectorAll('.preset-row');
+  const row = rows[medium-1];
+  if (row) row.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', Math.abs(presets[btnName(b)] - st[name]) < 1e-9);
+  });
+}
+function btnName(btn){
+  const m = btn.getAttribute('onclick').match(/'(\w+)'/);
+  return m ? m[1] : '';
+}
 
 function setPreset(medium, name, btn){
   const n = presets[name];
   const key = 'N' + medium;
-  const slider = document.getElementById('s' + key);
-  slider.value = n;
-  const pct = (n - 1.0) / (3.0 - 1.0) * 100;
-  slider.style.setProperty('--pct', pct + '%');
-  document.getElementById('v' + key).textContent = n.toFixed(2);
   st[key] = n;
-  // Update active preset buttons for this medium
+  el('s'+key).value = n;
+  el('v'+key).value = n.toFixed(2);
+  updateSliderFill(key);
   const btns = btn.parentElement.querySelectorAll('.preset-btn');
   btns.forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   compute();
-}function _updateSliderSnell(name, el){
-  const v = parseFloat(el.value);
-  const pct = (v - parseFloat(el.min)) / (parseFloat(el.max) - parseFloat(el.min)) * 100;
-  el.style.setProperty('--pct', pct + '%');
-  st[name] = v;
-  if (name === 'Theta1') {
-    document.getElementById('vTheta1').value = v.toFixed(0);
-  }else{
-    document.getElementById('v' + name).textContent = v.toFixed(2);
-    // Clear preset active state for this medium
-    const mid = name === 'N1' ? 1 : 2;
-  }
+}
+
+function toggleWaves(){
+  showWaves = !showWaves;
+  const b = el('waveToggle');
+  b.classList.toggle('active', showWaves);
+  b.innerHTML = showWaves ? '<i class="fas fa-water"></i> 波面 ON' : '<i class="fas fa-water"></i> 波面 OFF';
+  el('waveLeg').style.display = showWaves ? '' : 'none';
   compute();
-}function compute(){
+}
+
+function resetSim(){
+  st = { N1: 1.0, N2: 1.5, Theta1: 40 };
+  el('sN1').value = 1.0; el('vN1').value = '1.00';
+  el('sN2').value = 1.5; el('vN2').value = '1.50';
+  el('sTheta1').value = 40; el('vTheta1').value = '40';
+  ['N1','N2','Theta1'].forEach(updateSliderFill);
+  document.querySelectorAll('.preset-row').forEach((row,i)=>{
+    const target = i===0 ? 1.0 : 1.5;
+    row.querySelectorAll('.preset-btn').forEach(b=>{
+      b.classList.toggle('active', Math.abs(presets[btnName(b)] - target) < 1e-9);
+    });
+  });
+  compute();
+}
+
+/* ===== Physics ===== */
+function refractAngle(n1, n2, t1Deg){
+  const s = (n1/n2) * Math.sin(t1Deg*D2R);
+  if (s > 1) return null;
+  return Math.asin(s) * R2D;
+}
+function criticalAngle(n1, n2){
+  return n1 > n2 ? Math.asin(n2/n1) * R2D : null;
+}
+// Unpolarised Fresnel reflectance
+function reflectance(n1, n2, t1Deg){
+  const ti = t1Deg*D2R;
+  const s = (n1/n2) * Math.sin(ti);
+  if (s > 1) return 1; // TIR
+  const tt = Math.asin(s);
+  const cti = Math.cos(ti), ctt = Math.cos(tt);
+  const rs = ((n1*cti - n2*ctt)/(n1*cti + n2*ctt));
+  const rp = ((n1*ctt - n2*cti)/(n1*ctt + n2*cti));
+  return (rs*rs + rp*rp) / 2;
+}
+
+function compute(){
   const { N1, N2, Theta1 } = st;
-  const ratio = N1 / N2;
-  const sinTheta2 = ratio * Math.sin(Theta1 * Math.PI / 180);
-  const isTIR = sinTheta2 > 1.0;
-  const theta2 = isTIR ? null : Math.asin(sinTheta2) * 180 / Math.PI;
-  const critAngle = N1 > N2 ? Math.asin(N2 / N1) * 180 / Math.PI : null;
+  const theta2 = refractAngle(N1, N2, Theta1);
+  const isTIR = theta2 === null;
+  const critAngle = criticalAngle(N1, N2);
+  const R = reflectance(N1, N2, Theta1);
 
-  document.getElementById('svTheta2').textContent = isTIR ? '全反射' : theta2.toFixed(1) + '°';
-  document.getElementById('svThetaC').textContent = critAngle !== null ? critAngle.toFixed(1) + '°' : '—';
-  document.getElementById('svTIR').textContent = isTIR ? '全反射' : '屈折';
-  document.getElementById('svRatio').textContent = (N2 / N1).toFixed(3);
+  el('svTheta2').textContent = isTIR ? T.tirShort : theta2.toFixed(1) + '°';
+  el('svThetaC').textContent = critAngle !== null ? critAngle.toFixed(1) + '°' : '—';
+  el('svTIR').textContent = isTIR ? T.tirShort : T.refraction;
+  el('svRatio').textContent = (N2 / N1).toFixed(3);
+  el('scTIR').classList.toggle('tir', isTIR);
 
-  const tirCard = document.getElementById('scTIR');
-  tirCard.classList.toggle('tir', isTIR);
+  el('roT1').textContent = Theta1.toFixed(0) + '°';
+  el('roT2').textContent = isTIR ? T.tirShort : theta2.toFixed(1) + '°';
+  el('roT2card').classList.toggle('tir', isTIR);
+  el('roTc').textContent = critAngle !== null ? critAngle.toFixed(1) + '°' : '—';
+  el('roTccard').classList.toggle('tir', isTIR && critAngle !== null);
+  el('roN').textContent = N1.toFixed(2) + '→' + N2.toFixed(2);
+  el('roR').textContent = (R*100).toFixed(1) + '%';
 
-  drawRay(N1, N2, Theta1, isTIR ? null : theta2, critAngle);
+  drawRay(N1, N2, Theta1, theta2, critAngle, R);
   drawCurve(N1, N2, critAngle);
-}function drawRay(N1, N2, theta1Deg, theta2Deg, critAngle){
-  const canvas = document.getElementById('rayCanvas');
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.clientWidth || 760, H = 320;
+}
+
+/* ===== Ray diagram (HiDPI) ===== */
+let rayGeom = null;
+function drawRay(N1, N2, theta1Deg, theta2Deg, critAngle, R){
+  const canvas = el('rayCanvas');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const W = canvas.clientWidth || 760, H = 360;
   canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.height = H + 'px';
   const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0, 0, W, H);
 
-  const BY = H / 2; // boundary y
+  const BY = H * 0.5;
+  const O = { x: W/2, y: BY };
+  const rayLen = Math.min(150, W*0.22);
+  rayGeom = { O, BY, rayLen, W, H };
 
-  // Medium backgrounds
-  ctx.fillStyle = '#e8f4fd';
-  ctx.fillRect(0, 0, W, BY);
-  ctx.fillStyle = '#d4eaf7';
-  ctx.fillRect(0, BY, W, H - BY);
+  // Medium backgrounds (denser = darker blue)
+  const shade = n => { const f = Math.min(1,(n-1)/1.6); return `rgba(${Math.round(20-10*f)},${Math.round(70-30*f)},${Math.round(130-30*f)},${0.18+0.30*f})`; };
+  ctx.fillStyle = shade(N1); ctx.fillRect(0,0,W,BY);
+  ctx.fillStyle = shade(N2); ctx.fillRect(0,BY,W,H-BY);
+
+  const t1 = theta1Deg * D2R;
+
+  // Wavefronts (optional overlay) - drawn before rays so rays sit on top
+  if (showWaves){
+    drawWaves(ctx, O, t1, N1, N2, theta1Deg, theta2Deg, rayLen, W, H, BY);
+  }
+
+  // Boundary
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(0,BY); ctx.lineTo(W,BY); ctx.stroke(); ctx.setLineDash([]);
+  // Normal
+  ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(O.x, BY-130); ctx.lineTo(O.x, BY+130); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '10px Roboto Mono'; ctx.textAlign='center';
+  ctx.fillText(T.normal, O.x, 12);
 
   // Medium labels
-  ctx.font = 'bold 13px Noto Sans JP, sans-serif';
-  ctx.fillStyle = '#007BFF';
-  ctx.textAlign = 'left';
-  ctx.fillText('媒質1  n₁ = ' + N1.toFixed(2), 12, 22);
-  ctx.fillText('媒質2  n₂ = ' + N2.toFixed(2), 12, BY + 22);
+  ctx.font = 'bold 12px Noto Sans JP, sans-serif'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#cfe6ff'; ctx.fillText(T.medium1 + '  n₁ = ' + N1.toFixed(2), 12, 22);
+  ctx.fillStyle = '#cfe6ff'; ctx.fillText(T.medium2 + '  n₂ = ' + N2.toFixed(2), 12, BY + 24);
 
-  // Boundary line
-  ctx.strokeStyle = '#adb5bd';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath(); ctx.moveTo(0, BY); ctx.lineTo(W, BY); ctx.stroke();
-  ctx.setLineDash([]);
+  // Critical-angle reference ray (in medium 1, on incidence side) when relevant
+  if (critAngle !== null){
+    const tc = critAngle * D2R;
+    ctx.strokeStyle = 'rgba(46,204,113,.85)'; ctx.lineWidth = 1.4; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(O.x, O.y);
+    ctx.lineTo(O.x - rayLen*Math.sin(tc), O.y - rayLen*Math.cos(tc)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#2ecc71'; ctx.font = '11px Roboto Mono'; ctx.textAlign='right';
+    ctx.fillText('θc=' + critAngle.toFixed(1) + '°', O.x - rayLen*Math.sin(tc) - 4, O.y - rayLen*Math.cos(tc));
+  }
 
-  // Normal (dashed vertical)
-  ctx.strokeStyle = '#6c757d';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath(); ctx.moveTo(W / 2, BY - 110); ctx.lineTo(W / 2, BY + 110); ctx.stroke();
-  ctx.setLineDash([]);
+  // Incident ray
+  const incX = O.x - rayLen*Math.sin(t1), incY = O.y - rayLen*Math.cos(t1);
+  drawRayLine(ctx, incX, incY, O.x, O.y, '#f39c12', 3, true);
+  // grab handle at incident origin
+  ctx.beginPath(); ctx.arc(incX, incY, 6, 0, 7); ctx.fillStyle = '#ffd54a'; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 1; ctx.stroke();
 
-  const O = { x: W / 2, y: BY };
-  const rayLen = 130;
-  const t1 = theta1Deg * Math.PI / 180;
-
-  // Incident ray (from upper-left toward O)
-  const incX = O.x - rayLen * Math.sin(t1);
-  const incY = O.y - rayLen * Math.cos(t1);
-  ctx.strokeStyle = '#f39c12';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.moveTo(incX, incY); ctx.lineTo(O.x, O.y); ctx.stroke();
-  // Arrow head
-  ctx.fillStyle = '#f39c12';
-  const ang1 = Math.atan2(O.y - incY, O.x - incX);
-  ctx.beginPath();
-  ctx.moveTo(O.x, O.y);
-  ctx.lineTo(O.x - 12 * Math.cos(ang1 - 0.35), O.y - 12 * Math.sin(ang1 - 0.35));
-  ctx.lineTo(O.x - 12 * Math.cos(ang1 + 0.35), O.y - 12 * Math.sin(ang1 + 0.35));
-  ctx.fill();
-
-  // Reflected ray (angle of reflection = theta1)
-  const refX = O.x + rayLen * Math.sin(t1);
-  const refY = O.y - rayLen * Math.cos(t1);
-  ctx.strokeStyle = '#e74c3c';
-  ctx.lineWidth = theta2Deg === null ? 2.5 : 1.5;
-  ctx.globalAlpha = theta2Deg === null ? 1.0 : 0.5;
-  ctx.beginPath(); ctx.moveTo(O.x, O.y); ctx.lineTo(refX, refY); ctx.stroke();
+  // Reflected ray (always; brighter under TIR)
+  const isTIR = theta2Deg === null;
+  const refX = O.x + rayLen*Math.sin(t1), refY = O.y - rayLen*Math.cos(t1);
+  ctx.globalAlpha = isTIR ? 1 : 0.35 + 0.6*R;
+  drawRayLine(ctx, O.x, O.y, refX, refY, '#e74c3c', isTIR ? 3 : 2, true);
   ctx.globalAlpha = 1;
 
-  // Refracted ray (or TIR label)
-  if (theta2Deg !== null){
-    const t2 = theta2Deg * Math.PI / 180;
-    const refrX = O.x + rayLen * Math.sin(t2);
-    const refrY = O.y + rayLen * Math.cos(t2);
-    ctx.strokeStyle = '#007BFF';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.moveTo(O.x, O.y); ctx.lineTo(refrX, refrY); ctx.stroke();
-    ctx.fillStyle = '#007BFF';
-    ctx.font = '12px Roboto Mono';
-    ctx.textAlign = 'left';
-    ctx.fillText('θ₂ = ' + theta2Deg.toFixed(1) + '°', refrX + 6, refrY);
-  }else{
-    ctx.fillStyle = '#e74c3c';
-    ctx.font = 'bold 14px Noto Sans JP';
-    ctx.textAlign = 'center';
-    ctx.fillText('全反射 (TIR)', W / 2, BY + 40);
-  }// Angle labels
-  ctx.fillStyle = '#f39c12';
-  ctx.font = '12px Roboto Mono';
-  ctx.textAlign = 'right';
-  ctx.fillText('θ₁=' + theta1Deg + '°', O.x - 8, O.y - 50);
-
-  // Critical angle arc (if applicable)
-  if (critAngle !== null){
-    ctx.strokeStyle = '#2ecc71';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    const tc = critAngle * Math.PI / 180;
-    ctx.beginPath(); ctx.moveTo(O.x + rayLen * Math.sin(tc), O.y + rayLen * Math.cos(tc));
-    ctx.lineTo(O.x, O.y);
-    ctx.setLineDash([]);
-    ctx.stroke();
-    ctx.fillStyle = '#2ecc71';
-    ctx.font = '11px Roboto Mono';
-    ctx.textAlign = 'left';
-    ctx.fillText('θc=' + critAngle.toFixed(1) + '°', O.x + rayLen * Math.sin(tc) + 6, O.y + rayLen * Math.cos(tc) - 4);
-  }// Legend
-  const legendItems = [{ color: '#f39c12', label: '入射光' },{ color: '#e74c3c', label: '反射光' },{ color: '#007BFF', label: '屈折光' }];
-  let lx = W - 12;
-  ctx.font = '11px Noto Sans JP';
-  for (let i = legendItems.length - 1; i >= 0; i--){
-    const item = legendItems[i];
-    ctx.fillStyle = item.color;
-    const tw = ctx.measureText(item.label).width;
-    ctx.fillText(item.label, lx - tw, 16);
-    ctx.strokeStyle = item.color; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(lx - tw - 22, 12); ctx.lineTo(lx - tw - 8, 12); ctx.stroke();
-    lx -= tw + 30;
+  // Refracted ray or TIR
+  if (!isTIR){
+    const t2 = theta2Deg * D2R;
+    const refrX = O.x + rayLen*Math.sin(t2), refrY = O.y + rayLen*Math.cos(t2);
+    drawRayLine(ctx, O.x, O.y, refrX, refrY, '#00B4D8', 3, true);
+    ctx.fillStyle = '#7fdcff'; ctx.font = '12px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText('θ₂=' + theta2Deg.toFixed(1) + '°', refrX + 6, refrY + 4);
+  } else {
+    ctx.fillStyle = '#ff6b6b'; ctx.font = 'bold 14px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText(T.tir, O.x, BY + 50);
   }
-}function drawCurve(N1, N2, critAngle){
-  const canvas = document.getElementById('curveCanvas');
-  const dpr = window.devicePixelRatio || 1;
+
+  // θ1 label
+  ctx.fillStyle = '#ffd54a'; ctx.font = '12px Roboto Mono'; ctx.textAlign='right';
+  ctx.fillText('θ₁=' + theta1Deg.toFixed(0) + '°', O.x - 8, O.y - 54);
+
+  // Integrated annotation
+  let ann;
+  if (isTIR) ann = T.annTIR;
+  else if (N1 > N2) ann = T.annDense;
+  else if (N1 < N2) ann = T.annRare;
+  else ann = T.annRefr;
+  drawAnnotation(ctx, ann, W/2, H - 10, isTIR ? '#ff6b6b' : '#9b8cff');
+}
+
+function drawRayLine(ctx, x0,y0,x1,y1,color,width,arrow){
+  ctx.strokeStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+  if (arrow){
+    ctx.fillStyle = color;
+    const ang = Math.atan2(y1-y0, x1-x0), h = 9;
+    ctx.beginPath(); ctx.moveTo(x1,y1);
+    ctx.lineTo(x1 - h*Math.cos(ang-0.4), y1 - h*Math.sin(ang-0.4));
+    ctx.lineTo(x1 - h*Math.cos(ang+0.4), y1 - h*Math.sin(ang+0.4));
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawAnnotation(ctx, text, x, y, color){
+  ctx.font = 'bold 12px Noto Sans JP'; ctx.textAlign='center';
+  const w = ctx.measureText(text).width, pad = 7;
+  ctx.fillStyle = 'rgba(6,16,31,.82)';
+  const bx = x - w/2 - pad, by = y - 15;
+  if (ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, by, w+pad*2, 19, 5); ctx.fill(); }
+  else ctx.fillRect(bx, by, w+pad*2, 19);
+  ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+
+// Wavefronts: lines perpendicular to ray direction, spacing ∝ 1/n (wavelength shrinks in denser medium)
+function drawWaves(ctx, O, t1, N1, N2, theta1Deg, theta2Deg, rayLen, W, H, BY){
+  const baseLambda = 16;
+  ctx.save();
+  ctx.globalAlpha = 0.55; ctx.strokeStyle = '#9b8cff'; ctx.lineWidth = 1.4;
+  // incident direction unit
+  const di = { x: Math.sin(t1), y: Math.cos(t1) };
+  const lam1 = baseLambda / N1;
+  const halfLen = 46;
+  // perpendicular to incident ray
+  const pi = { x: di.y, y: -di.x };
+  for (let k = 1; k <= 7; k++){
+    const cx = O.x - di.x * lam1 * k, cy = O.y - di.y * lam1 * k;
+    if (cy < 4) break;
+    ctx.beginPath();
+    ctx.moveTo(cx - pi.x*halfLen, cy - pi.y*halfLen);
+    ctx.lineTo(cx + pi.x*halfLen, cy + pi.y*halfLen);
+    ctx.stroke();
+  }
+  // refracted side
+  if (theta2Deg !== null){
+    const t2 = theta2Deg * D2R;
+    const dr = { x: Math.sin(t2), y: Math.cos(t2) };
+    const lam2 = baseLambda / N2;
+    const pr = { x: dr.y, y: -dr.x };
+    for (let k = 1; k <= 7; k++){
+      const cx = O.x + dr.x * lam2 * k, cy = O.y + dr.y * lam2 * k;
+      if (cy > H-4) break;
+      ctx.beginPath();
+      ctx.moveTo(cx - pr.x*halfLen, cy - pr.y*halfLen);
+      ctx.lineTo(cx + pr.x*halfLen, cy + pr.y*halfLen);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/* ===== θ2 vs θ1 curve ===== */
+function drawCurve(N1, N2, critAngle){
+  const canvas = el('curveCanvas');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   const W = canvas.clientWidth || 760, H = 240;
   canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.height = H + 'px';
   const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,W,H);
+  const PAD = { l:50, r:20, t:20, b:38 };
+  const pw = W-PAD.l-PAD.r, ph = H-PAD.t-PAD.b;
+  const toX = d => PAD.l + d/89*pw, toY = d => PAD.t + (1-d/90)*ph;
 
-  const PAD = { l: 50, r: 20, t: 20, b: 38 };
-  const pw = W - PAD.l - PAD.r, ph = H - PAD.t - PAD.b;
-
-  function toX(deg){ return PAD.l + deg / 89 * pw; }function toY(deg){ return PAD.t + (1 - deg / 90) * ph; }// Grid
-  ctx.strokeStyle = '#e8ecf0'; ctx.lineWidth = 1;
-  for (let v = 0; v <= 90; v += 15){
-    ctx.beginPath(); ctx.moveTo(PAD.l, toY(v)); ctx.lineTo(PAD.l + pw, toY(v)); ctx.stroke();
-    ctx.fillStyle = '#6c757d'; ctx.font = '10px Roboto Mono'; ctx.textAlign = 'right';
-    ctx.fillText(v + '°', PAD.l - 4, toY(v) + 4);
-    ctx.beginPath(); ctx.moveTo(toX(v), PAD.t); ctx.lineTo(toX(v), PAD.t + ph); ctx.stroke();
-    ctx.textAlign = 'center';
-    ctx.fillText(v + '°', toX(v), PAD.t + ph + 16);
-  }// Critical angle marker
+  ctx.strokeStyle = '#e8ecf0'; ctx.lineWidth = 1; ctx.font = '10px Roboto Mono';
+  for (let v=0; v<=90; v+=15){
+    ctx.beginPath(); ctx.moveTo(PAD.l,toY(v)); ctx.lineTo(PAD.l+pw,toY(v)); ctx.stroke();
+    ctx.fillStyle='#6c757d'; ctx.textAlign='right'; ctx.fillText(v+'°', PAD.l-4, toY(v)+4);
+    ctx.beginPath(); ctx.moveTo(toX(v),PAD.t); ctx.lineTo(toX(v),PAD.t+ph); ctx.stroke();
+    ctx.textAlign='center'; ctx.fillText(v+'°', toX(v), PAD.t+ph+16);
+  }
   if (critAngle !== null){
     const xc = toX(critAngle);
-    ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(xc, PAD.t); ctx.lineTo(xc, PAD.t + ph); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 10px Roboto Mono'; ctx.textAlign = 'center';
-    ctx.fillText('θc=' + critAngle.toFixed(1) + '°', xc, PAD.t + 12);
-  }// Curve: theta2 vs theta1
-  ctx.strokeStyle = '#007BFF'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
-  ctx.beginPath();
-  let first = true;
-  for (let t1Deg = 0; t1Deg <= 89; t1Deg += 0.5){
-    const sinT2 = (N1 / N2) * Math.sin(t1Deg * Math.PI / 180);
-    if (sinT2 > 1) break;
-    const t2Deg = Math.asin(sinT2) * 180 / Math.PI;
-    const x = toX(t1Deg), y = toY(t2Deg);
-    if (first) { ctx.moveTo(x, y); first = false; }else{ ctx.lineTo(x, y); }
-  }ctx.stroke();
-
-  // Current point
-  const curSin = (N1 / N2) * Math.sin(st.Theta1 * Math.PI / 180);
-  if (curSin <= 1){
-    const curT2 = Math.asin(curSin) * 180 / Math.PI;
-    ctx.fillStyle = '#e74c3c';
-    ctx.beginPath(); ctx.arc(toX(st.Theta1), toY(curT2), 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle='#2ecc71'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(xc,PAD.t); ctx.lineTo(xc,PAD.t+ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#2ecc71'; ctx.font='bold 10px Roboto Mono'; ctx.textAlign='center';
+    ctx.fillText('θc='+critAngle.toFixed(1)+'°', xc, PAD.t+12);
   }
+  ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.beginPath();
+  let first = true;
+  for (let d=0; d<=89; d+=0.5){
+    const s=(N1/N2)*Math.sin(d*D2R); if (s>1) break;
+    const t2=Math.asin(s)*R2D, x=toX(d), y=toY(t2);
+    if (first){ ctx.moveTo(x,y); first=false; } else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  const curSin=(N1/N2)*Math.sin(st.Theta1*D2R);
+  if (curSin<=1){
+    const ct2=Math.asin(curSin)*R2D;
+    ctx.fillStyle='#e74c3c'; ctx.beginPath(); ctx.arc(toX(st.Theta1),toY(ct2),5,0,7); ctx.fill();
+  }
+  ctx.save(); ctx.translate(13,PAD.t+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.font='11px Noto Sans JP'; ctx.fillStyle='#555';
+  ctx.fillText(T.refrAxis, 0, 0); ctx.restore();
+  ctx.textAlign='center'; ctx.font='11px Noto Sans JP'; ctx.fillStyle='#555';
+  ctx.fillText(T.incAxis, PAD.l+pw/2, H-4);
+  ctx.strokeStyle='#dee2e6'; ctx.lineWidth=1; ctx.strokeRect(PAD.l,PAD.t,pw,ph);
+}
 
-  // Axis labels
-  ctx.save(); ctx.translate(13, PAD.t + ph / 2); ctx.rotate(-Math.PI / 2);
-  ctx.textAlign = 'center'; ctx.font = '11px Noto Sans JP'; ctx.fillStyle = '#555';
-  ctx.fillText('屈折角 θ₂ (°)', 0, 0); ctx.restore();
-  ctx.textAlign = 'center'; ctx.font = '11px Noto Sans JP'; ctx.fillStyle = '#555';
-  ctx.fillText('入射角 θ₁ (°)', PAD.l + pw / 2, H - 4);
+/* ===== Drag incident ray ===== */
+function pointerAngle(ev){
+  const canvas = el('rayCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+  const y = (ev.touches ? ev.touches[0].clientY : ev.clientY) - rect.top;
+  if (!rayGeom) return null;
+  const dx = x - rayGeom.O.x, dy = y - rayGeom.O.y;
+  // only top half (incidence side)
+  if (dy > 0) return null;
+  let ang = Math.atan2(Math.abs(dx), -dy) * R2D; // from normal
+  ang = Math.max(0, Math.min(89, ang));
+  return ang;
+}
+let dragging = false;
+function startDrag(ev){
+  const a = pointerAngle(ev);
+  if (a === null) return;
+  dragging = true;
+  el('rayCanvas').classList.add('dragging');
+  applyDragAngle(a);
+  ev.preventDefault();
+}
+function moveDrag(ev){
+  if (!dragging) return;
+  const a = pointerAngle(ev);
+  if (a === null) return;
+  applyDragAngle(a);
+  ev.preventDefault();
+}
+function endDrag(){ dragging = false; el('rayCanvas').classList.remove('dragging'); }
+function applyDragAngle(a){
+  st.Theta1 = Math.round(a);
+  el('sTheta1').value = st.Theta1;
+  el('vTheta1').value = st.Theta1.toFixed(0);
+  updateSliderFill('Theta1');
+  compute();
+}
 
-  ctx.strokeStyle = '#dee2e6'; ctx.lineWidth = 1;
-  ctx.strokeRect(PAD.l, PAD.t, pw, ph);
-}// Init sliders
-['sN1','sN2'].forEach(id =>{
-  const el = document.getElementById(id);
-  const v = parseFloat(el.value);
-  el.style.setProperty('--pct', ((v - 1.0) / 2.0 * 100) + '%');
-});
-document.getElementById('sTheta1').style.setProperty('--pct', (40 / 89 * 100) + '%');
-
-compute();
-window.addEventListener('resize', compute);
+/* ===== init ===== */
+(function init(){
+  ['N1','N2','Theta1'].forEach(updateSliderFill);
+  const rc = el('rayCanvas');
+  rc.addEventListener('mousedown', startDrag);
+  window.addEventListener('mousemove', moveDrag);
+  window.addEventListener('mouseup', endDrag);
+  rc.addEventListener('touchstart', startDrag, {passive:false});
+  rc.addEventListener('touchmove', moveDrag, {passive:false});
+  rc.addEventListener('touchend', endDrag);
+  rc.addEventListener('keydown', e=>{
+    if (e.key==='ArrowLeft'||e.key==='ArrowDown'){ st.Theta1=Math.max(0,st.Theta1-1); applyDragAngle(st.Theta1); e.preventDefault(); }
+    if (e.key==='ArrowRight'||e.key==='ArrowUp'){ st.Theta1=Math.min(89,st.Theta1+1); applyDragAngle(st.Theta1); e.preventDefault(); }
+  });
+  window.addEventListener('resize', compute);
+  compute();
+})();
 </script>
-
 
 </div>
 <section class="explanation">
@@ -455,22 +690,36 @@ window.addEventListener('resize', compute);
       <div class="bub">「スネルの法則」って何ですか？光が曲がるということですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大まかに言うと、光が水やガラスなど、違う物質に入るときに曲がる角度を決めるルールだよ。例えば、水の中にストローを入れると折れて見えるあの現象だ。このシミュレーターで、上の「屈折率 n₁」と「n₂」を変えてみると、光の曲がり方がどう変わるかすぐにわかるよ。</div>
+      <div class="bub">大まかに言うと、光が水やガラスなど、違う物質に入るときに曲がる角度を決めるルールだよ。例えば、水の中にストローを入れると折れて見えるあの現象だ。このシミュレーターで、上の「屈折率 n₁」と「n₂」を変えてみると、光の曲がり方がどう変わるかすぐにわかるよ。光線図の入射光をドラッグして角度を変えると、屈折光がリアルタイムで曲がるのも体感できる。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">え、そうなんですか！「全反射」って聞いたことがあります。それもこの法則で説明できるんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">その通り！光がガラス（密）から空気（疎）に出ようとするとき、ある角度を超えると、全部反射してしまう現象が全反射だ。シミュレーターで「n₁」をガラス（1.5）、「n₂」を空気（1.0）に設定して、「入射角 θ₁」のスライダーをゆっくり大きくしていくと、屈折光が消えて境界面でピカっと反射する瞬間が見えるはずだよ。それが臨界角だ。</div>
+      <div class="bub">その通り！光がガラス（密）から空気（疎）に出ようとするとき、ある角度を超えると、全部反射してしまう現象が全反射だ。シミュレーターで「n₁」をガラス（1.5）、「n₂」を空気（1.0）に設定して、入射光をゆっくりドラッグして角度を大きくしていくと、屈折光が消えて境界面でピカっと反射する瞬間が見えるはずだよ。緑の線が示す角度が臨界角だ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">ダイヤモンドがキラキラするのも関係あるんですか？プリセットにありますね。</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">鋭いね！ダイヤモンドの屈折率は約2.42と非常に高い。だから臨界角が小さく、内部に入った光がカット面で何度も全反射し、複雑に乱反射してキラキラ輝いて見えるんだ。プリセットから「ダイヤモンド」を選んで、入射角を変えてみると、すぐに全反射が起きるのが体感できるよ。</div>
+      <div class="bub">鋭いね！ダイヤモンドの屈折率は約2.42と非常に高い。だから臨界角が小さく、内部に入った光がカット面で何度も全反射し、複雑に乱反射してキラキラ輝いて見えるんだ。プリセットから「ダイヤモンド」を選んで、入射角を変えてみると、すぐに全反射が起きるのが体感できるよ。波面オーバーレイをONにすると、密な媒質ほど波の間隔（波長）が縮むのも見えるよ。</div>
     </div>
   </div>
-  <h2>よくある質問</h2>
+  <h2>スネルの法則と屈折率</h2>
+<div class="fblock">
+<p>光が屈折率の異なる媒質の境界を通るとき、入射角 $\theta_1$ と屈折角 $\theta_2$ は<strong>スネルの法則</strong>で結ばれます。</p>
+<p style="text-align:center">$n_1 \sin\theta_1 = n_2 \sin\theta_2, \qquad n = \dfrac{c}{v}$</p>
+<p>$n$ は<strong>屈折率</strong>で、真空中の光速 $c$ を媒質中の光速 $v$ で割った値です。屈折率の大きい媒質（密な媒質）に入ると光は法線側に曲がり（$\theta_2<\theta_1$）、小さい媒質に出ると法線から離れます。代表値は空気 $1.00$、水 $1.33$、ガラス $1.5$、ダイヤモンド $2.42$ です。</p>
+</div>
+
+<h2>全反射と臨界角</h2>
+<div class="fblock">
+<p>光が<strong>屈折率の大きい媒質から小さい媒質へ</strong>（$n_1>n_2$）進むとき、入射角を大きくすると屈折角が $90°$ に達します。この入射角が<strong>臨界角 $\theta_c$</strong> で、これを超えると光は境界で全て反射する<strong>全反射</strong>が起こります。</p>
+<p style="text-align:center">$\theta_c = \arcsin\!\left(\dfrac{n_2}{n_1}\right)$</p>
+<p>全反射は<strong>光ファイバー</strong>（コア内に光を閉じ込めて伝送）やプリズム、ダイヤモンドの輝きの原理です。水→空気の臨界角は約 $48.6°$、ガラス→空気では約 $41.8°$ です。本シミュレーターで入射角を変え、屈折・全反射の切り替わりを観察できます。</p>
+</div>
+
+<h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">全反射が起こる条件を教えてください。 <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -506,6 +755,9 @@ window.addEventListener('resize', compute);
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="snells-law.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -555,23 +807,33 @@ window.addEventListener('resize', compute);
 <ol>
 <li>媒質1の屈折率(vN1)を設定します。空気は1.0、水は1.33、ガラスは1.5を入力</li>
 <li>媒質2の屈折率(vN2)を設定します。例えば光が水からガラスに入射する場合は1.5を入力</li>
-<li>入射角(vTheta1)を0度から90度の範囲で変更し、リアルタイムで屈折角θ₂と臨界角θcの変化を観察</li>
+<li>入射角(vTheta1)を0度から90度の範囲で変更し、リアルタイムで屈折角θ₂と臨界角θcの変化を観察。光線図の入射光を直接ドラッグしても角度を変えられます</li>
 <li>全反射発生時は状態欄に「全反射」と表示され、屈折光は消滅します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>光ファイバーの結合損失設計を想定します。コア屈折率n₁=1.48、空気n₂=1.0の場合、臨界角θc=41.8度です。入射角を35度に設定するとスネルの法則n₁sinθ₁=n₂sinθ₂から、1.48×sin(35°)=1.0×sinθ₂により屈折角θ₂=59.1度となります。入射角を45度に上げると全反射が発生し、光はコア内に閉じ込められます。光学フィルターの設計時、BK7ガラス(n=1.517)とフッ化物ガラス(n=1.44)の界面では臨界角が約68.6度となり、斜入射時の分光特性を予測できます。</p>
+<p>光ファイバーの結合損失設計を想定します。コア屈折率n₁=1.48、空気n₂=1.0の場合、臨界角θc≈42.5度です。入射角を35度に設定するとスネルの法則n₁sinθ₁=n₂sinθ₂から、1.48×sin(35°)=1.0×sinθ₂により屈折角θ₂≈58.1度となります。入射角を45度に上げると全反射が発生し、光はコア内に閉じ込められます。光学フィルターの設計時、BK7ガラス(n=1.517)とフッ化物ガラス(n=1.44)の界面では臨界角が約71.7度となり、斜入射時の分光特性を予測できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>光学デバイス設計時、屈折率差が大きいほど臨界角は小さくなります。水晶(1.544)からエアギャップへの出射では臨界角40.1度以下に制限されるため、マイクロレンズアレイの配置を工夫する必要があります</li>
+<li>光学デバイス設計時、屈折率差が大きいほど臨界角は小さくなります。水晶(1.544)からエアギャップへの出射では臨界角約40.4度以下に制限されるため、マイクロレンズアレイの配置を工夫する必要があります</li>
 <li>波長依存性を考慮してください。分散ガラスBaF2は可視域1.47から近赤外1.44へ変化するため、同じ入射角でも波長により屈折角が異なります</li>
 <li>多層膜干渉フィルター設計では、各界面で数度の微小な角度ずれが位相応答に累積するため、スネルの法則による正確な追跡が必須です</li>
 <li>プリズム逃げ光設計で全反射を利用する場合、製造公差と温度膨張による屈折率変化で臨界角が±0.5度変動することを考慮してマージンを持たせます</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

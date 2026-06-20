@@ -41,7 +41,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "機械的利益・簡単な機械 計算ツール",
       "description": "てこ・滑車・斜面・ねじジャッキ・輪軸の機械的利益と効率をリアルタイム計算。摩擦係数を考慮した現実的な解析。",
       "url": "https://novasolver.jp/tools/mechanical-advantage.html",
@@ -51,7 +51,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["てこ（第1・2・3種）の機械的利益計算","滑車システムのMA計算","斜面・ねじジャッキ・輪軸の解析","摩擦係数を考慮した効率計算","Chart.jsによる荷重-力グラフ"],
       "keywords": "機械的利益,てこ,滑車,斜面,ねじジャッキ,輪軸,効率,摩擦,CAE,機械工学",
       "datePublished": "2026-04-09",
@@ -225,7 +225,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4274214591?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274214591.09._SCMZZZZZZ_.jpg" alt="土質力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">土質力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -253,8 +261,13 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
+(function(){
+"use strict";
 let currentMachine='lever';
 let forceChart=null,effChart=null;
+let lastMA=2,lastMAact=2,lastEff=1,lastW=1000,lastFin=500;
+let animPhase=0, animId=null, lastTs=0;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const theories={
   lever:{title:'てこの原理',content:'$$MA=\\frac{L_1}{L_2}$$力腕 $L_1$ を長くするほど少ない力で大きな抵抗を動かせます。仕事量は保存：$F_{in}\\cdot d_{in}=F_{out}\\cdot d_{out}$'},
@@ -272,11 +285,18 @@ function selectMachine(m){
   const th=theories[m];
   document.getElementById('theory-content').innerHTML=th.content;
   if(window.MathJax && typeof MathJax.typesetPromise === 'function') MathJax.typesetPromise([document.getElementById('theory-content')]);
+  animPhase=0;
   update();
-}function setPct(el){
+}
+window.selectMachine=selectMachine;
+
+function setPct(el){
   const pct=((el.value-el.min)/(el.max-el.min)*100).toFixed(1)+'%';
   el.style.setProperty('--pct',pct);
-}function getVal(id){ const e=document.getElementById(id); return e?parseFloat(e.value):0; }function calcMA(){
+}
+function getVal(id){ const e=document.getElementById(id); return e?parseFloat(e.value):0; }
+
+function calcMA(){
   const W=getVal('W');
   let MA=1,MAact=1,eff=1;
   if(currentMachine==='lever'){
@@ -302,7 +322,9 @@ function selectMachine(m){
     const Rw=getVal('R'),rax=getVal('r-ax');
     MA=Rw/Math.max(rax,0.001); MAact=MA; eff=1;
   }return{MA,MAact,eff,W,Fin:W/Math.max(MAact,0.001)};
-}function update(){
+}
+
+function update(){
   // update slider labels
   const sliders=['L1','L2','N','theta','mu-inc','lead','radius','mu-screw','R','r-ax','W'];
   sliders.forEach(id=>{
@@ -315,45 +337,69 @@ function selectMachine(m){
       else if(['L1','L2','R','r-ax'].includes(id)) vEl.textContent=v.toFixed(2);
       else if(id==='lead') vEl.textContent=v.toFixed(1);
       else vEl.textContent=v.toFixed(0);
-      setPct(el);
     }
+    setPct(el);
   });
 
-  const{MA,MAact,eff,W,Fin}=calcMA();
-  document.getElementById('stat-MA').textContent=MA.toFixed(2);
-  document.getElementById('stat-MAact').textContent=MAact.toFixed(2);
-  document.getElementById('stat-eff').textContent=(eff*100).toFixed(1)+'%';
-  document.getElementById('stat-Fin').textContent=Fin>=1000?(Fin/1000).toFixed(2)+'kN':Fin.toFixed(0)+'N';
+  const r=calcMA();
+  lastMA=r.MA; lastMAact=r.MAact; lastEff=r.eff; lastW=r.W; lastFin=r.Fin;
+  document.getElementById('stat-MA').textContent=r.MA.toFixed(2);
+  document.getElementById('stat-MAact').textContent=r.MAact.toFixed(2);
+  document.getElementById('stat-eff').textContent=(r.eff*100).toFixed(1)+'%';
+  document.getElementById('stat-Fin').textContent=r.Fin>=1000?(r.Fin/1000).toFixed(2)+'kN':r.Fin.toFixed(0)+'N';
 
-  drawMachine();
-  updateCharts(MA,MAact,eff);
-}/* ─── Drawing ─── */
-function drawMachine(){
+  updateCharts(r.MA,r.MAact,r.eff);
+  if(reduceMotion) drawMachine(); // single static frame
+}
+window.update=update;
+
+/* ─── HiDPI canvas setup ─── */
+const CH=260;
+function setupCanvas(){
   const canvas=document.getElementById('machineCanvas');
-  const ctx=canvas.getContext('2d');
   const W2=canvas.offsetWidth||600;
-  var __novaW = W2;
-  var __novaH = 260;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  ctx.clearRect(0,0,W2,260);
-  ctx.fillStyle='#f0f4f8'; ctx.fillRect(0,0,W2,260);
-  if(currentMachine==='lever') drawLever(ctx,W2);
-  else if(currentMachine==='pulley') drawPulley(ctx,W2);
-  else if(currentMachine==='inclined') drawInclined(ctx,W2);
-  else if(currentMachine==='screw') drawScrew(ctx,W2);
-  else drawWheel(ctx,W2);
-}function arrow(ctx,x1,y1,x2,y2,color,label){
+  const dpr=Math.min(window.devicePixelRatio||1,2.5);
+  canvas.style.width=W2+'px';
+  canvas.style.height=CH+'px';
+  canvas.width=Math.round(W2*dpr);
+  canvas.height=Math.round(CH*dpr);
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,W2};
+}
+
+function drawMachine(){
+  const {ctx,W2}=setupCanvas();
+  ctx.clearRect(0,0,W2,CH);
+  ctx.fillStyle='#f0f4f8'; ctx.fillRect(0,0,W2,CH);
+  // s: animation parameter 0..1 (effort stroke fraction). triangle wave for back-and-forth.
+  const tri=animPhase<0.5?animPhase*2:(1-animPhase)*2; // 0..1..0
+  if(currentMachine==='lever') drawLever(ctx,W2,tri);
+  else if(currentMachine==='pulley') drawPulley(ctx,W2,tri);
+  else if(currentMachine==='inclined') drawInclined(ctx,W2,tri);
+  else if(currentMachine==='screw') drawScrew(ctx,W2,tri);
+  else drawWheel(ctx,W2,tri);
+  // shared HUD: MA & work-conservation banner
+  drawHUD(ctx,W2);
+}
+
+function drawHUD(ctx,W2){
+  // force-magnitude legend bars: small effort vs big load
+  const fEff=lastFin, fLoad=lastW;
+  ctx.font='11px Roboto Mono,monospace'; ctx.textAlign='left';
+  ctx.fillStyle='#007BFF'; ctx.fillText('入力 F='+(fEff>=1000?(fEff/1000).toFixed(2)+'kN':fEff.toFixed(0)+'N'),10,CH-26);
+  ctx.fillStyle='#e67e22'; ctx.fillText('荷重 W='+(fLoad>=1000?(fLoad/1000).toFixed(2)+'kN':fLoad.toFixed(0)+'N'),10,CH-10);
+  ctx.textAlign='right'; ctx.fillStyle='#001F3F';
+  ctx.fillText('MA = '+lastMAact.toFixed(2),W2-10,CH-26);
+  ctx.fillStyle='#6c757d';
+  ctx.fillText('小さい力×長い距離 = 大きい力×短い距離',W2-10,CH-10);
+  ctx.textAlign='left';
+}
+
+function arrow(ctx,x1,y1,x2,y2,color,label){
   ctx.strokeStyle=color; ctx.lineWidth=3;
   ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-  const dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy),ux=dx/len,uy=dy/len;
+  const dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/len,uy=dy/len;
   ctx.fillStyle=color;
   ctx.beginPath();
   ctx.moveTo(x2,y2);
@@ -361,103 +407,177 @@ function drawMachine(){
   ctx.lineTo(x2-ux*12+uy*6,y2-uy*12-ux*6);
   ctx.closePath(); ctx.fill();
   if(label){ctx.fillStyle=color;ctx.font='bold 12px Roboto Mono,monospace';ctx.textAlign='center';ctx.fillText(label,x2+ux*16,y2+uy*16+4);}
-}function drawLever(ctx,W2){
-  const L1=getVal('L1'),L2=getVal('L2'),cy=180;
-  const beamLen=W2*0.75,cx=W2/2;
-  const total=L1+L2,frac=L1/total;
+  ctx.textAlign='left';
+}
+
+// effort moves big amplitude, load moves amplitude/MA (work conservation)
+function drawLever(ctx,W2,tri){
+  const L1=getVal('L1'),L2=getVal('L2');
+  const MA=Math.max(L1/L2,0.001);
+  const cls=parseInt(document.getElementById('leverClass').value);
+  const cy=140;
+  const beamLen=W2*0.74,cx=W2/2;
   const x0=cx-beamLen/2,x1=cx+beamLen/2;
+  // pivot position from arm ratio; effort at far end, load at other end
+  const total=L1+L2,frac=L1/total;
   const fulcrumX=x0+beamLen*frac;
-  const effortX=x0; const resistX=x1;
+  const effortX=x0, resistX=x1;
+  // effort end swings through a large angle; load end swings small angle (1/MA)
+  const maxSwing=0.32; // rad at effort end
+  const effortDrop=maxSwing*tri;             // effort goes DOWN to push
+  // angle of beam: rotate about fulcrum so effort side goes down
+  const ang=effortDrop*(effortX<fulcrumX?1:1);
+  // compute beam endpoints rotated about fulcrum
+  function rot(x){ const dx=x-fulcrumX; return {x:fulcrumX+dx*Math.cos(ang), y:cy + dx*Math.sin(ang)}; }
+  const pe=rot(effortX), pl=rot(resistX);
   // beam
   ctx.strokeStyle='#001F3F';ctx.lineWidth=7;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(x0,cy);ctx.lineTo(x1,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(pe.x,pe.y);ctx.lineTo(pl.x,pl.y);ctx.stroke();
   // fulcrum triangle
   ctx.fillStyle='#007BFF';
   ctx.beginPath();ctx.moveTo(fulcrumX,cy);ctx.lineTo(fulcrumX-16,cy+28);ctx.lineTo(fulcrumX+16,cy+28);ctx.closePath();ctx.fill();
-  ctx.strokeStyle='#007BFF';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(fulcrumX-22,cy+30);ctx.lineTo(fulcrumX+22,cy+30);ctx.stroke();
-  // effort (up)
-  arrow(ctx,effortX,cy-12,effortX,cy-55,'#007BFF','F↑');
-  // resistance (down)
-  arrow(ctx,resistX,cy+12,resistX,cy+55,'#e67e22','W↓');
-  ctx.fillStyle='#6c757d';ctx.font='12px sans-serif';ctx.textAlign='center';
-  ctx.fillText('MA = L₁/L₂ = '+(L1/L2).toFixed(2)+'  ('+['第1種','第2種','第3種'][parseInt(document.getElementById('leverClass').value)-1]+')',W2/2,22);
-}function drawPulley(ctx,W2){
+  // load block (big) on load end
+  ctx.fillStyle='#e67e22';ctx.fillRect(pl.x-18,pl.y-34,36,30);
+  ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillText('W',pl.x,pl.y-13);
+  // effort hand (small) - downward push proportional to small force
+  arrow(ctx,pe.x,pe.y-46,pe.x,pe.y-10,'#007BFF','F');
+  // load lifts up (output arrow)
+  arrow(ctx,pl.x,pl.y-38,pl.x,pl.y-70,'#e67e22','');
+  // arm length labels
+  ctx.fillStyle='#6c757d';ctx.font='11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('L₁='+L1.toFixed(1)+'m',(pe.x+fulcrumX)/2,cy+50);
+  ctx.fillText('L₂='+L2.toFixed(1)+'m',(pl.x+fulcrumX)/2,cy+50);
+  ctx.fillStyle='#001F3F';ctx.font='bold 12px sans-serif';
+  ctx.fillText('てこ '+(['第1種','第2種','第3種'][cls-1])+' — MA=L₁/L₂='+MA.toFixed(2),W2/2,22);
+}
+
+function drawPulley(ctx,W2,tri){
   const N=parseInt(getVal('N'));
-  ctx.fillStyle='#001F3F';ctx.fillRect(0,35,W2,8);
-  for(let i=0;i<10;i++){ctx.strokeStyle='#555';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(i*W2/9,35);ctx.lineTo(i*W2/9-12,28);ctx.stroke();}const gap=(W2-80)/(N+1);
+  const MA=2*N;
+  const stroke=64;                 // pixels the rope-end (effort) travels
+  const lift=stroke/MA;            // load travels stroke/MA (work conservation)
+  ctx.fillStyle='#001F3F';ctx.fillRect(0,30,W2,8);
+  for(let i=0;i<10;i++){ctx.strokeStyle='#555';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(i*W2/9,30);ctx.lineTo(i*W2/9-12,23);ctx.stroke();}
+  const gap=(W2-100)/(N+1);
+  const blockTop=150 - lift*tri;   // movable block rises as effort pulls
   for(let i=0;i<N;i++){
-    const px=60+(i+1)*gap,py=90+(i%2)*50,r=22;
+    const px=70+(i+1)*gap, py=blockTop+22, r=18;
     ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);
     ctx.strokeStyle='#007BFF';ctx.lineWidth=3;ctx.stroke();
     ctx.fillStyle='rgba(0,123,255,.12)';ctx.fill();
-    ctx.fillStyle='#007BFF';ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#007BFF';ctx.beginPath();ctx.arc(px,py,4,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle='#888';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(px-r,py);ctx.lineTo(px-r,40);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(px+r,py);ctx.lineTo(px+r,py+50);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(px-r,py);ctx.lineTo(px-r,38);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(px+r,py);ctx.lineTo(px+r,38);ctx.stroke();
   }
-  // load block
-  const lx=W2/2;
-  ctx.fillStyle='#e67e22';ctx.fillRect(lx-28,195,56,36);
-  ctx.fillStyle='#fff';ctx.font='bold 13px sans-serif';ctx.textAlign='center';ctx.fillText('W',lx,218);
-  // effort arrow
-  arrow(ctx,W2-60,120,W2-60,75,'#007BFF','F');
-  ctx.fillStyle='#6c757d';ctx.font='12px sans-serif';ctx.textAlign='center';
-  ctx.fillText('動滑車 '+N+'個 → MA = '+(2*N),W2/2,18);
-}function drawInclined(ctx,W2){
+  // load block hangs from movable block
+  const lx=70+gap, ly=blockTop+44;
+  ctx.strokeStyle='#888';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lx,blockTop+40);ctx.lineTo(lx,ly);ctx.stroke();
+  ctx.fillStyle='#e67e22';ctx.fillRect(lx-26,ly,52,34);
+  ctx.fillStyle='#fff';ctx.font='bold 13px sans-serif';ctx.textAlign='center';ctx.fillText('W',lx,ly+22);
+  // effort: hand pulls rope down (rope end descends by stroke)
+  const ex=70+N*gap+gap*0.6;
+  const handY=70+stroke*tri;
+  ctx.strokeStyle='#888';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ex,38);ctx.lineTo(ex,handY);ctx.stroke();
+  arrow(ctx,ex,handY-30,ex,handY,'#007BFF','F');
+  ctx.fillStyle='#001F3F';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+  ctx.fillText('動滑車 '+N+'個 — MA = 2N = '+MA,W2/2,20);
+}
+
+function drawInclined(ctx,W2,tri){
   const theta=getVal('theta')*Math.PI/180,mu=getVal('mu-inc');
-  const x0=50,y0=230,len=W2-80;
+  const MA=1/Math.sin(theta);
+  const x0=50,y0=210,len=W2-100;
+  const h=Math.tan(theta)*len;
   ctx.fillStyle='#b0bec5';
-  ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len,y0);ctx.lineTo(x0+len,y0-Math.tan(theta)*len);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len,y0);ctx.lineTo(x0+len,y0-h);ctx.closePath();ctx.fill();
   ctx.strokeStyle='#001F3F';ctx.lineWidth=2;ctx.stroke();
-  // angle
+  // angle arc
   ctx.strokeStyle='#007BFF';ctx.lineWidth=2;
-  ctx.beginPath();ctx.arc(x0+len,y0,44,-Math.PI+theta,-Math.PI,true);ctx.stroke();
-  ctx.fillStyle='#007BFF';ctx.font='bold 12px sans-serif';ctx.fillText('θ='+getVal('theta').toFixed(0)+'°',x0+len-72,y0-8);
-  // box on slope
-  const bx=x0+len*0.5,by=y0-Math.tan(theta)*len*0.5;
-  ctx.save();ctx.translate(bx,by);ctx.rotate(-theta);
-  ctx.fillStyle='#e67e22';ctx.fillRect(-20,-20,40,40);
-  ctx.strokeStyle='#c0392b';ctx.lineWidth=2;ctx.strokeRect(-20,-20,40,40);
-  ctx.restore();
-  // force arrow along slope
+  ctx.beginPath();ctx.arc(x0,y0,40,-theta,0,false);ctx.stroke();
+  ctx.fillStyle='#007BFF';ctx.font='bold 12px sans-serif';ctx.textAlign='left';ctx.fillText('θ='+getVal('theta').toFixed(0)+'°',x0+46,y0-8);
+  // box slides UP the ramp (long path) as effort is applied
   const cos=Math.cos(theta),sin=Math.sin(theta);
-  arrow(ctx,bx+28*cos,by-28*sin,bx+70*cos,by-70*sin,'#007BFF','F');
-  ctx.fillStyle='#6c757d';ctx.font='12px sans-serif';ctx.textAlign='left';
-  ctx.fillText('MA理論='+(1/Math.sin(theta)).toFixed(2)+'  µ='+mu.toFixed(2),60,18);
-}function drawScrew(ctx,W2){
+  const slideFrac=0.15+0.7*tri;        // box position along ramp
+  const bx=x0+len*slideFrac, by=y0-Math.tan(theta)*len*slideFrac;
+  // height gained label
+  ctx.save();ctx.translate(bx,by);ctx.rotate(-theta);
+  ctx.fillStyle='#e67e22';ctx.fillRect(-18,-18,36,36);
+  ctx.strokeStyle='#c0392b';ctx.lineWidth=2;ctx.strokeRect(-18,-18,36,36);
+  ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.fillText('W',0,4);
+  ctx.restore();
+  // effort along slope (small), pushing up-slope
+  arrow(ctx,bx-50*cos+22*sin,by+50*sin+22*cos,bx-18*cos+18*sin,by+18*sin+18*cos,'#007BFF','F');
+  // vertical rise indicator (load lifted small height vs long travel)
+  ctx.strokeStyle='rgba(230,126,34,.5)';ctx.setLineDash([4,4]);ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(x0+len+14,y0);ctx.lineTo(x0+len+14,y0-Math.tan(theta)*len*slideFrac);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#001F3F';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+  ctx.fillText('斜面 — MA理論 = 1/sinθ = '+MA.toFixed(2)+'  µ='+mu.toFixed(2),W2/2,20);
+}
+
+function drawScrew(ctx,W2,tri){
   const p=getVal('lead'),r=getVal('radius');
-  const cx=W2/2,tw=30,hr=Math.min(r*0.4,120);
-  ctx.fillStyle='#b0bec5';ctx.fillRect(cx-tw,60,tw*2,130);
-  ctx.strokeStyle='#001F3F';ctx.lineWidth=2;ctx.strokeRect(cx-tw,60,tw*2,130);
-  for(let y=66;y<185;y+=10){ctx.strokeStyle='rgba(0,123,255,.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx-tw-4,y);ctx.lineTo(cx+tw+4,y);ctx.stroke();}
+  const MA=2*Math.PI*r/p;
+  const cx=W2/2,tw=26,hr=Math.min(r*0.32,W2*0.3);
+  // platform rises a tiny amount as handle spins many turns
+  const rise=14*tri;
+  ctx.fillStyle='#b0bec5';ctx.fillRect(cx-tw,90-rise,tw*2,120+rise);
+  ctx.strokeStyle='#001F3F';ctx.lineWidth=2;ctx.strokeRect(cx-tw,90-rise,tw*2,120+rise);
+  // thread lines
+  for(let y=96-rise;y<200;y+=Math.max(6,p)){ctx.strokeStyle='rgba(0,123,255,.5)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx-tw-4,y);ctx.lineTo(cx+tw+4,y);ctx.stroke();}
+  // rotating handle (spins fast = effort travels far)
+  const ang=animPhase*Math.PI*6; // multiple turns per cycle
+  const hY=78-rise;
+  const hx1=cx+hr*Math.cos(ang), hx2=cx-hr*Math.cos(ang);
   ctx.strokeStyle='#001F3F';ctx.lineWidth=5;
-  ctx.beginPath();ctx.moveTo(cx-hr,60);ctx.lineTo(cx+hr,60);ctx.stroke();
-  ctx.fillStyle='#007BFF';ctx.beginPath();ctx.arc(cx+hr,60,9,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(cx-hr,60,9,0,Math.PI*2);ctx.fill();
-  arrow(ctx,cx+hr+8,60,cx+hr+8,28,'#007BFF','F');
-  arrow(ctx,cx,193,cx,230,'#e67e22','W');
-  ctx.fillStyle='#6c757d';ctx.font='12px sans-serif';ctx.textAlign='center';
-  ctx.fillText('p='+p+'mm  r='+r+'mm  MA='+(2*Math.PI*r/p).toFixed(0),W2/2,16);
-}function drawWheel(ctx,W2){
+  ctx.beginPath();ctx.moveTo(hx1,hY);ctx.lineTo(hx2,hY);ctx.stroke();
+  ctx.fillStyle='#007BFF';
+  ctx.beginPath();ctx.arc(hx1,hY,8,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(hx2,hY,8,0,Math.PI*2);ctx.fill();
+  // effort arrow (small, tangential) on the leading knob
+  arrow(ctx,hx1,hY-8,hx1,hY-36,'#007BFF','F');
+  // load on top of platform (big)
+  ctx.fillStyle='#e67e22';ctx.fillRect(cx-30,72-rise,60,18);
+  ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillText('W',cx,86-rise);
+  ctx.fillStyle='#001F3F';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+  ctx.fillText('ねじジャッキ — MA = 2πr/p = '+MA.toFixed(0),W2/2,20);
+}
+
+function drawWheel(ctx,W2,tri){
   const Rw=getVal('R'),rax=getVal('r-ax');
-  const cx=W2/2,cy=130,Rpx=Math.min(Rw*100,110),rpx=Math.max(rax/Rw*Rpx,6);
+  const MA=Rw/Math.max(rax,0.001);
+  const cx=W2/2,cy=130,Rpx=Math.min(Rw*100,100),rpx=Math.max(rax/Rw*Rpx,6);
+  // wheel rotates; effort rope (on wheel rim) descends far, load rope (on axle) rises little
+  const ang=animPhase*Math.PI*2;
   ctx.beginPath();ctx.arc(cx,cy,Rpx,0,Math.PI*2);
   ctx.strokeStyle='#001F3F';ctx.lineWidth=5;ctx.stroke();
   ctx.fillStyle='rgba(0,31,63,.06)';ctx.fill();
+  // spokes rotate
   for(let i=0;i<6;i++){
-    const a=i*Math.PI/3;
+    const a=ang+i*Math.PI/3;
     ctx.beginPath();ctx.moveTo(cx+rpx*Math.cos(a),cy+rpx*Math.sin(a));
     ctx.lineTo(cx+Rpx*Math.cos(a),cy+Rpx*Math.sin(a));
-    ctx.strokeStyle='#555';ctx.lineWidth=2;ctx.stroke();
+    ctx.strokeStyle='#888';ctx.lineWidth=2;ctx.stroke();
   }
   ctx.beginPath();ctx.arc(cx,cy,rpx,0,Math.PI*2);
   ctx.fillStyle='#007BFF';ctx.fill();ctx.strokeStyle='#001F3F';ctx.lineWidth=2;ctx.stroke();
-  arrow(ctx,cx+Rpx,cy,cx+Rpx+44,cy,'#007BFF','F');
-  arrow(ctx,cx,cy+rpx,cx,cy+rpx+44,'#e67e22','W');
-  ctx.fillStyle='#6c757d';ctx.font='12px sans-serif';ctx.textAlign='center';
-  ctx.fillText('R='+Rw.toFixed(2)+'m  r='+rax.toFixed(2)+'m  MA='+(Rw/rax).toFixed(2),W2/2,16);
-}/* ─── Charts ─── */
+  // effort rope on right of wheel descends
+  const ropeWheelLen=70*tri;
+  ctx.strokeStyle='#007BFF';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(cx+Rpx,cy);ctx.lineTo(cx+Rpx,cy+30+ropeWheelLen);ctx.stroke();
+  arrow(ctx,cx+Rpx,cy+ropeWheelLen,cx+Rpx,cy+30+ropeWheelLen,'#007BFF','F');
+  // load rope on left of axle rises little (lift = travel/MA)
+  const lift=ropeWheelLen/MA;
+  ctx.strokeStyle='#888';ctx.lineWidth=2;
+  const loadY=cy+60-lift;
+  ctx.beginPath();ctx.moveTo(cx-rpx,cy);ctx.lineTo(cx-rpx,loadY);ctx.stroke();
+  ctx.fillStyle='#e67e22';ctx.fillRect(cx-rpx-16,loadY,32,24);
+  ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.fillText('W',cx-rpx,loadY+16);
+  ctx.fillStyle='#001F3F';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+  ctx.fillText('輪軸 — MA = R/r = '+MA.toFixed(2),W2/2,20);
+}
+
+/* ─── Charts ─── */
 function updateCharts(MA,MAact,eff){
   if(forceChart){forceChart.destroy();forceChart=null;}if(effChart){effChart.destroy();effChart=null;}const loads=[200,500,1000,2000,3000,5000,8000,10000];
   const f1=loads.map(w=>+(w/Math.max(MA,0.001)).toFixed(1));
@@ -498,8 +618,23 @@ function updateCharts(MA,MAact,eff){
     data:{labels:muArr,datasets:[{label:'効率 η (%)',data:effArr,borderColor:'#00B4D8',backgroundColor:'rgba(0,180,216,.1)',tension:.3,pointRadius:3,fill:true}]},
     options:{responsive:true,animation:false,maintainAspectRatio:false,resizeDelay:100,plugins:{legend:{labels:{font:{size:11}}}},scales:{x:{ title:{display:true,text:'摩擦係数 µ'}},y:{title:{display:true,text:'効率 η (%)'},min:0,max:105}}}
   });
-}update();
-window.addEventListener('resize',()=>drawMachine());
+}
+
+/* ─── Animation loop ─── */
+function loop(ts){
+  if(!lastTs) lastTs=ts;
+  const dt=Math.min((ts-lastTs)/1000,0.05); lastTs=ts;
+  animPhase=(animPhase+dt*0.35)%1;   // ~3s per full cycle
+  drawMachine();
+  animId=requestAnimationFrame(loop);
+}
+
+// hook range inputs (they call update() via inline oninput; also ensure first render)
+update();
+if(reduceMotion){ drawMachine(); }
+else { animId=requestAnimationFrame(loop); }
+window.addEventListener('resize',()=>{ if(reduceMotion) drawMachine(); });
+})();
 </script>
 
 <section class="explanation">
@@ -561,6 +696,9 @@ window.addEventListener('resize',()=>drawMachine());
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="mechanical-advantage.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -614,7 +752,7 @@ window.addEventListener('resize',()=>drawMachine());
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>てこの場合：支点から力点までの距離L1と支点から作用点までの距離L2を入力。理論的機械的利益MA=L2/L1が自動計算されます</li>
+<li>てこの場合：力点側の力腕L1と作用点側の抵抗腕L2を入力。理論的機械的利益MA=L1/L2が自動計算されます</li>
 <li>滑車システムの場合：動滑車の本数Nを入力。N本の滑車で荷重を分散し、MA=2Nとなります</li>
 <li>斜面の場合：斜面の角度θ（度数法）を入力。MA=1/sin(θ)で計算され、摩擦係数μを考慮した実際の効率ηも表示されます</li>
 <li>ねじジャッキの場合：リード（ピッチ）Pとねじの平均直径dから、MA=πd/Pで算出</li>
@@ -623,7 +761,7 @@ window.addEventListener('resize',()=>drawMachine());
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>鋼製てこで荷重5kNを持ち上げる場合：L1=0.4m、L2=2.0mを入力すると、理論MA=5.0が得られます。摩擦損失を5%と仮定すると効率η=95%となり、必要入力力F=5000N÷5.0÷0.95≈1053Nです。一方、直径100mm、ピッチ5mmのねじジャッキで同じ5kN荷重を上げる場合、MA=πd/P=π×100/5≈62.8となり、効率を80%とすると入力力はわずか約99.5Nで済みます。斜面（角度15度）では理論MA=1/sin(15°)≈3.86ですが、摩擦係数0.2を考慮すると効率は約70%低下します。</p>
+<p>鋼製てこで荷重5kNを持ち上げる場合：力腕L1=2.0m、抵抗腕L2=0.4mを入力すると、理論MA=L1/L2=5.0が得られます。摩擦損失を5%と仮定すると効率η=95%となり、必要入力力F=5000N÷5.0÷0.95≈1053Nです。一方、ハンドル半径r=50mm、リードp=5mmのねじジャッキで同じ5kN荷重を上げる場合、MA=2πr/p=2π×50/5≈62.8となり、効率を80%とすると入力力はわずか約99.5Nで済みます。斜面（角度15度）では理論MA=1/sin(15°)≈3.86ですが、摩擦係数0.2を考慮すると効率は約52%まで低下します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -634,6 +772,16 @@ window.addEventListener('resize',()=>drawMachine());
 <li>ねじジャッキは出力が安定していますが、ピッチが小さいほど必要トルクが増加。М16×2（微細ピッチ）と М16×2.5では入力トルク差が20%以上となります</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4274214591?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274214591.09._SCMZZZZZZ_.jpg" alt="土質力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">土質力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

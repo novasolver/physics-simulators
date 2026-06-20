@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "柱座屈モード形シミュレーター",
       "description": "ピン-ピン・固定-自由・固定-固定・固定-ピンの4支持条件での柱座屈モード形をリアルタイムアニメーション。座屈荷重・細長比・有効座屈長さを自動計算。",
       "url": "https://novasolver.jp/tools/buckling-modes.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["4種類の端部条件（ピン-ピン・固定-自由・固定-固定・固定-ピン）","モード次数 n=1,2,3 の切り替え","P/Pcr比に応じた色変化（青→赤）","有効座屈長さ係数K・細長比λの自動計算"],
       "keywords": "座屈,オイラー座屈,座屈荷重,細長比,有効座屈長さ,柱,構造安定性,CAE",
       "datePublished": "2026-04-08",
@@ -187,6 +187,15 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
       <input type="range" id="P" min="0" max="100" step="0.1" value="50" oninput="syncToNum('P','PNum')">
 <input type="number" class="num-input" id="PNum" value="50" min="0" max="100" step="0.1" style="width:70px;margin-left:6px;" oninput="syncFromNum('P','PNum')">
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
   <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -223,16 +232,23 @@ function getParams() {
   const I = Math.pow(10, parseFloat(document.getElementById('I').value));
   const L = parseFloat(document.getElementById('L').value);
   const A = parseFloat(document.getElementById('A').value);
-  const Pslider = parseFloat(document.getElementById('P').value) / 100;
+  const Pload = parseFloat(document.getElementById('P').value) * 1000;
   const endCond = document.getElementById('endCond').value;
   let K;
   if (endCond === 'pp') K = 1.0;
   else if (endCond === 'ff') K = 2.0;
   else if (endCond === 'fixfix') K = 0.5;
   else K = 0.699;
-  return {E, I, L, A, K, Pslider};
-}function computePcr(E, I, L, K, n){
-  return (n * n * Math.PI * Math.PI * E * I) / (K * L * K * L);
+  return {E, I, L, A, K, Pload, endCond};
+}function computePcr(E, I, L, K, n, endCond){
+  const roots = {
+    pp: [Math.PI, 2*Math.PI, 3*Math.PI],
+    ff: [Math.PI/2, 3*Math.PI/2, 5*Math.PI/2],
+    fixfix: [2*Math.PI, 4*Math.PI, 6*Math.PI],
+    fixpin: [4.493409, 7.725252, 10.904122]
+  };
+  const beta = (roots[endCond] && roots[endCond][n-1]) || (n * Math.PI / K);
+  return beta * beta * E * I / (L * L);
 }function getModeShape(endCond, n, t, x){
   // x in [0,1], returns lateral deflection
   if (endCond === 'ff') {
@@ -246,15 +262,13 @@ function getParams() {
     return Math.sin(n * Math.PI * x);
   }
 }function draw(){
-  const {E, I, L, A, K, Pslider}= getParams();
-  const endCond = document.getElementById('endCond').value;
+  const {E, I, L, A, K, Pload, endCond}= getParams();
   const n = modeN;
-  Pcr = computePcr(E, I, L, K, n);
+  Pcr = computePcr(E, I, L, K, n, endCond);
   const r = Math.sqrt(I / A);
   const lambda = K * L / r;
 
-  const Pmax = Pcr * 2;
-  const P = Pslider * Pmax;
+  const P = Pload;
   ratio = P / Pcr;
 
   document.getElementById('statPcr').textContent = (Pcr / 1000).toFixed(1) + ' kN';
@@ -354,7 +368,7 @@ function getParams() {
   ctx.fillStyle = isBuckling ? '#dc3545' : '#001F3F';
   ctx.strokeStyle = isBuckling ? '#dc3545' : '#001F3F';
   ctx.lineWidth = 2;
-  const arrowLen = 30 + 20 * Pslider;
+  const arrowLen = 30 + 20 * Math.min(1, ratio / 2);
   ctx.moveTo(colX, colTop - arrowLen);
   ctx.lineTo(colX, colTop - 5);
   ctx.stroke();
@@ -550,6 +564,9 @@ draw();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="buckling-modes.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -613,6 +630,16 @@ draw();
 <li>有効座屈長さの決定は支持条件の理想化に依存するため、実設計では柱脚部や梁との接合部詳細を確認し、K値を決定します</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

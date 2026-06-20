@@ -43,7 +43,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "水圧破砕設計計算ツール",
       "description": "地層応力・間隙圧・岩石引張強度から破砕開始圧力・閉合圧・破砕窓をリアルタイム計算。深度-圧力プロファイル・感度解析・応力体制比較の3グラフ。",
       "url": "https://novasolver.jp/tools/hydraulic-fracture.html",
@@ -52,7 +52,7 @@
       "operatingSystem": "Web Browser",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["破砕開始圧力Pbの計算","閉合圧・破砕窓","深度-圧力プロファイル","最小水平応力感度解析","正断層・横ずれ・逆断層の応力体制比較"],
       "keywords": "水圧破砕,ハイドロフラクチャリング,破砕圧,閉合圧,破砕窓,地層応力,Biot係数,CAE",
       "datePublished": "2026-04-08",
@@ -180,6 +180,17 @@ footer { background: var(--navy); color: rgba(255,255,255,.7); padding: 32px 24p
 .param-group{margin-bottom:2px}.field-header{margin-bottom:0}.param-label{margin-bottom:0}.num-wrap{gap:2px}.num-input{width:56px;padding:1px 3px;font-size:.74rem;border-radius:4px}.num-unit{font-size:.68rem;min-width:16px}.param-name{font-size:.71rem}.param-value{font-size:.71rem;padding:1px 5px;min-width:auto}input[type=range]{height:3px;margin:0}select{padding:3px 5px;font-size:.74rem;margin-bottom:2px}.divider{margin:3px 0;opacity:.4}.panel{padding:7px}.panel-title{margin-bottom:4px;font-size:.58rem}.panel{padding:7px}.panel-title{margin-bottom:4px;font-size:.58rem}.divider{margin:3px 0;opacity:.4}
 
 }
+/* ===== v2 fracture animation ===== */
+#fracCanvas{display:block;width:100%;max-width:100%;height:360px;border-radius:8px;background:#0a1628}
+.frac-live{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.frac-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.frac-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.frac-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.frac-ro.accent .rv{color:#ffd54a}
+.frac-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.frac-legend .sw{width:16px;height:10px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle}
+@media(max-width:600px){.frac-live{grid-template-columns:repeat(2,1fr)}#fracCanvas{height:300px}}
+@media (prefers-reduced-motion: reduce){#fracCanvas{}}
 </style>
 </head>
 <body>
@@ -245,9 +256,34 @@ footer { background: var(--navy); color: rgba(255,255,255,.7); padding: 32px 24p
       <input type="range" id="alpha" min="0.30" max="1.00" value="0.80" step="0.05" oninput="syncToNum('alpha','alphaNum');syncToNum('alpha','v_alphaNum');syncVal('alpha');compute()">
 <input type="number" class="num-input" id="alphaNum" value="0.80" min="0.30" max="1.00" step="0.05" style="width:70px;margin-left:6px;" oninput="syncFromNum('alpha','alphaNum')">
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-bahai"></i> ライブ破砕アニメーション — 坑井に流体を圧入</div>
+      <div class="frac-live">
+        <div class="frac-ro accent"><div class="rv" id="ro_pinj">0.0</div><div class="rl">圧入圧 P<sub>inj</sub> [MPa]</div></div>
+        <div class="frac-ro"><div class="rv" id="ro_pnet">0.0</div><div class="rl">正味圧 ΔP<sub>net</sub> [MPa]</div></div>
+        <div class="frac-ro"><div class="rv" id="ro_len">0.0</div><div class="rl">亀裂半長 x<sub>f</sub> [m]</div></div>
+        <div class="frac-ro"><div class="rv" id="ro_wid">0.0</div><div class="rl">最大開口 w [mm]</div></div>
+      </div>
+      <canvas id="fracCanvas" height="360" role="img" aria-label="坑井に流体を圧入し、破砕開始圧を超えると亀裂が開いて伝播する様子のアニメーション"></canvas>
+      <div class="frac-legend">
+        <span><i class="sw" style="background:#3aa0ff"></i>圧入流体</span>
+        <span><i class="sw" style="background:#ff5252"></i>亀裂（開口・進展）</span>
+        <span><i class="sw" style="background:#9aa7b4"></i>原位置応力 σ_h（閉じる力）</span>
+        <span id="fracPhase" style="margin-left:auto;font-weight:700;color:#d97706"></span>
+      </div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stats">
         <div class="stat-card" id="card_Pb"><div class="val" id="s_Pb">—</div><div class="lbl">破砕圧 Pb (MPa)</div></div>
@@ -303,6 +339,9 @@ footer { background: var(--navy); color: rgba(255,255,255,.7); padding: 32px 24p
     <p>この計算は簡易モデルです。実務では坑井方位、岩盤の異方性、天然亀裂、流体粘性、リークオフ、温度、現地試験データを含めて評価します。安全や環境に関わる用途では専門的な解析が必要です。</p>
   </div>
 </section>
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="hydraulic-fracture.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -357,15 +396,15 @@ footer { background: var(--navy); color: rgba(255,255,255,.7); padding: 32px 24p
 <h3>使い方ガイド</h3>
 <ol>
 <li>最小主応力(Sh)と最大主応力(SH)をMPa単位で入力。例:花崗岩層でSh=25MPa、SH=45MPa</li>
-<li>孔内水圧(D)と間隙水圧(Pp)をMPa単位で設定。砂岩層では深度2000mでPp≈20MPaが標準</li>
-<li>岩石の引張強度(Dnum)を入力。花崗岩は15-20MPa、泥岩は5-10MPa程度</li>
-<li>シミュレーター実行で破砕開始圧Pf=(3Sh-SH+T+Pp)と閉合圧Pc=Shがリアルタイム計算される</li>
-<li>可視化グラフで破砕可能圧力範囲(Pf~Pc)と安全係数を確認</li>
+<li>深度(D)と間隙水圧(Pp)をMPa単位で設定。砂岩層では深度2000mでPp≈20MPaが標準</li>
+<li>岩石の引張強度(T₀)を入力。花崗岩は15-20MPa、泥岩は5-10MPa程度</li>
+<li>シミュレーターが破砕開始圧 Pb=3σ_h−σ_H−α·P_p+T₀ と閉合圧 Pc=σ_h をリアルタイム計算する</li>
+<li>可視化グラフで破砕窓 ΔP=Pb−Pc（破砕可能圧力範囲）を確認する</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>深度2500mの砂岩層における水圧破砕設計:Sh=28MPa、SH=52MPa、Pp=24.5MPa、岩石引張強度T=8MPaを入力。破砕開始圧Pf=3(28)-52+8+24.5=60.5MPa、閉合圧Pc=28MPaが計算される。設計水圧を55MPaに設定した場合、安全係数は(60.5-55)/(60.5-28)=0.15となり、破砕成功確度が高い。泥質シルト岩ではT=6MPaのため、Pfは58.5MPaに低下し、より低い圧力での破砕が可能になる。</p>
+<p>深度2500mの砂岩層における水圧破砕設計:σ_h=28MPa、σ_H=52MPa、P_p=24.5MPa、岩石引張強度T₀=8MPa、Biot係数α=0.80を入力。破砕開始圧 Pb=3(28)−52−0.80×24.5+8≈20.4MPa、閉合圧 Pc=σ_h=28MPaが計算される。この条件では破砕窓 ΔP=Pb−Pc≈−7.6MPa と負になり、想定圧力では破砕開始より先に閉合圧側へ寄るため、σ_H が大きすぎる（高い水平差応力）ことを示す。泥質シルト岩でT₀=6MPaならPbは18.4MPaに低下する。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -376,6 +415,16 @@ footer { background: var(--navy); color: rgba(255,255,255,.7); padding: 32px 24p
 <li>複数層試験では各層のSH/Sh比が重要。比率が1.5以上の脆性岩盤は破砕プロパガントが垂直方向に逸脱しやすい</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -507,7 +556,7 @@ function renderTab1(p, Pb, Pc) {
       datasets: [
         { label: '破砕圧 Pb (MPa)', data: pbVals, borderColor: '#dc2626', borderWidth: 2.5, pointRadius: 0, tension: 0.1, yAxisID: 'y' },
         { label: '破砕窓 ΔP (MPa)', data: winVals, borderColor: '#16a34a', borderWidth: 2, pointRadius: 0, tension: 0.1, borderDash: [4,2], yAxisID: 'y' },
-        { label: '現在の σ_h', data: shVals.map(v => v === p.sh ? Pb : null), borderColor: 'transparent', point戻るgroundColor: '#f59e0b', pointRadius: shVals.map(v => v === p.sh ? 8 : 0), yAxisID: 'y', tension: 0 },
+        { label: '現在の σ_h', data: shVals.map(v => v === p.sh ? Pb : null), borderColor: 'transparent', pointBackgroundColor: '#f59e0b', pointRadius: shVals.map(v => v === p.sh ? 8 : 0), yAxisID: 'y', tension: 0 },
       ]
     },
     options: {
@@ -568,6 +617,191 @@ function renderTab2(p) {
 }
 
 compute();
+
+/* ===== v2 live fracture-propagation animation (single IIFE) ===== */
+(function(){
+  "use strict";
+  var cv = document.getElementById('fracCanvas');
+  if(!cv) return;
+  var cx = cv.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function num(id){ var e=document.getElementById(id); return e?parseFloat(e.value):0; }
+  function P(){
+    var sh=num('sh'), sH=num('sH'), Pp=num('Pp'), T0=num('T0'), alpha=num('alpha');
+    var Pb = 3*sh - sH - alpha*Pp + T0;           // breakdown pressure (Kirsch)
+    return { sh:sh, sH:sH, Pp:Pp, T0:T0, Pb:Pb };
+  }
+
+  // HiDPI sizing
+  var cssW=600, cssH=360;
+  function resize(){
+    var r = cv.parentElement.getBoundingClientRect();
+    cssW = Math.max(280, Math.floor(r.width - 44));
+    cssH = (cssW<480)?300:360;
+    var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    cv.style.width=cssW+'px'; cv.style.height=cssH+'px';
+    cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
+    cx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // animation cycle: pressurize -> breakdown -> propagate -> hold -> reset
+  var t=0;                 // seconds within cycle
+  var CYCLE=9.0;           // total cycle length (s)
+  var Ep = 18000;          // plane-strain modulus E' (MPa) ~ for width scaling
+  var Hfrac = 40;          // fracture height (m), fixed for PKN visual
+  var Qrate = 0.06;        // injected volume rate proxy (m^3/s per unit)
+
+  // state derived each frame
+  function model(tt, p){
+    // injection pressure ramps from Pp up past Pb, then holds slightly above closure
+    var Pinj, phase, frac=0;
+    var Pbtarget = p.Pb;
+    var ramp = 3.2;        // time to reach breakdown
+    if(tt < ramp){
+      Pinj = p.Pp + (Pbtarget - p.Pp + 1) * (tt/ramp);
+      phase = (Pinj < Pbtarget) ? 'pre' : 'break';
+    } else {
+      // after breakdown, pressure drops to propagation pressure (~ sh + net)
+      Pinj = Math.max(p.sh, Pbtarget) ;
+      phase = 'prop';
+    }
+    // net pressure (drives width & opening); only positive net opens the crack
+    // during propagation net pressure ~ a few MPa above closure (sh)
+    var Pprop = p.sh + 4.0;
+    if(tt>=ramp){ Pinj = Pprop; }
+    var Pnet = Math.max(0, Pinj - p.sh);
+    // fracture half-length grows with pumped volume after breakdown (PKN-like)
+    var growT = Math.max(0, tt - ramp);
+    var xf = (phase==='prop' || phase==='break') ? 70 * (1 - Math.exp(-growT*0.5)) : 0;
+    if(phase==='pre') xf=0;
+    // PKN max width at wellbore: w ~ 2*Pnet*H/E' (converted to mm for display)
+    var w_m = (xf>0) ? (2.0 * Pnet * Hfrac / Ep) : 0;   // metres-ish proxy
+    var w_mm = w_m * 1000;
+    return { Pinj:Pinj, Pnet:Pnet, xf:xf, w_mm:w_mm, phase:phase };
+  }
+
+  function drawArrow(x0,y0,x1,y1,col,wd){
+    cx.strokeStyle=col; cx.fillStyle=col; cx.lineWidth=wd;
+    cx.beginPath(); cx.moveTo(x0,y0); cx.lineTo(x1,y1); cx.stroke();
+    var a=Math.atan2(y1-y0,x1-x0), h=5+wd;
+    cx.beginPath(); cx.moveTo(x1,y1);
+    cx.lineTo(x1-h*Math.cos(a-0.4),y1-h*Math.sin(a-0.4));
+    cx.lineTo(x1-h*Math.cos(a+0.4),y1-h*Math.sin(a+0.4));
+    cx.closePath(); cx.fill();
+  }
+
+  function render(tt){
+    resize();
+    var W=cssW, H=cssH, p=P();
+    var m = model(tt, p);
+    cx.clearRect(0,0,W,H);
+    // rock background
+    cx.fillStyle='#0a1628'; cx.fillRect(0,0,W,H);
+    // subtle rock strata
+    cx.strokeStyle='rgba(255,255,255,0.04)'; cx.lineWidth=1;
+    for(var yy=24; yy<H; yy+=26){ cx.beginPath(); cx.moveTo(0,yy); cx.lineTo(W,yy); cx.stroke(); }
+
+    var cyy=H/2;
+    var boreX=W*0.5, boreR=12;
+    var maxLenPx = (W*0.5 - boreX*0.06 - 30);
+    var lenPx = Math.min(maxLenPx, (m.xf/70)*maxLenPx);
+    var wPx = Math.min(34, 2 + m.w_mm*1.8);   // visual opening half-height (px)
+
+    // in-situ stress arrows squeezing vertically (sigma_h closes the crack)
+    cx.globalAlpha=0.9;
+    for(var sx=40; sx<W-20; sx+=70){
+      drawArrow(sx, 18, sx, cyy-wPx-14, '#9aa7b4', 1.6);
+      drawArrow(sx, H-18, sx, cyy+wPx+14, '#9aa7b4', 1.6);
+    }
+    cx.globalAlpha=1;
+
+    // fracture (two-wing horizontal crack), opening = wPx, filled with fluid
+    if(lenPx>1){
+      // crack body as lens shape both sides
+      for(var side=-1; side<=1; side+=2){
+        cx.beginPath();
+        var tip = boreX + side*(boreR+lenPx);
+        cx.moveTo(boreX + side*boreR, cyy);
+        cx.quadraticCurveTo(boreX + side*(boreR+lenPx*0.4), cyy - wPx, tip, cyy);
+        cx.quadraticCurveTo(boreX + side*(boreR+lenPx*0.4), cyy + wPx, boreX + side*boreR, cyy);
+        cx.closePath();
+        // fluid fill gradient
+        var g=cx.createLinearGradient(boreX, cyy, tip, cyy);
+        g.addColorStop(0,'rgba(58,160,255,0.95)');
+        g.addColorStop(1,'rgba(58,160,255,0.25)');
+        cx.fillStyle=g; cx.fill();
+        cx.strokeStyle='#ff5252'; cx.lineWidth=2; cx.stroke();
+        // crack tip marker
+        cx.beginPath(); cx.arc(tip, cyy, 3.5, 0, 7); cx.fillStyle='#ff7b7b'; cx.fill();
+      }
+    }
+
+    // wellbore (vertical) + injected fluid column
+    cx.fillStyle='#13243d'; cx.fillRect(boreX-boreR, 0, boreR*2, H);
+    cx.strokeStyle='rgba(255,255,255,0.35)'; cx.lineWidth=1.5;
+    cx.strokeRect(boreX-boreR, 0, boreR*2, H);
+    // fluid in bore (animated bubbles descending)
+    cx.save(); cx.beginPath(); cx.rect(boreX-boreR+1,0,boreR*2-2,H); cx.clip();
+    cx.fillStyle='rgba(58,160,255,0.85)'; cx.fillRect(boreX-boreR+1,0,boreR*2-2,H);
+    cx.fillStyle='rgba(255,255,255,0.5)';
+    for(var b=0;b<6;b++){
+      var by=((tt*60 + b*60) % (H+20)) - 10;
+      cx.beginPath(); cx.arc(boreX + (b%2?3:-3), by, 2.2, 0, 7); cx.fill();
+    }
+    cx.restore();
+
+    // pressure gauge bar (Pinj vs Pb) top-left
+    var gx=14, gy=14, gw=Math.min(180,W*0.34), gh=10;
+    var pmax = Math.max(p.Pb*1.25, p.Pinj, 1);
+    cx.fillStyle='rgba(255,255,255,0.12)'; cx.fillRect(gx,gy,gw,gh);
+    cx.fillStyle = (m.Pinj>=p.Pb)?'#ff5252':'#3aa0ff';
+    cx.fillRect(gx,gy,gw*Math.min(1,m.Pinj/pmax),gh);
+    // breakdown threshold tick
+    var tickX = gx + gw*Math.min(1,p.Pb/pmax);
+    cx.strokeStyle='#ffd54a'; cx.lineWidth=2;
+    cx.beginPath(); cx.moveTo(tickX,gy-3); cx.lineTo(tickX,gy+gh+3); cx.stroke();
+    cx.fillStyle='rgba(255,255,255,0.85)'; cx.font='10px Roboto Mono';
+    cx.fillText('Pb='+p.Pb.toFixed(0), tickX-12, gy+gh+15);
+    cx.fillStyle='rgba(255,255,255,0.7)'; cx.font='11px Noto Sans JP';
+    cx.fillText('坑井圧入圧', gx, gy-3);
+
+    // phase annotation near bore
+    var label='';
+    if(m.phase==='pre') label='加圧中：P_inj < Pb（亀裂は閉じている）';
+    else if(m.phase==='break') label='破砕開始！ P_inj ≥ Pb';
+    else label='亀裂が伝播：流体が満たし、σ_h に抗して開口';
+    cx.fillStyle='rgba(10,22,40,0.85)';
+    var lw=cx.measureText(label).width;
+    cx.fillRect(W/2-lw/2-8, H-26, lw+16, 20);
+    cx.fillStyle = (m.phase==='pre')?'#9aa7b4':(m.phase==='break')?'#ffd54a':'#ff8a8a';
+    cx.font='bold 12px Noto Sans JP'; cx.textAlign='center';
+    cx.fillText(label, W/2, H-12); cx.textAlign='left';
+
+    // live readouts
+    document.getElementById('ro_pinj').textContent = m.Pinj.toFixed(1);
+    document.getElementById('ro_pnet').textContent = m.Pnet.toFixed(1);
+    document.getElementById('ro_len').textContent  = m.xf.toFixed(1);
+    document.getElementById('ro_wid').textContent  = m.w_mm.toFixed(2);
+    var ph=document.getElementById('fracPhase');
+    if(ph) ph.textContent = (m.phase==='pre')?'加圧フェーズ':(m.phase==='break')?'破砕開始':'伝播フェーズ';
+  }
+
+  if(reduce){
+    // single static frame mid-propagation
+    render(6.0);
+    return;
+  }
+  var last=performance.now();
+  function loop(now){
+    var dt=(now-last)/1000; last=now;
+    t += dt; if(t>CYCLE) t=0;
+    render(t);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  window.addEventListener('resize', function(){ if(reduce) render(6.0); });
+})();
 </script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>
 <script src="/tools/tool-objectives.js" defer></script>

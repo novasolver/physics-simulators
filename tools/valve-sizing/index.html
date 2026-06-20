@@ -43,14 +43,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "バルブ選定・Cv値シミュレーター",
       "description": "液体・気体・蒸気のバルブCv値・Kv値をISA/IEC流量方程式でリアルタイム計算。チョーク流れ警告、Cv vs ΔP曲線、標準商用バルブサイズ選定テーブル付き。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/valve-sizing.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -90,7 +90,7 @@
           "name": "気体と液体でCv計算式が違うのはなぜですか？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "液体は非圧縮性流体なのでΔPと流量の関係は √ΔP に比例します（Cv = Q√(SG/ΔP)）。気体は圧縮性流体なので、密度が圧力・温度・分子量によって変化し、膨張係数Yも考慮する必要があります（Cv = Q/(963×Y×√(P1×ΔP×MW/T))）。高圧ガスでは膨張係数Yが0.67〜1.0の範囲で変化し、チョーク補正が重要です。"
+            "text": "液体は非圧縮性流体なのでΔPと流量の関係は √ΔP に比例します（Cv = Q√(SG/ΔP)）。気体は圧縮性流体なので、密度が圧力・温度・分子量によって変化します（Cv = Q/(963×√(ΔP×(P1+P2)×G/T_R))、G=MW/28.97、T_R=1.8×T[K]）。ΔPが0.5×P1を超えるとチョーク流れとなり、計算上ΔPは0.5×P1で頭打ちになります。"
           }
         }
       ]
@@ -272,7 +272,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <input type="range" id="mw" min="2" max="100" step="1" value="29" oninput="syncToNum('mw','mwVal');syncSlider(this,'mwVal',0,'g/mol');compute()">
       </div>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right -->
@@ -304,8 +312,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      <p><strong>液体：</strong> $C_v = Q\sqrt{\frac{SG}{\Delta P}}$ &nbsp;（Q: m³/h, ΔP: psi, SG: 比重）</p>
-      <p style="margin-top:5px;"><strong>気体：</strong> $C_v = \frac{Q}{963 \cdot Y \sqrt{\frac{P_1 \Delta P}{MW \cdot T}}}$ &nbsp;（T: K, MW: g/mol）</p>
+      <p><strong>液体：</strong> $C_v = Q\sqrt{\frac{SG}{\Delta P}}$ &nbsp;（Q: GPM, ΔP: psi, SG: 比重）</p>
+      <p style="margin-top:5px;"><strong>気体：</strong> $C_v = \frac{Q}{963\sqrt{\frac{\Delta P (P_1+P_2) G}{T_R}}}$ &nbsp;（Q: SCFH, G=MW/28.97, T_R=1.8T[K]）</p>
       <p style="margin-top:5px;"><strong>Kv変換：</strong> $K_v = 0.865 \times C_v$</p>
       <p style="margin-top:5px;"><strong>チョーク条件（気体）：</strong> $\Delta P \gt  0.5 P_1$</p>
     
@@ -352,10 +360,10 @@ function cvLiquid(Q_m3h, SG, dP_bar){
   const P1_psi = P1_bar * BAR_TO_PSI;
   const dP_psi = dP_bar * BAR_TO_PSI;
   if(dP_psi <= 0) return Infinity;
-  // Expansion factor Y
-  const x = dP_psi / P1_psi;
-  const Y = Math.max(0.667, 1 - x/3);
-  return Q_scfh / (963 * Y * Math.sqrt(P1_psi * dP_psi / (MW * T_K)));
+  // Masoneilan: Cv = Q/(963*sqrt(dP*(P1+P2)*G/T_R)), G=MW/28.97, T_R=1.8*T_K
+  const P2_psi = P1_psi - dP_psi;
+  // (choked clamp dP <= 0.5*P1 is applied by the caller via dP_eff)
+  return Q_scfh / (963 * Math.sqrt(dP_psi * (P1_psi + P2_psi) * 28.97 / (MW * 1.8 * T_K)));
 }let chart = null;
 
 function compute(){
@@ -553,6 +561,9 @@ else window.addEventListener('load', function(){ compute(); }, { once: true });
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="valve-sizing.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -605,17 +616,27 @@ else window.addEventListener('load', function(){ compute(); }, { once: true });
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>流体種別（液体または気体）を選択し、流量単位（m³/h、L/min、kg/hなど）を指定します</li><li>入口圧力P1と出口圧力P2をbarで入力し、流体温度を℃で設定します</li><li>ISA/IEC方程式に基づいてCv値が自動計算され、チョーク流れ判定と推奨バルブサイズが表示されます</li></ol>
+<ol><li>流体種別（液体または気体）を選択し、流量をm³/hで入力します</li><li>入口圧力P1と出口圧力P2をbarで入力し、流体温度を℃で設定します</li><li>ISA/IEC方程式に基づいてCv値が自動計算され、チョーク流れ判定と推奨バルブサイズが表示されます</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>常温20℃の水道水で流量2.5m³/hが必要な場合、入口圧力P1=5.0 bar、出口圧力P2=2.0 bar（ΔP=3.0 bar）と設定すると、必要Cv値は約15.8となります。同じ条件で蒸気（飽和蒸気、150℃）の流量450kg/hを制御する場合、P1=8.0 bar、P2=4.5 bar時の必要Kv値は約28.2と算出されます。チョーク流れが発生する場合は「圧力比が臨界値を超過」と警告されます</p>
+<p>常温20℃の水道水で流量2.5m³/hが必要な場合、入口圧力P1=5.0 bar、出口圧力P2=2.0 bar（ΔP=3.0 bar）と設定すると、必要Cv値は約1.7（Kv≈1.4）となります。同じ配管で空気（気体モード、MW=28.97、20℃）の流量100m³/hを制御する場合、P1=6.0 bar、P2=4.0 barでは必要Cv値は約1.3（Kv≈1.1）と算出されます。チョーク流れが発生する場合は警告が表示されます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul><li>DN15バルブで最大Cv=16程度に対し、必要Cv=35が計算された場合はDN20以上へのアップサイズが必須です</li><li>気体流量は密度補正が重要：常温1 bar基準と異なる条件では理想気体の状態方程式で質量流量に換算してください</li><li>高温蒸気（200℃超）では比体積が急速に増大するため、チョーク流れ判定（圧力比Fr>0.5）に注意し、2段階調圧化を検討します</li><li>バルブ選定後の実流量チェックでは、実配管抵抗を含めた全系統ΔPで再計算し、バルブ開度50～80%の運用領域確認が必須です</li></ul>
 </div>
-<footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
+<div class="howto-card"><h3>準拠規格・前提条件</h3><p><strong>準拠/参考：</strong>ISA-75.01 / IEC 60534 制御弁サイジング。液体 \(C_v = Q\sqrt{SG/\Delta P}\)（Q:GPM, ΔP:psi）、気体はMasoneilan式 \(C_v = Q/(963\sqrt{\Delta P (P_1+P_2)G/T_R})\)、\(K_v = 0.865\,C_v\)。チョーク判定 \(\Delta P > 0.5\,P_1\)。</p><p><strong>モデルの前提：</strong>定常・単相流。配管形状係数 \(F_p\)・圧力回復係数 \(F_L\)・粘性補正 \(F_R\) は省略（=1相当）。気体は理想気体近似、液体はキャビテーション初生を厳密に解かない。</p><p><strong>適用範囲・限界：</strong>教育・初期サイジング用。検証例 水20 m³/h・ΔP=1 bar で Kv≈20（Cv≈23.1）と一致。実選定はメーカ実測 \(C_v,F_L,x_T\) 曲線・25〜30%マージン・全開60〜80%動作を考慮し IEC 60534-2-1 詳細式で行うこと。</p></div><footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
   <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;font-size:.78rem">

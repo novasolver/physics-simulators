@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "マイケルソン干渉計 シミュレーター",
       "description": "マイケルソン干渉計の光路差・波長・ミラー移動量を入力すると、検出強度・位相差・縞次数を即時計算。光学系模式図と干渉縞パターンを並べて表示し、二光束干渉の原理を体感できる光学シミュレーターです。",
       "url": "https://novasolver.jp/tools/michelson-interferometer.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["光路差・波長・ミラー移動量・入射強度の可変設定","検出強度 I = I0 cos²(2π·Δ/λ) のリアルタイム計算","位相差・縞次数・1 縞当たりミラー移動量の表示","ビームスプリッタと2枚のミラーを含む光学系模式図","ミラー移動アニメーションによる縞の動きの可視化"],
       "keywords": "マイケルソン干渉計,光路差,干渉縞,ビームスプリッタ,波長計測,コヒーレンス,二光束干渉,光学計測",
       "datePublished": "2026-05-15",
@@ -100,8 +100,31 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#opticsCanvas,#fringeCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#opticsCanvas,#fringeCanvas,#bullseyeCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+.live-ro.bright .rv{color:#7CFC8A}
+.live-ro.dark .rv{color:#ff8a8a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.scrub-row{display:flex;align-items:center;gap:10px;margin-top:6px}
+.scrub-row input[type=range]{flex:1}
+.scrub-val{font-family:'Roboto Mono',monospace;font-size:0.78rem;color:var(--accent);min-width:78px;text-align:right}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.preset-btn{padding:5px 11px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:16px;height:10px;border-radius:3px;display:inline-block}
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{transition:none}
+}
 </style>
 </head>
 <body>
@@ -149,14 +172,6 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">ミラー追加移動 d</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slMirrorVal" value="0" min="0" max="1500" step="1" oninput="syncFromNum('slMirror','slMirrorVal')"><span class="num-unit">nm</span></div>
-      </div>
-      <input type="range" id="slMirror" min="0" max="1500" step="1" value="0" oninput="syncToNum('slMirror','slMirrorVal');updateSlider(this,'slMirrorVal',0,'');compute()">
-    </div>
-
-    <div class="param-group">
-      <div class="param-label">
         <span class="param-name">入射強度 I0</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slI0Val" value="1.00" min="0" max="1" step="0.01" oninput="syncFromNum('slI0','slI0Val')"><span class="num-unit">—</span></div>
       </div>
@@ -165,14 +180,68 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
-    <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> ミラー走査</button>
-      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+    <div class="preset-row">
+      <button type="button" class="preset-btn" onclick="setPreset('mono')">単色（He-Ne）</button>
+      <button type="button" class="preset-btn" onclick="setPreset('green')">緑（532nm）</button>
+      <button type="button" class="preset-btn" onclick="setPreset('white')">白色→局在縞</button>
+      <button type="button" class="preset-btn" onclick="setPreset('comp')">補償（ΔL=0）</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">経路差合計 Δ_total = ΔL + d。検出強度 I = I0 cos²(2π·Δ_total/λ) で計算します。</p>
+
+    <div class="divider"></div>
+
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">ミラー走査（再生）とリセットは可視化パネル側の操作で行います。経路差合計 Δ = ΔL + 2Δd（ミラーを Δd 動かすと光は往復し光路差は 2Δd 変化）。検出強度 I = I0 cos²(π·Δ/λ)。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> 走査中ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roDd">0</div><div class="rl">ミラー変位 Δd [nm]</div></div>
+        <div class="live-ro"><div class="rv" id="roDelta">0</div><div class="rl">光路差 Δ=2Δd [nm]</div></div>
+        <div class="live-ro"><div class="rv" id="roM">0.00</div><div class="rl">中央次数 m</div></div>
+        <div class="live-ro"><div class="rv" id="roN">0.00</div><div class="rl">通過縞数 N</div></div>
+        <div class="live-ro bright" id="roIcard"><div class="rv" id="roI">1.000</div><div class="rl">中央強度 I/I0</div></div>
+      </div>
+      <div class="scrub-row">
+        <span style="font-size:.72rem;color:var(--muted)"><i class="fas fa-arrows-left-right"></i></span>
+        <input type="range" id="slMirror" min="0" max="5000" step="1" value="0" oninput="onScan()" aria-label="ミラー M2 位置スクラブ（ナノメートル）">
+        <span class="scrub-val" id="scanVal">Δd=0 nm</span>
+      </div>
+      <div class="play-row">
+        <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 自動走査</button>
+        <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+        <span id="condBadge" style="margin-left:auto;font-size:.74rem;font-weight:700;color:#7CFC8A"></span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-bullseye"></i> 等傾角縞（リアルタイム）</div>
+      <canvas id="bullseyeCanvas" tabindex="0" role="img" aria-label="マイケルソン干渉計の同心円状の等傾角縞。ミラー走査に合わせて縞が出入りします。"></canvas>
+      <p class="canvas-hint">同心円縞 = 等傾角縞。ミラーを λ/2 動かすたびに中央で 1 本の縞が生まれる/消える。明=建設的(Δ=mλ) / 暗=破壊的(Δ=(m+½)λ)</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-microscope"></i> 光学系模式図</div>
+      <canvas id="opticsCanvas"></canvas>
+      <p class="canvas-hint">レーザー → ビームスプリッタ → M1（固定・右）/ M2（可動・上） → 検出器（下）。M2 が動くと Δ=2Δd が変化</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 強度 vs ミラー変位 I(Δd)</div>
+      <canvas id="fringeCanvas"></canvas>
+      <p class="canvas-hint">横軸 = ミラー変位 Δd / 縦軸 = 強度 I/I0、黄マーカー = 現在位置。周期 = λ/2</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -184,71 +253,73 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-microscope"></i> 光学系模式図</div>
-      <canvas id="opticsCanvas"></canvas>
-      <p class="canvas-hint">レーザー → ビームスプリッタ → ミラー M1（右）/ M2（上） → 検出器（下）。アーム長差 ΔL を強調表示</p>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 縞パターン I(d) と現在点</div>
-      <canvas id="fringeCanvas"></canvas>
-      <p class="canvas-hint">横軸 = ミラー追加移動 d（0〜λ）/ 縦軸 = 強度 I/I0、黄マーカー = 現在の d</p>
-    </div>
-
-    <div class="chart-card">
       <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
       <div class="theory-box">
-        <p>2 つのアームの合計経路差 Δ_total と入射強度 I0 から、検出器強度を 2 光束干渉式で計算します。</p>
-        <p style="margin-top:8px;">検出強度（cos² 表示）：</p>
-        $$I = I_0\,\cos^2\!\left(\frac{2\pi\,\Delta_\text{total}}{\lambda}\right)$$
-        <p style="margin-top:6px;">位相差（ミラー差から見た往復項を含む）：</p>
-        $$\varphi = \frac{4\pi\,\Delta_\text{total}}{\lambda}$$
-        <p style="margin-top:6px;">縞次数とミラー 1 縞分の移動量：</p>
-        $$m = \frac{2\,\Delta_\text{total}}{\lambda},\quad \Delta d_\text{fringe} = \frac{\lambda}{2}$$
-        <p style="margin-top:8px;">ミラー位置で 1 縞が λ/2 に対応するのは、光が往復することで光路差が 2d 変わるためです。</p>
+        <p>ミラー M2 を Δd 動かすと光は往復するため、光路差は Δ = ΔL + 2Δd 変化します。検出強度は 2 光束干渉式で：</p>
+        $$I = I_0\,\cos^2\!\left(\frac{\pi\,\Delta}{\lambda}\right),\qquad \Delta = \Delta L + 2\,\Delta d$$
+        <p style="margin-top:6px;">中央の干渉次数と、Δd を動かしたとき通過する縞数：</p>
+        $$m = \frac{\Delta}{\lambda},\qquad N = \frac{2\,\Delta d}{\lambda}$$
+        <p style="margin-top:6px;">建設的干渉（明）は Δ = mλ、破壊的干渉（暗）は Δ = (m+½)λ。ミラーを λ/2 動かすごとに中央で縞が 1 本入れ替わります。</p>
+        <p style="margin-top:8px;font-size:.8rem;color:var(--muted)">検証例：λ=633 nm、Δd を 10 µm 動かすと N = 2·10000/633 ≈ 31.6 本の縞が通過します。</p>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-// ========== マイケルソン干渉計 Simulator ==========
+"use strict";
+// ========== Michelson Interferometer v2 ==========
+var L = {
+  play:'<i class="fas fa-play"></i> 自動走査',
+  pause:'<i class="fas fa-pause"></i> 一時停止',
+  bright:'建設的（明）',
+  dark:'破壊的（暗）',
+  scan:'Δd=',
+  optTitle:'マイケルソン干渉計',
+  passed:'通過縞 N='
+};
+
 var opticsCanvas = document.getElementById('opticsCanvas');
 var opticsCtx = opticsCanvas.getContext('2d');
 var fringeCanvas = document.getElementById('fringeCanvas');
 var fringeCtx = fringeCanvas.getContext('2d');
+var bullCanvas = document.getElementById('bullseyeCanvas');
+var bullCtx = bullCanvas.getContext('2d');
 var playing = false;
 var animId = null;
+var lastTs = 0;
+var DD_MAX = 5000; // mirror travel range (nm)
+
+function $(id){ return document.getElementById(id); }
 
 function getParams() {
-  var deltaUm = parseFloat(document.getElementById('slDelta').value);
-  var lambdaNm = parseFloat(document.getElementById('slLambda').value);
-  var mirrorNm = parseFloat(document.getElementById('slMirror').value);
-  var I0 = parseFloat(document.getElementById('slI0').value);
-  // convert all path-related quantities to nm for internal math
-  var deltaNm = deltaUm * 1000.0;
-  var totalNm = deltaNm + mirrorNm;
-  return { deltaUm: deltaUm, deltaNm: deltaNm, lambdaNm: lambdaNm, mirrorNm: mirrorNm, totalNm: totalNm, I0: I0 };
+  var deltaUm = parseFloat($('slDelta').value);
+  var lambdaNm = parseFloat($('slLambda').value);
+  var ddNm = parseFloat($('slMirror').value);      // mirror displacement Δd (nm)
+  var I0 = parseFloat($('slI0').value);
+  if (!isFinite(deltaUm)) deltaUm = 0;
+  if (!isFinite(ddNm)) ddNm = 0;
+  if (!isFinite(I0)) I0 = 1;
+  var deltaNm = deltaUm * 1000.0;                  // arm length diff in nm
+  var totalNm = deltaNm + 2 * ddNm;                // total optical path difference Δ
+  return { deltaUm: deltaUm, deltaNm: deltaNm, lambdaNm: lambdaNm, ddNm: ddNm, totalNm: totalNm, I0: I0 };
 }
 
+// I = I0 cos^2(pi * Delta / lambda)
 function intensity(p) {
-  var arg = 2 * Math.PI * p.totalNm / p.lambdaNm;
-  return p.I0 * Math.pow(Math.cos(arg), 2);
+  return p.I0 * Math.pow(Math.cos(Math.PI * p.totalNm / p.lambdaNm), 2);
 }
-
-function fringeOrder(p) {
-  return 2 * p.totalNm / p.lambdaNm;
-}
-
+// central order m = Delta / lambda
+function fringeOrder(p) { return p.totalNm / p.lambdaNm; }
+// fringes passed for the mirror travel: N = 2 Δd / lambda
+function fringesPassed(p) { return 2 * p.ddNm / p.lambdaNm; }
+// phase phi = 2 pi Delta / lambda, wrapped to [0,2pi)
 function phaseModTwoPi(p) {
-  var phi = 4 * Math.PI * p.totalNm / p.lambdaNm;
-  // wrap into [0, 2π)
+  var phi = 2 * Math.PI * p.totalNm / p.lambdaNm;
   var twoPi = 2 * Math.PI;
-  var m = phi - twoPi * Math.floor(phi / twoPi);
-  return m;
+  return phi - twoPi * Math.floor(phi / twoPi);
 }
 
-// Map wavelength (nm) -> approximate visible RGB. Outside visible range fall back to white.
 function waveToRGB(nm) {
   var r = 1, g = 1, b = 1;
   if (nm >= 380 && nm < 440) { r = (440 - nm) / (440 - 380); g = 0; b = 1; }
@@ -266,151 +337,181 @@ function waveToRGB(nm) {
   ];
 }
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
+function __cssW(c){ return parseFloat(c.dataset.cssW) || c.width / Math.min(window.devicePixelRatio || 1, 2.5); }
+function __cssH(c){ return parseFloat(c.dataset.cssH) || c.height / Math.min(window.devicePixelRatio || 1, 2.5); }
 
 function resizeCanvases() {
-  [opticsCanvas, fringeCanvas].forEach(function (cv) {
+  [[opticsCanvas, 0.5], [fringeCanvas, 0.5], [bullCanvas, 0.62]].forEach(function (pair) {
+    var cv = pair[0], ratio = pair[1];
     var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+    var h = Math.round(w * ratio);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    cv.dataset.cssW = String(w);
+    cv.dataset.cssH = String(h);
+    var c = cv.getContext && cv.getContext('2d');
+    if (c) c.setTransform(dpr, 0, 0, dpr, 0, 0);
   });
 }
 
 function drawOptics(p) {
-  var ctx = opticsCtx, W = __novaCanvasCssW(opticsCanvas), H = __novaCanvasCssH(opticsCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+  var ctx = opticsCtx, W = __cssW(opticsCanvas), H = __cssH(opticsCanvas);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
 
   var rgb = waveToRGB(p.lambdaNm);
-  var beamCol = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',0.85)';
+  var beamCol = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',0.9)';
   var beamColDim = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',0.55)';
 
-  // Layout: laser on left, BS in centre, M1 on right, M2 on top, detector on bottom
-  var bsX = W * 0.5, bsY = H * 0.5;
+  var bsX = W * 0.46, bsY = H * 0.5;
   var laserX = W * 0.08;
-  var armBaseLen = Math.min(W, H) * 0.32;
-  var armRight = armBaseLen;          // arm to M1 (reference)
-  // Encode ΔL as a small visual offset of M1 (clamped so it stays on canvas)
-  var visualShift = Math.max(-40, Math.min(40, p.deltaUm * 1.5));
-  var m1X = bsX + armRight + visualShift;
-  var m2Y = bsY - armBaseLen;
+  var armBaseLen = Math.min(W, H) * 0.34;
+  // M2 (movable) position encodes Δd live; M1 fixed; ΔL shifts M1 slightly
+  var ddPix = Math.max(-26, Math.min(26, p.ddNm / DD_MAX * 26));
+  var visualShift = Math.max(-32, Math.min(32, p.deltaUm * 1.2));
+  var m1X = bsX + armBaseLen + visualShift;
+  var m2Y = bsY - armBaseLen + ddPix;
   var detY = bsY + armBaseLen * 0.85;
 
-  // axes/grid faint
-  ctx.strokeStyle = 'rgba(143,184,224,0.08)'; ctx.lineWidth = 1;
-  for (var gx = 0; gx <= W; gx += 40) {
-    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
-  }
-  for (var gy = 0; gy <= H; gy += 40) {
-    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
-  }
+  ctx.strokeStyle = 'rgba(143,184,224,0.07)'; ctx.lineWidth = 1;
+  for (var gx = 0; gx <= W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+  for (var gy = 0; gy <= H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
 
-  // Beam 1: laser -> BS -> M1 -> BS -> detector (split into segments for clarity)
-  ctx.strokeStyle = beamCol; ctx.lineWidth = 2.5;
+  // Beam: laser -> BS -> M1 (arm 1)
+  ctx.strokeStyle = beamCol; ctx.lineWidth = 2.6;
   ctx.beginPath();
-  ctx.moveTo(laserX + 26, bsY); ctx.lineTo(bsX, bsY);          // laser -> BS
-  ctx.moveTo(bsX, bsY); ctx.lineTo(m1X, bsY);                  // BS -> M1
+  ctx.moveTo(laserX + 26, bsY); ctx.lineTo(m1X, bsY);
   ctx.stroke();
+  // arm 1 return + recombine to detector
   ctx.strokeStyle = beamColDim; ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(m1X, bsY + 4); ctx.lineTo(bsX + 4, bsY + 4);      // M1 -> BS (return)
-  ctx.lineTo(bsX + 4, detY);                                   // BS -> detector
+  ctx.moveTo(m1X, bsY + 4); ctx.lineTo(bsX + 4, bsY + 4); ctx.lineTo(bsX + 4, detY);
   ctx.stroke();
-
-  // Beam 2: BS -> M2 -> BS -> detector
-  ctx.strokeStyle = beamCol; ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(bsX, bsY); ctx.lineTo(bsX, m2Y);                  // BS -> M2 (up)
-  ctx.stroke();
+  // Beam: BS -> M2 (arm 2, vertical)
+  ctx.strokeStyle = beamCol; ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.moveTo(bsX, bsY); ctx.lineTo(bsX, m2Y); ctx.stroke();
   ctx.strokeStyle = beamColDim; ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(bsX - 4, m2Y); ctx.lineTo(bsX - 4, bsY - 4);      // M2 -> BS (return)
-  ctx.lineTo(detY > bsY ? bsX - 4 : bsX - 4, bsY - 4);
-  ctx.lineTo(bsX - 4, detY);                                   // BS -> detector
+  ctx.moveTo(bsX - 4, m2Y); ctx.lineTo(bsX - 4, bsY - 4); ctx.lineTo(bsX - 4, detY);
   ctx.stroke();
 
-  // Beam splitter (BS) at 45 degrees
-  ctx.save();
-  ctx.translate(bsX, bsY);
-  ctx.rotate(-Math.PI / 4);
-  ctx.fillStyle = 'rgba(120,200,255,0.35)';
-  ctx.fillRect(-30, -3, 60, 6);
-  ctx.strokeStyle = '#7ad1ff'; ctx.lineWidth = 1.5;
-  ctx.strokeRect(-30, -3, 60, 6);
+  // Beam splitter at 45 deg
+  ctx.save(); ctx.translate(bsX, bsY); ctx.rotate(-Math.PI / 4);
+  ctx.fillStyle = 'rgba(120,200,255,0.35)'; ctx.fillRect(-30, -3, 60, 6);
+  ctx.strokeStyle = '#7ad1ff'; ctx.lineWidth = 1.5; ctx.strokeRect(-30, -3, 60, 6);
   ctx.restore();
+  ctx.fillStyle = '#9fd0ff'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('BS', bsX - 24, bsY - 16);
 
   // Laser source
-  ctx.fillStyle = '#13294a';
-  ctx.fillRect(laserX - 18, bsY - 14, 44, 28);
-  ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 2;
-  ctx.strokeRect(laserX - 18, bsY - 14, 44, 28);
+  ctx.fillStyle = '#13294a'; ctx.fillRect(laserX - 18, bsY - 14, 44, 28);
+  ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 2; ctx.strokeRect(laserX - 18, bsY - 14, 44, 28);
   ctx.fillStyle = '#FFD166'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
   ctx.fillText('Laser', laserX + 4, bsY + 4);
 
-  // Mirror M1 (vertical bar on right)
-  ctx.fillStyle = '#cfe3f7';
-  ctx.fillRect(m1X, bsY - 20, 6, 40);
-  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
-  ctx.fillText('M1', m1X + 10, bsY - 6);
-  // ΔL annotation
+  // M1 fixed (vertical bar right)
+  ctx.fillStyle = '#cfe3f7'; ctx.fillRect(m1X, bsY - 22, 6, 44);
+  ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('M1', m1X + 10, bsY - 8);
   ctx.fillStyle = '#FFD166'; ctx.font = '10px "Roboto Mono",monospace';
-  ctx.fillText('ΔL=' + p.deltaUm.toFixed(2) + ' μm', m1X + 10, bsY + 14);
+  ctx.fillText('ΔL=' + p.deltaUm.toFixed(2) + ' μm', m1X + 10, bsY + 12);
 
-  // Mirror M2 (horizontal bar on top)
-  ctx.fillStyle = '#cfe3f7';
-  ctx.fillRect(bsX - 20, m2Y - 6, 40, 6);
-  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
-  ctx.fillText('M2 (+d)', bsX + 24, m2Y - 4);
+  // M2 movable (horizontal bar top) + travel arrow
+  ctx.fillStyle = '#7CFC8A'; ctx.fillRect(bsX - 22, m2Y - 6, 44, 6);
+  ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('M2', bsX + 26, m2Y - 4);
   ctx.fillStyle = '#FFD166'; ctx.font = '10px "Roboto Mono",monospace';
-  ctx.fillText('d=' + p.mirrorNm.toFixed(0) + ' nm', bsX + 24, m2Y + 12);
+  ctx.fillText('Δd=' + p.ddNm.toFixed(0) + ' nm', bsX + 26, m2Y + 12);
+  // movement arrow on M2
+  ctx.strokeStyle = '#7CFC8A'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(bsX, m2Y - 14); ctx.lineTo(bsX, m2Y - 26); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bsX - 4, m2Y - 21); ctx.lineTo(bsX, m2Y - 27); ctx.lineTo(bsX + 4, m2Y - 21); ctx.stroke();
 
-  // Detector (square at bottom)
-  ctx.fillStyle = '#13294a';
-  ctx.fillRect(bsX - 22, detY - 14, 44, 28);
-  ctx.strokeStyle = '#4dabff'; ctx.lineWidth = 2;
-  ctx.strokeRect(bsX - 22, detY - 14, 44, 28);
+  // Detector
+  ctx.fillStyle = '#13294a'; ctx.fillRect(bsX - 22, detY - 14, 44, 28);
+  ctx.strokeStyle = '#4dabff'; ctx.lineWidth = 2; ctx.strokeRect(bsX - 22, detY - 14, 44, 28);
   ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
   ctx.fillText('Detector', bsX, detY + 4);
 
-  // Intensity display next to detector
   var I = intensity(p);
   ctx.fillStyle = '#FFD166'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'left';
-  ctx.fillText('I/I0 = ' + I.toFixed(3), bsX + 32, detY + 4);
+  ctx.fillText('I/I0 = ' + (I / Math.max(1e-9, p.I0)).toFixed(3), bsX + 32, detY + 4);
 
-  // Title
   ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
-  ctx.fillText('マイケルソン干渉計', 12, 16);
+  ctx.fillText(L.optTitle, 12, 16);
+}
+
+// Concentric equal-inclination fringes; ring radii from 2 d cosθ = m λ
+function drawBullseye(p) {
+  var ctx = bullCtx, W = __cssW(bullCanvas), H = __cssH(bullCanvas);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
+  var cx = W * 0.5, cy = H * 0.5;
+  var Rmax = Math.min(W, H) * 0.46;
+  var rgb = waveToRGB(p.lambdaNm);
+
+  // central order; rings appear where phase = 2 pi * (Delta/lambda) * cos(theta-ish r mapping)
+  var m0 = p.totalNm / p.lambdaNm;            // central order
+  // radial fringe field: I(r) = I0 cos^2(pi * Delta/lambda * (1 - alpha r^2))
+  // gives concentric rings that expand/contract as Delta changes.
+  var img = ctx.createImageData(Math.round(W), Math.round(H));
+  var data = img.data;
+  var dpr = 1; // we drew in CSS px already via createImageData on css size
+  var Wp = Math.round(W), Hp = Math.round(H);
+  // recompute with device-independent loop over css pixels
+  var alpha = 1.6 / (Rmax * Rmax);
+  for (var y = 0; y < Hp; y++) {
+    for (var x = 0; x < Wp; x++) {
+      var dx = x - cx, dy = y - cy;
+      var rr = dx * dx + dy * dy;
+      var r = Math.sqrt(rr);
+      var idx = (y * Wp + x) * 4;
+      if (r > Rmax) { data[idx] = 10; data[idx+1] = 25; data[idx+2] = 41; data[idx+3] = 255; continue; }
+      // effective order falls with radius (equal inclination): m_eff = m0*(1 - alpha r^2)
+      var ph = Math.PI * (p.totalNm / p.lambdaNm) * (1 - alpha * rr);
+      var c = Math.cos(ph); var Irel = c * c; // 0..1
+      var fall = 1 - 0.25 * (r / Rmax); // mild vignette
+      var v = Irel * fall;
+      data[idx] = Math.round(rgb[0] * v);
+      data[idx+1] = Math.round(rgb[1] * v);
+      data[idx+2] = Math.round(rgb[2] * v);
+      data[idx+3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  // overlay: central order + bright/dark badge
+  ctx.font = 'bold 12px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(10,22,40,0.65)'; ctx.fillRect(8, 8, 150, 40);
+  ctx.fillStyle = '#cfe3f7';
+  ctx.fillText('m(center) = ' + m0.toFixed(2), 14, 24);
+  var frac = Math.abs(m0 - Math.round(m0));
+  var constructive = frac < 0.25;
+  ctx.fillStyle = constructive ? '#7CFC8A' : '#ff8a8a';
+  ctx.fillText(constructive ? L.bright : L.dark, 14, 40);
+
+  // crosshair marking center
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx - 7, cy); ctx.lineTo(cx + 7, cy); ctx.moveTo(cx, cy - 7); ctx.lineTo(cx, cy + 7); ctx.stroke();
 }
 
 function drawFringe(p) {
-  var ctx = fringeCtx, W = __novaCanvasCssW(fringeCanvas), H = __novaCanvasCssH(fringeCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 56, my = 28;
-  var x0 = mx, x1 = W - 14, y0 = H - my, y1 = my;
+  var ctx = fringeCtx, W = __cssW(fringeCanvas), H = __cssH(fringeCanvas);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
+  var x0 = 56, x1 = W - 14, y0 = H - 28, y1 = 28;
   var gw = x1 - x0, gh = y0 - y1;
 
-  // Sweep mirror movement d from 0 to lambda (one full mirror cycle = 2 fringes)
-  var dMin = 0, dMax = p.lambdaNm; // nm
+  // window of mirror travel around current Δd: show 2 lambda span (4 fringes)
+  var span = 2 * p.lambdaNm; // in Δd nm => optical path 4 lambda
+  var dCenter = p.ddNm;
+  var dMin = Math.max(0, dCenter - span / 2);
+  var dMax = dMin + span;
+  if (dMax > DD_MAX) { dMax = DD_MAX; dMin = Math.max(0, dMax - span); }
 
   function tx(d) { return x0 + (d - dMin) / (dMax - dMin) * gw; }
   function ty(I) { return y0 - I / Math.max(1e-6, p.I0) * gh; }
 
-  // grid: vertical at λ/4, λ/2, 3λ/4, λ
   ctx.strokeStyle = 'rgba(143,184,224,0.12)'; ctx.lineWidth = 1;
   for (var k = 0; k <= 4; k++) {
     var dv = dMin + (dMax - dMin) * k / 4;
@@ -420,112 +521,160 @@ function drawFringe(p) {
     var Iv = p.I0 * k2 / 4;
     ctx.beginPath(); ctx.moveTo(x0, ty(Iv)); ctx.lineTo(x1, ty(Iv)); ctx.stroke();
   }
-
-  // axes
   ctx.strokeStyle = 'rgba(143,184,224,0.6)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
 
-  // labels
-  ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('0', tx(0), y0 + 14);
-  ctx.fillText('λ/4', tx(p.lambdaNm * 0.25), y0 + 14);
-  ctx.fillText('λ/2', tx(p.lambdaNm * 0.5), y0 + 14);
-  ctx.fillText('3λ/4', tx(p.lambdaNm * 0.75), y0 + 14);
-  ctx.fillText('λ', tx(p.lambdaNm), y0 + 14);
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  for (var t = 0; t <= 4; t++) {
+    var dvv = dMin + (dMax - dMin) * t / 4;
+    ctx.fillText(dvv.toFixed(0), tx(dvv), y0 + 14);
+  }
+  ctx.fillText('Δd [nm]', (x0 + x1) / 2, H - 4);
   ctx.textAlign = 'right';
   ctx.fillText('0', x0 - 4, y0 + 4);
-  ctx.fillText('I0/2', x0 - 4, ty(p.I0 * 0.5) + 4);
   ctx.fillText('I0', x0 - 4, y1 + 8);
 
-  // I(d) curve: with current ΔL and λ fixed, sweep mirror d from 0..λ
-  ctx.beginPath();
-  var N = 200;
   var rgb = waveToRGB(p.lambdaNm);
   var curveCol = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',0.95)';
-  for (var i = 0; i <= N; i++) {
-    var dv2 = dMin + (dMax - dMin) * i / N;
-    var totNm = p.deltaNm + dv2;
-    var Ii = p.I0 * Math.pow(Math.cos(2 * Math.PI * totNm / p.lambdaNm), 2);
-    var px = tx(dv2), py = ty(Ii);
+  ctx.beginPath();
+  var Nn = 240;
+  for (var i = 0; i <= Nn; i++) {
+    var dd = dMin + (dMax - dMin) * i / Nn;
+    var tot = p.deltaNm + 2 * dd;
+    var Ii = p.I0 * Math.pow(Math.cos(Math.PI * tot / p.lambdaNm), 2);
+    var px = tx(dd), py = ty(Ii);
     if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
   }
-  ctx.strokeStyle = curveCol; ctx.lineWidth = 2.5;
-  ctx.stroke();
+  ctx.strokeStyle = curveCol; ctx.lineWidth = 2.5; ctx.stroke();
 
-  // current marker at slMirror value
-  var dCur = Math.max(dMin, Math.min(dMax, p.mirrorNm));
+  // current marker
   var Icur = intensity(p);
-  var cx = tx(dCur), cy = ty(Icur);
-  ctx.strokeStyle = 'rgba(255,209,102,0.45)'; ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath(); ctx.moveTo(cx, y0); ctx.lineTo(cx, cy); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, cy); ctx.lineTo(cx, cy); ctx.stroke();
+  var cxp = tx(dCenter), cyp = ty(Icur);
+  ctx.strokeStyle = 'rgba(255,209,102,0.45)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(cxp, y0); ctx.lineTo(cxp, cyp); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0, cyp); ctx.lineTo(cxp, cyp); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFD166';
-  ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 12;
-  ctx.fill(); ctx.shadowBlur = 0;
+  ctx.beginPath(); ctx.arc(cxp, cyp, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFD166'; ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0;
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+}
 
-  // legend
-  ctx.fillStyle = '#FFD166'; ctx.textAlign = 'left'; ctx.font = '11px "Roboto Mono",monospace';
-  ctx.fillText('● d = ' + dCur.toFixed(0) + ' nm, I/I0 = ' + (Icur / Math.max(1e-9, p.I0)).toFixed(3), x0 + 8, y1 + 14);
+function updateReadouts(p) {
+  var I = intensity(p);
+  var Irel = I / Math.max(1e-9, p.I0);
+  var m = fringeOrder(p);
+  var Np = fringesPassed(p);
+  $('roDd').textContent = p.ddNm.toFixed(0);
+  $('roDelta').textContent = p.totalNm.toFixed(0);
+  $('roM').textContent = m.toFixed(2);
+  $('roN').textContent = Np.toFixed(2);
+  $('roI').textContent = Irel.toFixed(3);
+  var frac = Math.abs(m - Math.round(m));
+  var card = $('roIcard');
+  card.classList.toggle('bright', frac < 0.25);
+  card.classList.toggle('dark', frac >= 0.25);
+  $('condBadge').textContent = (frac < 0.25 ? L.bright : (frac > 0.4 ? L.dark : '')) +
+    (Np >= 1 ? '  ·  ' + L.passed + Np.toFixed(1) : '');
+  $('condBadge').style.color = frac < 0.25 ? '#00b894' : '#e17055';
+  $('scanVal').textContent = L.scan + p.ddNm.toFixed(0) + ' nm';
 }
 
 function compute() {
   var p = getParams();
   if (!isFinite(p.lambdaNm) || p.lambdaNm <= 0) return;
   var I = intensity(p);
-  var phi = phaseModTwoPi(p);
-  var m = fringeOrder(p);
-  var spacing = p.lambdaNm / 2;
   document.getElementById('statI').textContent = (I / Math.max(1e-9, p.I0)).toFixed(3);
-  document.getElementById('statPhase').textContent = phi.toFixed(3) + ' rad';
-  document.getElementById('statFringe').textContent = m.toFixed(3);
-  document.getElementById('statSpacing').textContent = spacing.toFixed(1) + ' nm';
+  document.getElementById('statPhase').textContent = phaseModTwoPi(p).toFixed(3) + ' rad';
+  document.getElementById('statFringe').textContent = fringeOrder(p).toFixed(3);
+  document.getElementById('statSpacing').textContent = (p.lambdaNm / 2).toFixed(1) + ' nm';
+  updateReadouts(p);
   drawOptics(p);
+  drawBullseye(p);
   drawFringe(p);
 }
 
-function animationStep() {
-  if (!playing) return;
-  var sl = document.getElementById('slMirror');
-  var v = parseFloat(sl.value) + 8;
-  if (v > 1500) v = 0;
-  sl.value = v;
-  updateSlider(sl, 'slMirrorVal', 0, '');
+function onScan() {
+  if (typeof updateSlider === 'function') updateSlider($('slMirror'), 'scanVal', 0, '');
   compute();
-  animId = requestAnimationFrame(animationStep);
+}
+
+// rAF auto-scan of M2
+var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function loop(ts) {
+  if (!playing) { animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dt = Math.min(0.05, (ts - lastTs) / 1000); lastTs = ts;
+  var sl = $('slMirror');
+  var v = parseFloat(sl.value) + dt * 1200; // 1200 nm/s
+  if (v > DD_MAX) v = 0;
+  sl.value = v;
+  compute();
+  animId = requestAnimationFrame(loop);
 }
 
 function togglePlay() {
   playing = !playing;
-  var btn = document.getElementById('playBtn');
+  var btn = $('playBtn');
   if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
+    btn.innerHTML = L.pause;
+    lastTs = 0;
+    if (prefersReduced) { // static: advance one fringe step instead of animating
+      var sl = $('slMirror');
+      var lam = parseFloat($('slLambda').value) || 633;
+      sl.value = Math.min(DD_MAX, parseFloat(sl.value) + lam / 2);
+      compute();
+      playing = false; btn.innerHTML = L.play;
+      return;
+    }
+    animId = requestAnimationFrame(loop);
   } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> ミラー走査';
+    btn.innerHTML = L.play;
     if (animId) cancelAnimationFrame(animId);
   }
+}
+
+function setPreset(name) {
+  var P = {
+    mono:  { lambda: 633, delta: 1.00, dd: 0,   I0: 1.00 },
+    green: { lambda: 532, delta: 1.00, dd: 0,   I0: 1.00 },
+    white: { lambda: 550, delta: 0.05, dd: 0,   I0: 1.00 },
+    comp:  { lambda: 633, delta: 0.00, dd: 0,   I0: 1.00 }
+  }[name];
+  if (!P) return;
+  $('slLambda').value = P.lambda; $('slLambdaVal').value = P.lambda;
+  $('slDelta').value = P.delta;   $('slDeltaVal').value = P.delta.toFixed(2);
+  $('slMirror').value = P.dd;
+  $('slI0').value = P.I0;          $('slI0Val').value = P.I0.toFixed(2);
+  if (typeof updateSlider === 'function') {
+    updateSlider($('slLambda'), 'slLambdaVal', 0, '');
+    updateSlider($('slDelta'), 'slDeltaVal', 2, '');
+    updateSlider($('slI0'), 'slI0Val', 2, '');
+  }
+  document.querySelectorAll('.preset-btn').forEach(function (b) { b.classList.remove('active'); });
+  compute();
 }
 
 function resetParams() {
   playing = false;
   if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> ミラー走査';
-  var defs = { slDelta: 1.00, slLambda: 633, slMirror: 0, slI0: 1.00 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slDelta'), 'slDeltaVal', 2, '');
-  updateSlider(document.getElementById('slLambda'), 'slLambdaVal', 0, '');
-  updateSlider(document.getElementById('slMirror'), 'slMirrorVal', 0, '');
-  updateSlider(document.getElementById('slI0'), 'slI0Val', 2, '');
+  $('playBtn').innerHTML = L.play;
+  $('slDelta').value = 1.00; $('slDeltaVal').value = '1.00';
+  $('slLambda').value = 633; $('slLambdaVal').value = '633';
+  $('slMirror').value = 0;
+  $('slI0').value = 1.00; $('slI0Val').value = '1.00';
+  if (typeof updateSlider === 'function') {
+    updateSlider($('slDelta'), 'slDeltaVal', 2, '');
+    updateSlider($('slLambda'), 'slLambdaVal', 0, '');
+    updateSlider($('slI0'), 'slI0Val', 2, '');
+  }
+  document.querySelectorAll('.preset-btn').forEach(function (b) { b.classList.remove('active'); });
   compute();
 }
+
+bullCanvas.addEventListener('keydown', function (e) {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePlay(); }
+});
 
 window.addEventListener('resize', function () { resizeCanvases(); compute(); });
 
@@ -605,6 +754,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="michelson-interferometer.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -658,15 +810,15 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>光路差スライダー（slDelta）で0～10μmの範囲を調整し、ビームスプリッターから各ミラーまでの距離差を設定します</li>
-<li>波長スライダー（slLambda）で可視光領域の405nm～700nmを選択（紫外線測定の場合は248nm、赤外線の場合は1550nmに対応）</li>
-<li>ミラー反射率（slMirror）と入射光強度I0（slI0）を調整して、実際の光学系の損失と検出強度を反映させます</li>
+<li>光路差スライダー（slDelta）で-50～50μmの範囲を調整し、ビームスプリッターから各ミラーまでの距離差を設定します</li>
+<li>波長スライダー（slLambda）で200nm～1100nmの範囲を選択（紫外線測定の場合は248nm、近赤外の場合は1064nmに対応）</li>
+<li>ミラー追加移動d（slMirror）で片側ミラーの変位を0～1500nmの範囲で与え、入射光強度I0（slI0）で検出強度のスケールを調整します</li>
 <li>リアルタイムで検出強度I/I0、位相差（mod 2π）、縞次数m、1縞当たりのミラー移動量λ/2が計算・表示されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>HeNeレーザー（λ=632.8nm）を用いた長さ測定でミラー間光路差Δ=3.164μmに設定した場合、位相差は2π×（3164nm/632.8nm）≈31.4rad（mod 2π≈5.6rad）となり、縞次数m=5となります。各ミラー反射率95%（損失5%）でI0=1mWの場合、検出強度I=0.9mW前後で明線が観測され、ミラーを λ/2=316.4nm移動させると次の明線に遷移します。精密測長では0.1μmの光路差変化が検出可能です</p>
+<p>HeNeレーザー（λ=632.8nm）を用いた長さ測定でミラー間光路差Δ=3.164μmに設定した場合、位相差は4π×（3164nm/632.8nm）≈62.8rad（mod 2π≈0rad）となり、縞次数m=10の明線に対応します。各ミラー反射率95%（損失5%）でI0=1mWの場合、検出強度I=0.9mW前後で明線が観測され、ミラーを λ/2=316.4nm移動させると次の明線に遷移します。精密測長では0.1μmの光路差変化が検出可能です</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -677,6 +829,16 @@ compute();
 <li>紫外領域（λ<400nm）での測定では石英光学系が必須で、通常のガラス部品は吸収により損失が5倍以上増加します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -43,14 +43,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "特殊相対性理論シミュレーター",
       "description": "速度スライダーでローレンツ因子γ・時間膨張・長さ収縮・相対論的運動エネルギーをリアルタイム計算。ミンコフスキー時空図と速度合成則も可視化。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/special-relativity.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "keywords": "特殊相対性理論,ローレンツ因子,時間膨張,長さ収縮,相対論的質量,ミンコフスキー時空図"
@@ -251,7 +251,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <input type="range" id="uSlider" min="-0.9999" max="0.9999" step="0.0001" value="0.6" oninput="syncToNum('uSlider','uVal');updateSlider(this,'uVal',3,'');compute()">
     </div>
     <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;">合成速度 u': <strong id="statUPrime" style="color:var(--accent);">—</strong></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="カオス・フラクタルの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">カオス・フラクタル の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -277,6 +285,19 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-rocket"></i> 実時間ショーケース：動く時計は遅れ、動く定規は縮む</div>
+      <div id="heroControls" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <button type="button" class="btn" id="heroPlay" aria-label="再生/一時停止"><i class="fas fa-pause"></i> 一時停止</button>
+        <button type="button" class="btn secondary" id="heroReset" aria-label="最初から"><i class="fas fa-undo"></i> リセット</button>
+        <label style="font-size:.76rem;color:var(--muted);display:flex;align-items:center;gap:6px">速さ
+          <input type="range" id="heroSpeed" min="0.25" max="3" step="0.25" value="1" style="width:90px" aria-label="アニメーション速度">
+          <span id="heroSpeedVal" style="font-family:monospace">1.0×</span>
+        </label>
+      </div>
+      <canvas id="heroCanvas" height="340" role="img" aria-label="光速に近い速度で進む宇宙船の長さ収縮と、船内時計が遅れる様子のアニメーション"></canvas>
+    </div>
+
       <div class="tab-row">
         <button class="tab-btn active" id="tabMinkowski" onclick="showTab('minkowski')">時空図 (Minkowski)</button>
         <button class="tab-btn" id="tabRocket" onclick="showTab('rocket')">ロケットアニメーション</button>
@@ -284,7 +305,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
 
       <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> ミンコフスキー図</div><canvas id="canvasMinkowski" height="380"></canvas></div>
-      <canvas id="canvasRocket" height="380" style="display:none"></canvas>
+      <div class="chart-card" id="rocketCard" style="display:none"><div class="chart-title"><i class="fas fa-rocket"></i> ロケットアニメーション（静止 vs 移動）</div><canvas id="canvasRocket" height="380"></canvas></div>
       <div id="chartContainer" style="display:none;background:#fff;border-radius:8px;padding:8px;"><div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> ガンマ</div><canvas class="ux-chartjs-canvas" id="chartGamma" height="300"></canvas></div></div>
     
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
@@ -326,7 +347,7 @@ let chartGammaObj = null;
 function showTab(t){
   currentTab = t;
   document.getElementById('canvasMinkowski').style.display = t === 'minkowski' ? 'block' : 'none';
-  document.getElementById('canvasRocket').style.display = t === 'rocket' ? 'block' : 'none';
+  document.getElementById('rocketCard').style.display = t === 'rocket' ? 'block' : 'none';
   document.getElementById('chartContainer').style.display = t === 'chart' ? 'block' : 'none';
   ['tabMinkowski','tabRocket','tabChart'].forEach(id => {
     document.getElementById(id).classList.remove('active');
@@ -555,6 +576,140 @@ window.addEventListener('load', () =>{
 });
 </script>
 
+<script>
+/* === v2 hero: real-time time-dilation & length-contraction showcase (IIFE, isolated) === */
+(function(){
+  var cv = document.getElementById('heroCanvas');
+  if(!cv) return;
+  var ctx = cv.getContext('2d');
+  var L = {
+    rest: '静止系（地上）', moving: '宇宙船（移動系）',
+    restClock: '静止時計', shipClock: '船内時計（遅い）',
+    properT: '固有時間 τ', coordT: '座標時間 t',
+    len: '長さ', factor: 'γ', contracted: '収縮率',
+    slow: 'ゆっくり進む', dilation: '時間の遅れ', beta: 'β = v/c'
+  };
+  var running = true, speed = 1, t0 = null, rocketX = 0;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function getBeta(){ var e=document.getElementById('betaSlider'); return e?Math.min(0.99999,parseFloat(e.value)||0):0.5; }
+  function getDt0(){ var e=document.getElementById('dt0Slider'); return e?(parseFloat(e.value)||1):1; }
+  function getL0(){ var e=document.getElementById('L0Slider'); return e?(parseFloat(e.value)||100):100; }
+  function gammaOf(b){ return 1/Math.sqrt(1-b*b); }
+
+  function setup(){
+    var W = cv.offsetWidth || 600, H = 340;
+    var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    cv.style.width = W+'px'; cv.style.height = H+'px';
+    cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    return {W:W,H:H};
+  }
+
+  function fmt(x,d){ return x.toFixed(d); }
+
+  function drawClock(x,y,r,frac,color,label,sub){
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.fillStyle='rgba(255,255,255,0.04)';
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    var ang = -Math.PI/2 + frac*Math.PI*2;
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(ang)*r*0.78, y+Math.sin(ang)*r*0.78); ctx.stroke();
+    ctx.fillStyle=color; ctx.beginPath(); ctx.arc(x,y,2.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText(label, x, y+r+15);
+    if(sub){ ctx.fillStyle=color; ctx.font='11px Roboto Mono'; ctx.fillText(sub, x, y+r+30); }
+    ctx.textAlign='left';
+  }
+
+  function frame(ts){
+    if(t0===null) t0=ts;
+    var dt = Math.min(0.05,(ts-t0)/1000); t0=ts;
+    var dim = setup(); var W=dim.W, H=dim.H;
+    var beta = getBeta(), g = gammaOf(beta), L0 = getL0(), dt0 = getDt0();
+    var Lp = L0/g;
+
+    if(running && !reduce){ rocketX += beta * speed * 90 * dt; }
+    var trackL = W*0.7, trackX0 = W*0.16;
+    if(rocketX > trackL+80) rocketX = -10;
+
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+
+    /* ground track + ruler */
+    var gy = H*0.62;
+    ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(trackX0,gy); ctx.lineTo(trackX0+trackL,gy); ctx.stroke();
+    for(var i=0;i<=10;i++){ var tx=trackX0+i*trackL/10; ctx.beginPath(); ctx.moveTo(tx,gy-5); ctx.lineTo(tx,gy+5); ctx.stroke(); }
+
+    /* reference (proper-length, at rest) rocket — faint outline */
+    var pxScale = (trackL*0.30)/Math.max(L0,1);
+    var refW = L0*pxScale, movW = Lp*pxScale;
+    ctx.setLineDash([4,3]); ctx.strokeStyle='rgba(0,180,216,0.5)'; ctx.lineWidth=1.5;
+    ctx.strokeRect(trackX0, gy-46, refW, 22); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(0,180,216,0.7)'; ctx.font='10px Noto Sans JP';
+    ctx.fillText(L.rest+' L₀='+fmt(L0,0)+'m', trackX0, gy-52);
+
+    /* moving rocket (length-contracted) */
+    var rx = trackX0 + (reduce? trackL*0.4 : rocketX);
+    if(rx>trackX0+trackL) rx=trackX0+trackL;
+    var ry = gy-20;
+    ctx.fillStyle='rgba(255,107,107,0.18)'; ctx.strokeStyle='#ff6b6b'; ctx.lineWidth=2;
+    /* body */
+    ctx.beginPath();
+    ctx.moveTo(rx, ry); ctx.lineTo(rx+movW*0.78, ry);
+    ctx.lineTo(rx+movW, ry+9); ctx.lineTo(rx+movW*0.78, ry+18); ctx.lineTo(rx, ry+18);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    /* flame */
+    ctx.fillStyle='#FFD700'; ctx.beginPath();
+    ctx.moveTo(rx, ry+3); ctx.lineTo(rx-8-Math.random()*4*(running&&!reduce?1:0), ry+9); ctx.lineTo(rx, ry+15); ctx.closePath(); ctx.fill();
+
+    /* velocity arrow */
+    ctx.strokeStyle='#FFD700'; ctx.fillStyle='#FFD700'; ctx.lineWidth=2;
+    var aX=rx+movW+10, aY=ry+9, aLen=Math.min(beta*70,70);
+    ctx.beginPath(); ctx.moveTo(aX,aY); ctx.lineTo(aX+aLen,aY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(aX+aLen,aY); ctx.lineTo(aX+aLen-7,aY-4); ctx.lineTo(aX+aLen-7,aY+4); ctx.closePath(); ctx.fill();
+    ctx.font='10px Roboto Mono'; ctx.fillText('v='+fmt(beta,3)+'c', aX, aY-7);
+    ctx.fillStyle='#ff6b6b'; ctx.font='10px Noto Sans JP';
+    ctx.fillText(L.moving+' L′='+fmt(Lp,1)+'m', rx, ry+32);
+
+    /* two clocks: stationary (full speed) vs onboard (slow by 1/γ) */
+    var elapsed = (ts/1000);
+    var restFrac = (elapsed*0.5*speed)%1;
+    var shipFrac = (elapsed*0.5*speed/g)%1;
+    drawClock(W*0.30, H*0.20, 26, restFrac, '#00B4D8', L.restClock, 't='+fmt(elapsed*0.5*speed,1)+'s');
+    drawClock(W*0.70, H*0.20, 26, shipFrac, '#ff6b6b', L.shipClock, 'τ='+fmt(elapsed*0.5*speed/g,1)+'s');
+    /* arrow between clocks */
+    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(W*0.30+30,H*0.20); ctx.lineTo(W*0.70-30,H*0.20); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='10px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText(L.dilation+' ×'+fmt(g,2), W*0.5, H*0.20-32); ctx.textAlign='left';
+
+    /* readouts strip */
+    ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='12px Roboto Mono';
+    var ry2 = H-14;
+    ctx.fillText(L.beta+'='+fmt(beta,3)+'   γ='+fmt(g,3)+'   Δt=γΔt₀='+fmt(g*dt0,2)+'s   L′=L₀/γ='+fmt(Lp,1)+'m   '+L.contracted+'='+fmt(100/g,1)+'%', 12, ry2);
+
+    requestAnimationFrame(frame);
+  }
+
+  function staticFrame(){ t0=null; requestAnimationFrame(frame); }
+
+  var playBtn = document.getElementById('heroPlay');
+  if(playBtn) playBtn.addEventListener('click', function(){
+    running=!running;
+    playBtn.innerHTML = running? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+  });
+  var resetBtn = document.getElementById('heroReset');
+  if(resetBtn) resetBtn.addEventListener('click', function(){ rocketX=0; });
+  var spd = document.getElementById('heroSpeed');
+  if(spd) spd.addEventListener('input', function(){ speed=parseFloat(spd.value)||1; var v=document.getElementById('heroSpeedVal'); if(v) v.textContent=speed.toFixed(1)+'×'; });
+
+  if(reduce){ running=false; if(playBtn) playBtn.innerHTML='<i class="fas fa-play"></i> 再生'; }
+  if(document.readyState==='complete') staticFrame();
+  else window.addEventListener('load', staticFrame);
+})();
+</script>
+
 <section class="explanation">
   <h2>特殊相対性理論とは</h2>
   <div class="chat">
@@ -590,7 +745,7 @@ window.addEventListener('load', () =>{
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">速度合成則の可視化では、なぜ単純な足し算にならないのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">光速が全慣性系で一定という原理のため、通常の速度の加法は成り立ちません。シミュレーターでは相対論的速度合成式（w = (u+v)/(1+uv/c²)）を用いて計算しており、結果が常に光速未満になることを確認できます。スライダーで両方の速度を変えて確認してみてください。</div>
+    <div class="faq-a">光速が全慣性系で一定という原理のため、通常の速度の加法は成り立ちません。シミュレーターは相対論的速度変換式 u' = (u − v)/(1 − uv/c²) を用い、系S内の物体速度uを速度vで動く系S'から見た速度u'に変換します。結果は常に光速未満です。例えば u=0.9c、互いに逆向きに v=−0.9c とすると u'=(0.9−(−0.9))/(1−0.9·(−0.9))≈0.994c となり、c を超えません。スライダーで u と β を変えて確認してみてください。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">ミンコフスキー時空図で、斜めの線（世界線）の傾きは何を意味しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -614,6 +769,9 @@ window.addEventListener('load', () =>{
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="special-relativity.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -685,6 +843,16 @@ window.addEventListener('load', () =>{
 <li>ローレンツ因子がγ>2の領域では古典力学が完全に破綻するため、素粒子物理学シミュレーションは必ず相対論的公式を使用してください。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="カオス・フラクタルの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">カオス・フラクタル の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -104,14 +104,14 @@ canvas{max-width:100%}.info-panel{background:#f0f7ff;border:1px solid #c3dafe;bo
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "噴流混合・速度/温度プロファイル発達シミュレーター",
       "description": "円形・平板噴流の速度プロファイル・温度プロファイル・中心線速度減衰・噴流拡がりをインタラクティブに可視化。乱流噴流の発達特性とエントレインメント比をリアルタイム計算。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/jet-mixing.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -233,10 +233,28 @@ canvas{max-width:100%}.info-panel{background:#f0f7ff;border:1px solid #c3dafe;bo
 <div class="range-row"><span>1</span><span>40</span></div>
 </div>
 <div class="info-panel" id="infoPanel"></div>
-
-</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 <div class="viz-panel">
-<div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+<div class="chart-card"><div class="chart-title"><i class="fas fa-wind"></i> 乱流噴流の混合アニメーション（噴流が広がり周囲流体を取り込む）</div>
+<canvas id="jetCanvas" height="300" style="width:100%;border-radius:8px;background:#06101f;display:block" role="img" aria-label="ノズルから噴出した乱流噴流が下流に向かって広がり、周囲流体を取り込みながら中心速度と濃度が減衰する様子のアニメーション"></canvas>
+<div class="stats-row" style="margin-top:14px">
+<div class="stat-card"><div class="val sv" id="liveUc">—</div><div class="lbl sl">中心線速度 U_c [m/s]</div></div>
+<div class="stat-card"><div class="val sv" id="liveHW">—</div><div class="lbl sl">噴流半幅 r₁/₂ [mm]</div></div>
+<div class="stat-card"><div class="val sv" id="liveEnt">—</div><div class="lbl sl">エントレインメント Q/Q_j</div></div>
+<div class="stat-card"><div class="val sv" id="liveDil">—</div><div class="lbl sl">中心濃度 C_c/C_0</div></div>
+</div>
+<div style="font-size:.72rem;color:var(--muted);margin-top:8px" id="jetNote">青粒子＝噴流流体、灰粒子＝取り込まれる周囲流体。下流ほどコーンが広がり、中心速度・濃度が 1/x で減衰します。</div>
+</div>
+<div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（x/D での値）</div>
 <div class="stats-row">
 <div class="stat-card">
 <div class="val" id="ucVal">—</div>
@@ -286,6 +304,8 @@ canvas{max-width:100%}.info-panel{background:#f0f7ff;border:1px solid #c3dafe;bo
   </div>
 </div>
 <script>
+(function(){
+"use strict";
 // Round jet constants
 
 const B_round = 6.3;    // centerline decay constant
@@ -430,7 +450,207 @@ document.getElementById('diam').addEventListener('input', e =>{ var _edv=documen
 document.getElementById('dtj').addEventListener('input', e =>{ var _edt=document.getElementById('dtjValNum');if(_edt)_edt.textContent=e.target.value+' °C'; update(); });
 document.getElementById('xd').addEventListener('input', e =>{ var _exd=document.getElementById('xdValNum');if(_exd)_exd.textContent=(+e.target.value).toFixed(1); update(); });
 
+/* ===== V2 hero animation: turbulent jet spreading + entrainment ===== */
+const jc = document.getElementById('jetCanvas');
+const jctx = jc ? jc.getContext('2d') : null;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// canonical far-field round-jet centerline decay: Uc/U0 ≈ 6.2*D/x  (∝ 1/x)
+// half-angle ~12° => r1/2/x ≈ 0.094 (spreading rate). Concentration decays like velocity (Cc/C0 ≈ 5*D/x).
+const BC_round = 5.0;   // centerline concentration decay constant
+const HALF_ANGLE = 12 * Math.PI / 180; // jet visual half-angle ~12 deg
+
+let particles = [];     // jet-fluid tracers
+let ambient = [];       // surrounding fluid tracers (entrained)
+let jcW = 0, jcH = 0, dprJ = 1;
+
+function jetModel(){
+  const p = getJetParams();
+  const xc = p.type === 'round' ? 6 : 5;
+  const B = p.type === 'round' ? B_round : B_planar;
+  const S = p.type === 'round' ? S_round : S_planar;
+  return { Uj:p.Uj, Uinf:p.Uinf, D:p.D, xc, B, S, type:p.type };
+}
+// centerline velocity as function of x/D (matches the chart model)
+function ucAt(xd, m){
+  if (xd < m.xc) return m.Uj;
+  if (m.type === 'round') return m.Uinf + (m.Uj - m.Uinf) * m.B / (xd - m.xc + m.B);
+  return m.Uinf + (m.Uj - m.Uinf) * m.B / Math.sqrt(xd - m.xc + m.B);
+}
+// concentration (dilution) on centerline, 0..1
+function ccAt(xd, m){
+  if (xd < m.xc) return 1;
+  if (m.type === 'round') return Math.min(1, BC_round / (xd - m.xc + BC_round));
+  return Math.min(1, 1.6 / Math.sqrt(xd - m.xc + 1.6));
+}
+function hwAt(xd, m){ // half-width in units of D
+  if (xd < m.xc) return 0.5;
+  return m.S * (xd - m.xc) + 0.5;
+}
+
+function resizeJet(){
+  if (!jc) return;
+  const w = Math.max(280, jc.clientWidth || jc.parentElement.clientWidth - 36);
+  jcW = w; jcH = 300;
+  dprJ = Math.min(window.devicePixelRatio || 1, 2.5);
+  jc.style.height = jcH + 'px';
+  jc.width = Math.round(jcW * dprJ);
+  jc.height = Math.round(jcH * dprJ);
+  jctx.setTransform(dprJ, 0, 0, dprJ, 0, 0);
+}
+
+const XD_MAX = 40;          // domain length in x/D shown across canvas
+function spawnParticle(){
+  // emitted at nozzle (x/D=0), random radial within nozzle radius
+  return { xd: 0, r: (Math.random()*2-1)*0.5, jet:true, c:1, life:0 };
+}
+function spawnAmbient(){
+  const xd = Math.random()*XD_MAX;
+  const side = Math.random()<0.5?-1:1;
+  return { xd, r: side*(2.5+Math.random()*2.5), jet:false, c:0, life:0 };
+}
+function seedParticles(){
+  particles = [];
+  ambient = [];
+  for(let i=0;i<150;i++){ const pp=spawnParticle(); pp.xd=Math.random()*XD_MAX; pp.r=(Math.random()*2-1)*Math.max(0.5, hwAt(pp.xd, jetModel())); particles.push(pp); }
+  for(let i=0;i<60;i++){ ambient.push(spawnAmbient()); }
+}
+
+function colorFor(c){
+  // c=1 (pure jet) -> warm/bright; c->0 (diluted/mixed) -> faded blue
+  const r = Math.round(40 + 215*c);
+  const g = Math.round(140 + 60*c);
+  const b = Math.round(216 - 60*c);
+  return 'rgba('+r+','+g+','+b+','+ (0.35+0.5*c).toFixed(2) +')';
+}
+
+function drawJet(advance){
+  if (!jctx) return;
+  const m = jetModel();
+  const padL = 46, padR = 18, padT = 16, padB = 26;
+  const plotW = jcW - padL - padR, plotH = jcH - padT - padB;
+  const cy = padT + plotH/2;
+  const sx = plotW / XD_MAX;
+  // radial scale: map r/D up to ~5 onto half height
+  const rMaxView = 5;
+  const sr = (plotH/2) / rMaxView;
+  const X = xd => padL + xd*sx;
+  const Y = r => cy - r*sr;
+
+  jctx.clearRect(0,0,jcW,jcH);
+  jctx.fillStyle = '#06101f'; jctx.fillRect(0,0,jcW,jcH);
+
+  // jet spreading cone (filled, dilution color gradient via bands)
+  const bands = 60;
+  for(let i=0;i<bands;i++){
+    const xd0 = i/bands*XD_MAX, xd1=(i+1)/bands*XD_MAX;
+    const hw0 = hwAt(xd0,m), hw1 = hwAt(xd1,m);
+    const c = ccAt((xd0+xd1)/2, m);
+    jctx.beginPath();
+    jctx.moveTo(X(xd0), Y(hw0));
+    jctx.lineTo(X(xd1), Y(hw1));
+    jctx.lineTo(X(xd1), Y(-hw1));
+    jctx.lineTo(X(xd0), Y(-hw0));
+    jctx.closePath();
+    jctx.fillStyle = 'rgba('+Math.round(20+60*c)+','+Math.round(120+90*c)+','+Math.round(200+30*c)+','+(0.10+0.22*c).toFixed(3)+')';
+    jctx.fill();
+  }
+  // half-width envelope lines
+  jctx.strokeStyle='rgba(0,180,216,0.55)'; jctx.lineWidth=1.4; jctx.setLineDash([5,4]);
+  jctx.beginPath();
+  for(let i=0;i<=bands;i++){ const xd=i/bands*XD_MAX; const x=X(xd),y=Y(hwAt(xd,m)); i?jctx.lineTo(x,y):jctx.moveTo(x,y);} jctx.stroke();
+  jctx.beginPath();
+  for(let i=0;i<=bands;i++){ const xd=i/bands*XD_MAX; const x=X(xd),y=Y(-hwAt(xd,m)); i?jctx.lineTo(x,y):jctx.moveTo(x,y);} jctx.stroke();
+  jctx.setLineDash([]);
+
+  // centerline + nozzle
+  jctx.strokeStyle='rgba(255,255,255,0.18)'; jctx.lineWidth=1;
+  jctx.beginPath(); jctx.moveTo(padL, cy); jctx.lineTo(jcW-padR, cy); jctx.stroke();
+  jctx.fillStyle='#cfd8e3'; jctx.fillRect(padL-7, cy-0.5*sr-2, 7, sr+4); // nozzle lip
+
+  // entrainment arrows (ambient drawn into jet)
+  jctx.strokeStyle='rgba(180,190,205,0.5)'; jctx.fillStyle='rgba(180,190,205,0.5)'; jctx.lineWidth=1.2;
+  for(const xd of [10,20,30]){
+    const hw=hwAt(xd,m);
+    for(const s of [1,-1]){
+      const x=X(xd), y0=Y(s*(hw+2.2)), y1=Y(s*(hw+0.3));
+      jctx.beginPath(); jctx.moveTo(x,y0); jctx.lineTo(x,y1); jctx.stroke();
+      jctx.beginPath(); jctx.moveTo(x,y1); jctx.lineTo(x-3, y1 - s*5); jctx.lineTo(x+3, y1 - s*5); jctx.closePath(); jctx.fill();
+    }
+  }
+
+  // ambient particles drift toward jet (entrainment)
+  for(const a of ambient){
+    if (advance){
+      const hw = hwAt(a.xd, m);
+      const dir = a.r>0?-1:1;
+      a.r += dir * 0.04 * (1 + 4/Math.max(1,Math.abs(a.r)-hw)); // pull toward edge
+      a.xd += 0.05; // mild downstream drift
+      if (Math.abs(a.r) < hw){ a.jet=false; /* becomes entrained -> respawn outside */ Object.assign(a, spawnAmbient()); }
+      if (a.xd>XD_MAX) Object.assign(a, spawnAmbient());
+    }
+    jctx.beginPath(); jctx.arc(X(a.xd), Y(a.r), 1.6, 0, 7); jctx.fillStyle='rgba(150,160,180,0.6)'; jctx.fill();
+  }
+
+  // jet particles advect downstream; speed ∝ local Uc, spread to local half-width
+  const vref = Math.max(m.Uj, 1);
+  for(const pt of particles){
+    if (advance){
+      const uc = ucAt(pt.xd, m);
+      pt.xd += (uc/vref) * 0.55;       // downstream advection scaled by centerline vel
+      pt.c = ccAt(pt.xd, m) * (1 - Math.min(1, Math.abs(pt.r)/Math.max(0.6, hwAt(pt.xd,m)))*0.4);
+      // gentle turbulent wandering + outward spread to follow cone
+      pt.r += (Math.random()*2-1)*0.06;
+      const hw = hwAt(pt.xd, m);
+      if (Math.abs(pt.r) > hw*1.3) pt.r *= 0.97;
+      if (pt.xd > XD_MAX){ Object.assign(pt, spawnParticle()); }
+    }
+    jctx.beginPath(); jctx.arc(X(pt.xd), Y(pt.r), 2.0, 0, 7);
+    jctx.fillStyle = colorFor(Math.max(0, Math.min(1, pt.c)));
+    jctx.fill();
+  }
+
+  // axis labels
+  jctx.fillStyle='rgba(255,255,255,0.55)'; jctx.font='11px Roboto Mono'; jctx.textAlign='left';
+  jctx.fillText('ノズル', padL-4, padT-2);
+  jctx.textAlign='right'; jctx.fillText('x/D = '+XD_MAX, jcW-padR, jcH-8);
+  jctx.textAlign='left';
+
+  // marker at current slider x/D
+  const xdNow = +document.getElementById('xd').value;
+  const hwNow = hwAt(xdNow, m);
+  jctx.strokeStyle='#ffd54a'; jctx.lineWidth=1.5; jctx.setLineDash([3,3]);
+  jctx.beginPath(); jctx.moveTo(X(xdNow), Y(hwNow)); jctx.lineTo(X(xdNow), Y(-hwNow)); jctx.stroke();
+  jctx.setLineDash([]);
+  jctx.fillStyle='#ffd54a'; jctx.font='10px Roboto Mono';
+  jctx.fillText('x/D='+xdNow.toFixed(0), X(xdNow)+3, Y(hwNow)-4);
+
+  // live numbers
+  const ucN = ucAt(xdNow, m);
+  const hwMm = hwAt(xdNow, m) * m.D * 1000;
+  const ent = (m.type==='round'? 0.32*xdNow : 0.44*Math.sqrt(xdNow));
+  const dil = ccAt(xdNow, m);
+  const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
+  set('liveUc', ucN.toFixed(2));
+  set('liveHW', hwMm.toFixed(1));
+  set('liveEnt', ent.toFixed(2));
+  set('liveDil', dil.toFixed(3));
+}
+
+let rafId=null;
+function loop(){ drawJet(true); rafId=requestAnimationFrame(loop); }
+
+function startJet(){
+  if (!jctx) return;
+  resizeJet(); seedParticles();
+  if (reduceMotion){ drawJet(false); }
+  else { if(rafId) cancelAnimationFrame(rafId); loop(); }
+}
+window.addEventListener('resize', ()=>{ if(jctx){ resizeJet(); if(reduceMotion) drawJet(false); } });
+
 update();
+startJet();
+})();
 </script>
 <section class="explanation">
 <h2>噴流混合・速度/温度プロファイル発達シミュレーターとは</h2>
@@ -506,6 +726,9 @@ update();
 </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="jet-mixing.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -559,14 +782,14 @@ update();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>ノズル出口速度(uj)を0.5～50 m/sの範囲で設定し、自由噴流の初期運動量を決定する</li>
+<li>ノズル出口速度(uj)を1～50 m/sの範囲で設定し、自由噴流の初期運動量を決定する</li>
 <li>ノズル径(diam)を2～50 mmで入力し、噴流の初期スケールと発達域への遷移を制御する</li>
-<li>周囲流速(uinf)と温度差(dtj)を指定してから「計算実行」ボタンをクリックし、軸方向(x)における速度・温度プロファイルの自己相似則への収束過程を観察する</li>
+<li>周囲流速(uinf)と温度差(dtj)を指定してスライダーを操作し、軸方向(x)における速度・温度プロファイルの自己相似則への収束過程を観察する</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>圧縮空気噴流(ρ=1.2 kg/m³、μ=1.8×10⁻⁵ Pa・s):ノズル径d=10 mm、出口速度uj=20 m/s、周囲静止(uinf=0)、加熱温度差ΔT=60 Kの場合、無次元軸距離x/d=30付近で速度プロファイルがガウス分布に収束し、混合層幅δ(u)≈0.11xとなる。同位置での温度プロファイルもガウス型を示し、熱拡散層がシュミット数Sc≈0.71により速度層より若干狭くなる。</p>
+<p>圧縮空気噴流(ρ=1.2 kg/m³、μ=1.8×10⁻⁵ Pa・s):ノズル径d=10 mm、出口速度uj=20 m/s、周囲静止(uinf=0)、加熱温度差ΔT=60 Kの場合、無次元軸距離x/d=30付近で速度プロファイルがガウス分布に収束し、混合層幅δ(u)≈0.11xとなる。同位置での温度プロファイルもガウス型を示し、乱流プラントル数Pr_t≈0.7により熱拡散が運動量拡散より速いため、温度プロファイルは速度プロファイルより約15〜20%広がる。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -576,6 +799,16 @@ update();
 <li>温度計測やIR撮像検証時は、周囲温度(uinf側の環境温度)の影響を必ず補正してdtj値を確定させる</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
 <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

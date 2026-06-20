@@ -41,14 +41,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "レーザー共振器設計シミュレーター",
       "description": "レーザー共振器設計シミュレーターで閾値電流・スロープ効率・縦モード間隔・Q 値・光子寿命をリアルタイム計算する光学設計の学習支援ツールです。L-I 特性曲線と縦モードスペクトル図を動的に可視化します。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/laser-design.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": ["閾値電流計算", "スロープ効率", "縦モード間隔", "ラウンドトリップゲイン", "Q値計算", "L-I特性曲線"]
@@ -265,8 +265,35 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="sWavelength" min="400" max="2000" step="1" value="1310" oninput="syncToNum('sWavelength','vWavelengthNum');updateSlider(this);compute()">
     </div>
-</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-bolt"></i> レーザー共振器ライブ可視化（ポンプ→反転分布→誘導放出→ビーム出力）</div>
+      <div class="stat-cards" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
+        <div class="stat-card"><div class="sv" id="lvPout">—</div><div class="sl">出力 P_out [a.u.]</div></div>
+        <div class="stat-card"><div class="sv" id="lvGain">—</div><div class="sl">利得 Γg [cm⁻¹]</div></div>
+        <div class="stat-card"><div class="sv" id="lvLoss">—</div><div class="sl">全損失 αᵢ+αₘ [cm⁻¹]</div></div>
+        <div class="stat-card"><div class="sv" id="lvState">—</div><div class="sl">発振状態</div></div>
+      </div>
+      <canvas id="laserCanvas" height="300" role="img" aria-label="レーザー共振器のアニメーション。ポンプ励起・反転分布・誘導放出のカスケード・出力ビームを表示します。"></canvas>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px">
+        <div style="flex:1;min-width:200px">
+          <div class="param-label" style="margin-bottom:4px"><span class="param-name">ポンプ電流 I / I_th</span><span class="param-value"><span id="pumpVal">1.8</span>×</span></div>
+          <input type="range" id="pumpRatio" min="0.2" max="4" step="0.05" value="1.8" oninput="document.getElementById('pumpVal').textContent=parseFloat(this.value).toFixed(2)" aria-label="ポンプ電流（閾値比）">
+        </div>
+        <button class="preset-btn" type="button" id="laserPlay" aria-label="再生/一時停止"><i class="fas fa-pause"></i> 一時停止</button>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:8px">ポンプを閾値（利得＝損失）以上に上げると、誘導放出が雪崩的に増え、部分透過鏡からコヒーレントなビームが出ます。下げると発振が止まります。</div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -330,6 +357,262 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
 <script>
+/* ===== v2 laser cavity live animation (isolated IIFE) ===== */
+(function(){
+  "use strict";
+  var cv = document.getElementById('laserCanvas');
+  if (!cv) return;
+  var cx = cv.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var playing = !reduce;
+  var photons = [];      // intracavity photons {x,dir,y}
+  var beam = [];         // emitted beam packets {x,y}
+  var atoms = [];        // gain-medium atoms {x,y,exc:0..1}
+  var cssW = 600, cssH = 300, dpr = 1;
+  var t0 = performance.now();
+
+  function num(id){ var el=document.getElementById(id); return el?parseFloat(el.value):0; }
+  function pumpRatio(){ return num('pumpRatio'); }
+
+  // physics snapshot from the design sliders (same model as compute())
+  function physics(){
+    var L = num('sCavLen')*1e-4;           // cm
+    var R1 = num('sR1'), R2 = num('sR2');
+    var alphaI = num('sAlphaI');
+    var Gamma = num('sGamma');
+    var g0 = num('sG0');
+    var alphaM = (1/(2*L))*Math.log(1/(R1*R2));
+    var loss = alphaI + alphaM;            // total cavity loss [cm^-1]
+    var r = pumpRatio();
+    // gain clamps to loss above threshold (gain pinning); below threshold gain ∝ pump
+    var gainAtThresh = loss;               // Γ g_th = αi + αm
+    var gain = r >= 1 ? gainAtThresh : gainAtThresh * Math.max(0, r);
+    // output mirror = front (R1): fraction of cavity loss that exits as useful light
+    var coupleOut = alphaM/(loss>0?loss:1);
+    var Pout = r > 1 ? (r - 1) * coupleOut : 0;   // a.u. ∝ slope*(pump-threshold)
+    return { R1:R1, R2:R2, gain:gain, loss:loss, alphaM:alphaM, r:r, Pout:Pout, coupleOut:coupleOut, above:r>1 };
+  }
+
+  function resize(){
+    var rect = cv.parentElement.getBoundingClientRect();
+    cssW = Math.max(280, Math.floor(rect.width - 44));
+    cssH = 300;
+    dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    cv.style.width = cssW+'px'; cv.style.height = cssH+'px';
+    cv.width = Math.round(cssW*dpr); cv.height = Math.round(cssH*dpr);
+    cx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  // cavity geometry in css px
+  function geom(){
+    var mL = 70, mR = cssW-70;             // mirror x positions
+    var midY = cssH*0.46;
+    var gmL = cssW*0.40, gmR = cssW*0.60;  // gain medium x span
+    return { mL:mL, mR:mR, midY:midY, gmL:gmL, gmR:gmR, halfH: 58 };
+  }
+
+  function seedAtoms(){
+    atoms = [];
+    var g = geom();
+    var cols = 6, rows = 4;
+    for (var i=0;i<cols;i++) for (var j=0;j<rows;j++){
+      atoms.push({
+        x: g.gmL + (i+0.5)/cols*(g.gmR-g.gmL),
+        y: g.midY - g.halfH*0.7 + j/(rows-1)*g.halfH*1.4,
+        exc: 0
+      });
+    }
+  }
+
+  function rgba(r,g,b,a){ return 'rgba('+r+','+g+','+b+','+a+')'; }
+
+  function step(dt){
+    var P = physics();
+    var g = geom();
+    // pumping raises excitation toward an inversion set by pump ratio
+    var target = Math.min(1, P.r/2.2);
+    for (var i=0;i<atoms.length;i++){
+      var a = atoms[i];
+      a.exc += (target - a.exc) * Math.min(1, dt*2.5);
+      // spontaneous decay flicker
+      if (Math.random() < dt*0.6*a.exc) a.exc = Math.max(0, a.exc-0.15);
+    }
+    // photon population target grows with how far gain exceeds loss
+    var want = P.above ? Math.round(14 + 60*Math.min(1.6, P.r-1)) : Math.round(2*Math.max(0,P.r));
+    // stimulated emission: photons crossing gain region multiply if inverted & above threshold
+    var speed = 230; // px/s
+    for (var k=photons.length-1;k>=0;k--){
+      var ph = photons[k];
+      ph.x += ph.dir*speed*dt;
+      // reflect at mirrors
+      if (ph.x <= g.mL){ ph.x = g.mL; ph.dir = 1;
+        if (Math.random() > P.R2) { photons.splice(k,1); continue; } // rear leak loss
+      } else if (ph.x >= g.mR){ ph.x = g.mR; ph.dir = -1;
+        // front mirror = output coupler: transmit fraction (1-R1) as beam
+        if (Math.random() > P.R1){
+          beam.push({ x: g.mR, y: ph.y, life: 1 });
+          photons.splice(k,1); continue;
+        }
+      }
+      // stimulated emission inside gain medium
+      if (P.above && ph.x>g.gmL && ph.x<g.gmR && photons.length<want && Math.random()<dt*6){
+        var src = atoms[(Math.random()*atoms.length)|0];
+        if (src.exc>0.4){ src.exc -= 0.3;
+          photons.push({ x: ph.x, dir: ph.dir, y: g.midY + (Math.random()-0.5)*g.halfH*0.9 });
+        }
+      }
+    }
+    // seed a photon if lasing wants more (spontaneous into mode)
+    if (photons.length < want && Math.random() < dt*8){
+      photons.push({ x: g.gmL+Math.random()*(g.gmR-g.gmL), dir: Math.random()<0.5?1:-1, y: g.midY+(Math.random()-0.5)*g.halfH });
+    }
+    // decay extra photons toward target when below threshold
+    if (photons.length > want && Math.random() < dt*10){ photons.pop(); }
+    // advance beam
+    for (var b=beam.length-1;b>=0;b--){
+      beam[b].x += 180*dt; beam[b].life -= dt*0.7;
+      if (beam[b].x > cssW+10 || beam[b].life<=0) beam.splice(b,1);
+    }
+  }
+
+  function draw(){
+    var P = physics();
+    var g = geom();
+    cx.clearRect(0,0,cssW,cssH);
+    cx.fillStyle = '#0a1628'; cx.fillRect(0,0,cssW,cssH);
+
+    // cavity axis
+    cx.strokeStyle='rgba(255,255,255,0.08)'; cx.lineWidth=1;
+    cx.beginPath(); cx.moveTo(g.mL,g.midY); cx.lineTo(g.mR,g.midY); cx.stroke();
+
+    // gain medium block
+    var grd = cx.createLinearGradient(g.gmL,0,g.gmR,0);
+    grd.addColorStop(0,'rgba(108,92,231,0.12)'); grd.addColorStop(0.5,'rgba(224,64,251,0.22)'); grd.addColorStop(1,'rgba(108,92,231,0.12)');
+    cx.fillStyle=grd;
+    cx.fillRect(g.gmL, g.midY-g.halfH, g.gmR-g.gmL, g.halfH*2);
+    cx.strokeStyle='rgba(224,64,251,0.45)'; cx.lineWidth=1.2;
+    cx.strokeRect(g.gmL, g.midY-g.halfH, g.gmR-g.gmL, g.halfH*2);
+    cx.fillStyle='rgba(255,255,255,0.55)'; cx.font='11px Noto Sans JP'; cx.textAlign='center';
+    cx.fillText('利得媒質', (g.gmL+g.gmR)/2, g.midY-g.halfH-6);
+
+    // pump arrows (downward into the gain medium), brightness ∝ pump
+    var pumpA = Math.min(1, P.r/2.5);
+    cx.strokeStyle = rgba(255,213,74, 0.25+0.55*pumpA); cx.lineWidth=2;
+    for (var px=g.gmL+14; px<g.gmR; px+=26){
+      cx.beginPath(); cx.moveTo(px, g.midY-g.halfH-30); cx.lineTo(px, g.midY-g.halfH-6); cx.stroke();
+      cx.beginPath(); cx.moveTo(px, g.midY-g.halfH-6); cx.lineTo(px-3, g.midY-g.halfH-12); cx.lineTo(px+3, g.midY-g.halfH-12); cx.closePath();
+      cx.fillStyle=rgba(255,213,74,0.25+0.55*pumpA); cx.fill();
+    }
+    cx.fillStyle=rgba(255,213,74,0.6+0.3*pumpA); cx.textAlign='center'; cx.font='10px Noto Sans JP';
+    cx.fillText('ポンプ', (g.gmL+g.gmR)/2, g.midY-g.halfH-34);
+
+    // atoms: red dot = ground, glowing = excited (inversion)
+    for (var i=0;i<atoms.length;i++){
+      var a=atoms[i];
+      var rad = 3 + 2.4*a.exc;
+      if (a.exc>0.05){
+        cx.beginPath(); cx.arc(a.x,a.y,rad+3,0,7); cx.fillStyle=rgba(255,213,74,0.22*a.exc); cx.fill();
+      }
+      cx.beginPath(); cx.arc(a.x,a.y,rad,0,7);
+      cx.fillStyle = a.exc>0.5 ? '#ffd54a' : (a.exc>0.2?'#ff9e57':'#4a5f7a');
+      cx.fill();
+    }
+
+    // mirrors
+    function mirror(x, R, label){
+      cx.fillStyle = rgba(120,200,255, 0.25+0.6*R);
+      cx.fillRect(x-5, g.midY-70, 10, 140);
+      cx.strokeStyle='rgba(180,220,255,0.8)'; cx.lineWidth=1.5; cx.strokeRect(x-5, g.midY-70, 10, 140);
+      cx.fillStyle='rgba(255,255,255,0.6)'; cx.font='10px Roboto Mono'; cx.textAlign='center';
+      cx.fillText(label, x, g.midY-78);
+    }
+    mirror(g.mL, P.R2, 'R2='+P.R2.toFixed(2));
+    mirror(g.mR, P.R1, 'R1='+P.R1.toFixed(2)+' (出力)');
+
+    // intracavity photons (cyan wave packets)
+    for (var k=0;k<photons.length;k++){
+      var ph=photons[k];
+      cx.beginPath(); cx.arc(ph.x, ph.y, 2.6, 0, 7);
+      cx.fillStyle='rgba(0,212,255,0.9)'; cx.fill();
+      cx.beginPath(); cx.arc(ph.x, ph.y, 5.5, 0, 7);
+      cx.fillStyle='rgba(0,212,255,0.18)'; cx.fill();
+    }
+
+    // output beam emerging from front mirror
+    if (P.above){
+      var bw = Math.min(1, P.Pout*1.4);
+      var bx0 = g.mR+5;
+      var grad2 = cx.createLinearGradient(bx0,0,cssW,0);
+      grad2.addColorStop(0, rgba(255,64,180,0.85)); grad2.addColorStop(1, rgba(255,64,180,0));
+      cx.fillStyle=grad2;
+      var bh = 4+14*bw;
+      cx.fillRect(bx0, g.midY-bh/2, cssW-bx0, bh);
+      cx.fillStyle='rgba(255,255,255,0.85)'; cx.font='11px Noto Sans JP'; cx.textAlign='left';
+      cx.fillText('コヒーレント出力ビーム', bx0+8, g.midY-bh/2-8);
+    }
+    for (var b=0;b<beam.length;b++){
+      cx.beginPath(); cx.arc(beam[b].x, beam[b].y, 3, 0, 7);
+      cx.fillStyle=rgba(255,64,180, Math.max(0,beam[b].life)); cx.fill();
+    }
+
+    // gain vs loss bar (top-left)
+    var barX=14, barY=18, barW=Math.min(220,cssW-28), barH=10;
+    var maxLG = Math.max(P.gain, P.loss, 1)*1.1;
+    cx.fillStyle='rgba(255,255,255,0.1)'; cx.fillRect(barX,barY,barW,barH);
+    cx.fillStyle='rgba(0,212,255,0.8)'; cx.fillRect(barX,barY,barW*Math.min(1,P.gain/maxLG),barH);
+    var lossX = barX+barW*Math.min(1,P.loss/maxLG);
+    cx.strokeStyle='#ff5252'; cx.lineWidth=2;
+    cx.beginPath(); cx.moveTo(lossX,barY-3); cx.lineTo(lossX,barY+barH+3); cx.stroke();
+    cx.fillStyle='rgba(255,255,255,0.7)'; cx.font='10px Noto Sans JP'; cx.textAlign='left';
+    cx.fillText('利得', barX, barY-4);
+    cx.fillStyle='#ff7b7b'; cx.fillText('損失しきい値', lossX+4, barY+barH+12);
+
+    // status annotation
+    cx.font='bold 12px Noto Sans JP'; cx.textAlign='center';
+    if (P.above){ cx.fillStyle='#00d4a0'; cx.fillText('発振中：誘導放出カスケード（利得＝損失にピン留め）', cssW/2, cssH-12); }
+    else { cx.fillStyle='rgba(255,255,255,0.55)'; cx.fillText('閾値以下：自然放出のみ（利得 < 損失）', cssW/2, cssH-12); }
+
+    // live numbers
+    document.getElementById('lvPout').textContent = P.Pout.toFixed(2);
+    document.getElementById('lvGain').textContent = P.gain.toFixed(1);
+    document.getElementById('lvLoss').textContent = P.loss.toFixed(1);
+    document.getElementById('lvState').textContent = P.above ? '発振 ON' : 'OFF';
+  }
+
+  var last = performance.now();
+  function frame(now){
+    var dt = Math.min(0.05, (now-last)/1000); last = now;
+    if (playing){ step(dt); }
+    draw();
+    if (playing) requestAnimationFrame(frame);
+  }
+
+  function start(){
+    resize(); seedAtoms();
+    if (reduce){
+      // single static frame at the current pump
+      for (var s=0;s<60;s++){ step(0.03); }
+      draw();
+    } else {
+      last = performance.now();
+      requestAnimationFrame(frame);
+    }
+  }
+
+  var btn = document.getElementById('laserPlay');
+  if (btn) btn.addEventListener('click', function(){
+    playing = !playing;
+    btn.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+    if (playing){ last = performance.now(); requestAnimationFrame(frame); }
+  });
+  var rsz; window.addEventListener('resize', function(){ clearTimeout(rsz); rsz=setTimeout(function(){ resize(); seedAtoms(); if(reduce||!playing) draw(); },150); });
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive'){ start(); }
+  else window.addEventListener('load', start);
+})();
+</script>
+
+<script>
 const CHARTS ={};
 const h = 6.626e-34, c = 3e8, e = 1.6e-19;
 
@@ -352,7 +635,7 @@ function getParams(){
   const etaD = p.etaI * alphaM / (p.alphaI + alphaM);
   const nu = c / p.lam;
   const SE = etaD * (h * nu / e);
-  const deltaNu = c / (2 * p.n * p.L) / 1e9; // GHz
+  const deltaNu = c / (2 * p.n * (p.L * 1e-2)) / 1e9; // GHz (p.L is in cm -> convert to m)
   const tauPh = p.n / (c * 100 * (p.alphaI + alphaM)) * 1e12; // ps (convert cm⁻¹ to m⁻¹)
   const Qfactor = 2 * Math.PI * nu * tauPh * 1e-12 / 1e6; // ×10⁶
   // threshold current estimate (simplified, assuming active volume J_tr proportional)
@@ -500,6 +783,9 @@ function getParams(){
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="laser-design.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -555,7 +841,7 @@ function getParams(){
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>共振器長L=200μm、屈折率n=3.5、R1=0.3、R2=0.95の1.55μm帯DFBレーザーの場合：閾値電流Ith≈8mA、スロープ効率≈0.45W/A、鏡面損失αm≈25cm⁻¹、縦モード間隔≈75GHz、Q値≈2.8×10⁶、フォトン寿命≈3.2psとなります。このような計算結果から、出射端ミラー反射率を0.5に上げると閾値電流は12mAに増加しますが、出力パワーの安定性が向上します</p>
+<p>共振器長L=200μm、屈折率n=3.5、R1=0.3、R2=0.95の1.55μm帯DFBレーザーの場合：スロープ効率≈0.39W/A、鏡面損失αm≈31cm⁻¹、縦モード間隔≈214GHz、フォトン寿命≈2.3psとなります（閾値電流は本ツールでは規格化指標として表示され、絶対mA値ではありません）。出射端ミラー反射率R1を0.5へ上げると鏡面損失が下がり閾値は低下しますが、取り出せる光出力は減少します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -566,6 +852,16 @@ function getParams(){
 <li>フォトン寿命が1ps以下の場合、高速変調が可能ですが、相対強度雑音(RIN)が増加する傾向があります</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

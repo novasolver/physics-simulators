@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "張出梁シミュレーター",
       "description": "張出梁（オーバーハング梁）の反力・最大曲げモーメント・張出端撓みを等分布荷重と先端集中荷重からリアルタイム計算・可視化するシミュレーター。主径間と張出長を変えてSFD/BMDの挙動を比較できます。",
       "url": "https://novasolver.jp/tools/beam-overhang.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["左右支点の反力 R_A・R_B 計算","張出根元の負モーメント M_B 計算","SFD/BMDのリアルタイム描画","張出端の撓み δ_D 表示"],
       "keywords": "張出梁,オーバーハング梁,反力,曲げモーメント,SFD,BMD,張出端撓み,構造解析,材料力学",
       "datePublished": "2026-05-16",
@@ -100,8 +100,15 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; max-width:600px; margin:0 auto; }
+#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; max-width:640px; margin:0 auto; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.sim-controls{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:10px 0 4px; }
+.sim-controls .btn{ flex:0 0 auto; }
+.preset-row{ display:flex; flex-wrap:wrap; gap:6px; }
+.preset-row .btn{ flex:1 1 auto; font-size:0.8rem; }
+.loadbar-wrap{ margin-top:8px; }
+.loadbar-track{ height:8px; border-radius:4px; background:#11233b; overflow:hidden; }
+.loadbar-fill{ height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .05s linear; }
 </style>
 </head>
 <body>
@@ -133,6 +140,14 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="param-group">
       <div class="param-label">
+        <span class="param-name">左張出 a</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slAVal" value="0.0" min="0" max="5" step="0.1" oninput="syncFromNum('slA','slAVal')"><span class="num-unit">m</span></div>
+      </div>
+      <input type="range" id="slA" min="0" max="5" step="0.1" value="0" oninput="syncToNum('slA','slAVal');updateSlider(this,'slAVal',1,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
         <span class="param-name">主径間 L_AB</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slLabVal" value="5.0" min="1" max="15" step="0.5" oninput="syncFromNum('slLab','slLabVal')"><span class="num-unit">m</span></div>
       </div>
@@ -141,7 +156,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">張出長 c</span>
+        <span class="param-name">右張出 c</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slCVal" value="2.0" min="0.1" max="5" step="0.1" oninput="syncFromNum('slC','slCVal')"><span class="num-unit">m</span></div>
       </div>
       <input type="range" id="slC" min="0.1" max="5" step="0.1" value="2" oninput="syncToNum('slC','slCVal');updateSlider(this,'slCVal',1,'');compute()">
@@ -157,7 +172,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">張出端集中荷重 P</span>
+        <span class="param-name">集中荷重 P</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slPVal" value="20" min="0" max="100" step="5" oninput="syncFromNum('slP','slPVal')"><span class="num-unit">kN</span></div>
       </div>
       <input type="range" id="slP" min="0" max="100" step="5" value="20" oninput="syncToNum('slP','slPVal');updateSlider(this,'slPVal',0,'');compute()">
@@ -165,10 +180,33 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
-    <div class="btn-group">
-      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">プリセット</span></div>
+      <div class="preset-row">
+        <button type="button" class="btn secondary" onclick="applyPreset('single')">片張出</button>
+        <button type="button" class="btn secondary" onclick="applyPreset('double')">両張出</button>
+        <button type="button" class="btn secondary" onclick="applyPreset('moving')">移動荷重</button>
+      </div>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">曲げ剛性は EI = 50000 kN·m² 固定。等分布荷重 w は全長（L_AB+c）に作用します。</p>
+
+    <div class="sim-controls">
+      <button type="button" class="btn" id="btnPlay" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+      <button type="button" class="btn secondary" onclick="resetSim()"><i class="fas fa-redo"></i> 最初から</button>
+    </div>
+    <div class="loadbar-wrap">
+      <div class="loadbar-track"><div class="loadbar-fill" id="loadFill"></div></div>
+      <p style="font-size:0.7rem;color:var(--muted);margin-top:4px;text-align:center;" id="loadLabel">荷重載荷率 0%</p>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">曲げ剛性は EI = 50000 kN·m² 固定。等分布荷重 w は全長（a+L_AB+c）に作用。「移動荷重」では集中荷重 P が左から右へ走行します。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -177,40 +215,47 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statRa">—</div><div class="sl">左支点反力 R_A</div></div>
         <div class="stat-card"><div class="sv" id="statRb">—</div><div class="sl">右支点反力 R_B</div></div>
-        <div class="stat-card"><div class="sv" id="statMb">—</div><div class="sl">張出根元モーメント M_B</div></div>
-        <div class="stat-card"><div class="sv" id="statDeltaD">—</div><div class="sl">張出端撓み δ_D</div></div>
+        <div class="stat-card"><div class="sv" id="statMpos">—</div><div class="sl">最大正モーメント M⁺</div></div>
+        <div class="stat-card"><div class="sv" id="statMneg">—</div><div class="sl">最大負モーメント M⁻</div></div>
+        <div class="stat-card"><div class="sv" id="statVmax">—</div><div class="sl">最大せん断力 V_max</div></div>
+        <div class="stat-card"><div class="sv" id="statDeltaD">—</div><div class="sl">最大撓み δ_max</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-ruler-horizontal"></i> 梁モデル・SFD・BMD</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">上＝梁モデル（A・B支点と等分布荷重・先端荷重）／中＝せん断力図 SFD／下＝曲げモーメント図 BMD（張出根元で負）</p>
+      <div class="chart-title"><i class="fas fa-ruler-horizontal"></i> 撓み形状・SFD・BMD ライブ</div>
+      <canvas id="cv" width="640" height="460" aria-label="張出梁の撓み形状とせん断力図・曲げモーメント図のリアルタイムアニメーション" role="img"></canvas>
+      <p class="canvas-hint">上＝載荷とともに変形する撓み形状（支点反力↑を表示）／中＝せん断力図 SFD（V=0点＝最大正曲げ）／下＝曲げモーメント図 BMD（M=0＝反曲点を●で表示／張出根元で負）</p>
     </div>
 
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
       <div class="theory-box">
-        <p>支点A（x=0）と支点B（x=L_AB）の2点でピン支持し、Bから右に長さcの張出があり自由端Dとなる構成です。等分布w（全長）と張出端集中Pに対する反力とモーメントを次式で評価します。</p>
-        <p style="margin-top:8px;">A点まわりのモーメント釣り合いから右支点反力：</p>
-        $$R_B = \frac{w\,L_{AB}^{2}/2 + w\,c\,(L_{AB}+c/2) + P\,(L_{AB}+c)}{L_{AB}}$$
+        <p>左張出a・主径間L_AB・右張出cの梁を、支点A・Bでピン支持。等分布w（全長）と集中Pに対する反力とモーメントを次式で評価します（モーメント基準点はA）。</p>
+        <p style="margin-top:8px;">A点まわりのモーメント釣り合いから右支点反力（x はAから測る）：</p>
+        $$R_B = \frac{\sum (\text{荷重}\times \text{Aからの距離})}{L_{AB}}$$
         <p style="margin-top:6px;">鉛直方向の釣り合いから左支点反力：</p>
-        $$R_A = w\,(L_{AB}+c) + P - R_B$$
-        <p style="margin-top:6px;">張出根元（B点）の負の曲げモーメント：</p>
+        $$R_A = w\,(a+L_{AB}+c) + P - R_B$$
+        <p style="margin-top:6px;">右張出根元（B点）の負の曲げモーメント（片張出時）：</p>
         $$M_B = -\left(\frac{w\,c^{2}}{2} + P\,c\right)$$
-        <p style="margin-top:6px;">張出端Dの撓み（B点を固定端と見た片持ち梁近似）：</p>
-        $$\delta_D \approx \frac{w\,c^{4}}{8\,EI} + \frac{P\,c^{3}}{3\,EI}$$
-        <p style="margin-top:8px;">主径間では x = R_A / w でせん断力が0となり、その点で正の最大モーメントが生じます。張出長 c や荷重 P を大きくすると M_B（負）が大きくなり、設計上は張出根元上端の引張に注意が必要です。</p>
+        <p style="margin-top:6px;">主径間の最大正モーメントは、せん断力 V(x)=0 となる点で発生します。</p>
+        <p style="margin-top:6px;">張出端の撓み（B点を固定端と見た片持ち梁近似）：</p>
+        $$\delta \approx \frac{w\,c^{4}}{8\,EI} + \frac{P\,c^{3}}{3\,EI}$$
+        <p style="margin-top:8px;">BMDが正から負へ符号を変える点（M=0）が<strong>反曲点</strong>で、撓み曲線の曲率がゼロになる位置です。張出長や荷重を増やすと負モーメントが拡大し、反曲点は支点側へ移動します。</p>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-// ========== Beam Overhang Simulator ==========
+// ========== Beam Overhang Simulator (v2: live deflected shape + SFD/BMD) ==========
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
 var EI = 50000; // kN*m^2 fixed
+var LW = 640, LH = 460; // logical canvas size
+
+var anim = { playing: false, lambda: 0, dir: 1, mode: 'static', t0: 0, raf: null };
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function fmtN(v, d) {
   if (!isFinite(v)) return '—';
@@ -218,76 +263,141 @@ function fmtN(v, d) {
   return v.toFixed(d);
 }
 
+// Geometry: A at x=a, B at x=a+Lab. Beam spans x in [0, a+Lab+c].
+// In moving mode, P travels from x=0 to x=total along the beam.
 function getParams() {
+  var a = parseFloat(document.getElementById('slA').value);
   var Lab = parseFloat(document.getElementById('slLab').value);
   var c = parseFloat(document.getElementById('slC').value);
   var w = parseFloat(document.getElementById('slW').value);
   var P = parseFloat(document.getElementById('slP').value);
-  return { Lab: Lab, c: c, w: w, P: P };
+  return { a: a, Lab: Lab, c: c, w: w, P: P };
 }
 
-function calcReactions(p) {
-  // ΣM_A = 0: R_B*L_AB = w*L_AB^2/2 + w*c*(L_AB+c/2) + P*(L_AB+c)
-  var Rb = (p.w * p.Lab * p.Lab / 2 + p.w * p.c * (p.Lab + p.c / 2) + p.P * (p.Lab + p.c)) / p.Lab;
-  var Ra = p.w * (p.Lab + p.c) + p.P - Rb;
-  var Mb = -(p.w * p.c * p.c / 2 + p.P * p.c);
-  // overhang-tip deflection (cantilever approximation from B)
-  var deltaD_m = (p.w * Math.pow(p.c, 4) / 8 + p.P * Math.pow(p.c, 3) / 3) / EI;
-  var deltaD_mm = deltaD_m * 1000;
-  // max positive moment in main span: occurs at x_star = R_A / w (if 0 < x_star < L_AB and w>0)
-  var Mpos = 0, xStar = 0;
-  if (p.w > 0) {
-    xStar = Ra / p.w;
-    if (xStar > 0 && xStar < p.Lab) {
-      Mpos = Ra * xStar - p.w * xStar * xStar / 2;
-    } else if (Ra > 0) {
-      // monotonic: max at x = L_AB just before Mb (positive side if Ra*L - w*L^2/2 > 0)
-      var Mend = Ra * p.Lab - p.w * p.Lab * p.Lab / 2;
-      Mpos = Math.max(0, Mend);
-    }
-  } else {
-    // no UDL on main span
-    Mpos = Math.max(0, Ra * p.Lab);
-  }
-  return { Ra: Ra, Rb: Rb, Mb: Mb, deltaD_mm: deltaD_mm, Mpos: Mpos, xStar: xStar };
+// reactions for general two-support beam with overhangs.
+// xa = a (support A position), xb = a+Lab (support B). UDL w over [0,total]. Point load Pp at position xp.
+function calcReactions(p, lambda, xp) {
+  var total = p.a + p.Lab + p.c;
+  var xa = p.a, xb = p.a + p.Lab;
+  var w = p.w * lambda;
+  var Pp = p.P * lambda;
+  // total UDL resultant at centroid total/2
+  var Wtot = w * total;
+  // sum moments about A (xa): Rb*(xb-xa) = Wtot*(total/2 - xa) + Pp*(xp - xa)
+  var Rb = (Wtot * (total / 2 - xa) + Pp * (xp - xa)) / (xb - xa);
+  var Ra = Wtot + Pp - Rb;
+  return { Ra: Ra, Rb: Rb, xa: xa, xb: xb, total: total, w: w, Pp: Pp, xp: xp };
 }
 
-// shear and moment at position x (0 <= x <= L_AB + c), measured from A
+// internal shear V(x) and moment M(x), measured from left end x=0.
+// Sign: V = sum of upward forces to the left; M = sum of moments to the left (sagging positive).
 function V_at(p, r, x) {
-  if (x < p.Lab) {
-    return r.Ra - p.w * x;
-  } else if (x < p.Lab + p.c) {
-    return r.Ra - p.w * x + r.Rb;
-  }
-  return 0;
+  var v = -r.w * x; // distributed load (downward) accumulated
+  if (x > r.xa) v += r.Ra;
+  if (x > r.xb) v += r.Rb;
+  if (x > r.xp) v -= r.Pp;
+  return v;
 }
 function M_at(p, r, x) {
-  if (x < p.Lab) {
-    return r.Ra * x - p.w * x * x / 2;
-  } else if (x <= p.Lab + p.c) {
-    return r.Ra * x - p.w * x * x / 2 + r.Rb * (x - p.Lab);
+  var m = -r.w * x * x / 2;
+  if (x > r.xa) m += r.Ra * (x - r.xa);
+  if (x > r.xb) m += r.Rb * (x - r.xb);
+  if (x > r.xp) m -= r.Pp * (x - r.xp);
+  return m;
+}
+
+// Deflected shape by double integration of M/EI (relative units for display).
+// Returns array of {x, y} with y = deflection (downward positive) scaled later.
+function deflection(p, r, N) {
+  var total = r.total;
+  var dx = total / N;
+  // theta and y by trapezoidal integration of curvature kappa = M/EI
+  var kappa = new Array(N + 1);
+  for (var i = 0; i <= N; i++) kappa[i] = M_at(p, r, i * dx) / EI;
+  // integrate kappa -> slope theta (unknown constant c1), then theta -> y (unknown c2)
+  var theta = new Array(N + 1); theta[0] = 0;
+  for (var i = 1; i <= N; i++) theta[i] = theta[i - 1] + (kappa[i - 1] + kappa[i]) / 2 * dx;
+  var y = new Array(N + 1); y[0] = 0;
+  for (var i = 1; i <= N; i++) y[i] = y[i - 1] + (theta[i - 1] + theta[i]) / 2 * dx;
+  // apply boundary conditions y(xa)=0, y(xb)=0 via linear correction y* = y + c1*x + c2
+  var ia = Math.round(r.xa / dx), ib = Math.round(r.xb / dx);
+  ia = Math.max(0, Math.min(N, ia)); ib = Math.max(0, Math.min(N, ib));
+  var xa = ia * dx, xb = ib * dx;
+  var c1, c2;
+  if (Math.abs(xb - xa) < 1e-9) { c1 = 0; c2 = -y[ia]; }
+  else {
+    c1 = -(y[ib] - y[ia]) / (xb - xa);
+    c2 = -y[ia] - c1 * xa;
   }
-  return 0;
+  var pts = new Array(N + 1);
+  var ymax = 1e-9;
+  for (var i = 0; i <= N; i++) {
+    var yy = y[i] + c1 * (i * dx) + c2;
+    pts[i] = { x: i * dx, y: yy };
+    if (Math.abs(yy) > ymax) ymax = Math.abs(yy);
+  }
+  return { pts: pts, ymax: ymax };
+}
+
+function currentXp(p, lambda) {
+  // moving mode: P position sweeps with lambda 0->1 across whole beam; else fixed at right end (D)
+  if (anim.mode === 'moving') return lambda * (p.a + p.Lab + p.c);
+  return p.a + p.Lab + p.c;
+}
+
+function analyse(p, lambda) {
+  var xp = currentXp(p, lambda);
+  var r = calcReactions(p, lambda, xp);
+  var total = r.total;
+  var N = 240, dx = total / N;
+  var Vmax = 0, Mpos = 0, Mneg = 0, contra = [];
+  var prevM = null;
+  for (var i = 0; i <= N; i++) {
+    var x = i * dx;
+    var v = V_at(p, r, x), m = M_at(p, r, x);
+    if (Math.abs(v) > Math.abs(Vmax)) Vmax = v;
+    if (m > Mpos) Mpos = m;
+    if (m < Mneg) Mneg = m;
+    if (prevM !== null && prevM * m < 0) {
+      // zero crossing -> contraflexure
+      var xc = x - dx * m / (m - prevM);
+      contra.push(xc);
+    }
+    prevM = m;
+  }
+  // sample exact critical sections (supports, load points) for accurate peak moments
+  var crit = [r.xa, r.xb, r.xp, total];
+  for (var k = 0; k < crit.length; k++) {
+    var mc = M_at(p, r, crit[k]), vc = V_at(p, r, crit[k]);
+    if (mc > Mpos) Mpos = mc;
+    if (mc < Mneg) Mneg = mc;
+    if (Math.abs(vc) > Math.abs(Vmax)) Vmax = vc;
+  }
+  var defl = deflection(p, r, N);
+  // physical max deflection in mm: cantilever-style scale uses M/EI already (m units, EI in kN*m^2, M in kN*m)
+  // y integrated has units of m (since M/EI is 1/m, integrated twice over m -> m). Convert to mm.
+  var deltaMaxMm = defl.ymax * 1000;
+  return { r: r, Vmax: Vmax, Mpos: Mpos, Mneg: Mneg, contra: contra, defl: defl, deltaMaxMm: deltaMaxMm, xp: xp, total: total };
 }
 
 function resizeCanvas() {
-  // keep logical 600x400 but scale to container
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 600));
+  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 640));
   var dpr = window.devicePixelRatio || 1;
+  var h = w * LH / LW;
   cv.style.width = w + 'px';
-  cv.style.height = (w * 400 / 600) + 'px';
-  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(w * 400 / 600 * dpr)) {
+  cv.style.height = h + 'px';
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
     cv.width = Math.round(w * dpr);
-    cv.height = Math.round(w * 400 / 600 * dpr);
+    cv.height = Math.round(h * dpr);
   }
-  ctx.setTransform(dpr * w / 600, 0, 0, dpr * w / 600, 0, 0);
+  ctx.setTransform(dpr * w / LW, 0, 0, dpr * w / LW, 0, 0);
 }
 
-function drawArrow(c, x0, y0, x1, y1, col) {
+function drawArrow(c, x0, y0, x1, y1, col, head) {
   c.strokeStyle = col; c.fillStyle = col; c.lineWidth = 1.5;
   c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
   var ang = Math.atan2(y1 - y0, x1 - x0);
-  var L = 6;
+  var L = head || 6;
   c.beginPath();
   c.moveTo(x1, y1);
   c.lineTo(x1 - L * Math.cos(ang - 0.4), y1 - L * Math.sin(ang - 0.4));
@@ -296,226 +406,245 @@ function drawArrow(c, x0, y0, x1, y1, col) {
   c.fill();
 }
 
-function drawBeam(p, r) {
-  // logical coordinates: 600 wide, 400 tall (3 stripes)
-  var W = 600, H = 400;
+function draw(p, A) {
+  var marginL = 44, marginR = 30;
+  var gw = LW - marginL - marginR;
+  var total = A.total;
+  function px(x) { return marginL + (x / total) * gw; }
+
   ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, LW, LH);
 
-  var marginL = 40, marginR = 30;
-  var gw = W - marginL - marginR;
-  var Ltot = p.Lab + p.c;
-  function px(x) { return marginL + (x / Ltot) * gw; }
-
-  // === Stripe 1: Beam model (y = 0..130) ===
-  var beamY = 60;
-  // load arrows above
-  var arrowTop = 18, arrowBot = beamY - 4;
-  // UDL
-  if (p.w > 0) {
-    ctx.strokeStyle = 'rgba(0,180,216,0.7)';
-    ctx.fillStyle = 'rgba(0,180,216,0.7)';
-    var nArrows = 14;
+  // ===== Stripe 1: deflected beam (y region 0..170) =====
+  var beamY = 78;
+  var arrowTop = 22, arrowBot = beamY - 4;
+  // UDL arrows
+  if (A.r.w > 0) {
+    var nArrows = 16;
     for (var i = 0; i <= nArrows; i++) {
       var xx = marginL + (i / nArrows) * gw;
-      drawArrow(ctx, xx, arrowTop, xx, arrowBot, 'rgba(0,180,216,0.85)');
+      drawArrow(ctx, xx, arrowTop, xx, arrowBot, 'rgba(0,180,216,0.8)');
     }
-    // UDL line
-    ctx.strokeStyle = 'rgba(0,180,216,0.9)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(marginL, arrowTop); ctx.lineTo(W - marginR, arrowTop); ctx.stroke();
-    ctx.fillStyle = '#00B4D8';
-    ctx.font = '11px "Roboto Mono",monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('w = ' + p.w.toFixed(0) + ' kN/m', marginL, 12);
+    ctx.strokeStyle = 'rgba(0,180,216,0.9)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(marginL, arrowTop); ctx.lineTo(LW - marginR, arrowTop); ctx.stroke();
+    ctx.fillStyle = '#00B4D8'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+    ctx.fillText('w = ' + A.r.w.toFixed(1) + ' kN/m', marginL, 14);
   }
-  // P at D
-  if (p.P > 0) {
-    var Dx = px(p.Lab + p.c);
-    drawArrow(ctx, Dx, 6, Dx, arrowBot, '#FFD166');
-    ctx.fillStyle = '#FFD166';
-    ctx.font = 'bold 11px "Roboto Mono",monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText('P = ' + p.P.toFixed(0) + ' kN', Dx - 4, 14);
+  // P arrow
+  if (A.r.Pp > 0.001) {
+    var Pxp = px(A.xp);
+    drawArrow(ctx, Pxp, 8, Pxp, arrowBot, '#FFD166', 8);
+    ctx.fillStyle = '#FFD166'; ctx.font = 'bold 11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillText('P = ' + A.r.Pp.toFixed(0) + ' kN', Pxp, 14);
   }
-  // beam
-  ctx.fillStyle = '#3d567a';
-  ctx.fillRect(marginL, beamY - 4, gw, 8);
-  ctx.strokeStyle = '#8fb8e0';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(marginL, beamY - 4, gw, 8);
-  // supports A and B (triangles)
-  function support(x, isPin) {
-    var sx = px(x);
+  // deflected centerline
+  var defScale = 46; // px per unit ymax
+  var pts = A.defl.pts, ymax = A.defl.ymax;
+  ctx.lineWidth = 4; ctx.strokeStyle = '#5a86c4';
+  // undeformed reference (faint)
+  ctx.strokeStyle = 'rgba(143,184,224,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(marginL, beamY); ctx.lineTo(LW - marginR, beamY); ctx.stroke();
+  ctx.setLineDash([]);
+  // deflected (downward positive => add to y)
+  ctx.beginPath();
+  for (var i = 0; i < pts.length; i++) {
+    var X = px(pts[i].x);
+    var Y = beamY + (pts[i].y / ymax) * defScale;
+    if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+  }
+  ctx.lineWidth = 4; ctx.strokeStyle = '#6ea8ff'; ctx.lineCap = 'round';
+  ctx.stroke(); ctx.lineCap = 'butt';
+
+  function ydef(x) {
+    var idx = Math.round(x / total * (pts.length - 1));
+    idx = Math.max(0, Math.min(pts.length - 1, idx));
+    return beamY + (pts[idx].y / ymax) * defScale;
+  }
+  // supports A and B (pin triangles) at deflected baseline (y=0 there)
+  function support(x) {
+    var sx = px(x), sy = ydef(x);
     ctx.fillStyle = '#E7717D';
     ctx.beginPath();
-    ctx.moveTo(sx, beamY + 4);
-    ctx.lineTo(sx - 8, beamY + 18);
-    ctx.lineTo(sx + 8, beamY + 18);
+    ctx.moveTo(sx, sy + 3); ctx.lineTo(sx - 8, sy + 17); ctx.lineTo(sx + 8, sy + 17);
     ctx.closePath(); ctx.fill();
-    if (isPin) {
-      ctx.strokeStyle = '#E7717D';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(sx - 12, beamY + 22); ctx.lineTo(sx + 12, beamY + 22);
-      ctx.stroke();
+    ctx.strokeStyle = '#E7717D'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(sx - 12, sy + 21); ctx.lineTo(sx + 12, sy + 21); ctx.stroke();
+  }
+  support(A.r.xa); support(A.r.xb);
+  // reaction arrows (upward) with magnitude
+  function reaction(x, val, label) {
+    var sx = px(x), sy = ydef(x) + 38;
+    var up = val >= 0;
+    var len = Math.min(30, 8 + Math.abs(val) * 0.28);
+    if (up) drawArrow(ctx, sx, sy, sx, sy - len, '#7CFC9A', 7);
+    else drawArrow(ctx, sx, sy - len, sx, sy, '#FF6B6B', 7);
+    ctx.fillStyle = up ? '#7CFC9A' : '#FF6B6B';
+    ctx.font = 'bold 10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(label + '=' + val.toFixed(0), sx, sy + 12);
+  }
+  reaction(A.r.xa, A.r.Ra, 'R_A');
+  reaction(A.r.xb, A.r.Rb, 'R_B');
+  // node labels
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('A', px(A.r.xa), ydef(A.r.xa) - 8);
+  ctx.fillText('B', px(A.r.xb), ydef(A.r.xb) - 8);
+
+  // ===== Stripe 2: SFD (y region 180..290) =====
+  drawDiagram({
+    px: px, total: total, gw: gw, marginL: marginL, marginR: marginR,
+    top: 188, baseY: 238, bottom: 292, gh: 42, fn: function (x) { return V_at(p, A.r, x); },
+    maxV: Math.max(Math.abs(A.Vmax), 1e-6), fill: 'rgba(0,180,216,0.32)', line: '#00B4D8',
+    label: 'SFD (kN)', rlabel: 'V_max = ' + A.Vmax.toFixed(1), supx: [A.r.xa, A.r.xb], contra: null
+  });
+
+  // ===== Stripe 3: BMD (y region 300..450) =====
+  drawDiagram({
+    px: px, total: total, gw: gw, marginL: marginL, marginR: marginR,
+    top: 312, baseY: 380, bottom: 452, gh: 58, fn: function (x) { return M_at(p, A.r, x); },
+    maxV: Math.max(Math.abs(A.Mpos), Math.abs(A.Mneg), 1e-6), fill: 'rgba(231,113,125,0.30)', line: '#E7717D',
+    label: 'BMD (kN·m)', rlabel: 'M⁺=' + A.Mpos.toFixed(1) + ' / M⁻=' + A.Mneg.toFixed(1),
+    supx: [A.r.xa, A.r.xb], contra: A.contra
+  });
+}
+
+function drawDiagram(o) {
+  var W = LW;
+  ctx.fillStyle = '#11233b';
+  ctx.fillRect(o.marginL, o.top, o.gw, o.bottom - o.top);
+  ctx.strokeStyle = 'rgba(143,184,224,0.5)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(o.marginL, o.baseY); ctx.lineTo(W - o.marginR, o.baseY); ctx.stroke();
+  var N = 240;
+  var vals = new Array(N + 1);
+  for (var i = 0; i <= N; i++) vals[i] = o.fn(i / N * o.total);
+  // fill
+  ctx.fillStyle = o.fill;
+  ctx.beginPath(); ctx.moveTo(o.marginL, o.baseY);
+  for (var i = 0; i <= N; i++) ctx.lineTo(o.px(i / N * o.total), o.baseY - (vals[i] / o.maxV) * o.gh);
+  ctx.lineTo(W - o.marginR, o.baseY); ctx.closePath(); ctx.fill();
+  // outline
+  ctx.strokeStyle = o.line; ctx.lineWidth = 2; ctx.beginPath();
+  for (var i = 0; i <= N; i++) {
+    var X = o.px(i / N * o.total), Y = o.baseY - (vals[i] / o.maxV) * o.gh;
+    if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+  }
+  ctx.stroke();
+  // support dashed verticals
+  ctx.strokeStyle = 'rgba(231,113,125,0.55)'; ctx.setLineDash([3, 3]);
+  for (var s = 0; s < o.supx.length; s++) {
+    ctx.beginPath(); ctx.moveTo(o.px(o.supx[s]), o.top); ctx.lineTo(o.px(o.supx[s]), o.baseY + o.gh); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // contraflexure markers (M=0 points)
+  if (o.contra) {
+    for (var k = 0; k < o.contra.length; k++) {
+      var cx = o.px(o.contra[k]);
+      ctx.fillStyle = '#FFD166';
+      ctx.beginPath(); ctx.arc(cx, o.baseY, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#FFD166'; ctx.font = '9px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+      ctx.fillText('反曲点', cx, o.baseY + o.gh + 4);
     }
   }
-  support(0, true);
-  support(p.Lab, true);
-  // labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('A', px(0), beamY + 36);
-  ctx.fillText('B', px(p.Lab), beamY + 36);
-  ctx.fillText('D', px(p.Lab + p.c), beamY + 36);
-  // span dimension
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.beginPath();
-  ctx.moveTo(px(0), beamY + 48); ctx.lineTo(px(p.Lab), beamY + 48);
-  ctx.moveTo(px(p.Lab), beamY + 48); ctx.lineTo(px(p.Lab + p.c), beamY + 48);
-  ctx.stroke();
-  ctx.fillStyle = '#8fb8e0';
-  ctx.textAlign = 'center';
-  ctx.fillText('L_AB = ' + p.Lab.toFixed(1) + ' m', (px(0) + px(p.Lab)) / 2, beamY + 60);
-  ctx.fillText('c = ' + p.c.toFixed(1) + ' m', (px(p.Lab) + px(p.Lab + p.c)) / 2, beamY + 60);
-
-  // === Stripe 2: SFD (y = 140..240) ===
-  var sfdY0 = 195; // baseline
-  var sfdGH = 45;
-  ctx.fillStyle = '#11233b';
-  ctx.fillRect(marginL, 140, gw, 100);
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(marginL, sfdY0); ctx.lineTo(W - marginR, sfdY0); ctx.stroke();
-  // compute V curve
-  var Nseg = 200;
-  var Vmax = 1e-6;
-  var Vs = [];
-  for (var i = 0; i <= Nseg; i++) {
-    var x = (i / Nseg) * Ltot;
-    var v = V_at(p, r, x);
-    Vs.push(v);
-    if (Math.abs(v) > Vmax) Vmax = Math.abs(v);
-  }
-  // fill polygon
-  ctx.fillStyle = 'rgba(0,180,216,0.35)';
-  ctx.beginPath();
-  ctx.moveTo(marginL, sfdY0);
-  for (var i = 0; i <= Nseg; i++) {
-    var x = (i / Nseg) * Ltot;
-    ctx.lineTo(px(x), sfdY0 - (Vs[i] / Vmax) * sfdGH);
-  }
-  ctx.lineTo(W - marginR, sfdY0);
-  ctx.closePath();
-  ctx.fill();
-  // outline
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (var i = 0; i <= Nseg; i++) {
-    var x = (i / Nseg) * Ltot;
-    if (i === 0) ctx.moveTo(px(x), sfdY0 - (Vs[i] / Vmax) * sfdGH);
-    else ctx.lineTo(px(x), sfdY0 - (Vs[i] / Vmax) * sfdGH);
-  }
-  ctx.stroke();
-  // support jumps as vertical bars
-  ctx.strokeStyle = 'rgba(231,113,125,0.6)';
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  ctx.moveTo(px(0), 140); ctx.lineTo(px(0), 240);
-  ctx.moveTo(px(p.Lab), 140); ctx.lineTo(px(p.Lab), 240);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  // label
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('SFD (kN)', marginL + 4, 152);
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText(o.label, o.marginL + 4, o.top + 12);
   ctx.textAlign = 'right';
-  ctx.fillText('Vmax = ' + Vmax.toFixed(1), W - marginR - 4, 152);
-
-  // === Stripe 3: BMD (y = 250..390) ===
-  var bmdY0 = 320;
-  var bmdGH = 60;
-  ctx.fillStyle = '#11233b';
-  ctx.fillRect(marginL, 250, gw, 140);
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.beginPath(); ctx.moveTo(marginL, bmdY0); ctx.lineTo(W - marginR, bmdY0); ctx.stroke();
-  var Ms = [];
-  var Mmax = 1e-6;
-  for (var i = 0; i <= Nseg; i++) {
-    var x = (i / Nseg) * Ltot;
-    var m = M_at(p, r, x);
-    Ms.push(m);
-    if (Math.abs(m) > Mmax) Mmax = Math.abs(m);
-  }
-  // fill
-  ctx.fillStyle = 'rgba(231,113,125,0.30)';
-  ctx.beginPath();
-  ctx.moveTo(marginL, bmdY0);
-  for (var i = 0; i <= Nseg; i++) {
-    var x = (i / Nseg) * Ltot;
-    ctx.lineTo(px(x), bmdY0 - (Ms[i] / Mmax) * bmdGH);
-  }
-  ctx.lineTo(W - marginR, bmdY0);
-  ctx.closePath(); ctx.fill();
-  // outline
-  ctx.strokeStyle = '#E7717D';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (var i = 0; i <= Nseg; i++) {
-    var x = (i / Nseg) * Ltot;
-    if (i === 0) ctx.moveTo(px(x), bmdY0 - (Ms[i] / Mmax) * bmdGH);
-    else ctx.lineTo(px(x), bmdY0 - (Ms[i] / Mmax) * bmdGH);
-  }
-  ctx.stroke();
-  // support dashes
-  ctx.strokeStyle = 'rgba(231,113,125,0.6)';
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  ctx.moveTo(px(0), 250); ctx.lineTo(px(0), 390);
-  ctx.moveTo(px(p.Lab), 250); ctx.lineTo(px(p.Lab), 390);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('BMD (kN·m)', marginL + 4, 262);
-  ctx.textAlign = 'right';
-  ctx.fillText('M_B = ' + r.Mb.toFixed(1) + ' / M+ = ' + r.Mpos.toFixed(1), W - marginR - 4, 262);
+  ctx.fillText(o.rlabel, W - o.marginR - 4, o.top + 12);
 }
 
-function compute() {
+function updateStats(A) {
+  document.getElementById('statRa').textContent = fmtN(A.r.Ra, 1) + ' kN';
+  document.getElementById('statRb').textContent = fmtN(A.r.Rb, 1) + ' kN';
+  document.getElementById('statMpos').textContent = fmtN(A.Mpos, 1) + ' kN·m';
+  document.getElementById('statMneg').textContent = fmtN(A.Mneg, 1) + ' kN·m';
+  document.getElementById('statVmax').textContent = fmtN(A.Vmax, 1) + ' kN';
+  document.getElementById('statDeltaD').textContent = fmtN(A.deltaMaxMm, 2) + ' mm';
+}
+
+function render(lambda) {
   var p = getParams();
   if (!isFinite(p.Lab) || !isFinite(p.c) || !isFinite(p.w) || !isFinite(p.P) || p.Lab <= 0) return;
-  var r = calcReactions(p);
-  document.getElementById('statRa').textContent = fmtN(r.Ra, 1) + ' kN';
-  document.getElementById('statRb').textContent = fmtN(r.Rb, 1) + ' kN';
-  document.getElementById('statMb').textContent = fmtN(r.Mb, 1) + ' kN·m';
-  document.getElementById('statDeltaD').textContent = fmtN(r.deltaD_mm, 2) + ' mm';
+  var A = analyse(p, lambda);
   resizeCanvas();
-  drawBeam(p, r);
+  draw(p, A);
+  updateStats(A);
+  var pct = Math.round(lambda * 100);
+  document.getElementById('loadFill').style.width = pct + '%';
+  document.getElementById('loadLabel').textContent =
+    (anim.mode === 'moving' ? '荷重位置 ' : '荷重載荷率 ') + pct + '%';
 }
 
-function resetParams() {
-  var defs = { slLab: 5, slC: 2, slW: 10, slP: 20 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
+// compute() kept for slider oninput hooks: redraw at full/current load (static)
+function compute() {
+  if (anim.playing) return; // animation loop handles drawing
+  render(anim.mode === 'moving' ? anim.lambda : 1);
+}
+
+function loop(ts) {
+  if (!anim.t0) anim.t0 = ts;
+  var dt = (ts - anim.t0) / 1000; anim.t0 = ts;
+  var speed = (anim.mode === 'moving') ? 0.35 : 0.55;
+  anim.lambda += anim.dir * dt * speed;
+  if (anim.mode === 'moving') {
+    if (anim.lambda >= 1) { anim.lambda = 1; anim.dir = -1; }
+    if (anim.lambda <= 0) { anim.lambda = 0; anim.dir = 1; }
+  } else {
+    if (anim.lambda >= 1) { anim.lambda = 1; anim.dir = -1; }
+    if (anim.lambda <= 0) { anim.lambda = 0; anim.dir = 1; }
+  }
+  render(anim.lambda);
+  if (anim.playing) anim.raf = requestAnimationFrame(loop);
+}
+
+function togglePlay() {
+  var btn = document.getElementById('btnPlay');
+  if (anim.playing) {
+    anim.playing = false;
+    if (anim.raf) cancelAnimationFrame(anim.raf);
+    btn.innerHTML = '<i class="fas fa-play"></i> 再生';
+  } else {
+    anim.playing = true; anim.t0 = 0;
+    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    anim.raf = requestAnimationFrame(loop);
+  }
+}
+
+function resetSim() {
+  anim.playing = false;
+  if (anim.raf) cancelAnimationFrame(anim.raf);
+  anim.lambda = 0; anim.dir = 1; anim.t0 = 0;
+  document.getElementById('btnPlay').innerHTML = '<i class="fas fa-play"></i> 再生';
+  render(0);
+}
+
+function setSliders(vals) {
+  Object.keys(vals).forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.value = vals[id];
   });
+  updateSlider(document.getElementById('slA'), 'slAVal', 1, '');
   updateSlider(document.getElementById('slLab'), 'slLabVal', 1, '');
   updateSlider(document.getElementById('slC'), 'slCVal', 1, '');
   updateSlider(document.getElementById('slW'), 'slWVal', 0, '');
   updateSlider(document.getElementById('slP'), 'slPVal', 0, '');
-  compute();
 }
 
-window.addEventListener('resize', function () { compute(); });
+function applyPreset(kind) {
+  anim.mode = (kind === 'moving') ? 'moving' : 'static';
+  if (kind === 'single') setSliders({ slA: 0, slLab: 5, slC: 2, slW: 10, slP: 20 });
+  else if (kind === 'double') setSliders({ slA: 2, slLab: 5, slC: 2, slW: 12, slP: 0 });
+  else if (kind === 'moving') setSliders({ slA: 0, slLab: 8, slC: 0.1, slW: 4, slP: 40 });
+  resetSim();
+  if (!reduceMotion) { anim.playing = false; togglePlay(); }
+  else render(1);
+}
 
+function resetParams() { applyPreset('single'); }
+
+window.addEventListener('resize', function () { if (!anim.playing) compute(); });
+
+// initial
 resizeCanvas();
-compute();
+if (reduceMotion) { render(1); }
+else { render(1); }
 </script>
 
 <section class="explanation">
@@ -540,10 +669,10 @@ compute();
       <div class="bub">張出側の荷重を全部B近くで受け止めるからね。R_B のほうが圧倒的に大きくなる。実際、張出長cや先端荷重Pを増やすと R_B はどんどん大きく、R_A は逆に小さく（場合によっては負＝浮き上がり）になる。これがてこの原理さ。スライダーで遊んでみると面白いよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">張出端の撓みが1.47 mmって、けっこう小さいんですね。</div>
+      <div class="bub">最大撓み δ_max が3.40 mmって、けっこう小さいんですね。</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">EI=50000 kN·m²の比較的しっかりした梁だからね。$\delta_D \approx wc^4/(8EI) + Pc^3/(3EI)$ で評価していて、c=2mのときはこの値だ。試しに c を倍の4mにしてみると、撓みは16倍以上に跳ね上がる。$c^4$ で効くので張出長の影響は強烈なんだ。設計実務では撓み制限としてスパンの1/250〜1/300などを基準にする。</div>
+      <div class="bub">EI=50000 kN·m²の比較的しっかりした梁だからね。このツールはモーメント M(x) を $M/EI$ で2回積分し、支点で撓みゼロという境界条件を課して弾性曲線全体を描くから、表示される δ_max は張出端の値だ。簡易には $\delta \approx wc^4/(8EI) + Pc^3/(3EI)$ の片持ち近似でも当たりが付く。試しに c を倍の4mにしてみると、撓みは跳ね上がる。$c^4$ で効くので張出長の影響は強烈なんだ。設計実務では撓み制限としてスパンの1/250〜1/300などを基準にする。</div>
     </div>
   </div>
 
@@ -563,7 +692,7 @@ compute();
     </div>
     <div class="faq-item">
       <button type="button" class="faq-q" onclick="toggleFaq(this)">EI が固定なのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-      <div class="faq-a">本ツールでは反力・モーメント・SFD・BMDという「断面剛性に依存しない量」と、撓みのみを扱います。撓みδ_DはEIに反比例するため、表示値を読み替えれば任意のEIに対応可能です。例：表示が1.47 mmならEI=50000のとき、EIを2倍の100000 kN·m²にすれば撓みは半分の0.74 mmです。スライダーを増やしすぎるとパラメータ感度が下がり初心者には学びにくいため、EIは固定値とした上で、ユーザーが「他のEIならどうなるか」を自分で換算できる構成にしました。</div>
+      <div class="faq-a">本ツールでは反力・モーメント・SFD・BMDという「断面剛性に依存しない量」と、撓みのみを扱います。撓みδ_DはEIに反比例するため、表示値を読み替えれば任意のEIに対応可能です。例：表示が3.40 mmならEI=50000のとき、EIを2倍の100000 kN·m²にすれば撓みは半分の1.70 mmです。スライダーを増やしすぎるとパラメータ感度が下がり初心者には学びにくいため、EIは固定値とした上で、ユーザーが「他のEIならどうなるか」を自分で換算できる構成にしました。</div>
     </div>
   </div>
 
@@ -582,6 +711,9 @@ compute();
     <p>最後に、<strong>BMDの符号と引張側を混同しない</strong>こと。BMDで「負」と表示されるからといって、その点が壊れやすいとは限りません。重要なのは「引張がどちら側に出るか」です。主径間の正モーメント領域では下端引張、張出根元の負モーメント領域では上端引張となり、鉄筋コンクリート梁では引張側に主筋を配置する必要があります。BMDが折れ曲がる点（M=0のゼロクロス点）は反曲点と呼ばれ、主筋を上下で切り替える位置として施工上の重要な目印になります。</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="beam-overhang.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -634,26 +766,27 @@ compute();
 <!-- codex-static-related-tools:end -->
 
 <div class="howto-card howto-guide">
-<h3>使い方ガイド</h3>
-<ol>
-<li>左側スパン長(slLabVal)と張出長(slCVal)をメートル単位で設定します。例えば鋼製張出梁の場合、主スパン3m・張出1.5mが標準です。</li>
-<li>等分布荷重(slWVal:kN/m)と集中荷重(slPVal:kN)の大きさを入力してください。張出端に集中荷重を配置する場合、位置(slC)で張出端からの距離を指定します。</li>
-<li>シミュレーション実行後、左支点反力R_A・右支点反力R_B・張出根元モーメントM_B・張出端たわみδ_Dが自動計算され、SFD・BMDがリアルタイムで可視化されます。</li>
-</ol>
+<h3>使い方</h3>
+<ol><li>主スパン長 L_AB と張出長 c（slCVal）をメートル単位で設定します。slC は荷重位置ではなく張出部の長さです。</li><li>等分布荷重 w は全長 L_AB+c に作用し、集中荷重 P は常に自由端 D に作用します。</li><li>左支点反力 R_A、右支点反力 R_B、張出根元モーメント M_B、張出端たわみ δ_D と SFD/BMD を確認します。</li></ol>
 </div>
 <div class="howto-card howto-example">
-<h3>具体的な計算例</h3>
-<p>SS400鋼梁(I形断面I=8,000cm⁴、E=200GPa)、主スパン4m・張出1m、等分布荷重10kN/mを全長に作用させた場合：左支点反力R_A=30kN(上向き)、右支点反力R_B=20kN(下向き)、張出根元負モーメントM_B=-10kNm、張出端たわみδ_D=約8.4mm(下向き)となります。負反力と負モーメントは張出の特性を示す重要な指標です。</p>
+<h3>計算例</h3>
+<p>主スパン4 m、張出1 m、w=10 kN/m、P=0、固定EI=50000 kN·m²では、R_A=18.75 kN（表示18.8）、R_B=31.25 kN（表示31.3、上向き）、M_B=-5.0 kN·m、δ_D=0.025 mm（表示0.03）です。主スパンの最大正モーメントは x=1.88 m 付近で M+=17.6 kN·m です。</p>
 </div>
 <div class="howto-card howto-notes">
-<h3>実務での注意点</h3>
-<ul>
-<li>張出長がスパン長の1/3を超える場合、主スパン中央での負曲げが支配的になります。補強が必要か設計段階で検証してください。</li>
-<li>コンクリート床板上の鋼梁使用時は、張出端のたわみ制限をL/250以下に設定し、仕上げ材との干渉を防ぎます。</li>
-<li>集中荷重を張出端以外に配置する場合、位置パラメータslCは支点から測定し、負値で張出側を指定できます。</li>
-<li>反力がマイナスになった場合、梁の浮き上がりリスクがあるため、アンカーボルト設計を確認してください。</li>
-</ul>
+<h3>注意点</h3>
+<ol><li>P=0の場合、主スパン中央の曲げが負になり得るのは張出長が約0.7L_ABを超える領域からです。</li><li>張出根元の負モーメントは上端引張を生むため、RC梁では上端筋の定着を確認します。</li><li>Pの位置は自由端Dに固定です。任意位置の集中荷重を扱う場合はSFD/BMDツールまたは連続梁モデルを使ってください。</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

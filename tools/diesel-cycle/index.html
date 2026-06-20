@@ -45,8 +45,24 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{overflow-x:hidden}
 body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-#dieselCanvas{display:block;width:100%;height:270px;background:#020d1a;border-radius:8px}
+#dieselCanvas{display:block;width:100%;height:340px;background:#020d1a;border-radius:8px}
+#dieselCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 7px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:.6rem;color:rgba(255,255,255,.62);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.preset-btn{padding:4px 10px;font-size:.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+@media (prefers-reduced-motion: reduce){.preset-btn{transition:none}}
 .verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
 .verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
 .verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
@@ -56,7 +72,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ディーゼルサイクル シミュレーター",
       "description": "空気標準ディーゼルサイクルの熱効率・各点の温度と圧力・正味仕事・平均有効圧力を計算。圧縮比・締切り比・比熱比・吸気条件を変えて、ディーゼル機関の性能をP-V線図とグラフで可視化できる無料シミュレーターです。",
       "url": "https://novasolver.jp/tools/diesel-cycle.html",
@@ -66,7 +82,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["空気標準ディーゼルサイクルの熱効率計算","各状態点の温度・圧力の算出","正味仕事・平均有効圧力（MEP）の算出","同一圧縮比でのオットーサイクルとの効率比較","P-V線図のアニメーションと熱効率カーブのグラフ"],
       "keywords": "ディーゼルサイクル,熱効率,P-V線図,締切り比,圧縮比,圧縮着火,熱力学",
       "inLanguage": "ja"
@@ -130,6 +146,18 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div style="margin-bottom:12px">
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">プリセット</div>
+      <div class="preset-row">
+        <button class="preset-btn" type="button" data-preset="typical" onclick="dieselPreset('typical')">標準ディーゼル r=18</button>
+        <button class="preset-btn" type="button" data-preset="highload" onclick="dieselPreset('highload')">高締切り比（高負荷）</button>
+        <button class="preset-btn" type="button" data-preset="lightload" onclick="dieselPreset('lightload')">低締切り比（軽負荷）</button>
+        <button class="preset-btn" type="button" data-preset="highcomp" onclick="dieselPreset('highcomp')">高圧縮比</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">圧縮比 r</span>
@@ -184,6 +212,15 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="param-desc">ピストンが掃く容積 V₁−V₂（排気量）</div>
       <input type="range" id="VdispRange" min="100" max="5000" step="50" value="2000" oninput="syncToNum('VdispRange','VdispNum');pct(this);compute()">
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right: visualization -->
@@ -202,9 +239,32 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-fire"></i> P-V線図 — サイクルアニメーション</div>
-      <canvas id="dieselCanvas"></canvas>
-      <p class="canvas-hint">1→2 断熱圧縮、2→3 定圧加熱（燃料噴射）、3→4 断熱膨張、4→1 定容放熱。囲まれた面積が正味仕事で、マーカーがサイクルを周回します。</p>
+      <div class="chart-title"><i class="fas fa-fire"></i> ディーゼル4行程 — リアルタイム・サイクルアニメーション</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roPhase">—</div><div class="rl">現在の行程</div></div>
+        <div class="live-ro"><div class="rv" id="roQin">—</div><div class="rl">加熱量 q_in [J]</div></div>
+        <div class="live-ro"><div class="rv" id="roQout">—</div><div class="rl">放熱量 q_out [J]</div></div>
+        <div class="live-ro"><div class="rv" id="roWnet">—</div><div class="rl">正味仕事 W [J]</div></div>
+      </div>
+      <canvas id="dieselCanvas" tabindex="0" role="img" aria-label="ディーゼルサイクルのピストン4行程とP-V線図のリアルタイムアニメーション"></canvas>
+      <p class="canvas-hint">1→2 断熱圧縮、2→3 定圧加熱（燃料噴射）、3→4 断熱膨張、4→1 定容放熱。左がシリンダーとピストン、右がP-V線図で、マーカーが同期して周回します。</p>
+
+      <div class="play-row">
+        <button class="btn" type="button" id="dieselPlayBtn" onclick="dieselTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="dieselReset()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn diesel-speed-btn" type="button" data-speed="0.5" onclick="dieselSpeed(0.5)">0.5×</button>
+          <button class="preset-btn diesel-speed-btn active" type="button" data-speed="1" onclick="dieselSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn diesel-speed-btn" type="button" data-speed="2" onclick="dieselSpeed(2)">2×</button>
+        </div>
+      </div>
+
+      <div class="legend">
+        <span><i class="swatch" style="background:#00B4D8"></i>サイクル軌道</span>
+        <span><i class="swatch" style="background:#e17055"></i>定圧燃焼 2→3</span>
+        <span><i class="swatch" style="background:#00b894"></i>現在位置</span>
+        <span><i class="swatch" style="background:rgba(0,123,255,.5)"></i>正味仕事（囲み面積）</span>
+      </div>
     </div>
 
     <div class="chart-card">
@@ -301,17 +361,20 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 </section>
 
 
+
+
+
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>圧縮比（rComp）を4～16の範囲で設定します。ディーゼルエンジンの標準値は14～17です。</li>
-<li>締切り比（rCutoff）を1.0～2.5の範囲で指定します。この値が大きいほど定圧加熱期間が長くなり、熱効率が低下します。</li>
-<li>比熱比γを1.35（ディーゼル空気）または1.40（標準空気）から選択し、初期温度T1（293～373K）を設定してシミュレートボタンを押します。</li>
+<li>圧縮比（rComp）を8～25の範囲で設定します。ディーゼルエンジンの標準値は15～23です。</li>
+<li>締切り比（rCutoff）を1.1～4.0の範囲で指定します。この値が大きいほど定圧加熱期間が長くなり、熱効率が低下します。</li>
+<li>比熱比γを1.2～1.5の範囲で設定し（標準空気は1.40）、初期温度T1（250～400K）を設定すると結果がリアルタイムに更新されます。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>圧縮比16、締切り比1.8、γ=1.35、T1=300Kの条件下：圧縮工程で状態1から状態2へ進み、P2≈4,200kPa、T2≈810Kに達します。その後定圧加熱により状態3（P3=4,200kPa、T3=1,458K）に至り、膨張工程で正味仕事W_net≈1,850J/サイクルを発生、熱効率η≈52.3%を達成します。同一圧縮比のオットーサイクル（η≈63.2%）と比較すると、ディーゼルサイクルは定圧加熱の制約により約11%低い効率になります。</p>
+<p>既定条件（圧縮比 r=18、締切り比 r_c=2、γ=1.4、T1=300K、P1=100kPa、排気量 V_disp=2000cc）：断熱圧縮で T2=T1·r^(γ−1)≈953K、P2=P1·r^γ≈5,720kPa。定圧加熱で状態3（P3=5,720kPa、T3=T2·r_c≈1,907K）に至り、正味仕事 W_net≈1,488J/サイクル、平均有効圧力 MEP≈744kPa、熱効率 η=1−(1/r^(γ−1))·(r_c^γ−1)/(γ(r_c−1))≈63.2%。同一圧縮比のオットーサイクル（η≈68.5%）と比べると、定圧加熱の分だけディーゼルが約5.4ポイント低くなります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -322,6 +385,65 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 <li>γ値は燃焼ガス組成や温度に依存するため、高負荷運転時は実測値に基づく補正をお勧めします。</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="diesel-cycle.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/atkinson-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">アトキンソンサイクル シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">アトキンソンサイクル（完全膨張サイクル）の熱効率・各点の温度と圧力・膨張比・正味仕事を計算。圧縮比・比熱比・吸気条件・加熱量を変えて、ハイブリッド車に使われる過膨張エンジンの性能をP...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/dual-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">複合（サバテ）サイクル シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">複合（サバテ）サイクルの熱効率・各点の温度と圧力・定容/定圧加熱の割合を計算。圧縮比・圧力上昇比・締切り比・比熱比を変えて、現代ディーゼル機関の理想サイクルをP-V線図とグラフで可視...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/ericsson-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">エリクソンサイクル シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">理想エリクソンサイクル（2つの等温過程＋2つの定圧過程）の熱効率・高温熱入力・低温熱排出・正味仕事・再生熱量を計算。高温熱源温度・低温熱源温度・圧力比・比熱比を変えて、理想再生により...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/otto-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">オットーサイクル シミュレーター — 火花点火機関の熱効率</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">オットーサイクル シミュレーターは、空気標準サイクルの圧縮比・比熱比・吸入温度・加熱量から、4過程の温度変化・熱効率・ネット仕事をリアルタイム計算します。なぜ圧縮比を上げると効率が上...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/stirling-engine-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">スターリングエンジンサイクルシミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">熱移動、温度差、冷却余裕の初期検討に向けて、代表条件と主要指標の関係を同じ画面で読み取れます。</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/brayton-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ブレイトンサイクル シミュレーター — ガスタービンの熱効率</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ブレイトンサイクル シミュレーターは、空気標準サイクルとして圧力比・比熱比・吸気温度・タービン入口温度から熱効率・圧縮機出口温度・タービン出口温度・ネット仕事をリアルタイム計算します...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -340,7 +462,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 const R_AIR = 287;          // J/(kg·K) gas constant of air
 
 // shared state for the P-V diagram animation
-const DS = {V1:1,V2:1,V3:1,P1:1,P2:1,eta:0};
+const DS = {V1:1,V2:1,V3:1,P1:1,P2:1,P3:1,P4:1,T1:300,T2:1,T3:1,T4:1,eta:0,gamma:1.4,rComp:18,rCutoff:2,qin:0,qout:0,Wnet:0,MEP:0};
 
 // ===== Chart.js setup =====
 const pvChart = new Chart(document.getElementById('pvChart').getContext('2d'),{
@@ -507,176 +629,246 @@ function compute(){
 
   // ----- shared state for the diagram -----
   DS.V1=V1; DS.V2=V2; DS.V3=V3; DS.P1=P1; DS.P2=P2; DS.eta=eta;
+  DS.T1=T1; DS.T2=T2; DS.T3=T3; DS.T4=T4;
+  DS.P3=P3; DS.P4=P3*Math.pow(V3/V1, gammaVal);
+  DS.gamma=gammaVal; DS.rComp=rComp; DS.rCutoff=rCutoff;
+  DS.qin=m*qin; DS.qout=m*qout; DS.Wnet=Wnet; DS.MEP=MEP/1000;
+  if(typeof window.dieselSyncReadouts==='function') window.dieselSyncReadouts();
 }
 
-// ===== P-V diagram animation =====
+// ===== v2 piston + P-V cycle animation (IIFE) =====
 (function(){
   const cv = document.getElementById('dieselCanvas');
   const ctx = cv.getContext('2d');
+  const CSS_H = 340;
+  const gShape = 1.4; // diagram shape gamma (near typical air)
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   let phase = 0;
+  let playing = !reduceMotion;
+  let speed = 1;
+  let animId = null;
+  let lastTs = 0;
+
+  // i18n labels (translated per file)
+  const L = {
+    leg1:'1→2 断熱圧縮', leg2:'2→3 定圧加熱（燃料噴射）',
+    leg3:'3→4 断熱膨張', leg4:'4→1 定容放熱',
+    cyl:'シリンダー', pv:'P-V線図',
+    work:'正味仕事', inject:'噴射', net:'網掛け=正味仕事'
+  };
+
+  function curPhaseInfo(u){
+    if(u<0.25) return {leg:1,txt:L.leg1};
+    if(u<0.50) return {leg:2,txt:L.leg2};
+    if(u<0.75) return {leg:3,txt:L.leg3};
+    return {leg:4,txt:L.leg4};
+  }
+
+  // map cycle parameter u(0..1) to {V,P}
+  function statePoint(u){
+    const V1=DS.V1,V2=DS.V2,V3=DS.V3,P1=DS.P1,P2=DS.P2,P4=DS.P4;
+    if(u<0.25){ const t=u/0.25; const Vv=V1+(V2-V1)*t; return {V:Vv,P:P1*Math.pow(V1/Vv,gShape)}; }
+    if(u<0.50){ const t=(u-0.25)/0.25; const Vv=V2+(V3-V2)*t; return {V:Vv,P:P2}; }
+    if(u<0.75){ const t=(u-0.50)/0.25; const Vv=V3+(V1-V3)*t; return {V:Vv,P:P2*Math.pow(V3/Vv,gShape)}; }
+    const t=(u-0.75)/0.25; return {V:V1,P:P4+(P1-P4)*t};
+  }
 
   function resize(){
-    const dpr = window.devicePixelRatio||1;
+    const dpr = Math.min(window.devicePixelRatio||1, 2.5);
     const w = cv.parentElement.getBoundingClientRect().width;
-    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
-      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    if(Math.abs(cv.width-w*dpr)>2 || Math.abs(cv.height-CSS_H*dpr)>2){
+      cv.width = Math.round(w*dpr); cv.height = Math.round(CSS_H*dpr);
+      cv.style.height = CSS_H+'px';
     }
     ctx.setTransform(dpr,0,0,dpr,0,0);
   }
 
-  // gamma used only for diagram shape (kept near typical air value)
-  const gShape = 1.4;
+  function drawCylinder(x0,y0,w,h,u){
+    const V1=DS.V1,V2=DS.V2;
+    const mk = statePoint(u);
+    // piston fraction: 0 = TDC (min volume V2 at top), 1 = BDC (max volume V1)
+    const frac = (V1>V2) ? (mk.V-V2)/(V1-V2) : 1;
+    const wallT = 6;
+    const bore = w;
+    const topY = y0;
+    const botY = y0+h;
+    // cylinder walls
+    ctx.fillStyle = '#0a1c30';
+    ctx.fillRect(x0,topY,bore,h);
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+    ctx.strokeRect(x0,topY,bore,h);
+    // piston crown position
+    const stroke = h - 30;
+    const pistonY = topY + 14 + frac*stroke;
+    const info = curPhaseInfo(u);
+    // gas (above piston) colour by temperature feel
+    let gasTop = topY+wallT;
+    const gasGrad = ctx.createLinearGradient(0,gasTop,0,pistonY);
+    if(info.leg===2){ gasGrad.addColorStop(0,'#ff7043'); gasGrad.addColorStop(1,'#b71c1c'); }
+    else if(info.leg===1){ gasGrad.addColorStop(0,'#1565c0'); gasGrad.addColorStop(1,'#0d3a6b'); }
+    else if(info.leg===3){ gasGrad.addColorStop(0,'#ef5350'); gasGrad.addColorStop(1,'#6a1b1b'); }
+    else { gasGrad.addColorStop(0,'#2a6fae'); gasGrad.addColorStop(1,'#102a4c'); }
+    ctx.fillStyle = gasGrad;
+    ctx.fillRect(x0+wallT,gasTop,bore-2*wallT,pistonY-gasTop);
+    // injector (top centre) + spray during leg 2
+    const cx = x0+bore/2;
+    ctx.fillStyle = '#cfd8dc';
+    ctx.fillRect(cx-3,topY-8,6,12);
+    if(info.leg===2){
+      const t=(u-0.25)/0.25;
+      ctx.strokeStyle = 'rgba(255,213,79,.85)';
+      ctx.lineWidth = 1.4;
+      for(let k=-2;k<=2;k++){
+        ctx.beginPath();
+        ctx.moveTo(cx, gasTop+2);
+        ctx.lineTo(cx+k*7, gasTop+2+22+8*Math.sin(t*9+k));
+        ctx.stroke();
+      }
+      ctx.fillStyle='#ffd54a'; ctx.font='bold 10px Roboto Mono, monospace'; ctx.textAlign='center';
+      ctx.fillText(L.inject, cx, gasTop+44);
+    }
+    // piston body
+    ctx.fillStyle = '#90a4ae';
+    ctx.fillRect(x0+wallT,pistonY,bore-2*wallT,16);
+    ctx.fillStyle = '#607d8b';
+    ctx.fillRect(cx-6,pistonY+16,12,botY-(pistonY+16));
+    // label
+    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='10px Roboto Mono, monospace'; ctx.textAlign='center';
+    ctx.fillText(L.cyl, cx, botY+14);
+  }
+
+  function drawPV(x0,y0,w,h,u){
+    const V1=DS.V1,V2=DS.V2,V3=DS.V3,P1=DS.P1,P2=DS.P2,P4=DS.P4;
+    const padL=42,padR=12,padT=8,padB=24;
+    const plotW=w-padL-padR, plotH=h-padT-padB;
+    const vMax=V1*1.06, pMax=P2*1.12;
+    const sx=v=>x0+padL+v/vMax*plotW;
+    const sy=p=>y0+padT+plotH-p/pMax*plotH;
+    // path
+    const NP=160, path=[];
+    for(let i=0;i<=NP;i++) path.push(statePoint(i/NP));
+    // shaded net work
+    ctx.beginPath(); ctx.moveTo(sx(path[0].V),sy(path[0].P));
+    for(let i=1;i<path.length;i++) ctx.lineTo(sx(path[i].V),sy(path[i].P));
+    ctx.closePath(); ctx.fillStyle='rgba(0,123,255,.18)'; ctx.fill();
+    // axes
+    ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x0+padL,y0+padT); ctx.lineTo(x0+padL,y0+padT+plotH);
+    ctx.lineTo(x0+padL+plotW,y0+padT+plotH); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='10px Roboto Mono, monospace'; ctx.textAlign='center';
+    ctx.fillText('V', x0+padL+plotW/2, y0+padT+plotH+16);
+    ctx.save(); ctx.translate(x0+12,y0+padT+plotH/2); ctx.rotate(-Math.PI/2); ctx.fillText('P',0,0); ctx.restore();
+    // outline
+    ctx.beginPath(); ctx.moveTo(sx(path[0].V),sy(path[0].P));
+    for(let i=1;i<path.length;i++) ctx.lineTo(sx(path[i].V),sy(path[i].P));
+    ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2.2; ctx.shadowColor='#00B4D8'; ctx.shadowBlur=6; ctx.stroke(); ctx.shadowBlur=0;
+    // constant-pressure top (2->3)
+    ctx.beginPath(); ctx.moveTo(sx(V2),sy(P2)); ctx.lineTo(sx(V3),sy(P2));
+    ctx.strokeStyle='#e17055'; ctx.lineWidth=3.5; ctx.stroke();
+    // state points
+    const pts=[{V:V1,P:P1,n:'1'},{V:V2,P:P2,n:'2'},{V:V3,P:P2,n:'3'},{V:V1,P:P4,n:'4'}];
+    ctx.font='bold 11px Roboto Mono, monospace';
+    for(const pt of pts){ const x=sx(pt.V),yy=sy(pt.P);
+      ctx.beginPath(); ctx.arc(x,yy,4,0,Math.PI*2); ctx.fillStyle='#ffd24b'; ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.92)'; ctx.textAlign='left'; ctx.fillText(pt.n,x+7,yy+4); }
+    // marker
+    const mk=statePoint(u), mx=sx(mk.V), my=sy(mk.P);
+    ctx.beginPath(); ctx.arc(mx,my,6.5,0,Math.PI*2);
+    ctx.fillStyle='#00b894'; ctx.shadowColor='#00b894'; ctx.shadowBlur=12; ctx.fill(); ctx.shadowBlur=0;
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='10px Roboto Mono, monospace'; ctx.textAlign='right';
+    ctx.fillText(L.pv, x0+padL+plotW, y0+padT+plotH+16);
+  }
 
   function frame(){
     resize();
-    const W = cv.width/(window.devicePixelRatio||1);
-    const H = 270;
+    const W = cv.width/Math.min(window.devicePixelRatio||1,2.5);
+    const H = CSS_H;
     ctx.clearRect(0,0,W,H);
-    ctx.fillStyle = '#020d1a';
-    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#020d1a'; ctx.fillRect(0,0,W,H);
 
-    // ----- plot geometry -----
-    const padL = 56, padR = 24, padT = 26, padB = 40;
-    const plotW = W - padL - padR;
-    const plotH = H - padT - padB;
+    const info = curPhaseInfo(phase);
+    // header: process label + eta
+    ctx.fillStyle='#00b894'; ctx.font='bold 13px Roboto Mono, monospace'; ctx.textAlign='left';
+    ctx.fillText(info.txt, 14, 20);
+    ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='11px Roboto Mono, monospace'; ctx.textAlign='right';
+    ctx.fillText('η = '+(DS.eta*100).toFixed(1)+'%', W-14, 20);
 
-    // state volumes / pressures from shared state
-    const V1 = DS.V1, V2 = DS.V2, V3 = DS.V3;
-    const P1 = DS.P1, P2 = DS.P2;
-    const P4 = P2*Math.pow(V3/V1, gShape);
+    // layout: left cylinder ~38%, right P-V ~62%
+    const topPad=30, bottomPad=8;
+    const cylW = Math.min(150, W*0.34);
+    const cylX = 18, cylY = topPad+6, cylH = H-topPad-bottomPad-22;
+    drawCylinder(cylX, cylY, cylW, cylH, phase);
 
-    // axis ranges
-    const vMin = 0, vMax = V1*1.06;
-    const pMin = 0, pMax = P2*1.12;
+    const pvX = cylX+cylW+24, pvY = topPad;
+    const pvW = W-pvX-12, pvH = H-topPad-bottomPad;
+    drawPV(pvX, pvY, pvW, pvH, phase);
 
-    function sx(v){ return padL + (v-vMin)/(vMax-vMin)*plotW; }
-    function sy(p){ return padT + plotH - (p-pMin)/(pMax-pMin)*plotH; }
-
-    // pressure along each process at parametric u in 0..1
-    function statePoint(u){
-      // u 0..1 maps over the whole cycle (4 legs of equal parameter span)
-      if(u<0.25){
-        const t=u/0.25; const Vv=V1+(V2-V1)*t;
-        return {V:Vv, P:P1*Math.pow(V1/Vv,gShape)};
-      }else if(u<0.50){
-        const t=(u-0.25)/0.25; const Vv=V2+(V3-V2)*t;
-        return {V:Vv, P:P2};
-      }else if(u<0.75){
-        const t=(u-0.50)/0.25; const Vv=V3+(V1-V3)*t;
-        return {V:Vv, P:P2*Math.pow(V3/Vv,gShape)};
-      }else{
-        const t=(u-0.75)/0.25;
-        return {V:V1, P:P4+(P1-P4)*t};
-      }
+    if(window.dieselSyncReadouts) window.dieselSyncReadouts();
+    if(playing){
+      phase += 0.0035*speed;
+      if(phase>=1) phase = 0;
     }
-
-    // ----- build full cycle path -----
-    const NPATH = 160;
-    const path = [];
-    for(let i=0;i<=NPATH;i++){
-      path.push(statePoint(i/NPATH));
-    }
-
-    // ----- shade enclosed area (net work) -----
-    ctx.beginPath();
-    ctx.moveTo(sx(path[0].V), sy(path[0].P));
-    for(let i=1;i<path.length;i++){
-      ctx.lineTo(sx(path[i].V), sy(path[i].P));
-    }
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(0,123,255,.18)';
-    ctx.fill();
-
-    // ----- axes -----
-    ctx.strokeStyle = 'rgba(255,255,255,.35)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+plotH);
-    ctx.lineTo(padL+plotW, padT+plotH);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,.55)';
-    ctx.font = '10px Roboto Mono, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('体積 V', padL+plotW/2, padT+plotH+26);
-    ctx.save();
-    ctx.translate(14, padT+plotH/2);
-    ctx.rotate(-Math.PI/2);
-    ctx.fillText('圧力 P', 0, 0);
-    ctx.restore();
-
-    // ----- cycle outline -----
-    ctx.beginPath();
-    ctx.moveTo(sx(path[0].V), sy(path[0].P));
-    for(let i=1;i<path.length;i++){
-      ctx.lineTo(sx(path[i].V), sy(path[i].P));
-    }
-    ctx.strokeStyle = '#00B4D8';
-    ctx.lineWidth = 2.2;
-    ctx.shadowColor = '#00B4D8'; ctx.shadowBlur = 6;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // ----- highlight the constant-pressure top line (2->3) -----
-    ctx.beginPath();
-    ctx.moveTo(sx(V2), sy(P2));
-    ctx.lineTo(sx(V3), sy(P2));
-    ctx.strokeStyle = '#e17055';
-    ctx.lineWidth = 3.5;
-    ctx.stroke();
-
-    // ----- state points + labels -----
-    const pts = [
-      {V:V1,P:P1,name:'1'},
-      {V:V2,P:P2,name:'2'},
-      {V:V3,P:P2,name:'3'},
-      {V:V1,P:P4,name:'4'}
-    ];
-    ctx.font = 'bold 12px Roboto Mono, monospace';
-    for(const pt of pts){
-      const x=sx(pt.V), yy=sy(pt.P);
-      ctx.beginPath();
-      ctx.arc(x,yy,4.5,0,Math.PI*2);
-      ctx.fillStyle = '#ffd24b';
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.92)';
-      ctx.textAlign = 'left';
-      ctx.fillText(pt.name, x+8, yy+4);
-    }
-
-    // ----- moving marker traversing the cycle -----
-    const mk = statePoint(phase);
-    const mx = sx(mk.V), my = sy(mk.P);
-    ctx.beginPath();
-    ctx.arc(mx,my,7,0,Math.PI*2);
-    ctx.fillStyle = '#00b894';
-    ctx.shadowColor = '#00b894'; ctx.shadowBlur = 12;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // ----- process label (which leg the marker is on) -----
-    let legText;
-    if(phase<0.25)      legText = '1→2 断熱圧縮';
-    else if(phase<0.50) legText = '2→3 定圧加熱（燃料噴射）';
-    else if(phase<0.75) legText = '3→4 断熱膨張';
-    else                legText = '4→1 定容放熱';
-    ctx.fillStyle = '#00b894';
-    ctx.font = 'bold 12px Roboto Mono, monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(legText, padL+6, padT+12);
-    ctx.fillStyle = 'rgba(255,255,255,.5)';
-    ctx.font = '10px Roboto Mono, monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText('η = '+(DS.eta*100).toFixed(1)+'%  （青網掛け = 正味仕事）', padL+plotW, padT+12);
-
-    phase += 0.0035;
-    if(phase>=1) phase = 0;
-    requestAnimationFrame(frame);
+    if(playing) animId = requestAnimationFrame(frame);
+    else animId = null;
   }
-  frame();
+
+  function start(){ if(reduceMotion) return; if(!playing){ playing=true; lastTs=0; } if(!animId) animId=requestAnimationFrame(frame); setBtn(); }
+  function stop(){ playing=false; if(animId){ cancelAnimationFrame(animId); animId=null; } setBtn(); }
+  function setBtn(){ const b=document.getElementById('dieselPlayBtn'); if(b) b.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生'; }
+
+  // expose controls
+  window.dieselTogglePlay = function(){ playing ? stop() : start(); };
+  window.dieselReset = function(){ phase=0; if(!playing){ frame(); } };
+  window.dieselSpeed = function(s){ speed=s;
+    document.querySelectorAll('.diesel-speed-btn').forEach(function(b){
+      const a=parseFloat(b.dataset.speed)===s; b.classList.toggle('active',a);
+      b.style.borderColor=a?'var(--accent)':''; b.style.color=a?'var(--accent)':'';
+    });
+  };
+
+  // sync the readouts above the canvas from DS
+  window.dieselSyncReadouts = function(){
+    const set=(id,val)=>{ const e=document.getElementById(id); if(e) e.textContent=val; };
+    const info = curPhaseInfo(phase);
+    set('roPhase', info.txt);
+    set('roQin', isFinite(DS.qin)?DS.qin.toFixed(0):'—');
+    set('roQout', isFinite(DS.qout)?DS.qout.toFixed(0):'—');
+    set('roWnet', isFinite(DS.Wnet)?DS.Wnet.toFixed(0):'—');
+  };
+
+  // keyboard a11y: space/enter toggles play
+  cv.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); window.dieselTogglePlay(); } });
+  window.addEventListener('resize', function(){ if(!playing) frame(); });
+
+  // initial paint
+  setBtn();
+  if(reduceMotion){ playing=false; frame(); setBtn(); }
+  else { animId = requestAnimationFrame(frame); }
 })();
+
+// ===== presets =====
+function dieselPreset(name){
+  const P = {
+    typical:   {r:18, rc:2,   g:1.4},
+    highload:  {r:18, rc:3,   g:1.4},
+    lightload: {r:18, rc:1.4, g:1.4},
+    highcomp:  {r:22, rc:2,   g:1.4}
+  }[name];
+  if(!P) return;
+  const setPair = (rangeId,numId,val)=>{
+    const rg=document.getElementById(rangeId), nm=document.getElementById(numId);
+    if(rg){ rg.value=val; pct(rg); } if(nm){ nm.value=val; }
+  };
+  setPair('rCompRange','rCompNum',P.r);
+  setPair('rCutoffRange','rCutoffNum',P.rc);
+  setPair('gammaValRange','gammaValNum',P.g);
+  document.querySelectorAll('.preset-btn[data-preset]').forEach(function(b){
+    b.classList.toggle('active', b.dataset.preset===name);
+  });
+  compute();
+}
 
 // ===== init =====
 ['rCompRange','rCutoffRange','gammaValRange','T1Range','P1Range','VdispRange'].forEach(function(id){

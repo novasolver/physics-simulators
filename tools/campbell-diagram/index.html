@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "キャンベル線図シミュレーター",
       "description": "ロータの自然振動数とジャイロ効果による前進・後退分岐、エンジンオーダー線との交点から複数の危険速度をリアルタイムに可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/campbell-diagram.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["2モードの自然振動数とジャイロ分岐の可視化","1×・2×・3× エンジンオーダー線との交点抽出","複数の危険速度（RPM）の自動計算","運転速度との余裕（マージン）の表示"],
       "keywords": "キャンベル線図,危険速度,ロータダイナミクス,ジャイロ効果,前進ホワール,後退ホワール,エンジンオーダー,回転機械",
       "datePublished": "2026-05-15",
@@ -170,6 +170,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">「スイープ」は運転速度を300〜6000 RPMで自動的に動かし、危険速度を通過する瞬間を確認できます。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="カオス・フラクタルの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">カオス・フラクタル の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -234,9 +243,14 @@ function getParams() {
   return { fn1: fn1, fn2: fn2, g: g, rpm: rpm };
 }
 
-// Critical speed (RPM) where order k crosses FW of mode m
-function critRpm(fn, k, g) {
+function critRpmFW(fn, k, g) {
   var denom = k - g;
+  if (denom <= 0) return Infinity;
+  return 60 * fn / denom;
+}
+
+function critRpmBW(fn, k, g) {
+  var denom = k + g;
   if (denom <= 0) return Infinity;
   return 60 * fn / denom;
 }
@@ -245,8 +259,10 @@ function allCriticalSpeeds(p) {
   var out = [];
   for (var i = 0; i < ORDERS.length; i++) {
     var k = ORDERS[i];
-    out.push({ mode: 1, order: k, rpm: critRpm(p.fn1, k, p.g) });
-    out.push({ mode: 2, order: k, rpm: critRpm(p.fn2, k, p.g) });
+    out.push({ mode: 1, order: k, branch: 'FW', rpm: critRpmFW(p.fn1, k, p.g) });
+    out.push({ mode: 1, order: k, branch: 'BW', rpm: critRpmBW(p.fn1, k, p.g) });
+    out.push({ mode: 2, order: k, branch: 'FW', rpm: critRpmFW(p.fn2, k, p.g) });
+    out.push({ mode: 2, order: k, branch: 'BW', rpm: critRpmBW(p.fn2, k, p.g) });
   }
   return out;
 }
@@ -365,7 +381,7 @@ function drawCampbell(p) {
     ctx.fillText('Mode ' + (mi + 1), x0 + 4, py(fn) - 4);
   }
 
-  // crossing markers (FW × kx)
+  // crossing markers (FW/BW × kx)
   var crits = allCriticalSpeeds(p);
   ctx.fillStyle = '#ff5252';
   for (var ci = 0; ci < crits.length; ci++) {
@@ -460,7 +476,7 @@ function drawMargin(p) {
       ctx.fillText(Math.round(crits[k].rpm).toString(), cx, by - 4);
       // label order/mode below
       ctx.fillStyle = '#8fb8e0';
-      ctx.fillText(crits[k].order + 'x M' + crits[k].mode, cx, y0 + 14);
+      ctx.fillText(crits[k].order + 'x M' + crits[k].mode + ' ' + crits[k].branch, cx, y0 + 14);
     }
   }
   // operating speed horizontal line
@@ -483,18 +499,20 @@ function drawMargin(p) {
 function compute() {
   var p = getParams();
   if (!isFinite(p.fn1) || !isFinite(p.fn2) || !isFinite(p.g) || !isFinite(p.rpm)) return;
-  var crit1m1 = critRpm(p.fn1, 1, p.g);
-  var crit1m2 = critRpm(p.fn2, 1, p.g);
+  var crit1m1FW = critRpmFW(p.fn1, 1, p.g);
+  var crit1m1BW = critRpmBW(p.fn1, 1, p.g);
+  var crit1m2FW = critRpmFW(p.fn2, 1, p.g);
+  var crit1m2BW = critRpmBW(p.fn2, 1, p.g);
   var crits = allCriticalSpeeds(p).filter(function (c) { return isFinite(c.rpm) && c.rpm <= RPM_MAX; });
   var nearest = null, nearestDist = Infinity;
   for (var i = 0; i < crits.length; i++) {
     var d = Math.abs(crits[i].rpm - p.rpm);
     if (d < nearestDist) { nearestDist = d; nearest = crits[i]; }
   }
-  document.getElementById('statCrit1m1').textContent = Math.round(crit1m1) + ' RPM';
-  document.getElementById('statCrit1m2').textContent = Math.round(crit1m2) + ' RPM';
+  document.getElementById('statCrit1m1').textContent = 'FW ' + Math.round(crit1m1FW) + ' / BW ' + Math.round(crit1m1BW) + ' RPM';
+  document.getElementById('statCrit1m2').textContent = 'FW ' + Math.round(crit1m2FW) + ' / BW ' + Math.round(crit1m2BW) + ' RPM';
   if (nearest) {
-    document.getElementById('statNearest').textContent = Math.round(nearest.rpm) + ' RPM';
+    document.getElementById('statNearest').textContent = Math.round(nearest.rpm) + ' RPM (' + nearest.order + 'x M' + nearest.mode + ' ' + nearest.branch + ')';
     var margin = (Math.abs(nearest.rpm - p.rpm) / p.rpm) * 100;
     document.getElementById('statMargin').textContent = margin.toFixed(1) + ' %';
   } else {
@@ -571,10 +589,10 @@ compute();
       <div class="bub">回転と同期する励振の周波数だよ。1× は不釣り合いやミスアライメント、2× はカップリングや軸の偏心、3× 以上は歯車のかみ合いや羽根車の翼通過。式で書くと $f = k\,\Omega$ なので、k 次の励振線の傾きはちょうど k になる。シミュレーターでは1×が実線、2×が破線、3×が点線にしてあるよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">運転速度1500 RPMだと、最近接の危険速度が1655 RPMで余裕10.3%って出てます。これって安全ですか？</div>
+      <div class="bub">運転速度1500 RPMだと、最近接の危険速度が1548 RPM（3x M2 BW）で余裕3.2%って出てます。これって安全ですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">微妙なラインだね。API 612や684みたいな回転機械の規格では15〜20%以上の分離余裕を要求しているから、10.3%だと再設計の対象。軸径や支持ベアリングの剛性を変えて自然振動数をずらすか、減衰を入れて共振ピークを抑えるか、どちらかの対策が必要になる。シミュレーターで f_n2 を90 Hzに動かしてみて、最近接危険速度が変わるのが見えるはずだ。</div>
+      <div class="bub">再設計が必要なラインだね。API 612や684みたいな回転機械の規格では15〜20%以上の分離余裕を要求しているから、3.2%では不足している。軸径や支持ベアリングの剛性を変えて自然振動数をずらすか、減衰を入れて共振ピークを抑えるか、どちらかの対策が必要になる。シミュレーターで f_n2 を90 Hzに動かしてみて、最近接危険速度が変わるのが見えるはずだ。</div>
     </div>
   </div>
 
@@ -613,6 +631,9 @@ compute();
     <p>最後に、<strong>「運転速度から離れていれば安全」という単純化</strong>に注意してください。キャンベル線図は線形で粘性減衰のみのモデルであり、実機ではシール力・流体力・内部摩擦などの非線形・非保存力が後退ホワールや劣モードを励振しうる場合があります。本ツールが示す危険速度は「同期励振が前進ホワールを励振する条件」であり、これだけで安全と結論できるわけではありません。詳細設計では完全な固有値解析（複素モード解析、安定性解析）が必須で、本シミュレーターは概念把握と初期検討のためのツールとしてご利用ください。</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="campbell-diagram.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -676,6 +697,16 @@ compute();
 <h3>実務での注意点</h3>
 <ol><li>遠心ポンプの吸入口近傍で2×励振による3400RPM危険速度が発生する場合、スラスト軸受の剛性不足でモード1が低下し危険速度が下降するリスクを評価</li><li>ジャイロ係数は軸受取付剛性と回転体の慣性モーメント比に依存するため、支持点変更時は再計算が必須</li><li>複数危険速度が密集している1500～4500RPM帯では加速時間を60秒以上確保し、共振点での加速エネルギーを分散</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="カオス・フラクタルの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">カオス・フラクタル の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

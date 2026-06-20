@@ -41,7 +41,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "磁気流体力学（MHD）シミュレーター",
       "description": "ハートマン数に基づくMHD流れをリアルタイム可視化。磁場強度・流体電気伝導度・粘性・圧力勾配を変えて速度プロファイルの変化を計算・表示するシミュレーター。",
       "url": "https://novasolver.jp/tools/magnetohydrodynamics.html",
@@ -51,7 +51,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ハートマン流れの速度プロファイル可視化","複数Haでの速度分布比較","磁場・電気伝導度・粘性・圧力勾配のリアルタイム操作","液体金属・海水・水銀の材料プリセット"],
       "keywords": "MHD,磁気流体力学,ハートマン流れ,ハートマン数,電磁ポンプ,液体金属,NAVIERストークス,マクスウェル方程式",
       "datePublished": "2026-04-08",
@@ -226,6 +226,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       • MHD発電（海水推進）<br>
       • 核融合炉ブランケット流れ
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -240,9 +249,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> MHD流れ場</div><canvas id="mhdCanvas" height="240"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> MHD流れ場（ライブ・アニメーション）</div><canvas id="mhdCanvas" height="240" role="img" aria-label="ハートマン流れのアニメーション。磁場B中を流れる導電性流体、誘導電流J、ローレンツ力J×B、速度プロファイルの平坦化を表示します。"></canvas>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:8px">
+        <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:3px;border-radius:2px;display:inline-block;background:#00B4D8"></i>ハートマン速度（現在）</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:0;border-top:2px dashed rgba(255,255,255,.55);display:inline-block"></i>放物線（B=0ゴースト）</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:3px;border-radius:2px;display:inline-block;background:#ffd54a"></i>磁場 B</span>
+        <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:3px;border-radius:2px;display:inline-block;background:#ff5252"></i>ローレンツ力 J×B</span>
+      </div>
+    </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 速度</div><canvas class="ux-chartjs-canvas" id="velChart" height="220"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 速度プロファイル比較</div><canvas class="ux-chartjs-canvas" id="velChart" height="220"></canvas></div>
   
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
@@ -259,234 +275,361 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
-const PRESETS = {
-  sodium:   { sigma: 1e7,  mu: 3e-4  },
-  mercury:{ sigma: 1e6,  mu: 1.5e-3 },
-  seawater:{ sigma: 5,    mu: 1e-3  },
-  custom:{ sigma: 1e4,  mu: 1e-3  }
-};
+window.__MHD_TXT = {"chartTitle": "ハートマン流れ：速度プロファイル比較", "chartX": "規格化速度 u/u_Poiseuille_max", "chartY": "y/h（壁面から壁面）", "flow": "流れ →", "regLow": "ポアズイユ流（放物線）", "regMid": "過渡域", "regHigh": "プラグ流（磁場支配）"};
+(function(){
+  "use strict";
+  // ===== Hartmann-flow MHD live simulator (v2) =====
+  var PRESETS = {
+    sodium:   { sigma: 1e7,  mu: 3e-4  },
+    mercury:  { sigma: 1e6,  mu: 1.5e-3 },
+    seawater: { sigma: 5,    mu: 1e-3  },
+    custom:   { sigma: 1e4,  mu: 1e-3  }
+  };
+  var RHO = 900; // approximate working-fluid density [kg/m^3]
+  var MU0 = 4e-7 * Math.PI;
+  var TXT = (window.__MHD_TXT || {});
+  function L(k, d){ return (TXT[k] != null) ? TXT[k] : d; }
 
-function updateSliderLog(el, valId){
-  const v = Math.pow(10, parseFloat(el.value));
-  var _ve=document.getElementById(valId);if(_ve){if(_ve.tagName==='INPUT')_ve.value=v.toExponential(0) + ' S/m';else _ve.textContent=v.toExponential(0) + ' S/m';}
-  const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
-  el.style.setProperty('--pct', ((val - min) / (max - min) * 100) + '%');
-}function updateSliderLogMu(el, valId){
-  const v = Math.pow(10, parseFloat(el.value));
-  var _ve=document.getElementById(valId);if(_ve){if(_ve.tagName==='INPUT')_ve.value=v.toExponential(1) + ' Pa·s';else _ve.textContent=v.toExponential(1) + ' Pa·s';}
-  const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
-  el.style.setProperty('--pct', ((val - min) / (max - min) * 100) + '%');
-}document.querySelectorAll('input[type=range]').forEach(el =>{
-  const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
-  el.style.setProperty('--pct', ((val - min) / (max - min) * 100) + '%');
-});
+  function el(id){ return document.getElementById(id); }
 
-function applyPreset(){
-  const key = document.getElementById('fluidPreset').value;
-  if (key === 'custom') { onParamChange(); return; }
-  const p = PRESETS[key];
-  const sigmaSlider = document.getElementById('sigma');
-  const muSlider = document.getElementById('viscosity');
-  const logSigma = Math.log10(p.sigma);
-  const logMu = Math.log10(p.mu);
-  sigmaSlider.value = logSigma.toFixed(2);
-  muSlider.value = logMu.toFixed(2);
-  sigmaSlider.style.setProperty('--pct', ((logSigma - parseFloat(sigmaSlider.min)) / (parseFloat(sigmaSlider.max) - parseFloat(sigmaSlider.min)) * 100) + '%');
-  muSlider.style.setProperty('--pct', ((logMu - parseFloat(muSlider.min)) / (parseFloat(muSlider.max) - parseFloat(muSlider.min)) * 100) + '%');
-  document.getElementById('muVal').textContent = p.mu.toExponential(1) + ' Pa·s';
-  onParamChange();
-}const velCtx = document.getElementById('velChart').getContext('2d');
-const colors = ['#007BFF','#e74c3c','#27ae60','#e67e22','#9b59b6'];
-const haValues = [0, 2, 5, 10, 20];
-const velChart = new Chart(velCtx,{
-  type: 'line',
-  data: {
-    labels: [],
-    datasets: haValues.map((ha, i) => ({
-      label: `Ha = ${ha}`,
-      data: [],
-      borderColor: colors[i],
-      borderWidth: i === 0 ? 2.5 : 2,
-      fill: false,
-      tension: 0.3,
-      pointRadius: 0
-    }))
-  },
-  options:{
-    responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-    indexAxis: 'y',
-    plugins: {
-      legend: { labels: { font: { size: 11 }, color: '#1a1a2e' } },
-      title:{ display: true, text: 'ハートマン流れ：速度プロファイル比較', color: '#1a1a2e', font: { size: 12, weight: '700' } }
-    },
-    scales:{
-      x: { title: { display: true, text: '規格化速度 u/u_Poiseuille_max', color: '#6c757d', font: { size: 11 } }, min: 0, max: 1.05, grid:{ color: 'rgba(0,0,0,0.05)' } },
-      y:{ title: { display: true, text: 'y/h（壁面からの距離）', color: '#6c757d', font: { size: 11 } }, grid:{ color: 'rgba(0,0,0,0.05)' } }
+  // ---- Hartmann analytical velocity profile (exact, overflow-safe) ----
+  // y_norm in [-1,1]; returns velocity [m/s]
+  function hartmannVelocityRaw(y_norm, Ha, dPdx, mu, h){
+    if (Ha < 0.01){
+      return (dPdx * h * h / (2 * mu)) * (1 - y_norm * y_norm); // Poiseuille parabola
+    }
+    if (Ha > 500){
+      // plug-flow asymptote with thin Hartmann boundary layer (delta ~ h/Ha)
+      var decay = Math.exp(-Ha * (1 - Math.abs(y_norm)));
+      return (dPdx * h * h / (mu * Ha * Ha)) * (1 - decay);
+    }
+    var coshHa = Math.cosh(Ha);
+    var coshHay = Math.cosh(Ha * y_norm);
+    if (!isFinite(coshHa) || coshHa === 0) return 0;
+    return (dPdx * h * h / (mu * Ha * Ha)) * (1 - coshHay / coshHa);
+  }
+
+  // ---- read controls ----
+  function readState(){
+    var B = parseFloat(el('magB').value);
+    var sigma = Math.pow(10, parseFloat(el('sigma').value));
+    var mu = Math.pow(10, parseFloat(el('viscosity').value));
+    var h = parseFloat(el('ductH').value);
+    var dPdx = parseFloat(el('pressGrad').value);
+    var Ha = B * h * Math.sqrt(sigma / mu);
+    return { B:B, sigma:sigma, mu:mu, h:h, dPdx:dPdx, Ha:Ha };
+  }
+
+  // ---- velocity comparison chart ----
+  var velChart = null;
+  var haValues = [0, 2, 5, 10, 20];
+  function initChart(){
+    var cv = el('velChart'); if (!cv || typeof Chart === 'undefined') return;
+    var colors = ['#007BFF','#e74c3c','#27ae60','#e67e22','#9b59b6'];
+    velChart = new Chart(cv.getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: haValues.map(function(ha,i){ return {
+        label: 'Ha = ' + ha, data: [], borderColor: colors[i],
+        borderWidth: i===0?2.5:2, fill:false, tension:0.3, pointRadius:0 }; }) },
+      options: {
+        responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:100,
+        indexAxis:'y',
+        plugins:{
+          legend:{ labels:{ font:{size:11}, color:'#1a1a2e' } },
+          title:{ display:true, text:L('chartTitle','Hartmann flow: velocity profile comparison'), color:'#1a1a2e', font:{size:12, weight:'700'} }
+        },
+        scales:{
+          x:{ title:{display:true, text:L('chartX','Normalized velocity u/u_Poiseuille,max'), color:'#6c757d', font:{size:11}}, min:0, max:1.05, grid:{color:'rgba(0,0,0,0.05)'} },
+          y:{ title:{display:true, text:L('chartY','y/h (wall to wall)'), color:'#6c757d', font:{size:11}}, grid:{color:'rgba(0,0,0,0.05)'} }
+        }
+      }
+    });
+  }
+  function updateChart(st){
+    if (!velChart) return;
+    var steps = 60, yLabels = [], i;
+    for (i=0;i<=steps;i++) yLabels.push((-1 + 2*i/steps).toFixed(2));
+    velChart.data.labels = yLabels;
+    var u0 = (st.dPdx * st.h * st.h) / (2 * st.mu);
+    haValues.forEach(function(ha_i, ci){
+      var ha = ha_i === 0 ? 0.001 : ha_i;
+      var data = [];
+      for (var j=0;j<=steps;j++){
+        var y = -1 + 2*j/steps;
+        var u = hartmannVelocityRaw(y, ha, st.dPdx, st.mu, st.h);
+        data.push(Math.max(0, u/u0));
+      }
+      velChart.data.datasets[ci].data = data;
+    });
+    velChart.update('none');
+  }
+
+  // ---- live stat-cards ----
+  function updateStats(st){
+    var u_max = hartmannVelocityRaw(0, st.Ha, st.dPdx, st.mu, st.h);
+    var u_avg = 0, N = 200, i;
+    for (i=0;i<N;i++){
+      var y = -1 + (2*(i+0.5)/N);
+      u_avg += hartmannVelocityRaw(y, st.Ha, st.dPdx, st.mu, st.h);
+    }
+    u_avg /= N;
+    var u_pois_avg = st.dPdx * st.h * st.h / (3 * st.mu);
+    var Q_ratio = u_avg / u_pois_avg;
+    var Re = RHO * u_avg * 2 * st.h / st.mu;
+    var Re_mag = MU0 * st.sigma * u_avg * 2 * st.h;
+    el('statHa').textContent  = st.Ha >= 1000 ? st.Ha.toExponential(1) : st.Ha.toFixed(1);
+    el('statUmax').textContent = u_max.toExponential(2);
+    el('statUavg').textContent = u_avg.toExponential(2);
+    el('statRe').textContent  = Re.toExponential(1);
+    el('statRem').textContent = Re_mag.toExponential(1);
+    el('statFlow').textContent = Q_ratio.toFixed(3);
+    return { u_max:u_max, u_avg:u_avg };
+  }
+
+  // ---- HiDPI canvas animation ----
+  var canvas = null, ctx = null, cssW = 0, cssH = 240, dpr = 1;
+  var particles = [];
+  var rafId = null, lastTs = 0, phase = 0;
+  var cur = null;            // current physics state
+  var reduceMotion = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  function sizeCanvas(){
+    canvas = el('mhdCanvas'); if (!canvas) return false;
+    ctx = canvas.getContext('2d');
+    cssW = Math.max(280, canvas.offsetWidth || canvas.parentElement.clientWidth - 24);
+    cssH = 240;
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return true;
+  }
+
+  // duct geometry (CSS px)
+  function geom(){
+    var ductTop = 42, ductBot = 198;
+    var ductL = 58, ductR = cssW - 30;
+    return { top:ductTop, bot:ductBot, l:ductL, r:ductR,
+             mid:(ductTop+ductBot)/2, hpx:(ductBot-ductTop)/2 };
+  }
+
+  function seedParticles(){
+    particles = [];
+    var g = geom();
+    var n = Math.max(60, Math.round((g.r - g.l) / 6));
+    for (var i=0;i<n;i++){
+      particles.push({
+        x: g.l + Math.random()*(g.r-g.l),
+        yn: -0.96 + 1.92*Math.random()   // normalized -1..1
+      });
     }
   }
-});
 
-function hartmannVelocity(y_norm, Ha){
-  // y_norm in [-1, 1], Ha = Hartmann number
-  if (Ha < 0.01) {
-    return 1.0 - y_norm * y_norm; // Poiseuille
+  // velocity profile normalized to its own peak (for visual speed), peak speed in px/s
+  function profileShape(yn, Ha){
+    // value 0..1: shape only (independent of magnitude), used to drive particle speed
+    if (Ha < 0.01) return 1 - yn*yn;
+    if (Ha > 500){ return 1 - Math.exp(-Ha*(1-Math.abs(yn))); }
+    var c = Math.cosh(Ha), cy = Math.cosh(Ha*yn);
+    if (!isFinite(c) || c===0) return 0;
+    return (1 - cy/c) / (1 - 1/c);
   }
-  const num = 1 - Math.cosh(Ha * y_norm) / Math.cosh(Ha);
-  const denom = 1 - Math.tanh(Ha) / Ha;
-  return num / (Ha * Ha * denom) * Ha * Ha; // normalized to ~1 at center for Ha→0
-}function hartmannVelocityRaw(y_norm, Ha, dPdx, mu, h){
-  if (Ha < 0.01) {
-    return (dPdx * h * h / (2 * mu)) * (1 - y_norm * y_norm);
+
+  function drawArrow(x0,y0,x1,y1,color,w){
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w;
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+    var a=Math.atan2(y1-y0,x1-x0), hl=5+w;
+    ctx.beginPath(); ctx.moveTo(x1,y1);
+    ctx.lineTo(x1-hl*Math.cos(a-0.45), y1-hl*Math.sin(a-0.45));
+    ctx.lineTo(x1-hl*Math.cos(a+0.45), y1-hl*Math.sin(a+0.45));
+    ctx.closePath(); ctx.fill();
   }
-  // For large Ha, cosh(Ha) overflows. Use the asymptotic plug-flow limit.
-  if (Ha > 500) {
-    // Hartmann profile → plug flow: u ≈ (dPdx*h²)/(mu*Ha²) * (1 - exp(-Ha*(1-|y_norm|)))
-    const decay = Math.exp(-Ha * (1 - Math.abs(y_norm)));
-    return (dPdx * h * h / (mu * Ha * Ha)) * (1 - decay);
-  }
-  const coshHa = Math.cosh(Ha);
-  const coshHay = Math.cosh(Ha * y_norm);
-  if (!isFinite(coshHa) || coshHa === 0) return 0;
-  return (dPdx * h * h / (mu * Ha * Ha)) * (1 - coshHay / coshHa);
-}function onParamChange(){
-  const B = parseFloat(document.getElementById('magB').value);
-  const sigma = Math.pow(10, parseFloat(document.getElementById('sigma').value));
-  const mu = Math.pow(10, parseFloat(document.getElementById('viscosity').value));
-  const h = parseFloat(document.getElementById('ductH').value);
-  const dPdx = parseFloat(document.getElementById('pressGrad').value);
-  const rho = 900; // approximate density
 
-  const Ha = B * h * Math.sqrt(sigma / mu);
+  function drawFrame(advance){
+    if (!ctx) return;
+    var st = cur;
+    var g = geom();
+    var Ha = st.Ha, B = st.B;
+    ctx.clearRect(0,0,cssW,cssH);
+    ctx.fillStyle = '#020d1a'; ctx.fillRect(0,0,cssW,cssH);
 
-  // Reference Poiseuille max velocity
-  const u_pois_max = dPdx * h * h / (2 * mu);
+    // duct walls
+    ctx.strokeStyle = '#5d8aa8'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(g.l,g.top); ctx.lineTo(g.r,g.top); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(g.l,g.bot); ctx.lineTo(g.r,g.bot); ctx.stroke();
 
-  // Hartmann velocity at center (y=0)
-  const u_max = hartmannVelocityRaw(0, Ha, dPdx, mu, h);
-
-  // Average velocity (numerical integration)
-  let u_avg = 0;
-  const N = 100;
-  for (let i = 0; i < N; i++) {
-    const y = -1 + (2 * (i + 0.5) / N);
-    u_avg += hartmannVelocityRaw(y, Ha, dPdx, mu, h);
-  }u_avg /= N;
-
-  const u_pois_avg = dPdx * h * h / (3 * mu);
-  const Q_ratio = u_avg / u_pois_avg;
-
-  const Re = rho * u_avg * 2 * h / mu;
-  const Re_m = rho * u_avg * 2 * h * mu / (mu); // magnetic Re = u*L*sigma*mu0
-  const mu0 = 4e-7 * Math.PI;
-  const Re_mag = mu0 * sigma * u_avg * 2 * h;
-
-  document.getElementById('statHa').textContent = Ha.toFixed(1);
-  document.getElementById('statUmax').textContent = u_max.toExponential(2);
-  document.getElementById('statUavg').textContent = u_avg.toExponential(2);
-  document.getElementById('statRe').textContent = Re.toExponential(1);
-  document.getElementById('statRem').textContent = Re_mag.toExponential(1);
-  document.getElementById('statFlow').textContent = Q_ratio.toFixed(3);
-
-  // Update charts
-  const steps = 60;
-  const yLabels = [];
-  for (let i = 0; i <= steps; i++){
-    const y = -1 + 2 * i / steps;
-    yLabels.push(y.toFixed(2));
-  }velChart.data.labels = yLabels;
-
-  haValues.forEach((ha_i, ci) =>{
-    const ha = ha_i === 0 ? 0.001 : ha_i;
-    const u0 = (dPdx * h * h) / (2 * mu); // Poiseuille reference
-    const data = [];
-    for (let i = 0; i <= steps; i++) {
-      const y = -1 + 2 * i / steps;
-      const u = hartmannVelocityRaw(y, ha, dPdx, mu, h);
-      data.push(Math.max(0, u / u0));
+    // magnetic field B: vertical arrows across the duct (intensity scales with B)
+    var bAlpha = 0.18 + 0.5*Math.min(1, B/6);
+    ctx.strokeStyle = 'rgba(255,213,74,' + bAlpha.toFixed(3) + ')';
+    ctx.fillStyle  = 'rgba(255,213,74,' + bAlpha.toFixed(3) + ')';
+    ctx.lineWidth = 1.2;
+    for (var bx=g.l+34; bx<g.r-8; bx+=48){
+      ctx.beginPath(); ctx.moveTo(bx, g.top-10); ctx.lineTo(bx, g.bot+10); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx-4,g.bot+2); ctx.lineTo(bx,g.bot+10); ctx.lineTo(bx+4,g.bot+2); ctx.closePath(); ctx.fill();
     }
-    velChart.data.datasets[ci].data = data;
-  });
-  velChart.update('none');
+    ctx.fillStyle = 'rgba(255,213,74,0.95)'; ctx.font = 'bold 11px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText('B = ' + B.toFixed(1) + ' T', g.l+4, g.top-13);
 
-  // Draw canvas
-  drawMHDCanvas(Ha, B, dPdx, mu, h);
-}
+    // Hartmann velocity envelope (live) and parabolic ghost (B=0) for comparison
+    var maxLen = (g.r - g.l) * 0.40;
+    function px(yn, shape){ return g.l + 6 + shape*maxLen; }
+    // ghost parabola (dashed)
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.6; ctx.setLineDash([5,5]);
+    ctx.beginPath();
+    for (var k=0;k<=40;k++){
+      var ynp = -1 + 2*k/40; var sp = 1 - ynp*ynp;
+      var X = px(ynp, sp), Y = g.mid + ynp*g.hpx;
+      if (k===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+    // hartmann envelope (live, cyan)
+    ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    for (var m=0;m<=60;m++){
+      var ynh = -1 + 2*m/60; var sh = Math.max(0, profileShape(ynh, Ha));
+      var Xh = px(ynh, sh), Yh = g.mid + ynh*g.hpx;
+      if (m===0) ctx.moveTo(Xh,Yh); else ctx.lineTo(Xh,Yh);
+    }
+    ctx.stroke();
 
-function drawMHDCanvas(Ha, B, dPdx, mu, h) {
-  const canvas = document.getElementById('mhdCanvas');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth;
-  var __novaW = W;
-  var __novaH = 240;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  ctx.fillStyle = '#020d1a';
-  ctx.fillRect(0, 0, W, 240);
+    // induced current J = sigma(u x B) (into/out of plane) shown as small circulating glyphs,
+    // and Lorentz force J x B (opposes flow, strongest where u is largest -> centre)
+    var nForce = 5;
+    for (var f=1; f<nForce; f++){
+      var yn = -1 + 2*f/nForce;
+      var shp = Math.max(0, profileShape(yn, Ha));
+      var yy = g.mid + yn*g.hpx;
+      var fx = g.l + maxLen*0.55 + 70;
+      // Lorentz force arrow (red), magnitude ~ B^2 * shape, points upstream (-x)
+      var fmag = Math.min(1, (B/6)) * shp;
+      if (fmag > 0.02){
+        var flen = 8 + fmag*34;
+        drawArrow(fx, yy, fx - flen, yy, 'rgba(255,82,82,0.9)', 2);
+      }
+      // induced-current glyph J (green ⊙/⊗ alternating top/bottom half)
+      ctx.strokeStyle = 'rgba(46,204,113,0.85)'; ctx.lineWidth = 1.4;
+      var jx = g.r - 40, jr = 4 + 3*shp*Math.min(1,B/4);
+      ctx.beginPath(); ctx.arc(jx, yy, jr, 0, 6.2832); ctx.stroke();
+      if (yn < 0){ // dot (out of plane)
+        ctx.fillStyle='rgba(46,204,113,0.85)'; ctx.beginPath(); ctx.arc(jx,yy,1.4,0,6.2832); ctx.fill();
+      } else { // cross (into plane)
+        ctx.beginPath(); ctx.moveTo(jx-jr*0.7,yy-jr*0.7); ctx.lineTo(jx+jr*0.7,yy+jr*0.7);
+        ctx.moveTo(jx+jr*0.7,yy-jr*0.7); ctx.lineTo(jx-jr*0.7,yy+jr*0.7); ctx.stroke();
+      }
+    }
+    ctx.fillStyle = 'rgba(255,82,82,0.9)'; ctx.font='10px Roboto Mono'; ctx.textAlign='center';
+    ctx.fillText('J×B', g.l + maxLen*0.55 + 70, g.top+12);
+    ctx.fillStyle = 'rgba(46,204,113,0.9)';
+    ctx.fillText('J', g.r-40, g.top+12);
 
-  const ductTop = 40, ductBot = 200;
-  const ductL = 60, ductR = W - 40;
-  const ductMid = (ductTop + ductBot) / 2;
-  const ductHpx = (ductBot - ductTop) / 2;
+    // flowing particles (speed follows hartmann profile shape)
+    var pkSpeed = 70 + 90*Math.min(1, st.u_avg / (st.u_max||1) + 0.2); // px/s visual peak
+    for (var p=0;p<particles.length;p++){
+      var pt = particles[p];
+      var shape = Math.max(0.02, profileShape(pt.yn, Ha));
+      if (advance){
+        pt.x += shape * pkSpeed * advance;
+        if (pt.x > g.r-4){ pt.x = g.l+4; pt.yn = -0.96 + 1.92*Math.random(); }
+      }
+      var py = g.mid + pt.yn*g.hpx;
+      var tail = 4 + shape*16;
+      var grd = ctx.createLinearGradient(pt.x-tail, py, pt.x, py);
+      grd.addColorStop(0,'rgba(0,180,216,0)');
+      grd.addColorStop(1,'rgba(120,220,255,0.9)');
+      ctx.strokeStyle = grd; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(pt.x-tail, py); ctx.lineTo(pt.x, py); ctx.stroke();
+    }
 
-  // Draw duct walls
-  ctx.strokeStyle = '#5d8aa8';
-  ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(ductL, ductTop); ctx.lineTo(ductR, ductTop); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(ductL, ductBot); ctx.lineTo(ductR, ductBot); ctx.stroke();
+    // flow direction label
+    ctx.fillStyle = '#00B4D8'; ctx.font='10px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText(L('flow','flow →'), g.l+4, g.bot+16);
 
-  // Magnetic field arrows (vertical, representing B perpendicular to flow)
-  ctx.strokeStyle = 'rgba(255,220,0,0.5)';
-  ctx.lineWidth = 1;
-  for (let x = ductL + 30; x < ductR - 10; x += 50) {
-    ctx.beginPath(); ctx.moveTo(x, ductTop - 12); ctx.lineTo(x, ductBot + 12); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x - 4, ductTop - 2); ctx.lineTo(x, ductTop - 12); ctx.lineTo(x + 4, ductTop - 2); ctx.stroke();
-  }ctx.fillStyle = 'rgba(255,220,0,0.7)';
-  ctx.font = 'bold 11px Roboto Mono';
-  ctx.fillText(`B = ${B.toFixed(1)}T`, ductR - 55, ductTop - 15);
+    // Ha + regime caption
+    ctx.fillStyle = '#fff'; ctx.font='bold 13px Roboto Mono'; ctx.textAlign='center';
+    ctx.fillText('Ha = ' + (Ha>=1000?Ha.toExponential(1):Ha.toFixed(1)), cssW/2, g.bot+16);
+    ctx.fillStyle = '#9fb3c8'; ctx.font='10px Roboto Mono'; ctx.textAlign='right';
+    var regime = Ha < 1 ? L('regLow','Poiseuille (parabolic)') : Ha < 5 ? L('regMid','transition') : L('regHigh','plug flow (B-dominated)');
+    ctx.fillText(regime, g.r, g.bot+16);
+    ctx.textAlign='left';
+  }
 
-  // Velocity profile (colored arrows/bars)
-  const profileX = ductL + 80;
-  const uRef = (dPdx * h * h) / (2 * mu);
-  const steps = 30;
-  for (let i = 0; i <= steps; i++){
-    const y_norm = -1 + 2 * i / steps;
-    const ypx = ductMid + y_norm * ductHpx;
-    const u = hartmannVelocityRaw(y_norm, Ha, dPdx, mu, h);
-    const uNorm = Math.max(0, Math.min(1, u / uRef));
-    const barLen = uNorm * (ductR - profileX - 20);
-    const tRatio = uNorm;
-    const r = Math.round(0 + tRatio * 0);
-    const g = Math.round(123 + tRatio * (180 - 123));
-    const b = Math.round(255);
-    ctx.strokeStyle = `rgba(${r},${g},${b},0.8)`;
-    ctx.lineWidth = Math.max(1, (ductBot - ductTop) / (steps * 1.2));
-    ctx.beginPath(); ctx.moveTo(profileX, ypx); ctx.lineTo(profileX + barLen, ypx); ctx.stroke();
-  }// Flow direction arrow
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(ductL + 10, ductMid); ctx.lineTo(ductL + 45, ductMid); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(ductL + 38, ductMid - 5); ctx.lineTo(ductL + 45, ductMid); ctx.lineTo(ductL + 38, ductMid + 5); ctx.stroke();
-  ctx.fillStyle = '#00B4D8';
-  ctx.font = '10px Roboto Mono';
-  ctx.fillText('flow', ductL + 5, ductMid + 20);
+  function loop(ts){
+    if (!lastTs) lastTs = ts;
+    var dt = Math.min(0.05, (ts - lastTs)/1000);
+    lastTs = ts;
+    drawFrame(dt);
+    rafId = requestAnimationFrame(loop);
+  }
 
-  // Ha label
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 13px Roboto Mono';
-  ctx.fillText(`Ha = ${Ha.toFixed(1)}`, ductL + 80, ductBot + 22);
-  ctx.fillStyle = '#aaa';
-  ctx.font = '10px Roboto Mono';
-  const regime = Ha < 1 ? 'ポアズイユ流（磁場無視）' : Ha < 5 ? '過渡域' : 'プラグ流（磁場支配）';
-  ctx.fillText(regime, ductL + 160, ductBot + 22);
-}onParamChange();
-window.addEventListener('resize', onParamChange);
+  function recompute(){
+    var st = readState();
+    var ex = updateStats(st);
+    st.u_max = ex.u_max; st.u_avg = ex.u_avg;
+    cur = st;
+    updateChart(st);
+    if (!particles.length) seedParticles();
+    if (reduceMotion){ drawFrame(0); }   // single static frame
+  }
+
+  // ---- slider value labels (referenced by inline oninput) ----
+  function updateSliderLog(elm, valId){
+    var v = Math.pow(10, parseFloat(elm.value));
+    var ve = document.getElementById(valId);
+    if (ve){ var s = v.toExponential(0)+' S/m'; if (ve.tagName==='INPUT') ve.value=s; else ve.textContent=s; }
+    var mn=parseFloat(elm.min), mx=parseFloat(elm.max), vl=parseFloat(elm.value);
+    elm.style.setProperty('--pct', ((vl-mn)/(mx-mn)*100)+'%');
+  }
+  function updateSliderLogMu(elm, valId){
+    var v = Math.pow(10, parseFloat(elm.value));
+    var ve = document.getElementById(valId);
+    if (ve){ var s = v.toExponential(1)+' Pa·s'; if (ve.tagName==='INPUT') ve.value=s; else ve.textContent=s; }
+    var mn=parseFloat(elm.min), mx=parseFloat(elm.max), vl=parseFloat(elm.value);
+    elm.style.setProperty('--pct', ((vl-mn)/(mx-mn)*100)+'%');
+  }
+  function applyPreset(){
+    var key = el('fluidPreset').value;
+    if (key === 'custom'){ recompute(); return; }
+    var p = PRESETS[key];
+    var ss = el('sigma'), ms = el('viscosity');
+    var ls = Math.log10(p.sigma), lm = Math.log10(p.mu);
+    ss.value = ls.toFixed(2); ms.value = lm.toFixed(2);
+    ss.style.setProperty('--pct', ((ls-parseFloat(ss.min))/(parseFloat(ss.max)-parseFloat(ss.min))*100)+'%');
+    ms.style.setProperty('--pct', ((lm-parseFloat(ms.min))/(parseFloat(ms.max)-parseFloat(ms.min))*100)+'%');
+    var sv = el('sigmaNum'); if (sv){ if (sv.tagName==='INPUT') sv.value=p.sigma.toExponential(0)+' S/m'; else sv.textContent=p.sigma.toExponential(0)+' S/m'; }
+    var mv = el('viscosityNum') || el('muVal'); if (mv){ if (mv.tagName==='INPUT') mv.value=p.mu.toExponential(1)+' Pa·s'; else mv.textContent=p.mu.toExponential(1)+' Pa·s'; }
+    recompute();
+  }
+  function onParamChange(){ recompute(); }
+
+  // expose globals used by inline handlers
+  window.updateSliderLog = updateSliderLog;
+  window.updateSliderLogMu = updateSliderLogMu;
+  window.applyPreset = applyPreset;
+  window.onParamChange = onParamChange;
+
+  function init(){
+    if (!sizeCanvas()) return;
+    initChart();
+    // init slider fill + labels
+    document.querySelectorAll('input[type=range]').forEach(function(elm){
+      var mn=parseFloat(elm.min), mx=parseFloat(elm.max), vl=parseFloat(elm.value);
+      elm.style.setProperty('--pct', ((vl-mn)/(mx-mn)*100)+'%');
+    });
+    var muV = el('muVal'); if (muV){ muV.textContent = Math.pow(10, parseFloat(el('viscosity').value)).toExponential(1)+' Pa·s'; }
+    var sV = el('sigmaNum'); if (sV){ var sval = Math.pow(10, parseFloat(el('sigma').value)).toExponential(0)+' S/m'; if (sV.tagName==='INPUT') sV.value=sval; else sV.textContent=sval; }
+    var vV = el('viscosityNum'); if (vV && vV.tagName==='INPUT'){ /* numeric stays as exponent input */ }
+    seedParticles();
+    recompute();
+    window.addEventListener('resize', function(){ sizeCanvas(); seedParticles(); recompute(); if (reduceMotion) drawFrame(0); });
+    if (!reduceMotion){ rafId = requestAnimationFrame(loop); }
+    else { drawFrame(0); }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
 </script>
 
 <section class="explanation">
@@ -547,6 +690,9 @@ window.addEventListener('resize', onParamChange);
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="magnetohydrodynamics.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -609,7 +755,7 @@ window.addEventListener('resize', onParamChange);
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>ナトリウム冷却高速炉の冷却材流路を想定した場合：磁場強度2.0 T、電気伝導度σ=7×10⁵ S/m、ダクト高さ0.1 m、粘度μ=3×10⁻⁴ Pa·sの条件でシミュレーション実行時、ハートマン数Ha≈18に達し、最大流速u_max=2.5 m/sから平均流速u_avg=2.4 m/sへ急速に接近します。磁気レイノルズ数Re_m=8.4となり、流量比Q/Q₀は0.96で磁場による流量抑制が約4%になります</p>
+<p>液体ナトリウム既定プリセット（磁場強度1.0 T、電気伝導度σ=1×10⁷ S/m、動粘性μ≒3×10⁻⁴ Pa·s、ダクト半高さh=0.05 m、圧力勾配−dP/dx=1000 Pa/m）でシミュレーションを実行すると、ハートマン数Ha=B·h·√(σ/μ)≒9100に達し、磁場が完全に支配するプラグ流領域になります。中央部の速度はほぼ一定で、壁面に薄いハートマン層が形成されます。圧力勾配を固定したままこの強磁場では平均流速が大きく低下し、流量比Q/Q₀は1に対してごく小さな値（≈10⁻⁸オーダ）となり、磁場による強い制動効果が確認できます。Ha≈18のような穏やかな領域を見たい場合は、電気伝導度の低い海水プリセット等に切り替えてください。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -619,6 +765,16 @@ window.addEventListener('resize', onParamChange);
 <li>強磁場下での電磁力は両側壁に集中し、ダクト中央では速度が均一化するため、混合促進が必要な場合は三次元スパイラルフロー設計への移行を検討してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

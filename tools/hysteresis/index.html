@@ -43,14 +43,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ヒステリシス損失・磁気回路設計ツール",
       "description": "トロイダル・Eコア・ソレノイドの磁気回路をリラクタンスモデルで解析。磁束Φ・磁束密度B・インダクタンスL・コア損失をリアルタイム計算。フリンジング補正考慮。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/hysteresis.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -239,10 +239,33 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="param-label"><span class="param-name">周波数 f [Hz]</span><div class="num-wrap"><input type="number" class="num-input" id="freqValNum" value="50" min="0" max="1000" step="10" oninput="syncFromNum('freqSlider','freqValNum')"><span class="num-unit">Hz</span></div></div>
       <input type="range" id="freqSlider" min="0" max="1000" step="10" value="50" oninput="syncToNum('freqSlider','freqValNum');updateSlider(this);compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-circle-notch fa-spin" style="animation-duration:3s"></i> B–Hヒステリシス・ループ（リアルタイム）</div>
+      <canvas id="bhCanvas" height="340" role="img" aria-label="磁界HとともにB-Hヒステリシス・ループを描くアニメーション。ループの囲む面積が1サイクルあたりのヒステリシス損失です。"></canvas>
+      <div class="stat-cards" style="grid-template-columns:repeat(4,1fr);margin-top:14px">
+        <div class="stat-card"><div class="sv" id="scH">—</div><div class="sl">磁界 H [A/m]</div></div>
+        <div class="stat-card"><div class="sv" id="scBnow">—</div><div class="sl">磁束密度 B [T]</div></div>
+        <div class="stat-card"><div class="sv" id="scBr">—</div><div class="sl">残留磁束 Br [T]</div></div>
+        <div class="stat-card"><div class="sv" id="scHc">—</div><div class="sl">保磁力 Hc [A/m]</div></div>
+        <div class="stat-card"><div class="sv" id="scWh">—</div><div class="sl">損失/周期 [J/m³]</div></div>
+        <div class="stat-card"><div class="sv" id="scPv">—</div><div class="sl">損失密度 [kW/m³]</div></div>
+        <div class="stat-card"><div class="sv" id="scBs">—</div><div class="sl">飽和磁束 Bs [T]</div></div>
+        <div class="stat-card"><div class="sv" id="scLoop">—</div><div class="sl">面積=損失</div></div>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:8px">青の点が入力磁界 H の周期変化に伴ってループを一周します。出力 B は入力 H に<strong>遅れ（ラグ）</strong>、その遅れがループを開かせ、<strong>囲む面積＝1サイクルで熱になる損失</strong>です。スライダー（μr・電流・周波数）で形が変わります。</div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="scPhi">—</div><div class="sl">磁束 Φ [μWb]</div></div>
@@ -444,6 +467,223 @@ function getParams(){
 compute();
 </script>
 
+<script>
+/* === v2 B–H hysteresis loop hero (self-contained IIFE) === */
+(function(){
+  "use strict";
+  var cv = document.getElementById('bhCanvas');
+  if (!cv) return;
+  var ctx = cv.getContext('2d');
+  var MU0L = 4 * Math.PI * 1e-7;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function num(id, dflt){
+    var el = document.getElementById(id);
+    if (!el) return dflt;
+    var v = parseFloat(el.value);
+    return isFinite(v) ? v : dflt;
+  }
+
+  // Derive the magnetic model from the circuit sliders.
+  function model(){
+    var lc  = num('lcSlider', 10) * 1e-2;     // m
+    var N   = num('nSlider', 100);
+    var I   = num('currSlider', 1);
+    var mur = num('murSlider', 2000);
+    var f   = num('freqSlider', 50);
+    // Peak applied field from drive (Ampere's law over the core path)
+    var Hm = N * I / Math.max(lc, 1e-3);       // A/m
+    // Saturation flux density grows mildly with permeability class (soft ferrite/steel 0.4-2.0 T)
+    var Bs = Math.max(0.35, Math.min(2.0, 0.30 + 0.30 * Math.log10(Math.max(mur, 10))));
+    // Anhysteretic knee tied to drive so the loop reaches toward saturation and stays legible
+    var a = Math.max(Hm * 0.35, 30);
+    // Coercivity (loop half-width): wider for hard/low-mur material, grows with frequency
+    var Hc = Hm * (0.10 + 25 / mur) * (1 + 0.5 * f / 100) + 1;
+    Hc = Math.max(0.5, Math.min(Hc, Hm * 0.85 + 0.5));
+    return { Hm: Hm, Bs: Bs, a: a, Hc: Hc, f: f };
+  }
+
+  // Branch curves: tanh anhysteretic shifted by +/-Hc, plus reversible vacuum slope mu0*H.
+  function Bup(H, m){ return m.Bs * Math.tanh((H + m.Hc) / m.a) + MU0L * H; }      // dH/dt > 0
+  function Bdn(H, m){ return m.Bs * Math.tanh((H - m.Hc) / m.a) + MU0L * H; }      // dH/dt < 0
+
+  // Numerically integrate loop area Wh = ∮ H dB  (J/m^3 per cycle), and find Br, Hc(B=0).
+  function loopMetrics(m){
+    var Hm = m.Hm, n = 360, area = 0, prevH = null, prevB = null;
+    var Br = Bup(0, m);                 // remanence: B at H=0 on ascending branch
+    // coercivity where ascending branch crosses B=0 (negative H side)
+    var Hcoer = m.Hc; // analytic half-width approximates B=0 crossing closely
+    for (var i = 0; i <= n; i++){
+      var ph = i / n * 2 * Math.PI;
+      var H = Hm * Math.sin(ph);
+      var rising = Math.cos(ph) >= 0;   // dH/dt sign
+      var B = rising ? Bup(H, m) : Bdn(H, m);
+      if (prevH !== null){
+        // ∮ H dB  (trapezoid); sign gives enclosed area for one full CCW/CW loop
+        area += (H + prevH) * 0.5 * (B - prevB);
+      }
+      prevH = H; prevB = B;
+    }
+    var Wh = Math.abs(area);            // J/m^3 per cycle
+    return { Wh: Wh, Br: Br, Hc: Hcoer };
+  }
+
+  var W = 0, H = 0, dpr = 1, phase = 0, last = 0;
+  function resize(){
+    var wrap = cv.parentElement;
+    var cssW = Math.max(260, Math.floor((wrap ? wrap.getBoundingClientRect().width : 600) - 4));
+    var cssH = 340;
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = cssW + 'px';
+    cv.style.height = cssH + 'px';
+    cv.width = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    W = cssW; H = cssH;
+  }
+
+  function fmt(v){
+    if (!isFinite(v)) return '—';
+    var a = Math.abs(v);
+    if (a !== 0 && (a < 0.01 || a >= 1e5)) return v.toExponential(1);
+    if (a >= 1000) return v.toFixed(0);
+    if (a >= 10) return v.toFixed(1);
+    return v.toFixed(a < 1 ? 3 : 2);
+  }
+
+  function draw(ph){
+    var m = model();
+    var met = loopMetrics(m);
+    var Hm = m.Hm || 1;
+    var Bmax = (m.Bs + MU0L * Hm) * 1.12 + 1e-6;
+    var padL = 54, padR = 18, padT = 16, padB = 34;
+    var x0 = padL, x1 = W - padR, y0 = padT, y1 = H - padB;
+    var cxp = (x0 + x1) / 2, cyp = (y0 + y1) / 2;
+    var sx = (x1 - x0) / 2 / Hm, sy = (y1 - y0) / 2 / Bmax;
+    function TX(h){ return cxp + h * sx; }
+    function TY(b){ return cyp - b * sy; }
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, W, H);
+
+    // grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1;
+    ctx.font = '10px Roboto Mono';
+    for (var gi = -2; gi <= 2; gi++){
+      var gy = TY(gi / 2 * Bmax);
+      ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x1, gy); ctx.stroke();
+      var gx = TX(gi / 2 * Hm);
+      ctx.beginPath(); ctx.moveTo(gx, y0); ctx.lineTo(gx, y1); ctx.stroke();
+    }
+    // axes
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(x0, TY(0)); ctx.lineTo(x1, TY(0)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(TX(0), y0); ctx.lineTo(TX(0), y1); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '11px Noto Sans JP';
+    ctx.textAlign = 'right'; ctx.fillText('H [A/m]', x1 - 2, TY(0) - 6);
+    ctx.textAlign = 'left'; ctx.fillText('B [T]', TX(0) + 6, y0 + 11);
+
+    // build branch polylines
+    var nSeg = 120, k;
+    function branch(fn){
+      var pts = [];
+      for (k = 0; k <= nSeg; k++){
+        var h = -Hm + 2 * Hm * k / nSeg;
+        pts.push([TX(h), TY(fn(h, m))]);
+      }
+      return pts;
+    }
+    var up = branch(Bup), dn = branch(Bdn);
+
+    // shaded enclosed area = hysteresis loss
+    ctx.beginPath();
+    ctx.moveTo(up[0][0], up[0][1]);
+    for (k = 1; k < up.length; k++) ctx.lineTo(up[k][0], up[k][1]);
+    for (k = dn.length - 1; k >= 0; k--) ctx.lineTo(dn[k][0], dn[k][1]);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,180,216,0.16)'; ctx.fill();
+
+    // descending branch
+    ctx.strokeStyle = 'rgba(255,120,90,0.85)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(dn[0][0], dn[0][1]);
+    for (k = 1; k < dn.length; k++) ctx.lineTo(dn[k][0], dn[k][1]);
+    ctx.stroke();
+    // ascending branch
+    ctx.strokeStyle = 'rgba(0,123,255,0.95)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(up[0][0], up[0][1]);
+    for (k = 1; k < up.length; k++) ctx.lineTo(up[k][0], up[k][1]);
+    ctx.stroke();
+
+    // markers: remanence Br (H=0) and coercivity Hc (B=0)
+    ctx.fillStyle = '#ffd54a';
+    ctx.beginPath(); ctx.arc(TX(0), TY(met.Br), 4, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(TX(0), TY(-met.Br), 4, 0, 7); ctx.fill();
+    ctx.fillStyle = '#00e0a0';
+    ctx.beginPath(); ctx.arc(TX(-met.Hc), TY(0), 4, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(TX(met.Hc), TY(0), 4, 0, 7); ctx.fill();
+    ctx.font = '10px Roboto Mono'; ctx.fillStyle = 'rgba(255,213,74,0.9)';
+    ctx.textAlign = 'left'; ctx.fillText('+Br', TX(0) + 6, TY(met.Br) - 4);
+    ctx.fillStyle = 'rgba(0,224,160,0.9)'; ctx.textAlign = 'center';
+    ctx.fillText('−Hc', TX(-met.Hc), TY(0) + 14);
+
+    // moving operating point
+    var Hn = Hm * Math.sin(ph);
+    var rising = Math.cos(ph) >= 0;
+    var Bn = rising ? Bup(Hn, m) : Bdn(Hn, m);
+    var px = TX(Hn), py = TY(Bn);
+    // drive input bar at top (shows H lag)
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.setLineDash([3,3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px, y0); ctx.lineTo(px, py); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0, py); ctx.lineTo(px, py); ctx.stroke();
+    ctx.setLineDash([]);
+    var bg = ctx.createRadialGradient(px-2, py-2, 1, px, py, 9);
+    bg.addColorStop(0, '#fff'); bg.addColorStop(1, '#007BFF');
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, 7); ctx.fillStyle = bg; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1; ctx.stroke();
+    // annotation following the point
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = 'bold 10px Noto Sans JP';
+    ctx.textAlign = px > cxp ? 'right' : 'left';
+    ctx.fillText(rising ? 'H増加 →' : '← H減少', px + (px > cxp ? -10 : 10), py - 10);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(0,180,216,0.9)'; ctx.font = '11px Noto Sans JP';
+    ctx.fillText('面積 = ヒステリシス損失', x0 + 6, y1 - 6);
+
+    // live numbers
+    var Pv = met.Wh * (m.f || 0); // W/m^3
+    function set(id, val){ var e = document.getElementById(id); if (e) e.textContent = val; }
+    set('scH', fmt(Hn));
+    set('scBnow', fmt(Bn));
+    set('scBr', fmt(met.Br));
+    set('scHc', fmt(met.Hc));
+    set('scWh', fmt(met.Wh));
+    set('scPv', fmt(Pv / 1000));
+    set('scBs', fmt(m.Bs));
+    set('scLoop', fmt(met.Wh) + ' J/m³');
+  }
+
+  function frame(ts){
+    if (!last) last = ts;
+    var dt = Math.min(0.05, (ts - last) / 1000); last = ts;
+    var m = model();
+    // cycle speed scales gently with frequency (visual), clamped for readability
+    var rate = 0.6 + Math.min(2.0, (m.f || 50) / 120);
+    phase += dt * rate * 2 * Math.PI;
+    if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
+    resize();
+    draw(phase);
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  if (reduced){
+    draw(Math.PI / 2); // static full loop at H = +Hm
+    window.addEventListener('resize', function(){ resize(); draw(Math.PI / 2); });
+  } else {
+    requestAnimationFrame(frame);
+  }
+})();
+</script>
+
 <section class="explanation">
   <h2>ヒステリシス損失・磁気回路設計ツールとは</h2>
   <div class="chat">
@@ -478,7 +718,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">トロイダルコアとEコアで解析結果が大きく異なるのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">磁路形状とエアギャップの有無が主な要因です。トロイダルは閉磁路で漏れ磁束が少ないため高インダクタンスが得られますが、Eコアはギャップがあるためリラクタンスが大きく、フリンジングの影響も顕著になります。ツールでは各形状に応じたリラクタンスモデルを適用しています。</div>
+    <div class="faq-a">実機では磁路形状とエアギャップの有無が主な要因です。トロイダルは閉磁路で漏れ磁束が少なく高インダクタンスが得られ、Eコアはギャップがあるためリラクタンスが大きくフリンジングの影響も顕著になります。なお本ツールはトポロジ選択を磁気回路の断面図表示にのみ用い、磁束Φ・磁束密度B・インダクタンスLは入力したリラクタンス（A・lc・lg・μr）から計算するため、同じパラメータなら形状によらず同一の数値結果になります。形状差は lc・lg・実効断面積の値として入力してください。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">計算結果のインダクタンスが実測と合わない場合、どこを確認すべきですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -502,6 +742,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="hysteresis.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -556,7 +799,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>珪素鋼板コア(μᵣ=1500、密度=7.65g/cm³)でφ25mm トロイダルコアを設計する場合：断面積A=50mm²、磁路長lc=78mm、空隙lg=0.3mm、巻線数N=200ターン、励磁電流I=0.5Aと設定すると、磁束Φ=156μWb、磁束密度B=1.24T、インダクタンスL=62.4mH、総リラクタンス=1.82MA/Wbが得られます。1kHz駆動時のヒステリシス損失は約0.34W/kg・100kHz相当です。</p>
+<p>本ツールの既定値（コア断面積 A=4cm²、磁路長 lc=10cm、エアギャップ lg=0.5mm、巻数 N=100、電流 I=1A、比透磁率 μr=2000）で計算すると、起磁力 MMF=N·I=100A·T、フリンジング補正後の総リラクタンス R_total≈1.046MA/Wb、磁束 Φ=MMF/R_total≈95.58μWb、磁束密度 B=Φ/A≈0.239T、インダクタンス L=N²/R_total≈9.558mH が得られます。エアギャップ lg を増やすと R_gap が増えて L が下がる一方、直流重畳特性（飽和しにくさ）が改善します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -566,6 +809,16 @@ compute();
 <li>実装時の温度上昇でコア透磁率が低下するため、25℃設計値から−10%マージンを見込み、目標インダクタンスを1.1倍で設定することを推奨します。</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

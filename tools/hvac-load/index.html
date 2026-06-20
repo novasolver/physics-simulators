@@ -43,14 +43,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "空調熱負荷計算機・冷暖房能力",
       "description": "室内の冷房・暖房熱負荷を自動計算。外壁・窓・人員・照明・機器・換気負荷を分解し合計熱負荷・SHR・推奨エアコン容量を算出。東京/大阪/札幌/シンガポール対応。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/hvac-load.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -162,6 +162,14 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.live-ro{background:rgba(0,123,255,.04);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center}
+.live-ro.accent{background:rgba(0,180,216,.08);border-color:rgba(0,180,216,.35)}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--accent)}
+.live-ro.accent .rv{color:var(--accent2)}
+.live-ro .rl{font-size:.64rem;color:var(--muted);margin-top:2px}
+.legend .swatch{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -268,9 +276,33 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="param-label"><span class="param-name">COP（空調効率）</span><div class="num-wrap"><input type="number" class="num-input" id="vCopNum" value="3.5" min="1.5" max="7.0" step="0.1" oninput="syncFromNum('cop','vCopNum')"><span class="num-unit"></span></div></div>
       <input type="range" id="cop" min="1.5" max="7.0" step="0.1" value="3.5" oninput="syncToNum('cop','vCopNum');upd(this,'vCop',1,'');compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 熱負荷ライブビュー（夏季・冷房）</div>
+      <canvas id="bldgCanvas" height="360" role="img" aria-label="夏季の建物に各種の熱取得が流入し、エアコンが合計負荷を除去する様子のアニメーション。矢印の太さは各負荷の大きさに比例します。"></canvas>
+      <div class="live-readouts" id="liveRO">
+        <div class="live-ro accent"><div class="rv" id="roTot">0.0</div><div class="rl">合計負荷 [kW]</div></div>
+        <div class="live-ro"><div class="rv" id="roSens">0.0</div><div class="rl">顕熱 [kW]</div></div>
+        <div class="live-ro"><div class="rv" id="roLat">0.0</div><div class="rl">潜熱 [kW]</div></div>
+        <div class="live-ro"><div class="rv" id="roDom">—</div><div class="rl">最大の熱源</div></div>
+      </div>
+      <div class="legend" style="margin-top:10px;font-size:.72rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:10px">
+        <span><i class="swatch" style="background:#ffd166"></i>日射（窓）</span>
+        <span><i class="swatch" style="background:#ef476f"></i>貫流（壁・屋根・窓）</span>
+        <span><i class="swatch" style="background:#06d6a0"></i>換気・隙間風</span>
+        <span><i class="swatch" style="background:#118ab2"></i>内部発熱</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>エアコン除去</span>
+      </div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="sQsens">—</div><div class="sl">顕熱負荷 [kW]</div></div>
@@ -303,182 +335,373 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         $$Q_{sens}= \underbrace{(U_w A_w + U_r A_r + U_g A_g)\Delta T}_{\text{貫流熱}}+ \underbrace{I \cdot A_g \cdot SHGC}_{\text{日射}}+ \underbrace{Q_{light}+Q_{equip}+Q_{people,s}}_{\text{内部発熱}}+ \underbrace{\dot{V}\rho c_p\Delta T}_{\text{換気}}$$
         <p style="margin-top:8px;"><strong>潜熱負荷：</strong> $Q_{lat}= \dot{V}\rho \lambda \Delta W$（換気・人員）</p>
         <p style="margin-top:6px;"><strong>顕熱比：</strong> $SHR = Q_{sens}/(Q_{sens}+Q_{lat})$</p>
-        <p style="margin-top:6px;"><strong>年間電力：</strong> $E = Q_{tot}\times FLH / COP$（FLH：等価全負荷時間≈700h）</p>
+        <p style="margin-top:6px;"><strong>年間電力：</strong> $E = Q_{AC}\times FLH / COP$（FLH：等価全負荷時間≈700h）</p>
       
 </div>
 </div>
   </div>
 
 <script>
+(function(){
+"use strict";
+/* ===== HVAC cooling-load V2: live building heat-gain animation ===== */
+var LANG = (document.documentElement.lang || 'ja').toLowerCase();
+var L = (function(){
+  var T = {
+    ja: { mon:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+      pie:['外壁','屋根','窓貫流','日射','照明','機器','人員','換気(顕)','潜熱'],
+      monthLabel:'月別熱負荷 [kW]',
+      gain:{solar:'日射',cond:'貫流',vent:'換気',internal:'内部',ac:'除去'},
+      heat:'冷房（夏）', acOn:'AC稼働中', heating:'暖房負荷' },
+    en: { mon:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+      pie:['Wall','Roof','Window cond.','Solar','Lighting','Equipment','People','Vent.(sens.)','Latent'],
+      monthLabel:'Monthly load [kW]',
+      gain:{solar:'Solar',cond:'Conduction',vent:'Ventilation',internal:'Internal',ac:'AC removes'},
+      heat:'Cooling (summer)', acOn:'AC running', heating:'Heating load' },
+    zh: { mon:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+      pie:['外墙','屋顶','窗传导','日射','照明','设备','人员','通风(显)','潜热'],
+      monthLabel:'月度热负荷 [kW]',
+      gain:{solar:'日射',cond:'传导',vent:'通风',internal:'内部',ac:'空调移除'},
+      heat:'制冷（夏）', acOn:'空调运行中', heating:'供暖负荷' }
+  };
+  if (LANG.indexOf('zh') === 0) return T.zh;
+  if (LANG.indexOf('en') === 0) return T.en;
+  return T.ja;
+})();
 
-function upd(el, vid, dec, unit){
-  const v = parseFloat(el.value);
-  const _eHV=document.getElementById(vid);if(_eHV){if(_eHV.tagName==='INPUT')_eHV.value=v.toFixed(dec);else _eHV.textContent=v.toFixed(dec)+(unit?' '+unit:'');}
-  const mn = parseFloat(el.min), mx = parseFloat(el.max);
-  el.style.setProperty('--pct', ((v - mn) / (mx - mn) * 100).toFixed(1) + '%');
-}const LOCATIONS ={
-  tokyo: { To: 35, Ti: 26 },
-  osaka:{ To: 36, Ti: 26 },
-  sapporo:{ To: 32, Ti: 26 },
-  singapore:{ To: 33, Ti: 24 }
+function el(id){ return document.getElementById(id); }
+function gv(id){ return parseFloat(el(id).value); }
+
+/* keep inline-handler globals */
+window.upd = function(node, vid, dec, unit){
+  var v = parseFloat(node.value);
+  var t = document.getElementById(vid);
+  if (t){ if (t.tagName === 'INPUT') t.value = v.toFixed(dec); else t.textContent = v.toFixed(dec) + (unit ? ' ' + unit : ''); }
+  var mn = parseFloat(node.min), mx = parseFloat(node.max);
+  node.style.setProperty('--pct', ((v - mn) / (mx - mn) * 100).toFixed(1) + '%');
 };
 
-function applyLocation(){
-  const loc = document.getElementById('location').value;
-  const data = LOCATIONS[loc];
-  const toEl = document.getElementById('To');
-  toEl.value = data.To;
-  upd(toEl, 'vTo', 1, '°C');
-  const tiEl = document.getElementById('Ti');
-  tiEl.value = data.Ti;
-  upd(tiEl, 'vTi', 1, '°C');
-  compute();
-}let pieChart = null, monthChart = null;
-
-function compute(){
-  const To = parseFloat(document.getElementById('To').value);
-  const Ti = parseFloat(document.getElementById('Ti').value);
-  const Af = parseFloat(document.getElementById('Af').value);
-  const Hc = parseFloat(document.getElementById('Hc').value);
-  const Uw = parseFloat(document.getElementById('Uw').value);
-  const Ur = parseFloat(document.getElementById('Ur').value);
-  const Wwr = parseFloat(document.getElementById('Wwr').value) / 100;
-  const Ug = parseFloat(document.getElementById('Ug').value);
-  const Shgc = parseFloat(document.getElementById('Shgc').value);
-  const people = parseFloat(document.getElementById('people').value);
-  const lighting = parseFloat(document.getElementById('lighting').value);
-  const equipment = parseFloat(document.getElementById('equipment').value);
-  const ventilation = parseFloat(document.getElementById('ventilation').value);
-  const cop = parseFloat(document.getElementById('cop').value);
-
-  const dT = To - Ti;
-  const vol = Af * Hc;
-
-  // Areas
-  const perimEst = 4 * Math.sqrt(Af); // estimated perimeter for a square room
-  const Awall_total = perimEst * Hc;
-  const Ag = Awall_total * Wwr;
-  const Aw = Awall_total * (1 - Wwr);
-  const Ar = Af;
-
-  // Solar irradiance estimate W/m² (design day)
-  const I_solar = 500; // W/m² representative
-
-  // Sensible components [W]
-  const Q_wall = Uw * Aw * dT;
-  const Q_roof = Ur * Ar * dT;
-  const Q_glass_cond = Ug * Ag * dT;
-  const Q_solar = I_solar * Ag * Shgc;
-  const Q_lighting = lighting * Af;
-  const Q_equip = equipment * Af;
-  const Q_people_s = people * 70; // 70W sensible/person (office)
-  const Q_vent_s = ventilation * vol / 3600 * 1.2 * 1006 * dT; // kg/m³, J/kgK
-
-  const Q_sens = (Q_wall + Q_roof + Q_glass_cond + Q_solar + Q_lighting + Q_equip + Q_people_s + Q_vent_s) / 1000; // kW
-
-  // Latent components [W]
-  const Q_people_l = people * 55; // 55W latent/person
-  const dW = 0.008; // kg/kg humidity difference estimate
-  const Q_vent_l = ventilation * vol / 3600 * 1.2 * 2501000 * dW; // 2501 kJ/kg vaporization
-
-  const Q_lat = (Q_people_l + Q_vent_l) / 1000;
-  const Q_tot = Q_sens + Q_lat;
-  const SHR = Q_tot > 0 ? Q_sens / Q_tot : 1;
-  const AC = Q_tot * 1.15; // 15% safety factor
-  const FLH = 700; // full load hours/year
-  const energy_annual = AC / cop * FLH;
-
-  document.getElementById('sQsens').textContent = Q_sens.toFixed(2);
-  document.getElementById('sQlat').textContent = Q_lat.toFixed(2);
-  document.getElementById('sQtot').textContent = Q_tot.toFixed(2);
-  document.getElementById('sSHR').textContent = SHR.toFixed(3);
-  document.getElementById('sAC').textContent = AC.toFixed(2);
-  document.getElementById('sEnergy').textContent = energy_annual.toFixed(0);
-
-  drawPie(Q_wall, Q_roof, Q_glass_cond, Q_solar, Q_lighting, Q_equip, Q_people_s, Q_vent_s, Q_lat);
-  drawMonthly(To, Ti, Af, Hc, Uw, Ur, Ag, Aw, Shgc, people, lighting, equipment, ventilation);
-}function drawPie(Qw, Qr, Qg, Qs, Ql, Qe, Qp, Qv, Qlat){
-  const ctx = document.getElementById('chartPie').getContext('2d');
-  if (pieChart) pieChart.destroy();
-
-  const data = [
-    Math.max(0, Qw), Math.max(0, Qr), Math.max(0, Qg),
-    Math.max(0, Qs), Math.max(0, Ql), Math.max(0, Qe),
-    Math.max(0, Qp), Math.max(0, Qv), Math.max(0, Qlat * 1000)
-  ];
-
-  pieChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['外壁', '屋根', '窓貫流', '日射', '照明', '機器', '人員', '換気(顕)', '潜熱'],
-      datasets: [{
-        data,
-        backgroundColor: ['#007BFF','#00B4D8','#48cae4','#ffd166','#ef476f','#06d6a0','#118ab2','#ffc8dd','#a8dadc'],
-        borderWidth: 0
-      }]
-    },
-    options:{
-      responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
-      plugins: {
-        legend: { position: 'bottom', labels: { color: '#555', font: { size: 10 }, boxWidth: 12 } }
-      }
-    }
-  });
-}// Monthly temperature variation (sinusoidal approximation)
-
-const MONTH_TEMPS ={
-  tokyo: [6,7,11,16,21,24,28,29,26,20,14,9],
-  osaka: [7,8,12,17,22,25,29,30,26,21,15,10],
-  sapporo: [-3,-2,2,10,16,20,24,25,20,13,5,-1],
+var LOCATIONS = {
+  tokyo:     { To: 35, Ti: 26, dW: 0.008 },
+  osaka:     { To: 36, Ti: 26, dW: 0.009 },
+  sapporo:   { To: 32, Ti: 26, dW: 0.005 },
+  singapore: { To: 33, Ti: 24, dW: 0.014 }
+};
+var MONTH_TEMPS = {
+  tokyo:     [6,7,11,16,21,24,28,29,26,20,14,9],
+  osaka:     [7,8,12,17,22,25,29,30,26,21,15,10],
+  sapporo:   [-3,-2,2,10,16,20,24,25,20,13,5,-1],
   singapore: [27,28,28,29,30,30,30,30,29,28,27,27]
 };
 
-function drawMonthly(To, Ti, Af, Hc, Uw, Ur, Ag, Aw, Shgc, people, lighting, equipment, ventilation){
-  const loc = document.getElementById('location').value;
-  const temps = MONTH_TEMPS[loc] || MONTH_TEMPS.tokyo;
-  const months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-  const vol = Af * Hc;
-  const Ar = Af;
+window.applyLocation = function(){
+  var loc = el('location').value;
+  var d = LOCATIONS[loc];
+  var toEl = el('To'); toEl.value = d.To; window.upd(toEl, 'vTo', 1, '°C'); if (window.syncToNum) syncToNum('To','vToNum');
+  var tiEl = el('Ti'); tiEl.value = d.Ti; window.upd(tiEl, 'vTi', 1, '°C'); if (window.syncToNum) syncToNum('Ti','vTiNum');
+  window.compute();
+};
 
-  const loads = temps.map(t => {
-    const dt = t - Ti;
-    const I = dt > 0 ? 300 + Math.max(0, (t - 20)) * 15 : 100;
-    const Qw = Uw * Aw * dt;
-    const Qr = Ur * Ar * dt;
-    const Qg = parseFloat(document.getElementById('Ug').value) * Ag * dt;
-    const Qs2 = I * Ag * Shgc;
-    const Ql = lighting * Af;
-    const Qe = equipment * Af;
-    const Qp = people * 70;
-    const Qv = ventilation * vol / 3600 * 1.2 * 1006 * dt;
+var pieChart = null, monthChart = null;
+var state = null;   // latest computed model (for the animation)
+
+window.compute = function(){
+  var To = gv('To'), Ti = gv('Ti'), Af = gv('Af'), Hc = gv('Hc');
+  var Uw = gv('Uw'), Ur = gv('Ur'), Wwr = gv('Wwr') / 100, Ug = gv('Ug'), Shgc = gv('Shgc');
+  var people = gv('people'), lighting = gv('lighting'), equipment = gv('equipment');
+  var ventilation = gv('ventilation'), cop = gv('cop');
+
+  var dT = To - Ti;
+  var vol = Af * Hc;
+
+  // Envelope areas from floor area (square-room assumption)
+  var perimEst = 4 * Math.sqrt(Af);
+  var Awall_total = perimEst * Hc;
+  var Ag = Awall_total * Wwr;          // window area
+  var Aw = Awall_total * (1 - Wwr);    // opaque wall area
+  var Ar = Af;                         // roof area
+
+  var I_solar = 500;                   // W/m^2 design-day solar irradiance on glazing
+
+  // Sensible components [W]
+  var Q_wall  = Uw * Aw * dT;
+  var Q_roof  = Ur * Ar * dT;
+  var Q_glass = Ug * Ag * dT;
+  var Q_solar = I_solar * Ag * Shgc;
+  var Q_light = lighting * Af;
+  var Q_equip = equipment * Af;
+  var Q_peopleS = people * 70;         // 70 W sensible / person
+  var Q_ventS = ventilation * vol / 3600 * 1.2 * 1006 * dT;  // rho=1.2 kg/m^3, cp=1006 J/kgK
+
+  var Q_sens = (Q_wall + Q_roof + Q_glass + Q_solar + Q_light + Q_equip + Q_peopleS + Q_ventS) / 1000; // kW
+
+  // Latent components [W]
+  var Q_peopleL = people * 55;         // 55 W latent / person
+  var dW = LOCATIONS[el('location').value].dW;
+  var Q_ventL = ventilation * vol / 3600 * 1.2 * 2501000 * dW;  // hfg = 2501 kJ/kg
+  var Q_lat = (Q_peopleL + Q_ventL) / 1000; // kW
+
+  var Q_tot = Q_sens + Q_lat;
+  var isHeating = Q_tot < 0;
+  var dispS = Math.abs(Q_sens), dispL = Math.abs(Q_lat), dispT = Math.abs(Q_tot);
+  var SHR = Q_tot > 0 ? Q_sens / Q_tot : null;
+  var AC = dispT * 1.15;               // 15% safety factor
+  var FLH = 700;
+  var energy = AC / cop * FLH;
+
+  el('sQsens').textContent  = dispS.toFixed(2);
+  el('sQlat').textContent   = dispL.toFixed(2);
+  el('sQtot').textContent   = dispT.toFixed(2);
+  el('sSHR').textContent    = isHeating ? '—' : SHR.toFixed(3);
+  el('sAC').textContent     = AC.toFixed(2);
+  el('sEnergy').textContent = energy.toFixed(0);
+
+  // Grouped gains for the animation [kW], all positive magnitudes
+  var gSolar = Math.max(0, Q_solar) / 1000;
+  var gCond  = Math.max(0, Q_wall + Q_roof + Q_glass) / 1000;
+  var gVent  = Math.max(0, Q_ventS + Q_peopleL + Q_ventL) / 1000;  // air exchange (sens.+latent)
+  var gInt   = Math.max(0, Q_light + Q_equip + Q_peopleS) / 1000;
+  var gSum   = gSolar + gCond + gVent + gInt;
+
+  // dominant source label
+  var sources = [[L.gain.solar, gSolar],[L.gain.cond, gCond],[L.gain.vent, gVent],[L.gain.internal, gInt]];
+  sources.sort(function(a,b){ return b[1]-a[1]; });
+  var domLabel = (gSum > 0) ? sources[0][0] : '—';
+
+  el('roTot').textContent  = dispT.toFixed(1);
+  el('roSens').textContent = dispS.toFixed(1);
+  el('roLat').textContent  = dispL.toFixed(1);
+  el('roDom').textContent  = domLabel;
+
+  state = {
+    isHeating: isHeating,
+    gains: { solar: gSolar, cond: gCond, vent: gVent, internal: gInt },
+    sum: gSum, total: dispT, ac: AC, shr: isHeating ? null : SHR
+  };
+
+  drawPie(Q_wall, Q_roof, Q_glass, Q_solar, Q_light, Q_equip, Q_peopleS, Q_ventS, Q_lat);
+  drawMonthly(Ti, Af, Hc, Uw, Ur, Ag, Aw, Ug, Shgc, people, lighting, equipment, ventilation);
+  if (!rafId) renderBuilding();   // ensure a frame even when paused/reduced-motion
+};
+
+/* ===== Chart.js: breakdown + monthly (preserved) ===== */
+function drawPie(Qw, Qr, Qg, Qs, Ql, Qe, Qp, Qv, Qlat){
+  if (typeof Chart === 'undefined') return;
+  var ctx = el('chartPie').getContext('2d');
+  if (pieChart) pieChart.destroy();
+  var data = [Math.max(0,Qw),Math.max(0,Qr),Math.max(0,Qg),Math.max(0,Qs),
+              Math.max(0,Ql),Math.max(0,Qe),Math.max(0,Qp),Math.max(0,Qv),Math.max(0,Qlat*1000)];
+  pieChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: L.pie, datasets: [{ data: data,
+      backgroundColor: ['#007BFF','#00B4D8','#48cae4','#ffd166','#ef476f','#06d6a0','#118ab2','#ffc8dd','#a8dadc'],
+      borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, resizeDelay: 100, animation: false,
+      plugins: { legend: { position: 'bottom', labels: { color: '#555', font: { size: 10 }, boxWidth: 12 } } } }
+  });
+}
+
+function drawMonthly(Ti, Af, Hc, Uw, Ur, Ag, Aw, Ug, Shgc, people, lighting, equipment, ventilation){
+  if (typeof Chart === 'undefined') return;
+  var loc = el('location').value;
+  var temps = MONTH_TEMPS[loc] || MONTH_TEMPS.tokyo;
+  var vol = Af * Hc, Ar = Af;
+  var loads = temps.map(function(t){
+    var dt = t - Ti;
+    var I = dt > 0 ? 300 + Math.max(0, (t - 20)) * 15 : 100;
+    var Qw = Uw * Aw * dt, Qr = Ur * Ar * dt, Qg = Ug * Ag * dt;
+    var Qs2 = I * Ag * Shgc, Ql = lighting * Af, Qe = equipment * Af, Qp = people * 70;
+    var Qv = ventilation * vol / 3600 * 1.2 * 1006 * dt;
     return ((Qw + Qr + Qg + Qs2 + Ql + Qe + Qp + Qv) / 1000).toFixed(2);
   });
-
-  const ctx = document.getElementById('chartMonth').getContext('2d');
+  var ctx = el('chartMonth').getContext('2d');
   if (monthChart) monthChart.destroy();
-  monthChart = new Chart(ctx,{
+  monthChart = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels: months,
-      datasets: [{
-        label: '月別熱負荷 [kW]',
-        data: loads,
-        backgroundColor: loads.map(v => v > 0 ? 'rgba(0,123,255,0.7)' : 'rgba(0,180,216,0.7)'),
-        borderWidth: 0
-      }]
-    },
-    options:{
-      responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
+    data: { labels: L.mon, datasets: [{ label: L.monthLabel, data: loads,
+      backgroundColor: loads.map(function(v){ return v > 0 ? 'rgba(0,123,255,0.7)' : 'rgba(0,180,216,0.7)'; }),
+      borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, resizeDelay: 100, animation: false,
       plugins: { legend: { display: false } },
-      scales:{
-        x: { ticks: { color: '#888', font: { size: 10 } } },
-        y:{ ticks: { color: '#888', font: { size: 10 } }, title:{ display: true, text: 'kW', color: '#888' } }
-      }
-    }
+      scales: { x: { ticks: { color: '#888', font: { size: 10 } } },
+                y: { ticks: { color: '#888', font: { size: 10 } }, title: { display: true, text: 'kW', color: '#888' } } } }
   });
-}window.addEventListener('resize', compute);
-if (document.readyState === 'complete') compute();
-else window.addEventListener('load', function(){ compute(); }, { once: true });
+}
+
+/* ===== Building heat-gain animation ===== */
+var canvas = el('bldgCanvas');
+var bctx = canvas ? canvas.getContext('2d') : null;
+var rafId = null, animT = 0, cssW = 600, cssH = 360;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+var GCOL = { solar:'#ffd166', cond:'#ef476f', vent:'#06d6a0', internal:'#118ab2', ac:'#00B4D8' };
+
+function resizeCanvas(){
+  if (!canvas) return;
+  var rect = canvas.parentElement.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width - 44));
+  cssH = 360;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function arrow(x0, y0, x1, y1, color, width){
+  var a = Math.atan2(y1 - y0, x1 - x0), head = Math.max(6, width * 1.8);
+  bctx.strokeStyle = color; bctx.fillStyle = color; bctx.lineWidth = width; bctx.lineCap = 'round';
+  bctx.beginPath(); bctx.moveTo(x0, y0); bctx.lineTo(x1, y1); bctx.stroke();
+  bctx.beginPath();
+  bctx.moveTo(x1, y1);
+  bctx.lineTo(x1 - head * Math.cos(a - 0.4), y1 - head * Math.sin(a - 0.4));
+  bctx.lineTo(x1 - head * Math.cos(a + 0.4), y1 - head * Math.sin(a + 0.4));
+  bctx.closePath(); bctx.fill();
+}
+
+function renderBuilding(){
+  if (!bctx) return;
+  var s = state || { gains:{solar:1,cond:1,vent:1,internal:1}, sum:4, total:4, ac:4.6, shr:0.8, isHeating:false };
+  var W = cssW, H = cssH;
+  bctx.clearRect(0, 0, W, H);
+
+  // backdrop (sky gradient)
+  var sky = bctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#0b1e3a'); sky.addColorStop(1, '#06122a');
+  bctx.fillStyle = sky; bctx.fillRect(0, 0, W, H);
+
+  // ground line
+  var groundY = H - 26;
+  bctx.strokeStyle = 'rgba(120,200,120,0.45)'; bctx.lineWidth = 2;
+  bctx.beginPath(); bctx.moveTo(0, groundY); bctx.lineTo(W, groundY); bctx.stroke();
+
+  // building rectangle (centered)
+  var bw = Math.min(220, W * 0.34), bh = 150;
+  var bx = W / 2 - bw / 2, by = groundY - bh;
+  bctx.fillStyle = 'rgba(255,255,255,0.06)';
+  bctx.strokeStyle = 'rgba(255,255,255,0.55)'; bctx.lineWidth = 2;
+  bctx.fillRect(bx, by, bw, bh); bctx.strokeRect(bx, by, bw, bh);
+  // roof slab
+  bctx.fillStyle = 'rgba(239,71,111,0.18)';
+  bctx.fillRect(bx - 6, by - 10, bw + 12, 10);
+  // window
+  var wx = bx + bw * 0.55, wy = by + bh * 0.28, ww = bw * 0.32, wh = bh * 0.4;
+  bctx.fillStyle = 'rgba(120,200,255,0.30)'; bctx.fillRect(wx, wy, ww, wh);
+  bctx.strokeStyle = 'rgba(180,220,255,0.7)'; bctx.lineWidth = 1.4; bctx.strokeRect(wx, wy, ww, wh);
+
+  // internal icons (people/lights/equipment) inside building
+  bctx.font = '15px sans-serif'; bctx.textAlign = 'center'; bctx.textBaseline = 'middle';
+  bctx.fillText('💡', bx + bw * 0.22, by + bh * 0.30);
+  bctx.fillText('🧑', bx + bw * 0.22, by + bh * 0.62);
+  bctx.fillText('🖥️', bx + bw * 0.40, by + bh * 0.62);
+
+  // scale arrow widths by contribution
+  var maxg = Math.max(s.gains.solar, s.gains.cond, s.gains.vent, s.gains.internal, 1e-6);
+  function wOf(v){ return 2 + 12 * (v / maxg); }       // 2..14 px
+  function fOf(v){ return 0.25 + 0.75 * (v / maxg); }  // arrow flow alpha/length factor
+
+  var t = animT;
+  var cx = bx + bw / 2, cyMid = by + bh / 2;
+
+  // 1) SOLAR — sun rays into the window (top-right -> window)
+  var sunX = W - 46, sunY = 46;
+  bctx.fillStyle = '#ffd166'; bctx.beginPath(); bctx.arc(sunX, sunY, 16, 0, Math.PI * 2); bctx.fill();
+  bctx.strokeStyle = 'rgba(255,209,102,0.6)'; bctx.lineWidth = 2;
+  for (var r = 0; r < 8; r++){ var ar = r / 8 * Math.PI * 2; bctx.beginPath();
+    bctx.moveTo(sunX + Math.cos(ar) * 19, sunY + Math.sin(ar) * 19);
+    bctx.lineTo(sunX + Math.cos(ar) * 26, sunY + Math.sin(ar) * 26); bctx.stroke(); }
+  if (s.gains.solar > 0){
+    var p = (t * 0.6) % 1;
+    var sx0 = sunX - 6, sy0 = sunY + 6, sx1 = wx + ww * 0.5, sy1 = wy + wh * 0.5;
+    arrow(sx0, sy0, sx0 + (sx1 - sx0) * (0.55 + 0.45 * fOf(s.gains.solar)), sy0 + (sy1 - sy0) * (0.55 + 0.45 * fOf(s.gains.solar)), GCOL.solar, wOf(s.gains.solar));
+    // moving photons
+    bctx.fillStyle = GCOL.solar;
+    for (var k = 0; k < 3; k++){ var pp = (p + k / 3) % 1; var px = sx0 + (sx1 - sx0) * pp, py = sy0 + (sy1 - sy0) * pp;
+      bctx.beginPath(); bctx.arc(px, py, 2.4, 0, Math.PI * 2); bctx.fill(); }
+  }
+
+  // 2) CONDUCTION — heat arrows through wall (left) and roof (top)
+  if (s.gains.cond > 0){
+    arrow(bx - 40, cyMid, bx - 6, cyMid, GCOL.cond, wOf(s.gains.cond));
+    arrow(bx + bw * 0.30, by - 34, bx + bw * 0.30, by - 4, GCOL.cond, wOf(s.gains.cond));
+    var cp = (t * 0.5) % 1; bctx.fillStyle = GCOL.cond;
+    var pxw = (bx - 40) + (34) * cp; bctx.beginPath(); bctx.arc(pxw, cyMid, 2.2, 0, Math.PI * 2); bctx.fill();
+  }
+
+  // 3) VENTILATION / INFILTRATION — wavy air through a gap (bottom-left edge)
+  if (s.gains.vent > 0){
+    bctx.strokeStyle = GCOL.vent; bctx.lineWidth = wOf(s.gains.vent); bctx.lineCap = 'round';
+    var gy = by + bh - 16, gx0 = bx - 42, gx1 = bx - 4;
+    bctx.beginPath();
+    for (var xx = gx0; xx <= gx1; xx += 3){
+      var yy = gy + Math.sin((xx - gx0) * 0.5 + t * 4) * 4;
+      if (xx === gx0) bctx.moveTo(xx, yy); else bctx.lineTo(xx, yy);
+    }
+    bctx.stroke();
+    arrow(gx1 - 10, gy, gx1, gy, GCOL.vent, Math.max(2, wOf(s.gains.vent) * 0.7));
+  }
+
+  // 4) INTERNAL GAINS — heat shimmer rising from the icons toward the AC zone
+  if (s.gains.internal > 0){
+    var ix = bx + bw * 0.30, iy0 = by + bh * 0.62, iy1 = by + bh * 0.18;
+    arrow(ix, iy0, ix, iy0 - (iy0 - iy1) * (0.5 + 0.5 * fOf(s.gains.internal)), GCOL.internal, wOf(s.gains.internal));
+    bctx.fillStyle = GCOL.internal;
+    var ipp = (t * 0.8) % 1; var ipy = iy0 - (iy0 - iy1) * ipp;
+    bctx.beginPath(); bctx.arc(ix + Math.sin(t * 3) * 3, ipy, 2.2, 0, Math.PI * 2); bctx.fill();
+  }
+
+  // AC unit on the wall, removing the total load
+  var acX = bx + bw - 30, acY = by + 14, acW = 36, acH = 18;
+  bctx.fillStyle = '#0a2f4a'; bctx.strokeStyle = GCOL.ac; bctx.lineWidth = 2;
+  bctx.fillRect(acX, acY, acW, acH); bctx.strokeRect(acX, acY, acW, acH);
+  // AC cold output (blue arrows out, animated louvers)
+  bctx.strokeStyle = GCOL.ac; bctx.lineWidth = 2;
+  for (var lv = 0; lv < 3; lv++){
+    var loy = acY + acH + 4 + lv * 5 + Math.sin(t * 5 + lv) * 1.5;
+    bctx.beginPath(); bctx.moveTo(acX + 4, loy); bctx.lineTo(acX + acW - 4, loy + 4); bctx.stroke();
+  }
+
+  // breakdown bar (bottom): proportions of each gain
+  var barX = 16, barY = H - 16, barW = W - 32, barH = 10;
+  var segs = [['solar', s.gains.solar], ['cond', s.gains.cond], ['vent', s.gains.vent], ['internal', s.gains.internal]];
+  var sum = s.sum || 1e-6;
+  var bxc = barX;
+  bctx.textAlign = 'left'; bctx.textBaseline = 'alphabetic';
+  for (var si = 0; si < segs.length; si++){
+    var segW = barW * (segs[si][1] / sum);
+    bctx.fillStyle = GCOL[segs[si][0]];
+    bctx.fillRect(bxc, barY, Math.max(0, segW), barH);
+    bxc += segW;
+  }
+  bctx.strokeStyle = 'rgba(255,255,255,0.25)'; bctx.lineWidth = 1; bctx.strokeRect(barX, barY, barW, barH);
+
+  // header labels
+  bctx.fillStyle = 'rgba(255,255,255,0.9)'; bctx.font = '12px Noto Sans JP, sans-serif'; bctx.textAlign = 'left';
+  bctx.fillText((s.isHeating ? L.heating : L.heat) + ' · ' + L.gain.ac + ' ' + (s.ac).toFixed(1) + ' kW', 14, 22);
+  bctx.textAlign = 'right'; bctx.fillStyle = GCOL.ac;
+  bctx.fillText(L.acOn + ' ▸ ' + s.total.toFixed(1) + ' kW', W - 14, 22);
+  bctx.textAlign = 'left';
+}
+
+function animLoop(ts){
+  if (reduceMotion){ rafId = null; return; }
+  animT = ts / 1000;
+  renderBuilding();
+  rafId = requestAnimationFrame(animLoop);
+}
+
+function start(){
+  resizeCanvas();
+  window.compute();
+  if (reduceMotion){ renderBuilding(); }
+  else if (!rafId){ rafId = requestAnimationFrame(animLoop); }
+}
+
+window.addEventListener('resize', function(){ resizeCanvas(); window.compute(); if (reduceMotion) renderBuilding(); });
+if (document.readyState === 'complete') start();
+else window.addEventListener('load', start, { once: true });
+})();
 </script>
 
 <section class="explanation">
@@ -540,6 +763,9 @@ else window.addEventListener('load', function(){ compute(); }, { once: true });
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="hvac-load.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -593,23 +819,33 @@ else window.addEventListener('load', function(){ compute(); }, { once: true });
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>外気温度（To）と室内設定温度（Ti）を入力します。東京夏季35℃、冬季5℃などの実測値を使用してください。</li>
-<li>外壁面積（Af）と総窓面積（Af）を㎡単位で入力。壁の熱貫流率Uは一般的な鉄筋コンクリート造0.4W/㎡K、複層ガラス窓1.6W/㎡Kを初期値として設定されています。</li>
-<li>室内発熱量（人員数×115W/人、照明密度×床面積）をHc[W]に入力すると、顕熱負荷と潜熱負荷（湿度15g/kg上昇で約10kW）が自動算出されます。SHR値とAC推奨容量が表示されます。</li>
+<li>外気温度（To）と室内設定温度（Ti）を入力します。地域選択では東京35℃、大阪36℃、札幌32℃、シンガポール33℃と地域別湿度差が反映されます。</li>
+<li>床面積Af、天井高さHc、窓面積率Wwr、外壁U=1.5W/㎡K、窓U=2.8W/㎡Kなどを設定します。窓面積は床面積と窓面積率から推定されます。</li>
+<li>人員発熱は70W/人（顕熱）+55W/人（潜熱）、照明・機器密度、換気回数から顕熱負荷と潜熱負荷を算出します。初期値では顕熱9.67kW、潜熱1.21kW、合計10.88kW、SHR=0.889、推奨容量12.51kWです。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>オフィスビル4階フロア（床面積500㎡）の夏季冷房負荷計算：外壁面積180㎡、窓面積80㎡、外気温度35℃、室内設定温度24℃の場合、壁からの顕熱負荷＝0.4×180×(35-24)=792W、窓からの顕熱負荷＝1.6×80×11=1,408W。人員100名（11.5kW）と照明30W/㎡（15kW）で合計顕熱負荷≒28.1kW。潜熱負荷（室内発熱と新気導入）≒12.0kW。SHR=0.7、推奨AC容量は30号機以上（約32kW）となります。</p>
+<p>代表的な500㎡オフィスで、To=35℃、Ti=26℃、Hc=2.8m、Uw=1.5、Ug=2.8、Wwr=30%、人員100名、照明10W/㎡、機器15W/㎡、換気1.0回/h、COP=3.5とすると、顕熱負荷50.37kW、潜熱負荷14.84kW、合計65.21kW、SHR=0.772です。推奨AC容量は合計負荷×1.15=74.99kWとなり、負荷を下回らない75kW級機を選定します（人員顕熱は70W/人=7.0kWで計算）。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
-<li>太陽放射熱を考慮する場合、東西面窓には単純Uより5～8W/㎡K高い実効値を使用。南面は季節変動で冬季設計時は日射遮蔽を除外してください。</li>
+<li>日射の影響は方位・時刻・遮蔽条件で大きく変わります。詳細設計では方位別の日射取得を別途確認してください。</li>
 <li>湿度管理が必要な精密機器室（IT機器）では潜熱負荷が大きくなるため、実際の湿度変化（±5%程度）でSHR値を修正し、除湿能力を確保したAC選定が必須です。</li>
-<li>建築基準法による外気導入量が500㎡以上階は150㎥/h必須となり、負荷計算に直結します。気象データは35年確率最高気温を使用し、過小設計を避けてください。</li>
+<li>外気導入量の目安は20m³/h・人です。設計用外気条件はTAC超過確率2.5〜5%などの基準で確認し、過小設計を避けてください。</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -622,9 +858,6 @@ else window.addEventListener('load', function(){ compute(); }, { once: true });
   <div style="font-size:.65rem;color:rgba(255,255,255,.35)">&copy; 2026 NovaSolver Contributors. All rights reserved.</div>
 </div>
 </footer>
-<script>
-document.addEventListener('click',function(e){});
-</script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>
 <script src="/tools/related-tools.js" defer></script>
 <script src="/tools/tool-objectives.js" defer></script>

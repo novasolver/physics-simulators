@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "重力式ダム水圧・安定計算ツール",
       "description": "重力式ダムの断面諸元と水深から、転倒安全率・滑動安全率・底面圧力分布をリアルタイム計算。水圧・揚圧力・自重の力の釣り合いを可視化するCAE計算ツール。",
       "url": "https://novasolver.jp/tools/dam-water-pressure.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["転倒安全率・滑動安全率のリアルタイム計算","底面圧力分布（台形分布）の可視化","断面形状・水圧・揚圧力の力の釣り合い図","OK/NG判定付き安定照査"],
       "keywords": "重力式ダム,水圧,転倒安全率,滑動安全率,揚圧力,底面応力,水理構造物,CAE計算",
       "datePublished": "2026-04-09",
@@ -132,6 +132,11 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* v2 hero animation */
+.hero-anim-card #damHeroCanvas{background:#f3f7fb;border:1px solid var(--border);}
+.hero-anim-card .hero-stats{grid-template-columns:repeat(5,1fr);margin-bottom:12px;}
+.hero-anim-card .hero-stats .sv{font-size:0.98rem;}
+@media(max-width:600px){.hero-anim-card .hero-stats{grid-template-columns:repeat(3,1fr);}}
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/dam-water-pressure.html">
@@ -217,10 +222,30 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="divider"></div>
     <div class="panel-title">安定照査結果</div>
     <div class="status-banner" id="statusBanner"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="一般物理の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">一般物理 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card hero-anim-card"><div class="chart-title"><i class="fas fa-water"></i> 静水圧の可視化 — 三角形分布と合力</div>
+      <div class="stat-cards hero-stats">
+        <div class="stat-card"><div class="sv" id="hvH">—</div><div class="sl">水深 H [m]</div></div>
+        <div class="stat-card"><div class="sv" id="hvPmax">—</div><div class="sl">底部圧力 p_max [kPa]</div></div>
+        <div class="stat-card"><div class="sv" id="hvF">—</div><div class="sl">合力 F [kN/m]</div></div>
+        <div class="stat-card"><div class="sv" id="hvYbar">—</div><div class="sl">作用点 H/3 [m]</div></div>
+        <div class="stat-card"><div class="sv" id="hvM">—</div><div class="sl">転倒モーメント M [kN·m/m]</div></div>
+      </div>
+      <canvas id="damHeroCanvas" height="340" role="img" aria-label="ダム壁に作用する静水圧の三角形分布と合力のアニメーション"></canvas>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:8px">圧力は深さに比例（p=ρgh）して三角形に増大し、底部で最大。合力 F=½ρgH²·b は底面から H/3 の高さに作用し、つま先まわりに転倒モーメント M=F·(H/3) を生みます。</div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -618,6 +643,179 @@ update();
 window.addEventListener('resize', () => drawDam(getParams(), computeStability(getParams())));
 </script>
 
+<script>
+(function(){
+  "use strict";
+  var cv = document.getElementById('damHeroCanvas');
+  if (!cv) return;
+  var ctx = cv.getContext('2d');
+  var RHO = 1000, G = 9.81;          // water density kg/m^3, gravity m/s^2
+  var Hmax = 10;                      // full water depth (m) shown in hero
+  var bWidth = 1;                     // unit width (b = 1 m) for resultant F
+  var cssW = 0, cssH = 340;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function fmt(v, d){ return (Math.abs(v) >= 1000) ? (v/1000).toFixed(d) + 'k' : v.toFixed(d); }
+
+  function setStats(H){
+    var pmax = RHO * G * H / 1000;            // kPa  (p = rho*g*H)
+    var F = 0.5 * RHO * G * H * H * bWidth / 1000; // kN/m  (F = 1/2 rho g H^2 b)
+    var ybar = H / 3;                          // line of action above base
+    var M = F * ybar;                          // kN*m/m overturning moment about toe
+    var s;
+    s = document.getElementById('hvH');    if (s) s.textContent = H.toFixed(2);
+    s = document.getElementById('hvPmax'); if (s) s.textContent = pmax.toFixed(1);
+    s = document.getElementById('hvF');    if (s) s.textContent = fmt(F, 1);
+    s = document.getElementById('hvYbar'); if (s) s.textContent = ybar.toFixed(2);
+    s = document.getElementById('hvM');    if (s) s.textContent = fmt(M, 1);
+  }
+
+  function resize(){
+    var parent = cv.parentElement;
+    var w = (parent && parent.getBoundingClientRect().width) || 600;
+    cssW = Math.max(280, Math.floor(w - 28));
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = cssW + 'px';
+    cv.style.height = cssH + 'px';
+    cv.width = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function arrow(x0, y0, x1, y1, col, lw){
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    var a = Math.atan2(y1 - y0, x1 - x0), h = 6 + lw;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - h*Math.cos(a - 0.42), y1 - h*Math.sin(a - 0.42));
+    ctx.lineTo(x1 - h*Math.cos(a + 0.42), y1 - h*Math.sin(a + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+
+  function draw(H, phase){
+    var W = cssW, Hpx = cssH;
+    ctx.clearRect(0, 0, W, Hpx);
+    ctx.fillStyle = '#f3f7fb'; ctx.fillRect(0, 0, W, Hpx);
+
+    var baseY = Hpx - 46;
+    var topY = 28;
+    var damX = W * 0.60;            // upstream face of dam (water on the left)
+    var damBaseW = Math.min(120, W * 0.26);
+    var pxPerM = (baseY - topY) / Hmax;
+    var waterTop = baseY - H * pxPerM;
+
+    // ground
+    ctx.fillStyle = '#cbb487'; ctx.fillRect(0, baseY, W, Hpx - baseY);
+    ctx.strokeStyle = '#a8966b'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, baseY); ctx.lineTo(W, baseY); ctx.stroke();
+
+    // water body with ripple surface
+    ctx.beginPath();
+    ctx.moveTo(0, waterTop);
+    for (var x = 0; x <= damX; x += 6){
+      var ry = waterTop + Math.sin(x * 0.07 + phase) * 2.2 + Math.sin(x * 0.021 - phase * 0.7) * 1.4;
+      ctx.lineTo(x, ry);
+    }
+    ctx.lineTo(damX, baseY); ctx.lineTo(0, baseY); ctx.closePath();
+    var wg = ctx.createLinearGradient(0, waterTop, 0, baseY);
+    wg.addColorStop(0, 'rgba(46,140,210,0.45)');
+    wg.addColorStop(1, 'rgba(20,80,160,0.65)');
+    ctx.fillStyle = wg; ctx.fill();
+    ctx.strokeStyle = 'rgba(20,90,170,0.8)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, waterTop);
+    for (var x2 = 0; x2 <= damX; x2 += 6){
+      var ry2 = waterTop + Math.sin(x2 * 0.07 + phase) * 2.2 + Math.sin(x2 * 0.021 - phase * 0.7) * 1.4;
+      ctx.lineTo(x2, ry2);
+    }
+    ctx.stroke();
+
+    // dam cross-section (upstream face vertical at damX, downstream sloped)
+    ctx.beginPath();
+    ctx.moveTo(damX, baseY);
+    ctx.lineTo(damX + damBaseW, baseY);
+    ctx.lineTo(damX + 18, topY);
+    ctx.lineTo(damX, topY);
+    ctx.closePath();
+    ctx.fillStyle = '#b9c2c9'; ctx.fill();
+    ctx.strokeStyle = '#7c8893'; ctx.lineWidth = 2; ctx.stroke();
+
+    // triangular hydrostatic pressure distribution (arrows growing with depth)
+    var nArr = 9;
+    var maxLen = Math.min(0.40 * (damX), 150);
+    for (var i = 1; i <= nArr; i++){
+      var frac = i / nArr;                 // depth fraction from surface
+      var y = waterTop + frac * (baseY - waterTop);
+      var len = frac * maxLen;             // p proportional to depth
+      if (len < 4) continue;
+      arrow(damX - len, y, damX - 2, y, 'rgba(231,76,60,0.85)', 1.6);
+    }
+    // pressure triangle outline
+    ctx.strokeStyle = 'rgba(231,76,60,0.5)'; ctx.lineWidth = 1.4; ctx.setLineDash([4,3]);
+    ctx.beginPath();
+    ctx.moveTo(damX, waterTop);
+    ctx.lineTo(damX - maxLen, baseY);
+    ctx.lineTo(damX, baseY);
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // resultant force F at H/3 above base
+    var yF = baseY - (H / 3) * pxPerM;
+    var Flen = Math.max(28, 0.62 * maxLen * (H / Hmax));
+    arrow(damX - Flen - 8, yF, damX - 2, yF, '#c0392b', 4);
+    // line of action marker
+    ctx.strokeStyle = 'rgba(192,57,43,0.45)'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(damX - Flen - 8, yF); ctx.lineTo(damX + damBaseW, yF); ctx.stroke(); ctx.setLineDash([]);
+
+    // labels
+    ctx.fillStyle = '#c0392b'; ctx.font = 'bold 12px Roboto Mono'; ctx.textAlign = 'right';
+    var Fval = 0.5 * RHO * G * H * H / 1000;
+    ctx.fillText('F=' + Fval.toFixed(0) + ' kN/m', damX - 6, yF - 8);
+    ctx.fillStyle = '#15539a'; ctx.font = 'bold 11px Roboto Mono'; ctx.textAlign = 'left';
+    ctx.fillText('H=' + H.toFixed(1) + ' m', 8, waterTop - 8 > topY ? waterTop - 8 : topY + 14);
+    ctx.fillStyle = '#7a5a2a'; ctx.textAlign = 'left';
+    ctx.fillText('H/3', damX + damBaseW + 4, yF + 4);
+
+    // base / toe pivot (overturning point)
+    ctx.beginPath(); ctx.arc(damX + damBaseW, baseY, 4, 0, 7); ctx.fillStyle = '#e67e22'; ctx.fill();
+    ctx.fillStyle = '#a05a14'; ctx.font = '10px Noto Sans JP'; ctx.textAlign = 'center';
+    ctx.fillText('つま先（転倒支点）', damX + damBaseW, baseY + 16);
+
+    // p = rho g h annotation near base
+    ctx.fillStyle = 'rgba(231,76,60,0.9)'; ctx.font = '10px Roboto Mono'; ctx.textAlign = 'left';
+    var pmaxKpa = RHO * G * H / 1000;
+    ctx.fillText('p_max=' + pmaxKpa.toFixed(0) + ' kPa', damX - maxLen, baseY + 12);
+
+    ctx.fillStyle = '#001F3F'; ctx.font = 'bold 11px Noto Sans JP'; ctx.textAlign = 'right';
+    ctx.fillText('単位幅あたり (b=1m)', W - 8, 18);
+    ctx.textAlign = 'left';
+  }
+
+  var t0 = null;
+  function frame(ts){
+    if (t0 === null) t0 = ts;
+    var el = (ts - t0) / 1000;
+    // water level oscillates: fill up then drain, smooth
+    var cyc = (Math.sin(el * 0.45 - Math.PI/2) + 1) / 2;  // 0..1
+    var H = 1.2 + cyc * (Hmax - 1.2);
+    setStats(H);
+    draw(H, el * 2.2);
+    requestAnimationFrame(frame);
+  }
+
+  function staticFrame(){
+    var H = Hmax * 0.85;
+    setStats(H);
+    draw(H, 0);
+  }
+
+  resize();
+  window.addEventListener('resize', function(){ resize(); if (reduce) staticFrame(); });
+  if (reduce){ staticFrame(); }
+  else { requestAnimationFrame(frame); }
+})();
+</script>
+
 <section class="explanation">
   <h2>重力式ダムの安定計算とは</h2>
   <div class="chat">
@@ -677,6 +875,9 @@ window.addEventListener('resize', () => drawDam(getParams(), computeStability(ge
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="dam-water-pressure.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -730,8 +931,8 @@ window.addEventListener('resize', () => drawDam(getParams(), computeStability(ge
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>ダム高さH（m）、貯水位高さsH（m）を入力し、水圧分布を決定する</li>
-<li>堤体上流面幅vBtop（m）、下流面幅vB（m）、コンクリート比重vGc（kN/m3、通常23.5）を設定</li>
+<li>ダム高 H（m）、貯水深 H_w（m）を入力し、水圧分布を決定する</li>
+<li>天端幅 b_top（m）、底面幅 B（m）、コンクリート単位重量 γ_c（kN/m³、通常23.5）を設定</li>
 <li>基礎底面の圧力分布を確認し、つま先応力σ_toe、かかと応力σ_heelが許容値以下（σ_heel ≥ 0、σ_toe ≤ 地盤支持力）であることを検証</li>
 <li>転倒安全率FSo≥1.5、滑動安全率FSs≥1.0の要件を満たす断面寸法に調整</li>
 <li>揚圧力係数を変更（0.3～0.5）して基礎排水条件の影響を検討</li>
@@ -739,7 +940,7 @@ window.addEventListener('resize', () => drawDam(getParams(), computeStability(ge
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>高さH=50m、貯水位sH=48m、上流面幅vBtop=8m、下流面幅vB=35m、コンクリート比重vGc=23.5kN/m3の重力式ダムの場合：水圧P=0.5×ρg×H²=0.5×9.81×48²≈11,270kN/mが作用。転倒モーメント＝11,270×48/3≈180,160kN・m。堤体自重＝0.5×(8+35)×50×23.5≈50,663kN、復元モーメント＝50,663×(8+35)/2＝1,080,655kN・mとなり、FSo＝1,080,655/180,160≈6.0で要件を満たす。底面応力はσ_heel≈180kPa、σ_toe≈50kPaで、地盤支持力400kPa以上の場合は安全。</p>
+<p>高さH=50m、貯水深H_w=48m、天端幅b_top=8m、底面幅B=35m、コンクリート単位重量γ_c=23.5kN/m³の重力式ダムの場合：水圧F_h=0.5×γ_w×H_w²=0.5×9.81×48²≈11,300kN/mが作用。転倒モーメント＝11,300×48/3≈180,800kN・m。堤体自重W＝0.5×(8+35)×50×23.5≈25,260kN/m、重心はつま先から約22.84m（断面重心式 x_cg=(b_top²+b_top·B+B²)/(3(b_top+B))=12.16m）なので復元モーメント＝25,260×22.84≈576,900kN・mとなり、揚圧力を無視するとFSo＝576,900/180,800≈3.2で要件（≥1.5）を満たす。揚圧力を見込むとさらに低下するため照査が必要。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -750,6 +951,16 @@ window.addEventListener('resize', () => drawDam(getParams(), computeStability(ge
 <li>底面応力分布が非線形（ヒール部で応力集中）の場合、堤体下流面形状を湾曲させてσ_toeを低減する対策を検討</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="一般物理の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">一般物理 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "Blasius 境界層シミュレーター",
       "description": "平板層流の境界層厚さ・排除厚さ・運動量厚さ・局所摩擦係数を Blasius 解でリアルタイムに計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/blasius-bl.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["流速・位置・動粘度からの局所 Reynolds 数の計算","99% 境界層厚さ δ_99・排除厚さ δ*・運動量厚さ θ の表示","局所摩擦係数 C_f と壁面せん断応力 τ_w の計算","層流→乱流遷移の目安（Re_x ≈ 5×10⁵）の表示","境界層プロファイル u(y)/U の可視化"],
       "keywords": "Blasius,境界層,平板,層流,排除厚さ,運動量厚さ,摩擦係数,Reynolds数,粘性流れ",
       "datePublished": "2026-05-16",
@@ -169,11 +169,24 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     <div class="divider"></div>
 
     <div class="btn-group">
+      <button type="button" class="btn" id="btnPlay" onclick="togglePlay()"><i class="fas fa-pause"></i> <span id="btnPlayTxt">一時停止</span></button>
+      <button type="button" class="btn secondary" onclick="resetSim()"><i class="fas fa-redo"></i> 最初から</button>
+    </div>
+    <div class="btn-group" style="margin-top:8px;">
       <button type="button" class="btn secondary" onclick="presetAir()"><i class="fas fa-wind"></i> 空気 20°C</button>
       <button type="button" class="btn secondary" onclick="presetWater()"><i class="fas fa-tint"></i> 水 20°C</button>
-      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+      <button type="button" class="btn secondary" onclick="presetHighRe()"><i class="fas fa-gauge-high"></i> 高 Re</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">空気 20°C: ν ≈ 1.5×10⁻⁵ m²/s, ρ ≈ 1.2 kg/m³。水 20°C: ν ≈ 1.0×10⁻⁶ m²/s, ρ ≈ 998 kg/m³。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">空気 20°C: ν ≈ 1.5×10⁻⁵ m²/s, ρ ≈ 1.2 kg/m³。水 20°C: ν ≈ 1.0×10⁻⁶ m²/s, ρ ≈ 998 kg/m³。スライダーを動かすと粒子流れと δ(x) 包絡線がリアルタイムに更新されます。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -182,6 +195,8 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statRex">—</div><div class="sl">局所 Reynolds 数 Re_x</div></div>
         <div class="stat-card"><div class="sv" id="statDelta99">—</div><div class="sl">99% 境界層厚さ δ_99</div></div>
+        <div class="stat-card"><div class="sv" id="statDeltaStar">—</div><div class="sl">排除厚さ δ*</div></div>
+        <div class="stat-card"><div class="sv" id="statTheta">—</div><div class="sl">運動量厚さ θ</div></div>
         <div class="stat-card"><div class="sv" id="statCf">—</div><div class="sl">局所摩擦係数 C_f</div></div>
         <div class="stat-card"><div class="sv" id="statTauW">—</div><div class="sl">壁面せん断応力 τ_w</div></div>
       </div>
@@ -189,9 +204,9 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-water"></i> 境界層プロファイル u(y)/U</div>
+      <div class="chart-title"><i class="fas fa-water"></i> 平板上の境界層成長アニメーション</div>
       <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">平板上面に沿った流れ／緑実線＝Blasius プロファイル u/U／青破線＝δ_99／橙＝δ*／紫＝θ</p>
+      <p class="canvas-hint">左から U で流入する粒子が壁近傍で減速（非滑り u=0）／青の包絡線＝δ_99(x) が √x で成長／白の縦線＝評価位置 x／橙破線＝δ*・紫破線＝θ／右の挿入図＝選択位置での Blasius プロファイル u(y)/U</p>
     </div>
 
     <div class="chart-card">
@@ -211,269 +226,406 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Blasius Flat-Plate Laminar Boundary Layer Simulator ==========
-var cv = document.getElementById('cv');
-var ctx = cv.getContext('2d');
+// ========== Blasius Flat-Plate Laminar Boundary Layer Simulator (v2 real-time) ==========
+(function () {
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var W = 600, H = 372;           // CSS pixel logical size
+  var playing = true;
+  var rafId = null;
+  var lastT = 0;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function getParams() {
-  var U = parseFloat(document.getElementById('slU').value);
-  var x_mm = parseFloat(document.getElementById('slX').value);
-  var nu = parseFloat(document.getElementById('slNu').value);
-  var rho = parseFloat(document.getElementById('slRhoFlu').value);
-  return { U: U, x: x_mm / 1000, nu: nu, rho: rho };
-}
+  // Plate geometry in physical units: plate length L = 1.0 m mapped across canvas.
+  var L_PLATE = 1.0; // m (full plate span shown horizontally)
+  var particles = [];
+  var NP = 150;
 
-function fmtSig(v, n) {
-  if (!isFinite(v)) return '—';
-  if (v === 0) return '0';
-  var a = Math.abs(v);
-  if (a < 1e-3 || a >= 1e5) return v.toExponential(n - 1);
-  return v.toPrecision(n);
-}
-
-function fmtLen(m) {
-  if (!isFinite(m)) return '—';
-  var mm = m * 1000;
-  if (Math.abs(mm) >= 100) return mm.toFixed(0) + ' mm';
-  if (Math.abs(mm) >= 10) return mm.toFixed(1) + ' mm';
-  if (Math.abs(mm) >= 1) return mm.toFixed(2) + ' mm';
-  if (Math.abs(mm) >= 0.01) return mm.toFixed(3) + ' mm';
-  return (m * 1e6).toFixed(2) + ' µm';
-}
-
-function fmtStress(pa) {
-  if (!isFinite(pa)) return '—';
-  var a = Math.abs(pa);
-  if (a >= 1e3) return (pa / 1e3).toFixed(2) + ' kPa';
-  if (a >= 1) return pa.toFixed(2) + ' Pa';
-  if (a >= 1e-3) return (pa * 1e3).toFixed(2) + ' mPa';
-  return (pa * 1e6).toFixed(2) + ' µPa';
-}
-
-function fmtCf(v) {
-  if (!isFinite(v)) return '—';
-  if (v >= 0.01) return v.toFixed(5);
-  return v.toExponential(2);
-}
-
-function fmtRex(v) {
-  if (!isFinite(v)) return '—';
-  if (v < 1000) return v.toFixed(0);
-  if (v < 1e6) return v.toFixed(0);
-  return v.toExponential(2);
-}
-
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var h = Math.round(w * 0.62);
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
-  cv.width = Math.round(w * dpr);
-  cv.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cv.dataset.cssW = String(w);
-  cv.dataset.cssH = String(h);
-}
-
-// Blasius profile approximation using tanh
-function blasiusProfile(eta_norm) {
-  // u/U as function of y/delta_99; eta_norm ranges 0..1+
-  // Use smooth approximation: u/U = tanh(1.85 * eta_norm)
-  // at eta_norm=1 returns ~0.95 (close to 0.99 with adjusted factor)
-  var v = Math.tanh(2.30 * eta_norm);
-  if (v < 0) v = 0;
-  if (v > 1) v = 1;
-  return v;
-}
-
-function drawProfile(p, results) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var marginL = 70, marginR = 24, marginT = 30, marginB = 60;
-  var plateY = H - marginB;
-  var topY = marginT;
-  var gw = W - marginL - marginR;
-  var gh = plateY - topY;
-
-  // boundary layer height (visual) — use a fixed display height that represents 1.6 * delta_99
-  var dispH = gh; // full plot area corresponds to ~1.6*delta_99
-  var d99 = results.delta99;
-  var ystar = results.deltaStar;
-  var theta = results.theta;
-  var refScale = d99 > 0 ? d99 * 1.6 : 1;
-  function ypx(yMeters) { return plateY - (yMeters / refScale) * dispH; }
-
-  // flat plate (top surface line)
-  ctx.strokeStyle = '#9bb8d6';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(marginL, plateY);
-  ctx.lineTo(W - marginR, plateY);
-  ctx.stroke();
-  // plate hatch below
-  ctx.fillStyle = 'rgba(155,184,214,0.18)';
-  ctx.fillRect(marginL, plateY, gw, marginB - 18);
-  ctx.strokeStyle = 'rgba(155,184,214,0.55)';
-  ctx.lineWidth = 1;
-  for (var hx = 0; hx < gw; hx += 12) {
-    ctx.beginPath();
-    ctx.moveTo(marginL + hx, plateY);
-    ctx.lineTo(marginL + hx + 8, plateY + 14);
-    ctx.stroke();
+  // ---- numeric helpers ----
+  function fmtLen(m) {
+    if (!isFinite(m)) return '—';
+    var mm = m * 1000;
+    if (Math.abs(mm) >= 100) return mm.toFixed(0) + ' mm';
+    if (Math.abs(mm) >= 10) return mm.toFixed(1) + ' mm';
+    if (Math.abs(mm) >= 1) return mm.toFixed(2) + ' mm';
+    if (Math.abs(mm) >= 0.01) return mm.toFixed(3) + ' mm';
+    return (m * 1e6).toFixed(2) + ' µm';
+  }
+  function fmtStress(pa) {
+    if (!isFinite(pa)) return '—';
+    var a = Math.abs(pa);
+    if (a >= 1e3) return (pa / 1e3).toFixed(2) + ' kPa';
+    if (a >= 1) return pa.toFixed(2) + ' Pa';
+    if (a >= 1e-3) return (pa * 1e3).toFixed(2) + ' mPa';
+    return (pa * 1e6).toFixed(2) + ' µPa';
+  }
+  function fmtCf(v) {
+    if (!isFinite(v)) return '—';
+    if (v >= 0.01) return v.toFixed(5);
+    return v.toExponential(2);
+  }
+  function fmtRex(v) {
+    if (!isFinite(v)) return '—';
+    if (v < 1e6) return Math.round(v).toLocaleString('en-US');
+    return v.toExponential(2);
   }
 
-  // freestream arrows from left
-  ctx.strokeStyle = 'rgba(0,180,216,0.55)';
-  ctx.fillStyle = 'rgba(0,180,216,0.7)';
-  ctx.lineWidth = 1.5;
-  for (var i = 0; i < 5; i++) {
-    var ay = topY + 8 + i * ((gh - 16) / 4);
-    var ax0 = 6, ax1 = marginL - 8;
+  function getParams() {
+    var U = parseFloat(document.getElementById('slU').value);
+    var x_mm = parseFloat(document.getElementById('slX').value);
+    var nu = parseFloat(document.getElementById('slNu').value);
+    var rho = parseFloat(document.getElementById('slRhoFlu').value);
+    return { U: U, x: x_mm / 1000, nu: nu, rho: rho };
+  }
+
+  // ---- Blasius results at a given x (exact correlation constants) ----
+  function blasiusAt(p, xMeters) {
+    var Rex = p.U * xMeters / p.nu;
+    var sqrtRex = Math.sqrt(Math.max(Rex, 1e-12));
+    return {
+      Rex: Rex,
+      delta99: 5.0 * xMeters / sqrtRex,
+      deltaStar: 1.721 * xMeters / sqrtRex,
+      theta: 0.664 * xMeters / sqrtRex,
+      Cf: 0.664 / sqrtRex
+    };
+  }
+
+  // Smooth Blasius velocity profile approximation u/U as f'(eta).
+  // eta_norm = y/delta_99; tanh fit reaches ~0.99 at eta_norm=1.
+  function uOverU(eta_norm) {
+    var v = Math.tanh(2.30 * eta_norm);
+    if (v < 0) v = 0;
+    if (v > 1) v = 1;
+    return v;
+  }
+
+  // ---- HiDPI sizing ----
+  function resizeCanvas() {
+    var w = Math.max(280, Math.min((cv.parentElement.clientWidth || 600) - 40, 900));
+    var h = Math.round(w * 0.62);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    W = w; H = h;
+    seedParticles();
+  }
+
+  function seedParticles() {
+    particles = [];
+    for (var i = 0; i < NP; i++) {
+      particles.push({ x: Math.random(), y: Math.random() });
+    }
+  }
+
+  // delta_99 envelope (in metres) at fractional plate position fx in [0,1]
+  function deltaEnvMeters(p, fx) {
+    var xm = Math.max(fx * L_PLATE, 1e-5);
+    return blasiusAt(p, xm).delta99;
+  }
+
+  // The drawing layout (side view of plate)
+  function layout() {
+    return {
+      marginL: 54, marginR: 18, marginT: 26, marginB: 52
+    };
+  }
+
+  // Convert physical delta (m) to pixels. We auto-scale so the envelope at the
+  // trailing edge fills a fixed fraction of the plot height.
+  function draw(p, dt) {
+    var lo = layout();
+    var plateY = H - lo.marginB;
+    var topY = lo.marginT;
+    var gw = W - lo.marginL - lo.marginR;
+    var gh = plateY - topY;
+
+    ctx.fillStyle = '#0a1929';
+    ctx.fillRect(0, 0, W, H);
+
+    // visual vertical scale: map deltaMax(=envelope at trailing edge) -> 0.62*gh
+    var deltaTE = deltaEnvMeters(p, 1.0);
+    var yScale = deltaTE > 0 ? (0.62 * gh) / deltaTE : 1;
+    function dyPix(m) { return m * yScale; }
+    function envPixAt(fx) { return Math.min(dyPix(deltaEnvMeters(p, fx)), gh); }
+    function fxToPx(fx) { return lo.marginL + fx * gw; }
+
+    // --- plate surface ---
+    ctx.strokeStyle = '#9bb8d6';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(ax0, ay); ctx.lineTo(ax1, ay);
+    ctx.moveTo(lo.marginL, plateY);
+    ctx.lineTo(W - lo.marginR, plateY);
     ctx.stroke();
+    ctx.fillStyle = 'rgba(155,184,214,0.16)';
+    ctx.fillRect(lo.marginL, plateY, gw, lo.marginB - 14);
+    ctx.strokeStyle = 'rgba(155,184,214,0.5)';
+    ctx.lineWidth = 1;
+    for (var hx = 0; hx < gw; hx += 12) {
+      ctx.beginPath();
+      ctx.moveTo(lo.marginL + hx, plateY);
+      ctx.lineTo(lo.marginL + hx + 7, plateY + 12);
+      ctx.stroke();
+    }
+
+    // --- shaded boundary-layer region under envelope ---
     ctx.beginPath();
-    ctx.moveTo(ax1, ay); ctx.lineTo(ax1 - 6, ay - 3); ctx.lineTo(ax1 - 6, ay + 3); ctx.closePath();
+    ctx.moveTo(lo.marginL, plateY);
+    var STEPS = 90;
+    for (var s = 0; s <= STEPS; s++) {
+      var fx = s / STEPS;
+      ctx.lineTo(fxToPx(fx), plateY - envPixAt(fx));
+    }
+    ctx.lineTo(W - lo.marginR, plateY);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,180,216,0.10)';
     ctx.fill();
-  }
-  ctx.fillStyle = '#9bd8ec';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('U = ' + p.U.toFixed(2) + ' m/s', 4, topY - 12 < 14 ? 14 : topY - 12);
 
-  // x-axis label at plate
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('前縁 →  x = ' + (p.x * 1000).toFixed(0) + ' mm', marginL, plateY + 28);
-
-  // shaded boundary layer region (very subtle)
-  ctx.fillStyle = 'rgba(0,180,216,0.06)';
-  ctx.fillRect(marginL, ypx(d99), gw, plateY - ypx(d99));
-
-  // dashed reference lines for delta99 / delta* / theta
-  function dashLine(yMeters, color, label) {
-    var yy = ypx(yMeters);
-    if (yy < topY || yy > plateY) return;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.4;
-    ctx.setLineDash([6, 4]);
+    // --- delta_99(x) envelope curve (grows as sqrt(x)) ---
+    ctx.strokeStyle = '#00B4D8';
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.moveTo(marginL, yy);
-    ctx.lineTo(W - marginR - 4, yy);
+    for (var s2 = 0; s2 <= STEPS; s2++) {
+      var fx2 = s2 / STEPS;
+      var px = fxToPx(fx2), py = plateY - envPixAt(fx2);
+      if (s2 === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // --- moving particles: u(y) profile drives horizontal speed; no-slip at wall ---
+    ctx.lineCap = 'round';
+    for (var i = 0; i < particles.length; i++) {
+      var pt = particles[i];
+      var fx3 = pt.x;
+      var envM = deltaEnvMeters(p, Math.max(fx3, 1e-4));
+      // particle vertical position: pt.y in [0,1] maps to physical height as
+      // fraction of the local envelope band (band height ~1.05*delta_99 in pixels)
+      var bandPix = Math.min(dyPix(envM * 1.05), gh);
+      var yPix = pt.y * bandPix;                  // height above plate (pixels)
+      var yMeters = yPix / yScale;
+      var etaNorm = envM > 0 ? yMeters / envM : 2;
+      var uRel = etaNorm >= 1 ? 1 : uOverU(etaNorm);  // u/U (no-slip -> 0 at wall)
+      // advance: speed proportional to local u (px/s). Outside BL moves at U speed.
+      var baseSpeed = 0.16 + 0.34 * Math.min(p.U / 5, 1); // visual normalization
+      if (!reduced && playing && dt > 0) {
+        pt.x += uRel * baseSpeed * dt;
+        if (pt.x > 1) { pt.x -= 1; pt.y = Math.random(); }
+      }
+      var sx = fxToPx(pt.x);
+      var sy = plateY - yPix;
+      // color: slow (near wall) = warm, fast (freestream) = cyan
+      var c = uRel;
+      var r = Math.round(120 + 135 * (1 - c));
+      var g = Math.round(150 + 60 * c);
+      var b = Math.round(120 + 135 * c);
+      ctx.strokeStyle = 'rgba(' + r + ',' + g + ',' + b + ',0.85)';
+      ctx.lineWidth = 1.6;
+      var tail = 4 + 14 * uRel;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx - tail, sy);
+      ctx.stroke();
+    }
+
+    // --- velocity profiles drawn at fixed stations along x ---
+    var stations = [0.18, 0.42, 0.70];
+    ctx.font = '10px "Roboto Mono",monospace';
+    for (var st = 0; st < stations.length; st++) {
+      var fxs = stations[st];
+      var baseX = fxToPx(fxs);
+      var envMs = deltaEnvMeters(p, fxs);
+      var bandPixS = Math.min(dyPix(envMs * 1.15), gh);
+      var profW = Math.min(gw * 0.12, 60);
+      ctx.strokeStyle = 'rgba(61,240,168,0.9)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      var M = 36;
+      for (var k = 0; k <= M; k++) {
+        var yp = bandPixS * k / M;
+        var ym = yp / yScale;
+        var en = envMs > 0 ? ym / envMs : 2;
+        var ur = en >= 1 ? 1 : uOverU(en);
+        var pxp = baseX + ur * profW;
+        var pyp = plateY - yp;
+        if (k === 0) ctx.moveTo(pxp, pyp); else ctx.lineTo(pxp, pyp);
+      }
+      ctx.stroke();
+      // baseline (u=0 axis) tick
+      ctx.strokeStyle = 'rgba(143,184,224,0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(baseX, plateY);
+      ctx.lineTo(baseX, plateY - bandPixS);
+      ctx.stroke();
+    }
+
+    // --- selected evaluation station x (white vertical marker) ---
+    var fxSel = Math.max(Math.min(p.x / L_PLATE, 1), 0);
+    var selX = fxToPx(fxSel);
+    var r0 = blasiusAt(p, Math.max(p.x, 1e-5));
+    var d99sel = r0.delta99, dStarSel = r0.deltaStar, thSel = r0.theta;
+    // marker line
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(selX, plateY);
+    ctx.lineTo(selX, plateY - Math.min(dyPix(d99sel), gh) - 4);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = color;
+    // delta* and theta short markers at selected station
+    function tick(m, color, label, side) {
+      var yy = plateY - Math.min(dyPix(m), gh);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.3;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(selX - 16, yy);
+      ctx.lineTo(selX + 16, yy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.font = '10px "Roboto Mono",monospace';
+      ctx.textAlign = side < 0 ? 'right' : 'left';
+      ctx.fillText(label, selX + side * 20, yy + 3);
+    }
+    tick(dStarSel, '#FFA552', 'δ*', 1);
+    tick(thSel, '#B388FF', 'θ', -1);
+    // delta99 label at selected station
+    ctx.fillStyle = '#bfe9f6';
     ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    var d99y = plateY - Math.min(dyPix(d99sel), gh);
+    ctx.fillText('δ₉₉=' + fmtLen(d99sel), selX, Math.max(d99y - 6, topY + 10));
+
+    // --- freestream label + inflow arrows ---
+    ctx.strokeStyle = 'rgba(0,180,216,0.5)';
+    ctx.fillStyle = 'rgba(0,180,216,0.7)';
+    ctx.lineWidth = 1.4;
+    for (var a = 0; a < 4; a++) {
+      var ay = topY + 6 + a * ((gh * 0.55) / 3);
+      ctx.beginPath();
+      ctx.moveTo(4, ay); ctx.lineTo(lo.marginL - 8, ay); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(lo.marginL - 8, ay);
+      ctx.lineTo(lo.marginL - 14, ay - 3);
+      ctx.lineTo(lo.marginL - 14, ay + 3);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#9bd8ec';
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('U = ' + p.U.toFixed(2) + ' m/s', 4, topY - 10 < 12 ? 12 : topY - 10);
+
+    // x-axis label
+    ctx.fillStyle = '#cfe3f7';
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('前縁', lo.marginL, plateY + 26);
+    ctx.textAlign = 'center';
+    ctx.fillText('x = ' + (p.x * 1000).toFixed(0) + ' mm', selX, plateY + 26);
+    ctx.fillStyle = '#9bb8d6';
     ctx.textAlign = 'right';
-    ctx.fillText(label, W - marginR - 6, yy - 3);
+    ctx.fillText('δ(x) ∝ √x', W - lo.marginR, topY + 12);
   }
-  dashLine(d99, '#00B4D8', 'δ_99 = ' + fmtLen(d99));
-  dashLine(ystar, '#FFA552', 'δ* = ' + fmtLen(ystar));
-  dashLine(theta, '#B388FF', 'θ = ' + fmtLen(theta));
 
-  // Blasius profile curve: u/U on x-axis between marginL..marginL+gw*0.7,
-  // y from 0..refScale
-  var curveBaseX = marginL;
-  var curveSpanX = gw * 0.72; // u/U=0..1
-  ctx.strokeStyle = '#3df0a8';
-  ctx.lineWidth = 2.6;
-  ctx.beginPath();
-  var N = 80;
-  for (var k = 0; k <= N; k++) {
-    var yy_m = refScale * k / N;
-    var eta_norm = d99 > 0 ? yy_m / d99 : 0;
-    var ur = blasiusProfile(eta_norm);
-    var px = curveBaseX + ur * curveSpanX;
-    var py = ypx(yy_m);
-    if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  function updateStats(p) {
+    var r = blasiusAt(p, Math.max(p.x, 1e-9));
+    var tauW = 0.5 * r.Cf * p.rho * p.U * p.U;
+    document.getElementById('statRex').textContent = fmtRex(r.Rex);
+    document.getElementById('statDelta99').textContent = fmtLen(r.delta99);
+    document.getElementById('statDeltaStar').textContent = fmtLen(r.deltaStar);
+    document.getElementById('statTheta').textContent = fmtLen(r.theta);
+    document.getElementById('statCf').textContent = fmtCf(r.Cf);
+    document.getElementById('statTauW').textContent = fmtStress(tauW);
+
+    var tag = document.getElementById('regimeTag');
+    if (r.Rex < 5e5) {
+      tag.textContent = '層流（Re_x < 5×10⁵）— Blasius 解は有効';
+      tag.className = 'regime-tag lam';
+    } else {
+      tag.textContent = '遷移／乱流（Re_x ≥ 5×10⁵）— Blasius 解は適用外';
+      tag.className = 'regime-tag tur';
+    }
+    return r;
   }
-  ctx.stroke();
 
-  // axis: u/U scale ticks
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(curveBaseX, plateY);
-  ctx.lineTo(curveBaseX, topY);
-  ctx.stroke();
-  ctx.fillStyle = '#9bb8d6';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText('y', curveBaseX - 6, topY + 10);
-  ctx.textAlign = 'center';
-  ctx.fillText('u/U = 0', curveBaseX, plateY + 14);
-  ctx.fillText('u/U = 1', curveBaseX + curveSpanX, plateY + 14);
+  function frame(t) {
+    var dt = lastT ? Math.min((t - lastT) / 1000, 0.05) : 0;
+    lastT = t;
+    var p = getParams();
+    if (isFinite(p.U) && isFinite(p.x) && isFinite(p.nu) && p.nu > 0) {
+      updateStats(p);
+      draw(p, dt);
+    }
+    rafId = requestAnimationFrame(frame);
+  }
 
-  // label for profile curve
-  ctx.fillStyle = '#3df0a8';
-  ctx.textAlign = 'left';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.fillText('Blasius u(y)/U', curveBaseX + curveSpanX + 8, topY + 18);
-}
+  // compute() is referenced by slider oninput; recompute stats + redraw a static frame.
+  window.compute = function () {
+    var p = getParams();
+    if (!(isFinite(p.U) && isFinite(p.x) && isFinite(p.nu) && p.nu > 0)) return;
+    updateStats(p);
+    if (reduced || !playing) draw(p, 0);
+  };
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.U) || !isFinite(p.x) || !isFinite(p.nu) || p.nu <= 0) return;
-  var Rex = p.U * p.x / p.nu;
-  var sqrtRex = Math.sqrt(Math.max(Rex, 1e-12));
-  var delta99 = 5.0 * p.x / sqrtRex;
-  var deltaStar = 1.721 * p.x / sqrtRex;
-  var theta = 0.664 * p.x / sqrtRex;
-  var Cf = 0.664 / sqrtRex;
-  var tauW = 0.5 * Cf * p.rho * p.U * p.U;
+  window.togglePlay = function () {
+    playing = !playing;
+    var icon = document.querySelector('#btnPlay i');
+    var txt = document.getElementById('btnPlayTxt');
+    if (playing) {
+      if (icon) icon.className = 'fas fa-pause';
+      if (txt) txt.textContent = '一時停止';
+    } else {
+      if (icon) icon.className = 'fas fa-play';
+      if (txt) txt.textContent = '再生';
+    }
+  };
 
-  document.getElementById('statRex').textContent = fmtRex(Rex);
-  document.getElementById('statDelta99').textContent = fmtLen(delta99);
-  document.getElementById('statCf').textContent = fmtCf(Cf);
-  document.getElementById('statTauW').textContent = fmtStress(tauW);
+  window.resetSim = function () {
+    seedParticles();
+    playing = true;
+    var icon = document.querySelector('#btnPlay i');
+    var txt = document.getElementById('btnPlayTxt');
+    if (icon) icon.className = 'fas fa-pause';
+    if (txt) txt.textContent = '一時停止';
+    window.compute();
+  };
 
-  var tag = document.getElementById('regimeTag');
-  if (Rex < 5e5) {
-    tag.textContent = '層流（Re_x < 5×10⁵）— Blasius 解は有効';
-    tag.className = 'regime-tag lam';
+  function applyPreset(U, xmm, nu, rho) {
+    document.getElementById('slU').value = U;
+    document.getElementById('slX').value = xmm;
+    document.getElementById('slNu').value = nu;
+    document.getElementById('slRhoFlu').value = rho;
+    updateSlider(document.getElementById('slU'), 'slUVal', 2, '');
+    updateSlider(document.getElementById('slX'), 'slXVal', 0, '');
+    updateSlider(document.getElementById('slNu'), 'slNuVal', 7, '');
+    updateSlider(document.getElementById('slRhoFlu'), 'slRhoFluVal', 1, '');
+    seedParticles();
+    window.compute();
+  }
+  window.presetAir = function () { applyPreset(1.0, 100, 0.0000150, 1.2); };
+  window.presetWater = function () { applyPreset(1.0, 100, 0.0000010, 998.0); };
+  window.presetHighRe = function () { applyPreset(8.0, 700, 0.0000150, 1.2); };
+  window.resetParams = function () { window.presetAir(); };
+
+  window.addEventListener('resize', function () { resizeCanvas(); window.compute(); });
+
+  resizeCanvas();
+  if (reduced) {
+    playing = false;
+    var icon0 = document.querySelector('#btnPlay i');
+    var txt0 = document.getElementById('btnPlayTxt');
+    if (icon0) icon0.className = 'fas fa-play';
+    if (txt0) txt0.textContent = '再生';
+    window.compute();
   } else {
-    tag.textContent = '遷移／乱流（Re_x ≥ 5×10⁵）— Blasius 解は適用外';
-    tag.className = 'regime-tag tur';
+    rafId = requestAnimationFrame(frame);
   }
-
-  drawProfile(p, { delta99: delta99, deltaStar: deltaStar, theta: theta });
-}
-
-function presetAir() {
-  document.getElementById('slU').value = 1.0;
-  document.getElementById('slX').value = 100;
-  document.getElementById('slNu').value = 0.0000150;
-  document.getElementById('slRhoFlu').value = 1.2;
-  updateSlider(document.getElementById('slU'), 'slUVal', 2, '');
-  updateSlider(document.getElementById('slX'), 'slXVal', 0, '');
-  updateSlider(document.getElementById('slNu'), 'slNuVal', 7, '');
-  updateSlider(document.getElementById('slRhoFlu'), 'slRhoFluVal', 1, '');
-  compute();
-}
-
-function presetWater() {
-  document.getElementById('slU').value = 1.0;
-  document.getElementById('slX').value = 100;
-  document.getElementById('slNu').value = 0.0000010;
-  document.getElementById('slRhoFlu').value = 998.0;
-  updateSlider(document.getElementById('slU'), 'slUVal', 2, '');
-  updateSlider(document.getElementById('slX'), 'slXVal', 0, '');
-  updateSlider(document.getElementById('slNu'), 'slNuVal', 7, '');
-  updateSlider(document.getElementById('slRhoFlu'), 'slRhoFluVal', 1, '');
-  compute();
-}
-
-function resetParams() {
-  presetAir();
-}
-
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
-
-resizeCanvas();
-compute();
+})();
 </script>
 
 <section class="explanation">
@@ -547,6 +699,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="blasius-bl.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -600,8 +755,8 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>流速（U）をスライダーで設定します。空気の場合は10～50 m/s、水の場合は0.5～5 m/sが標準範囲です</li>
-<li>平板先端からの位置（x）を指定します。0.1～2.0 mの範囲で層流域を確認できます</li>
+<li>流速（U）をスライダーで設定します（範囲 0.01～10 m/s）。低速域ほど境界層は厚くなります</li>
+<li>平板先端からの位置（x）を指定します（範囲 1～1000 mm）。後端ほど境界層が √x で厚くなります</li>
 <li>動粘度（ν）と流体密度（ρ）を入力します。20℃の水はν=1.0×10⁻⁶ m²/s、ρ=998 kg/m³です</li>
 <li>計算実行ボタンを押すと、局所Reynolds数Re_xに基づくBlasius解から境界層厚さδ_99、排除厚さδ*、運動量厚さθを算出します</li>
 <li>出力されるC_fと壁面せん断応力τ_wは設計時の抵抗予測に使用します</li>
@@ -609,7 +764,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>航空機翼表面での計算例：U=50 m/s、x=1.5 m、空気（ν=1.5×10⁻⁵ m²/s、ρ=1.225 kg/m³）の場合、Re_x≈5.0×10⁶となります。Blasius解からδ_99≈4.9 mm、C_f≈0.00062、τ_w≈0.038 Paが得られます。同じ条件で位置をx=0.5 mに変更すると、Re_x≈1.67×10⁶、δ_99≈2.8 mm、C_f≈0.00100となり、先端近くではせん断が強くなる特性が確認できます</p>
+<p>翼前縁近傍での層流域の計算例：U=10 m/s、x=1.0 m、空気（ν=1.5×10⁻⁵ m²/s、ρ=1.225 kg/m³）の場合、Re_x≈6.67×10⁵（遷移近傍の層流上限付近）となります。Blasius解からδ_99≈6.1 mm、C_f≈0.00081、τ_w≈0.050 Paが得られます。同じ条件で位置をx=0.5 mに変更すると、Re_x≈3.33×10⁵、δ_99≈4.3 mm、C_f≈0.00115となり、先端近くではせん断が強くなる特性が確認できます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -620,6 +775,16 @@ compute();
 <li>設計段階では安全係数1.2～1.5を摩擦抵抗に乗じて、計算値より保守的に評価します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

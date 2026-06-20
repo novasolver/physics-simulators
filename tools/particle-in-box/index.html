@@ -124,14 +124,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "箱の中の粒子シミュレーター（無限井戸型ポテンシャル）",
       "description": "量子力学の基礎：無限井戸型ポテンシャルの波動関数ψₙ(x)・確率密度|ψₙ|²・エネルギー準位をインタラクティブに可視化。電子・陽子・中性子対応。重ね合わせ状態の時間発展アニメーション付き。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/particle-in-box.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -249,6 +249,26 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <input type="range" id="sliderN" min="1" max="8" step="1" value="1" oninput="syncToNum('sliderN','nValNum');updateSlider(this);compute()">
     </div>
 
+    <div class="param-group" style="margin-bottom:8px;">
+      <span class="param-name" style="display:block;margin-bottom:6px;">表示モード（中央アニメーション）</span>
+      <div class="btn-group" role="group" aria-label="表示モード">
+        <button class="toggle-btn active" data-view="super" onclick="setViewMode('super',this)">重ね合わせ |Ψ(x,t)|²</button>
+        <button class="toggle-btn" data-view="prob" onclick="setViewMode('prob',this)">単一 |ψₙ|²</button>
+        <button class="toggle-btn" data-view="psi" onclick="setViewMode('psi',this)">単一 ψₙ(x)</button>
+        <button class="toggle-btn" id="reimToggle" style="display:none;" onclick="toggleReIm(this)">Re/Im</button>
+      </div>
+    </div>
+
+    <div class="param-group" style="margin-bottom:6px;">
+      <span class="param-name" style="display:block;margin-bottom:6px;">プリセット</span>
+      <div class="btn-group">
+        <button class="toggle-btn" onclick="applyPreset('ground')">基底状態 n=1</button>
+        <button class="toggle-btn" onclick="applyPreset('three')">n=3（3つの腹）</button>
+        <button class="toggle-btn" onclick="applyPreset('slosh')">ψ₁+ψ₂ 振動</button>
+        <button class="toggle-btn" onclick="applyPreset('wide')">広い井戸→低E</button>
+      </div>
+    </div>
+
     <div class="divider"></div>
 
     <div class="superposition-section">
@@ -268,7 +288,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <input type="range" id="sliderN2" min="1" max="8" step="1" value="2" oninput="syncToNum('sliderN2','n2ValNum');updateSlider(this);compute()">
       </div>
       <div class="btn-group">
-        <button class="btn" id="animBtn" onclick="toggleAnim()"><i class="fas fa-play"></i> アニメ開始</button>
+        <button class="btn" id="animBtn" onclick="toggleAnim()" data-play="<i class=&quot;fas fa-play&quot;></i> アニメ開始" data-pause="<i class=&quot;fas fa-pause&quot;></i> 一時停止"><i class="fas fa-play"></i> アニメ開始</button>
         <button class="btn secondary" onclick="stopAnim()"><i class="fas fa-stop"></i> 停止</button>
       </div>
     </div>
@@ -298,10 +318,20 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <!-- Save Overlay -->
     <div class="panel-title"><i class="fas fa-layer-group"></i> 波動関数オーバーレイ</div>
+    <button class="btn" onclick="saveWaveOverlay()" style="width:100%;margin-bottom:10px;"><i class="fas fa-save"></i> 波動関数を保存</button>
     <div id="overlayList" style="font-size:0.78rem;"></div>
+    <button class="btn secondary" onclick="clearOverlays()" style="width:100%;margin-top:6px;display:none;" id="clearOverlaysBtn"><i class="fas fa-trash"></i> クリア</button>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130626345?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130626345.09._SCMZZZZZZ_.jpg" alt="量子力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">量子力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -331,6 +361,18 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="stat-card">
         <div class="sv" id="statMomentum">—</div>
         <div class="sl">量子運動量 [kg·m/s]</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statRatio">—</div>
+        <div class="sl">Eₙ/E₁ = n²</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statPeriod">—</div>
+        <div class="sl">振動周期 T = 2πℏ/(E₂−E₁)</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statMeanX">—</div>
+        <div class="sl">⟨x⟩(t)（重ね合わせ）</div>
       </div>
     </div>
     </div>
@@ -368,10 +410,40 @@ const ME = 9.10938e-31;
 const EV = 1.60218e-19;
 const masses ={ electron: ME, proton: 1.67262e-27, neutron: 1.67493e-27 };
 
+/* === i18n runtime strings (labels generated by JS) === */
+const LANG = (document.documentElement.lang || 'ja').toLowerCase();
+const I18N = {
+  ja: {
+    obs: '観測位置', period: '振動周期 T', expX: '⟨x⟩(t)', stationary: '定常状態（時間に依らず）',
+    eRatio: 'Eₙ/E₁', saved: '保存なし', remove: '削除', node: '節',
+    modeSuper: '重ね合わせ |Ψ(x,t)|²', modeProb: '単一状態 |ψₙ|²', modePsi: '単一状態 ψₙ(x)',
+    reim: 'Re/Im 表示', t: 't', static: '（reduced-motion：静止フレーム）'
+  },
+  en: {
+    obs: 'Observation', period: 'Period T', expX: '⟨x⟩(t)', stationary: 'stationary (time-independent)',
+    eRatio: 'Eₙ/E₁', saved: 'none saved', remove: 'remove', node: 'node',
+    modeSuper: 'Superposition |Ψ(x,t)|²', modeProb: 'Single state |ψₙ|²', modePsi: 'Single state ψₙ(x)',
+    reim: 'Show Re/Im', t: 't', static: '(reduced-motion: static frame)'
+  },
+  zh: {
+    obs: '观测位置', period: '振动周期 T', expX: '⟨x⟩(t)', stationary: '定态（不随时间变化）',
+    eRatio: 'Eₙ/E₁', saved: '无保存', remove: '删除', node: '节点',
+    modeSuper: '叠加态 |Ψ(x,t)|²', modeProb: '单一状态 |ψₙ|²', modePsi: '单一状态 ψₙ(x)',
+    reim: '显示 Re/Im', t: 't', static: '（reduced-motion：静止帧）'
+  }
+};
+const T = I18N[LANG.startsWith('zh') ? 'zh' : (LANG.startsWith('en') ? 'en' : 'ja')];
+
+const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 let waveChart = null;
 let animId = null;
 let animTime = 0;
 let animRunning = false;
+
+/* view mode for the showcase canvas: 'super' | 'prob' | 'psi' */
+let viewMode = 'super';
+let showReIm = false;
 
 /* === Playback state === */
 let pbPlaying = false;
@@ -393,11 +465,72 @@ function getMass(){
     return parseFloat(document.getElementById('sliderCustomMass').value) * ME;
   }
   return masses[type];
-}function getL(){
+}
+function getL(){
   return parseFloat(document.getElementById('sliderL').value) * 1e-9;
-}function En(n, m, L){
+}
+function En(n, m, L){
   return (n * n * Math.PI * Math.PI * HBAR * HBAR) / (2 * m * L * L);
-}function compute(){
+}
+
+/* mean position <x> for a 2-state superposition, analytic.
+   <x> = L/2 - (16 L /pi^2) * (n1 n2 / (n1^2-n2^2)^2) * cos(omega t),  (n1+n2 odd)
+   = L/2 (no oscillation) when n1+n2 even.  Returned in nm. */
+function meanXsuper(n1, n2, omega, t, L){
+  if (n1 === n2) return L/2 * 1e9;
+  const parityOdd = ((n1 + n2) % 2) !== 0;
+  let osc = 0;
+  if (parityOdd){
+    const denom = Math.pow(n1*n1 - n2*n2, 2);
+    osc = (16 * L / (Math.PI*Math.PI)) * (n1*n2 / denom) * Math.cos(omega * t);
+  }
+  return (L/2 + osc) * 1e9;
+}
+
+function setViewMode(mode, btn){
+  viewMode = mode;
+  document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const reBtn = document.getElementById('reimToggle');
+  if (reBtn) reBtn.style.display = (mode === 'psi') ? 'inline-flex' : 'none';
+  drawSuperposition(animTime);
+}
+function toggleReIm(btn){
+  showReIm = !showReIm;
+  if (btn) btn.classList.toggle('active', showReIm);
+  drawSuperposition(animTime);
+}
+
+const PRESETS = {
+  ground:   { L:1.0, n:1, n1:1, n2:2, view:'prob', particle:'electron', anim:false },
+  three:    { L:1.0, n:3, n1:1, n2:2, view:'prob', particle:'electron', anim:false },
+  slosh:    { L:1.0, n:1, n1:1, n2:2, view:'super', particle:'electron', anim:true },
+  wide:     { L:5.0, n:1, n1:1, n2:2, view:'prob', particle:'electron', anim:false }
+};
+function applyPreset(key){
+  const p = PRESETS[key];
+  if (!p) return;
+  document.getElementById('sliderL').value = p.L;
+  document.getElementById('lValNum').value = p.L;
+  document.getElementById('sliderN').value = p.n;
+  document.getElementById('nValNum').value = p.n;
+  document.getElementById('sliderN1').value = p.n1;
+  document.getElementById('n1ValNum').value = p.n1;
+  document.getElementById('sliderN2').value = p.n2;
+  document.getElementById('n2ValNum').value = p.n2;
+  document.getElementById('particleType').value = p.particle;
+  ['sliderL','sliderN','sliderN1','sliderN2'].forEach(id => updateSlider(document.getElementById(id)));
+  viewMode = p.view;
+  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.getAttribute('data-view') === p.view));
+  const reBtn = document.getElementById('reimToggle');
+  if (reBtn) reBtn.style.display = (p.view === 'psi') ? 'inline-flex' : 'none';
+  animTime = 0; pbElapsedTime = 0;
+  const pe = document.getElementById('pbElapsed'); if (pe) pe.textContent = '0.000 fs';
+  compute();
+  if (p.anim && !prefersReduced) { if (!pbPlaying) pbPlay(); } else { pbPause(); }
+}
+
+function compute(){
   const type = document.getElementById('particleType').value;
   document.getElementById('customMassGroup').style.display = type === 'custom' ? 'block' : 'none';
 
@@ -418,10 +551,30 @@ function getMass(){
   document.getElementById('statDeltaE').textContent = deltaE.toFixed(4) + ' eV';
   document.getElementById('statMomentum').textContent = momentum.toExponential(3);
 
+  /* === superposition-derived readouts: period T, <x>, E ratios === */
+  const n1 = parseInt(document.getElementById('sliderN1').value);
+  const n2 = parseInt(document.getElementById('sliderN2').value);
+  const E1s = En(n1, m, L);
+  const E2s = En(n2, m, L);
+  const dE = Math.abs(E2s - E1s);
+  const periodEl = document.getElementById('statPeriod');
+  if (periodEl){
+    if (dE > 0){
+      const period = 2 * Math.PI * HBAR / dE; // seconds
+      periodEl.textContent = (period * 1e15).toFixed(3) + ' fs';
+    } else {
+      periodEl.textContent = '∞ (' + T.stationary + ')';
+    }
+  }
+  const ratioEl = document.getElementById('statRatio');
+  if (ratioEl) ratioEl.textContent = (n*n) + '× E₁';
+
   drawWaveChart(n, L);
   drawEnergyDiagram(n, m, L);
   if (!animRunning && !pbPlaying) drawSuperposition(animTime);
-}function drawWaveChart(n, L){
+}
+
+function drawWaveChart(n, L){
   const pts = 300;
   const xs = [], psi = [], prob = [];
   for (let i = 0; i <= pts; i++) {
@@ -430,7 +583,7 @@ function getMass(){
     const p = Math.sqrt(2 / L) * Math.sin(n * Math.PI * x / L);
     psi.push(p);
     prob.push(p * p);
-  }// Build overlay datasets
+  }
   const overlayDS = savedOverlays.map((ov, idx) => ({
     label: ov.label,
     data: ov.data,
@@ -450,7 +603,7 @@ function getMass(){
       labels: xs,
       datasets: [
         {
-          label: '\u03c8\u2099(x)',
+          label: 'ψₙ(x)',
           data: psi,
           borderColor: '#007BFF',
           borderWidth: 2,
@@ -458,7 +611,7 @@ function getMass(){
           tension: 0.3,
           yAxisID: 'y'
         },{
-          label: '|\u03c8\u2099|\u00b2',
+          label: '|ψₙ|²',
           data: prob,
           borderColor: '#00b894',
           borderWidth: 2,
@@ -471,7 +624,7 @@ function getMass(){
       ]
     },
     options:{
-      responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
+      responsive: true, maintainAspectRatio:false,resizeDelay:100,
       animation: { duration: 150 },
       plugins:{ legend: { labels: { color: '#ccc', font: { size: 11 } } } },
       scales:{
@@ -488,13 +641,18 @@ function getMass(){
     }
   });
   ctx.canvas.style.background = '#0a1628';
-}function drawEnergyDiagram(nSel, m, L){
+}
+
+function drawEnergyDiagram(nSel, m, L){
   const canvas = document.getElementById('energyCanvas');
   const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth || 400;
-  const H = 300;
-  canvas.width = W;
-  canvas.height = H;
+  const cssW = canvas.offsetWidth || 400;
+  const cssH = 300;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = cssW, H = cssH;
 
   ctx.fillStyle = '#0a1628';
   ctx.fillRect(0, 0, W, H);
@@ -508,7 +666,8 @@ function getMass(){
   const drawW = W - pad.left - pad.right;
   const eMax = E[maxN - 1] * 1.08;
 
-  function yOf(e){ return pad.top + drawH - (e / eMax) * drawH; }ctx.strokeStyle = '#334';
+  function yOf(e){ return pad.top + drawH - (e / eMax) * drawH; }
+  ctx.strokeStyle = '#334';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, H - pad.bottom); ctx.stroke();
   ctx.fillStyle = '#778'; ctx.font = '10px Roboto Mono, monospace';
@@ -531,18 +690,29 @@ function getMass(){
     ctx.font = '9px Roboto Mono, monospace';
     ctx.fillText(E[i - 1].toFixed(3), pad.left - 44, y + 13);
 
+    /* ratio E_n/E_1 = n^2 on the right */
+    ctx.fillStyle = isSelected ? '#9ad' : '#566';
+    ctx.textAlign = 'right';
+    ctx.fillText((i*i) + '×', pad.left + drawW, y - 3);
+    ctx.textAlign = 'left';
+
     if (isSelected) {
       ctx.fillStyle = 'rgba(0,123,255,0.18)';
       ctx.fillRect(pad.left + 4, y, drawW - 4, 14);
     }
   }
-}function drawSuperposition(t){
+}
+
+function drawSuperposition(t){
   const canvas = document.getElementById('superCanvas');
   const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth || 700;
-  const H = 200;
-  canvas.width = W;
-  canvas.height = H;
+  const cssW = canvas.offsetWidth || 700;
+  const cssH = 200;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = cssW, H = cssH;
 
   ctx.fillStyle = '#0a1628';
   ctx.fillRect(0, 0, W, H);
@@ -551,88 +721,171 @@ function getMass(){
   const m = getMass();
   const n1 = parseInt(document.getElementById('sliderN1').value);
   const n2 = parseInt(document.getElementById('sliderN2').value);
+  const nSingle = parseInt(document.getElementById('sliderN').value);
   const E1 = En(n1, m, L);
   const E2 = En(n2, m, L);
+  const omega = (E2 - E1) / HBAR;
 
   const pts = 300;
   const pad = 20;
   const drawW = W - pad * 2;
+  const midY = H / 2;
 
+  /* ---- compute arrays per view mode ---- */
+  let probs = [], reArr = [], imArr = [];
+  let isStationary = (viewMode !== 'super');
   let maxProb = 0;
-  const probs = [];
-  for (let i = 0; i <= pts; i++) {
+  for (let i = 0; i <= pts; i++){
     const x = (i / pts) * L;
-    const phi1 = Math.sqrt(2 / L) * Math.sin(n1 * Math.PI * x / L);
-    const phi2 = Math.sqrt(2 / L) * Math.sin(n2 * Math.PI * x / L);
-    const omega = (E2 - E1) / HBAR;
-    const re = (phi1 + phi2 * Math.cos(omega * t)) / Math.sqrt(2);
-    const im = (phi2 * Math.sin(omega * t)) / Math.sqrt(2);
-    const prob = re * re + im * im;
-    probs.push(prob);
-    if (prob > maxProb) maxProb = prob;
-  }const midY = H / 2;
-  const scale = maxProb > 0 ? (H * 0.42) / maxProb : 1;
+    if (viewMode === 'super'){
+      const phi1 = Math.sqrt(2 / L) * Math.sin(n1 * Math.PI * x / L);
+      const phi2 = Math.sqrt(2 / L) * Math.sin(n2 * Math.PI * x / L);
+      const re = (phi1 + phi2 * Math.cos(omega * t)) / Math.sqrt(2);
+      const im = (phi2 * Math.sin(omega * t)) / Math.sqrt(2);
+      reArr.push(re); imArr.push(im);
+      const pr = re * re + im * im;
+      probs.push(pr);
+      if (pr > maxProb) maxProb = pr;
+    } else {
+      const p = Math.sqrt(2 / L) * Math.sin(nSingle * Math.PI * x / L);
+      reArr.push(p); imArr.push(0);
+      const pr = (viewMode === 'prob') ? p * p : p; // psi mode draws psi itself
+      probs.push(pr);
+      if (Math.abs(pr) > maxProb) maxProb = Math.abs(pr);
+    }
+  }
+  const bipolar = (viewMode === 'psi'); // psi can be negative -> center baseline
+  const ampH = bipolar ? H * 0.40 : H * 0.42;
+  const scale = maxProb > 0 ? ampH / maxProb : 1;
+  const base = bipolar ? midY : H - pad;
 
-  // Draw saved overlays
-  savedOverlays.forEach((ov, idx) =>{
-    if (!ov.superData) return;
-    const c = OVERLAY_COLORS[idx % OVERLAY_COLORS.length];
-    ctx.strokeStyle = c;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4,3]);
+  /* grid baseline / well walls */
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad, base); ctx.lineTo(pad + drawW, base); ctx.stroke();
+  ctx.strokeStyle = 'rgba(120,150,200,0.45)';
+  ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, H - pad); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad + drawW, pad); ctx.lineTo(pad + drawW, H - pad); ctx.stroke();
+
+  /* Draw saved overlays (only meaningful in super mode) */
+  if (viewMode === 'super'){
+    savedOverlays.forEach((ov, idx) =>{
+      if (!ov.superData) return;
+      const c = OVERLAY_COLORS[idx % OVERLAY_COLORS.length];
+      ctx.strokeStyle = c;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4,3]);
+      ctx.beginPath();
+      const ovMax = Math.max.apply(null, ov.superData);
+      const ovScale = ovMax > 0 ? (H * 0.42) / ovMax : 1;
+      for (let i = 0; i <= pts; i++) {
+        const px = pad + (i / pts) * drawW;
+        const py = (H - pad) - (ov.superData[i] || 0) * ovScale;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+  }
+
+  /* Optional Re/Im traces in psi mode (eigenstate has trivial Im=0, but draw psi) */
+  if (showReIm && viewMode === 'super'){
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(255,107,107,0.7)'; // Re
     ctx.beginPath();
-    const ovMax = Math.max(...ov.superData);
-    const ovScale = ovMax > 0 ? (H * 0.42) / ovMax : 1;
-    for (let i = 0; i <= pts; i++) {
+    for (let i = 0; i <= pts; i++){
       const px = pad + (i / pts) * drawW;
-      const py = midY - (ov.superData[i] || 0) * ovScale;
+      const py = midY - reArr[i] * (ampH / (maxProb>0?Math.sqrt(maxProb):1)) * 0.5;
       if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
     ctx.stroke();
-    ctx.setLineDash([]);
-  });
+    ctx.strokeStyle = 'rgba(162,155,254,0.7)'; // Im
+    ctx.beginPath();
+    for (let i = 0; i <= pts; i++){
+      const px = pad + (i / pts) * drawW;
+      const py = midY - imArr[i] * (ampH / (maxProb>0?Math.sqrt(maxProb):1)) * 0.5;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
 
-  // Current curve
-  ctx.strokeStyle = '#00B4D8';
+  /* Current main curve */
+  ctx.strokeStyle = bipolar ? '#007BFF' : '#00B4D8';
   ctx.lineWidth = 2;
   ctx.beginPath();
   for (let i = 0; i <= pts; i++){
     const px = pad + (i / pts) * drawW;
-    const py = midY - probs[i] * scale;
+    const py = base - probs[i] * scale;
     if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-  }ctx.stroke();
+  }
+  ctx.stroke();
 
-  ctx.fillStyle = 'rgba(0,180,216,0.12)';
-  ctx.beginPath();
-  ctx.moveTo(pad, midY);
-  for (let i = 0; i <= pts; i++){
-    const px = pad + (i / pts) * drawW;
-    const py = midY - probs[i] * scale;
-    ctx.lineTo(px, py);
-  }ctx.lineTo(pad + drawW, midY);
-  ctx.closePath();
-  ctx.fill();
+  if (!bipolar){
+    ctx.fillStyle = 'rgba(0,180,216,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(pad, base);
+    for (let i = 0; i <= pts; i++){
+      const px = pad + (i / pts) * drawW;
+      const py = base - probs[i] * scale;
+      ctx.lineTo(px, py);
+    }
+    ctx.lineTo(pad + drawW, base);
+    ctx.closePath();
+    ctx.fill();
+  }
 
-  // Observation marker
+  /* interior nodes marker for single-state views */
+  if (viewMode !== 'super'){
+    const nNodes = nSingle - 1;
+    ctx.fillStyle = 'rgba(255,215,0,0.85)';
+    for (let k = 1; k <= nNodes; k++){
+      const xf = k / nSingle;
+      const px = pad + xf * drawW;
+      ctx.beginPath(); ctx.arc(px, base, 3.5, 0, Math.PI*2); ctx.fill();
+    }
+    if (nNodes > 0){
+      ctx.fillStyle = '#aa9';
+      ctx.font = '10px Roboto Mono, monospace';
+      ctx.fillText(T.node + ' ×' + nNodes, pad + 4, H - 6);
+    }
+  }
+
+  /* live <x> marker (super mode) */
+  if (viewMode === 'super'){
+    const xMeanNm = meanXsuper(n1, n2, omega, t, L);
+    const xMeanFrac = (xMeanNm / (L*1e9));
+    const mpx = pad + xMeanFrac * drawW;
+    ctx.strokeStyle = 'rgba(0,255,136,0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([2,2]);
+    ctx.beginPath(); ctx.moveTo(mpx, pad); ctx.lineTo(mpx, H - pad); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(0,255,136,0.95)';
+    ctx.font = '10px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('⟨x⟩', mpx, pad - 6 < 8 ? 12 : pad - 4);
+    ctx.textAlign = 'left';
+    const xmEl = document.getElementById('statMeanX');
+    if (xmEl) xmEl.textContent = xMeanNm.toFixed(4) + ' nm';
+  }
+
+  /* Observation marker */
   if (obsXfrac !== null){
     const obsIdx = Math.round(obsXfrac * pts);
     const obsPx = pad + obsXfrac * drawW;
     const obsProb = probs[Math.min(obsIdx, pts)] || 0;
-    const obsPy = midY - obsProb * scale;
+    const obsPy = base - obsProb * scale;
 
-    // Vertical dashed line
     ctx.strokeStyle = 'rgba(255,215,0,0.6)';
     ctx.lineWidth = 1;
     ctx.setLineDash([3,3]);
     ctx.beginPath(); ctx.moveTo(obsPx, 0); ctx.lineTo(obsPx, H); ctx.stroke();
     ctx.setLineDash([]);
 
-    // Dot at intersection
     ctx.beginPath(); ctx.arc(obsPx, obsPy, 5, 0, Math.PI*2);
     ctx.fillStyle = 'rgba(255,215,0,0.9)'; ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
 
-    // Info text on canvas
     const xNm = (obsXfrac * L * 1e9).toFixed(3);
     ctx.fillStyle = 'rgba(255,215,0,0.9)';
     ctx.font = '10px Roboto Mono, monospace';
@@ -640,14 +893,24 @@ function getMass(){
     ctx.fillText('x=' + xNm + ' nm  |Ψ|²=' + obsProb.toFixed(4), W - 8, 14);
     ctx.textAlign = 'left';
 
-    // Update info below canvas
-    document.getElementById('obsInfo').textContent = '観測位置: x = ' + xNm + ' nm, |Ψ(x,t)|² = ' + obsProb.toFixed(6);
+    document.getElementById('obsInfo').textContent = T.obs + ': x = ' + xNm + ' nm, |Ψ(x,t)|² = ' + obsProb.toFixed(6);
   }
 
-  ctx.fillStyle = '#556';
+  ctx.fillStyle = '#8aa';
   ctx.font = '10px Roboto Mono, monospace';
-  ctx.fillText('t = ' + (t * 1e15).toFixed(1) + ' fs', 8, 14);
-  ctx.fillText('n\u2081=' + n1 + ' n\u2082=' + n2, 8, 26);
+  let modeLabel = (viewMode === 'super') ? T.modeSuper : (viewMode === 'prob' ? T.modeProb : T.modePsi);
+  ctx.fillText(modeLabel, 8, 14);
+  if (viewMode === 'super'){
+    ctx.fillText(T.t + ' = ' + (t * 1e15).toFixed(1) + ' fs   n₁=' + n1 + ' n₂=' + n2, 8, 26);
+  } else {
+    ctx.fillText('n=' + nSingle, 8, 26);
+  }
+  if (prefersReduced){
+    ctx.fillStyle = '#566';
+    ctx.textAlign = 'right';
+    ctx.fillText(T.static, W - 8, H - 6);
+    ctx.textAlign = 'left';
+  }
 }
 
 /* === Click on superCanvas to set observation position === */
@@ -669,43 +932,49 @@ function toggleAnim(){
   if (animRunning) {
     stopAnim();
   }else{
-    animRunning = true;
-    document.getElementById('animBtn').innerHTML = '<i class="fas fa-pause"></i> \u4e00\u6642\u505c\u6b62';
-    runAnim();
+    pbPlay();
   }
-}function stopAnim(){
-  animRunning = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('animBtn').innerHTML = '<i class="fas fa-play"></i> \u30a2\u30cb\u30e1\u958b\u59cb';
-}function runAnim(){
-  if (!animRunning) return;
-  animTime += 1e-17 * pbSpeed;
-  pbElapsedTime = animTime;
-  document.getElementById('pbElapsed').textContent = (pbElapsedTime * 1e15).toFixed(3) + ' fs';
-  drawSuperposition(animTime);
-  animId = requestAnimationFrame(runAnim);
-}/* === Playback controls === */
+}
+function stopAnim(){
+  pbPause();
+}
+function runAnim(){ /* retained for compat; playback handled by pbLoop */ }
+
+/* === Playback controls === */
 function pbToggle(){
   if (pbPlaying) {
     pbPause();
   }else{
     pbPlay();
   }
-}function pbPlay(){
+}
+function pbPlay(){
+  if (prefersReduced){
+    /* reduced motion: render a single representative frame instead of looping */
+    animTime += 1e-15;
+    pbElapsedTime = animTime;
+    document.getElementById('pbElapsed').textContent = (pbElapsedTime * 1e15).toFixed(3) + ' fs';
+    drawSuperposition(animTime);
+    return;
+  }
   pbPlaying = true;
   animRunning = true;
   pbLastTs = null;
   document.getElementById('pbPlayBtn').innerHTML = '<i class="fas fa-pause"></i>';
-  document.getElementById('animBtn').innerHTML = '<i class="fas fa-pause"></i> \u4e00\u6642\u505c\u6b62';
+  const ab = document.getElementById('animBtn');
+  if (ab) ab.innerHTML = '<i class="fas fa-pause"></i> ' + (ab.getAttribute('data-pause') || ab.textContent.trim());
   pbLoop();
-}function pbPause(){
+}
+function pbPause(){
   pbPlaying = false;
   animRunning = false;
   if (pbAnimId) cancelAnimationFrame(pbAnimId);
   if (animId) cancelAnimationFrame(animId);
   document.getElementById('pbPlayBtn').innerHTML = '<i class="fas fa-play"></i>';
-  document.getElementById('animBtn').innerHTML = '<i class="fas fa-play"></i> \u30a2\u30cb\u30e1\u958b\u59cb';
-}function pbLoop(ts){
+  const ab = document.getElementById('animBtn');
+  if (ab && ab.getAttribute('data-play')) ab.innerHTML = ab.getAttribute('data-play');
+}
+function pbLoop(ts){
   if (!pbPlaying) return;
   if (pbLastTs !== null) {
     const dt = (ts - pbLastTs) / 1000; // seconds of real time
@@ -716,22 +985,27 @@ function pbToggle(){
   document.getElementById('pbElapsed').textContent = (pbElapsedTime * 1e15).toFixed(3) + ' fs';
   drawSuperposition(animTime);
   pbAnimId = requestAnimationFrame(pbLoop);
-}function pbStep(){
+}
+function pbStep(){
   if (pbPlaying) pbPause();
-  animTime += 1e-17 * pbSpeed;
+  animTime += 1e-16 * pbSpeed;
   pbElapsedTime = animTime;
   document.getElementById('pbElapsed').textContent = (pbElapsedTime * 1e15).toFixed(3) + ' fs';
   drawSuperposition(animTime);
-}function pbSetSpeed(s, btnEl){
+}
+function pbSetSpeed(s, btnEl){
   pbSpeed = s;
-  document.getElementById('pbSpeedVal').textContent = s + '\u00d7';
+  document.getElementById('pbSpeedVal').textContent = s + '×';
   document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
   if (btnEl) btnEl.classList.add('active');
-}/* === Save / overlay functions === */
+}
+
+/* === Save / overlay functions === */
 function saveWaveOverlay(){
   if (savedOverlays.length >= 5) {
-    savedOverlays.shift(); // remove oldest
-  }const n = parseInt(document.getElementById('sliderN').value);
+    savedOverlays.shift();
+  }
+  const n = parseInt(document.getElementById('sliderN').value);
   const L = getL();
   const m = getMass();
   const pts = 300;
@@ -741,7 +1015,7 @@ function saveWaveOverlay(){
     const p = Math.sqrt(2 / L) * Math.sin(n * Math.PI * x / L);
     psiData.push(p);
     probData.push(p * p);
-  }// Also save superposition state
+  }
   const n1 = parseInt(document.getElementById('sliderN1').value);
   const n2 = parseInt(document.getElementById('sliderN2').value);
   const E1 = En(n1, m, L);
@@ -755,17 +1029,19 @@ function saveWaveOverlay(){
     const re = (phi1 + phi2 * Math.cos(omega * animTime)) / Math.sqrt(2);
     const im = (phi2 * Math.sin(omega * animTime)) / Math.sqrt(2);
     superData.push(re * re + im * im);
-  }const label = 'n=' + n + ' L=' + (L*1e9).toFixed(2) + 'nm t=' + (animTime*1e15).toFixed(1) + 'fs';
+  }
+  const label = 'n=' + n + ' L=' + (L*1e9).toFixed(2) + 'nm t=' + (animTime*1e15).toFixed(1) + 'fs';
   savedOverlays.push({ n, L, m, data: probData, superData, label });
 
   updateOverlayList();
   drawWaveChart(n, L);
   drawSuperposition(animTime);
-}function updateOverlayList(){
+}
+function updateOverlayList(){
   const el = document.getElementById('overlayList');
   const clearBtn = document.getElementById('clearOverlaysBtn');
   if (savedOverlays.length === 0) {
-    el.innerHTML = '<span style="color:var(--muted);">保存なし</span>';
+    el.innerHTML = '<span style="color:var(--muted);">' + T.saved + '</span>';
     if(clearBtn)clearBtn.style.display='none';
     return;
   }
@@ -774,22 +1050,26 @@ function saveWaveOverlay(){
     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
     '<span style="display:inline-block;width:14px;height:3px;border-radius:2px;background:' + OVERLAY_COLORS[i % OVERLAY_COLORS.length] + '"></span>' +
     '<span style="color:var(--text);font-family:\'Roboto Mono\',monospace;font-size:.74rem;">' + ov.label + '</span>' +
-    '<button onclick="removeOverlay(' + i + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.7rem;margin-left:auto;" title="\u524a\u9664">&times;</button>' +
+    '<button onclick="removeOverlay(' + i + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.7rem;margin-left:auto;" title="' + T.remove + '">&times;</button>' +
     '</div>'
   ).join('');
-}function removeOverlay(idx){
+}
+function removeOverlay(idx){
   savedOverlays.splice(idx, 1);
   updateOverlayList();
   const n = parseInt(document.getElementById('sliderN').value);
   drawWaveChart(n, getL());
   drawSuperposition(animTime);
-}function clearOverlays(){
+}
+function clearOverlays(){
   savedOverlays = [];
   updateOverlayList();
   const n = parseInt(document.getElementById('sliderN').value);
   drawWaveChart(n, getL());
   drawSuperposition(animTime);
-}document.getElementById('particleType').addEventListener('change', function(){
+}
+
+document.getElementById('particleType').addEventListener('change', function(){
   const show = this.value === 'custom';
   document.getElementById('customMassGroup').style.display = show ? 'block' : 'none';
 });
@@ -801,6 +1081,18 @@ function saveWaveOverlay(){
     const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
     el.style.setProperty('--pct', ((val - min) / (max - min) * 100).toFixed(1) + '%');
   }
+});
+
+// Redraw canvases on resize (HiDPI / responsive)
+let _rzT = null;
+window.addEventListener('resize', function(){
+  if (_rzT) clearTimeout(_rzT);
+  _rzT = setTimeout(function(){
+    const n = parseInt(document.getElementById('sliderN').value);
+    const m = getMass(), L = getL();
+    drawEnergyDiagram(n, m, L);
+    drawSuperposition(animTime);
+  }, 120);
 });
 
 updateOverlayList();
@@ -846,7 +1138,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">規格化とは何ですか？また、シミュレーターで確認できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">規格化とは、全空間で波動関数の絶対値の2乗（確率密度）を積分した値が1になるよう調整することです。これは粒子が必ずどこかに存在するという確率の保存を意味します。本シミュレーターでは、表示される確率密度のグラフの下に積分値が表示され、常に1であることを確認できます。</div>
+    <div class="faq-a">規格化とは、全空間で波動関数の絶対値の2乗（確率密度）を積分した値が1になるよう調整することです。これは粒子が必ずどこかに存在するという確率の保存を意味します。本シミュレーターの確率密度グラフは規格化された|ψₙ|²を描画しており、全区間の面積が1になるよう設計されています。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -866,6 +1158,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="particle-in-box.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -927,7 +1222,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>電子（m=9.109×10⁻³¹ kg）が幅L=1.0 nmの無限井戸に閉じ込められた場合、n=2準位のエネルギーはEₙ=(n²π²ℏ²)/(2mL²)=(4×π²×(1.055×10⁻³⁴)²)/(2×9.109×10⁻³¹×(1.0×10⁻⁹)²)=6.03 eV。ド・ブロイ波長λ=h/p=h/√(2mEₙ)=0.50 nm。n=4時のエネルギー24.1 eVとの差ΔE=18.1 eVで可視光領域の遷移が実現</p>
+<p>電子（m=9.109×10⁻³¹ kg）が幅L=1.0 nmの無限井戸に閉じ込められた場合、n=2準位のエネルギーはEₙ=(n²π²ℏ²)/(2mL²)=(4×π²×(1.055×10⁻³⁴)²)/(2×9.109×10⁻³¹×(1.0×10⁻⁹)²)=6.03 eV。ド・ブロイ波長λ=2L/n=1.00 nm（箱内に整数個の半波長が収まる）。n=4時のエネルギー24.1 eVとの差ΔE=18.1 eVで可視光〜紫外領域の遷移が実現</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -937,6 +1232,16 @@ compute();
 <li>規格化条件∫|ψₙ|²dx=1の確認。n≥5で高準位への遷移確率は急減するため、実験では主にn=1,2,3状態のみ観測される傾向</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130626345?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130626345.09._SCMZZZZZZ_.jpg" alt="量子力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">量子力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

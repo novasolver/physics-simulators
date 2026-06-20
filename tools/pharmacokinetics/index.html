@@ -123,14 +123,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "薬物動態シミュレーター（1/2コンパートメントモデル）",
       "description": "1コンパートメント静注/経口・2コンパートメントモデルで血中濃度-時間曲線をシミュレート。複数回投与の蓄積・定常状態・治療域を視覚化。Cmax/Tmax/AUC/半減期を自動計算。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/pharmacokinetics.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -306,7 +306,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="slMSC" min="1" max="200" step="1" value="20" oninput="syncToNum('slMSC','mscValNum');onSlide()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4816367659?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816367659.09._SCMZZZZZZ_.jpg" alt="バイオメカニクスの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">バイオメカニクス の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -420,10 +428,18 @@ function updateSliderPct(el){
     concs.push(parseFloat(c.toFixed(4)));
   }
 
-  const Cmax = Math.max(...concs);
-  const Tmax = times[concs.indexOf(Cmax)];
-  const AUC = concs.reduce((s, c, i) => i === 0 ? s : s + (concs[i-1] + c) / 2 * dt, 0) + concs[concs.length - 1] / kel;
+  const chartCmax = Math.max(...concs);
   const F_eff = model === 'oral1' ? F : 1;
+  const AUC = F_eff * dose / CL;
+  let Cmax, Tmax;
+  if(model === 'oral1'){
+    Tmax = Math.abs(ka-kel)<1e-6 ? 1/kel : Math.log(ka/kel)/(ka-kel);
+    Tmax = Math.max(0, Tmax);
+    Cmax = concOral1(Tmax, dose, Vd, kel, ka, F);
+  }else{
+    Tmax = 0;
+    Cmax = model === 'iv2' ? concIV2(0, dose, Vd, CL) : concIV1(0, dose, Vd, kel);
+  }
   const Css_avg = F_eff * dose / (CL * tau);
 
   document.getElementById('statCmax').textContent = fmt(Cmax, 2);
@@ -433,7 +449,7 @@ function updateSliderPct(el){
   document.getElementById('statCss').textContent  = fmt(Css_avg, 2);
   document.getElementById('statTI').textContent   = fmt(MSC / MEC, 1);
 
-  drawChart(times, concs, MEC, MSC, Cmax);
+  drawChart(times, concs, MEC, MSC, chartCmax);
 }function drawChart(times, concs, MEC, MSC, Cmax){
   if (chartPKInst) chartPKInst.destroy();
   const ctx = document.getElementById('chartPK').getContext('2d');
@@ -511,10 +527,10 @@ function updateSliderPct(el){
       <div class="bub">その通り、色がついた帯の部分だ。これは「薬が効きすぎず、効かなすぎず」のちょうどいい濃度の範囲を視覚化したものだよ。下の限界が「最小有効濃度（MEC）」、上が「最大安全濃度（MSC）」。シミュレーターで「MEC」の値を変えてみると、この帯の位置が上下するのがわかる。実務では、てんかん治療薬のフェニトインなど、このウィンドウが狭い薬の投与設計でシミュレーションが活躍するんだ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">「定常状態」ってボタンもありますね。あれを押すと何が起こるんですか？</div>
+      <div class="bub">投与回数と投与間隔を変えると、定常状態に近づく様子も見られますか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">あれをオンにすると、薬を繰り返し投与した時の状態をシミュレートできるんだ。例えば1日3回の抗生物質投与を想定して、「投与回数」と「投与間隔τ（タウ）」を設定してみて。グラフがジグザグになり、その山と谷が一定の範囲に収まってくるのが「定常状態」だ。現場で多いのは、この谷濃度がMECを下回らないように、投与間隔や量を調整する作業だね。</div>
+      <div class="bub">見られるよ。例えば1日3回の抗生物質投与を想定して、「投与回数」と「投与間隔τ（タウ）」を設定してみて。グラフがジグザグになり、山と谷がだんだん一定の範囲に近づくのが「定常状態」だ。現場で多いのは、この谷濃度がMECを下回らないように、投与間隔や量を調整する作業だね。</div>
     </div>
   </div>
   <h2>よくある質問</h2>
@@ -529,7 +545,7 @@ function updateSliderPct(el){
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">治療ウィンドウ（有効濃度範囲と毒性濃度範囲）を設定するにはどうすればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">画面上の「治療ウィンドウ設定」項目で、最小有効濃度（MEC）と最大毒性濃度（MTC）の数値を直接入力してください。設定後、グラフ上に薄い色の帯で表示され、血中濃度がこの範囲内に維持されているかリアルタイムで確認できます。範囲を外れた場合はアラート表示も可能です。</div>
+    <div class="faq-a">画面上の治療ウィンドウ設定で、最小有効濃度（MEC）と最大安全濃度（MSC）の数値を直接入力してください。設定後、グラフ上に薄い色の帯で表示され、血中濃度がこの範囲内に維持されているかリアルタイムで確認できます。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">シミュレーション結果のグラフから、生物学的半減期（t1/2）を読み取ることはできますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -553,6 +569,9 @@ function updateSliderPct(el){
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="pharmacokinetics.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -608,22 +627,32 @@ function updateSliderPct(el){
 <h3>使い方ガイド</h3>
 <ol>
 <li>投与量（mg）と患者体重（kg）を入力します。例えば、アミノフィリン500mg、体重70kgの場合</li>
-<li>分布容積（L/kg）と全身クリアランス（mL/min/kg）を設定します。アミノフィリンの場合、Vd=0.5L/kg、CL=0.08mL/min/kgが標準値です</li>
+<li>分布容積（L/kg）と全身クリアランス（L/h）を設定します。例としてVd=0.5 L/kg、CL=2.85 L/hのように入力します</li>
 <li>シミュレーション実行ボタンをクリックすると、Cmax、Tmax、AUC、半減期、定常状態平均濃度が自動計算され、治療ウィンドウとの照合が表示されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>アミノフィリン500mg経口投与、体重70kg患者の場合：分布容積=35L（0.5×70）、全身クリアランス=5.6mL/min（0.08×70）と設定すると、Cmax=14.3μg/mL、Tmax=1.2時間、t₁/₂=8.5時間、AUC₀→∞=89.3μg·h/mLが算出されます。治療ウィンドウ10～20μg/mLに対し、Cmaxが治療域内であることが確認できます。</p>
+<p>アミノフィリン500mg経口投与、体重70kg患者で、Vd=35L（0.5×70）、CL=2.85L/h、ka=1.0/h、F=1.0と設定すると、単回投与統計はCmax=11.44μg/mL、Tmax=2.73時間、t₁/₂=8.51時間、AUC₀→∞=175.4μg·h/mLとなります。治療ウィンドウ10～20μg/mLに対し、初回ピークは範囲内です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
-<li>ワルファリン患者にアミノフィリンを併用する場合、クリアランスが30％低下するため、CL値を0.056mL/min/kgに修正して再計算してください</li>
+<li>ワルファリン患者にアミノフィリンを併用する場合、クリアランスが30％低下する想定なら、CLを約2.0L/hに下げて再計算してください</li>
 <li>肝機能障害時（Child-Pugh B以上）はクリアランスが50％低下するため、投与間隔を12時間から18時間に延長した上で、定常状態平均濃度が20μg/mLを超えないか確認が必須です</li>
 <li>テオフィリン血中濃度測定値がある場合、実測値とシミュレーション結果を比較し、個別パラメータの補正が可能です</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4816367659?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816367659.09._SCMZZZZZZ_.jpg" alt="バイオメカニクスの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">バイオメカニクス の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

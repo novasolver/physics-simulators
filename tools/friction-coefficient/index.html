@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "摩擦係数シミュレーター",
       "description": "材料ペアの静止・動摩擦係数と傾斜角から摩擦力・自己ロック角・滑り判定をリアルタイム計算する工学ツール。",
       "url": "https://novasolver.jp/tools/friction-coefficient.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["材料ペアプリセット6種（スチール・黄銅・木材・ゴム・テフロン・カスタム）","傾斜面アニメーション（法線力・摩擦力ベクトル表示）","摩擦力 vs 傾斜角グラフ（静止・動摩擦曲線）","自己ロック角・滑り判定・正味力の即時計算"],
       "keywords": "摩擦係数,摩擦力,静止摩擦,動摩擦,自己ロック角,傾斜面,CAEシミュレーター",
       "datePublished": "2026-04-09",
@@ -131,6 +131,25 @@ details.theory-box[open]>summary h3,details.theory-box[open]>summary h4{margin-b
 details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
+
+/* ===== v2 friction animation ===== */
+canvas#planeCanvas{background:#0a1628;}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.83rem;font-family:inherit;font-weight:600;transition:background .2s;}
+.btn:hover{background:#0056b3;}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+.btn.secondary:hover{background:var(--border);}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+.fc-modebar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.fc-mode-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.8rem;font-family:inherit;cursor:pointer;transition:all .2s;}
+.fc-mode-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.fc-statebadge{margin-left:auto;font-size:0.78rem;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(0,180,216,.15);color:var(--accent2);border:1px solid rgba(0,180,216,.3);}
+.fc-statebadge.sliding{background:rgba(231,76,60,.15);color:#e74c3c;border-color:rgba(231,76,60,.3);}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px;}
+.legend span{display:inline-flex;align-items:center;gap:5px;}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block;}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px;}
+@media(prefers-reduced-motion:reduce){.btn,.fc-mode-btn{transition:none;}}
+/* end v2 additions */
 
 </style>
 <meta property="og:type" content="article">
@@ -216,20 +235,47 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4274214591?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274214591.09._SCMZZZZZZ_.jpg" alt="土質力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">土質力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-    <div class="stat-cards">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+    <div class="stat-cards" style="grid-template-columns:repeat(4,1fr)">
       <div class="stat-card">
-        <div class="sv" id="phiCard">36.4°</div>
-        <div class="sl">摩擦角 φ</div>
+        <div class="sv" id="appliedCard">0.0 N</div>
+        <div class="sl">外力 F</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="fricCard">0.0 N</div>
+        <div class="sl">摩擦力 f</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="fsCard">68.3 N</div>
+        <div class="sl">最大静摩擦 f<sub>s,max</sub></div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="accelCard">0.00</div>
+        <div class="sl">加速度 a [m/s²]</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="nCard">92.3 N</div>
         <div class="sl">法線力 N</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="fkCard">52.6 N</div>
+        <div class="sl">動摩擦 f<sub>k</sub></div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="phiCard">36.4°</div>
+        <div class="sl">摩擦角 φ</div>
       </div>
       <div class="stat-card" id="slideCard">
         <div class="sv" id="slideVal">静止</div>
@@ -238,288 +284,487 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 平面</div><canvas id="planeCanvas" height="320"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 静止→滑り出しアニメーション</div>
+      <div class="fc-modebar">
+        <button type="button" class="fc-mode-btn active" data-mode="flat" id="fcModeFlat"><i class="fas fa-grip-lines"></i> 水平面（牽引試験）</button>
+        <button type="button" class="fc-mode-btn" data-mode="incline" id="fcModeIncline"><i class="fas fa-mountain"></i> 傾斜面</button>
+      </div>
+      <canvas id="planeCanvas" height="300" tabindex="0" role="img" aria-label="ブロックに加わる外力が静止摩擦の最大値を超えると滑り出す様子のアニメーション"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="fcPlay" onclick="fcTogglePlay()"><i class="fas fa-play"></i> 再生</button>
+        <button class="btn secondary" type="button" id="fcReplay" onclick="fcReplay()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <span class="fc-statebadge" id="fcStateBadge">静止（静摩擦）</span>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#f39c12"></i>外力 F</span>
+        <span><i class="swatch" style="background:#00b894"></i>摩擦力 f</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>法線力 N</span>
+        <span><i class="swatch" style="background:#aaa"></i>重力 W</span>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 摩擦力 vs 時間（静→動の遷移）</div>
     <canvas class="ux-chartjs-canvas" id="frictionChart" height="220"></canvas>
-  
+    </div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      $$F_f = \mu N, \quad N = mg\cos\theta$$
-      $$\phi = \arctan(\mu_s) \quad \text{（摩擦角）}$$
-      <p style="margin-top:8px;font-size:0.8rem;color:var(--muted);">θ &lt; φ なら外力なしで静止（自己ロック）。θ ≥ φ なら物体は滑落する。</p>
-    
+      $$f_{s,\max} = \mu_s N,\quad f_k = \mu_k N,\quad N = mg\cos\theta$$
+      $$\text{滑り出し: } F > \mu_s N,\qquad a = \frac{F - \mu_k N}{m}$$
+      $$\phi = \arctan(\mu_s) \quad \text{（摩擦角 / 安息角）}$$
+      <p style="margin-top:8px;font-size:0.8rem;color:var(--muted);">外力 F が最大静摩擦 μ<sub>s</sub>N を超えるまでブロックは静止し、摩擦力は F に等しく増加。超えた瞬間に動摩擦 μ<sub>k</sub>N へ落ち、ブロックは加速する。傾斜面では tan θ = μ<sub>s</sub> が安息角。</p>
+
 </div>
 </div>
 </div>
 
 <script>
+window.__FRIC_L = {
+  blockStatic:'静止（静摩擦）', blockSliding:'滑り出し（動摩擦）',
+  play:'<i class="fas fa-play"></i> 再生', pause:'<i class="fas fa-pause"></i> 一時停止',
+  fLabel:'F', fricLabel:'f', nLabel:'N', wLabel:'W',
+  hintRamp:'外力 F を増加中…', hintHold:'静止：摩擦 f が F に追従', hintBreak:'F > μsN → 滑り出し！', hintSlide:'滑走中：f = μk N（一定）',
+  chartFs:'最大静摩擦 μsN (N)', chartApplied:'外力 F (N)', chartFric:'摩擦力 f (N)',
+  chartX:'時間 t (s)', chartY:'力 (N)',
+  statStatic:'静止', statSliding:'滑走中',
+  groundHint:'水平面で外力を 0→最大まで自動で増加', inclineHint:'重力の斜面成分が摩擦を上回ると滑落'
+};
 
-const g = 9.81;
-let chart;
-
-const presets = {
+(function(){
+"use strict";
+var g = 9.81;
+var L = window.__FRIC_L || {};
+var chart = null;
+var presets = {
   ss: [0.74, 0.57], sb: [0.51, 0.44], ww: [0.40, 0.20],
   rc: [0.70, 0.50], ts: [0.04, 0.04], cu: [null, null]
 };
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function el(id){ return document.getElementById(id); }
+function gv(id){ return parseFloat(el(id).value); }
 
 function setSR(id, v, min, max){
-  const el = document.getElementById(id);
-  el.value = v;
-  const pct = ((v - min) / (max - min)) * 100;
-  el.style.setProperty('--pct', pct + '%');
-}function applyPreset(){
-  const key = document.getElementById('presetSelect').value;
-  const [ms, mk] = presets[key];
+  var e = el(id); if(!e) return;
+  e.value = v;
+  e.style.setProperty('--pct', ((v - min) / (max - min)) * 100 + '%');
+}
+
+window.applyPreset = function(){
+  var key = el('presetSelect').value;
+  var pr = presets[key]; var ms = pr[0], mk = pr[1];
   if (ms !== null) {
     setSR('musSlider', ms, 0.01, 1.5);
     setSR('mukSlider', mk, 0.01, 1.0);
-    update();
+    if(el('musNum')) el('musNum').value = ms;
+    if(el('mukNum')) el('mukNum').value = mk;
+    resetAnim(); update();
   }
-}function onSlider(name){
-  const maps = {
-    mus: ['musSlider', 'musVal', 0.01, 1.5, 2],
-    muk: ['mukSlider', 'mukVal', 0.01, 1.0, 2],
-    mass: ['massSlider', 'massVal', 0.1, 100, 1],
-    angle: ['angleSlider', 'angleVal', 0, 80, 0],
-    force: ['forceSlider', 'forceVal', 0, 500, 1]
+};
+
+window.onSlider = function(name){
+  var maps = {
+    mus: ['musSlider', 0.01, 1.5],
+    muk: ['mukSlider', 0.01, 1.0],
+    mass: ['massSlider', 0.1, 100],
+    angle: ['angleSlider', 0, 80],
+    force: ['forceSlider', 0, 500]
   };
-  const [sid, vid, min, max, dec] = maps[name];
-  const v = parseFloat(document.getElementById(sid).value);
-  const _eFCon=document.getElementById(vid);if(_eFCon){if(_eFCon.tagName==='INPUT')_eFCon.value=v.toFixed(dec);else _eFCon.textContent=v.toFixed(dec);}
-  const pct = ((v - min) / (max - min)) * 100;
-  document.getElementById(sid).style.setProperty('--pct', pct + '%');
-  // mark as custom if mus/muk changed
-  if (name === 'mus' || name === 'muk'){
-    document.getElementById('presetSelect').value = 'cu';
-  }
-  update();
-}function getValues(){
+  var m = maps[name]; var sid = m[0], min = m[1], max = m[2];
+  var v = parseFloat(el(sid).value);
+  el(sid).style.setProperty('--pct', ((v - min) / (max - min)) * 100 + '%');
+  if (name === 'mus' || name === 'muk'){ el('presetSelect').value = 'cu'; }
+  resetAnim();
+};
+
+function getValues(){
   return {
-    mus: parseFloat(document.getElementById('musSlider').value),
-    muk: parseFloat(document.getElementById('mukSlider').value),
-    m: parseFloat(document.getElementById('massSlider').value),
-    theta: parseFloat(document.getElementById('angleSlider').value),
-    F: parseFloat(document.getElementById('forceSlider').value)
+    mus: gv('musSlider'),
+    muk: gv('mukSlider'),
+    m: gv('massSlider'),
+    theta: gv('angleSlider'),
+    F: gv('forceSlider')
   };
-}function update(){
-  const {mus, muk, m, theta, F}= getValues();
-  const th = theta * Math.PI / 180;
-  const N = m * g * Math.cos(th);
-  const Wsin = m * g * Math.sin(th);
-  const FsMax = mus * N;
-  const Fk = muk * N;
-  const phi = Math.atan(mus) * 180 / Math.PI;
+}
 
-  // Determine state
-  const netDrivingForce = Wsin - F; // net force trying to slide down (positive = down slope)
-  // If F pushes up, netDrivingForce can be negative
-  const needsFriction = Math.abs(netDrivingForce); // friction needed to stay still
-  const sliding = needsFriction > FsMax;
+/* ===== Animation state ===== */
+var mode = 'flat';        // 'flat' | 'incline'
+var playing = false;
+var animId = null;
+var lastTs = 0;
+var simT = 0;             // animation clock (s)
+var blockX = 0;           // block displacement along surface (m, visual units)
+var blockV = 0;           // block velocity (m/s)
+var rampDur = 2.6;        // seconds to ramp applied force from 0 to Fmax (flat mode)
+var Fmax = 0;             // peak applied force used by ramp
+var slipT = -1;           // time of slip (for chart marker)
+var history = [];         // {t, applied, fric, fsmax} for chart
+var phase = 'ramp';       // ramp -> slide
 
-  let Fnet;
-  if (sliding){
-    // kinetic friction opposes motion
-    const motionDir = netDrivingForce > 0 ? 1 : -1;
-    Fnet = netDrivingForce - motionDir * Fk; // net along slope
-  }else{
-    Fnet = 0;
-  }document.getElementById('phiCard').textContent = phi.toFixed(1) + '°';
-  document.getElementById('nCard').textContent = N.toFixed(1) + ' N';
-  (document.getElementById('fsCard') || {}).textContent = FsMax.toFixed(1) + ' N';
-  (document.getElementById('fkCard') || {}).textContent = Fk.toFixed(1) + ' N';
-  (document.getElementById('fnetCard') || {}).textContent = Fnet.toFixed(1) + ' N';
+function physics(){
+  var v = getValues();
+  var th = v.theta * Math.PI/180;
+  var N = mode === 'incline' ? v.m*g*Math.cos(th) : v.m*g;  // flat: N = mg
+  var fsMax = v.mus * N;
+  var fk = v.muk * N;
+  var phi = Math.atan(v.mus) * 180/Math.PI;
+  var wSlope = mode === 'incline' ? v.m*g*Math.sin(th) : 0;  // gravity component down slope
+  return {mus:v.mus, muk:v.muk, m:v.m, theta:v.theta, th:th, Fslider:v.F,
+          N:N, fsMax:fsMax, fk:fk, phi:phi, wSlope:wSlope};
+}
 
-  const slideCard = document.getElementById('slideCard');
-  const slideVal = document.getElementById('slideVal');
-  if (sliding){
-    slideVal.textContent = '滑落中';
-    slideCard.className = 'stat-card warn';
-  }else{
-    slideVal.textContent = '静止';
-    slideCard.className = 'stat-card ok';
+// Current applied force as a function of sim time.
+// Flat mode: auto-ramp 0 -> Fmax. Incline mode: gravity drives, slider F assists up-slope.
+function appliedAt(p, t){
+  if (mode === 'flat'){
+    // ramp linearly; Fmax chosen to exceed fsMax so the user always sees the break.
+    return Math.min(Fmax, Fmax * (t / rampDur));
+  }
+  return p.Fslider; // incline: slider is constant assist up the slope
+}
+
+function resetAnim(){
+  var p = physics();
+  // ensure the ramp peak clearly exceeds the static threshold so transition is visible
+  Fmax = Math.max(p.fsMax * 1.6, p.fsMax + 20);
+  simT = 0; blockX = 0; blockV = 0; slipT = -1; phase = 'ramp';
+  history = [];
+  setBadge(false);
+  update();
+}
+
+window.fcReplay = function(){ resetAnim(); if(!playing) startPlay(); };
+
+window.fcTogglePlay = function(){ playing ? stopPlay() : startPlay(); };
+
+function startPlay(){
+  if (history.length && phase === 'done'){ resetAnim(); }
+  playing = true;
+  if(el('fcPlay')) el('fcPlay').innerHTML = L.pause || 'Pause';
+  lastTs = 0;
+  if (reduceMotion){ // jump straight to a representative slid frame
+    simT = rampDur + 1.4; stepTo(simT); render(); stopPlay(); return;
+  }
+  animId = requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing = false;
+  if(el('fcPlay')) el('fcPlay').innerHTML = L.play || 'Play';
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+}
+
+function setBadge(sliding){
+  var b = el('fcStateBadge'); if(!b) return;
+  b.textContent = sliding ? (L.blockSliding||'Sliding') : (L.blockStatic||'Static');
+  b.className = 'fc-statebadge' + (sliding ? ' sliding' : '');
+}
+
+// advance internal state to absolute time t (used by loop with small dt)
+function stepTo(t){
+  var p = physics();
+  var dt, prev = simT;
+  // integrate from prev to t in small steps for stable kinematics
+  var steps = Math.max(1, Math.ceil((t - prev)/0.016));
+  if (t < prev){ // rewind: recompute from 0
+    blockX = 0; blockV = 0; slipT = -1; phase='ramp'; prev = 0; history=[];
+    steps = Math.max(1, Math.ceil(t/0.016));
+  }
+  for (var i=0;i<steps;i++){
+    var tt = prev + (t - prev)*(i+1)/steps;
+    var ddt = (t - prev)/steps;
+    advance(p, tt, ddt);
+  }
+  simT = t;
+}
+
+function advance(p, t, dt){
+  var applied = appliedAt(p, t);
+  var sliding, fric, a;
+  if (mode === 'flat'){
+    if (phase !== 'slide'){
+      if (applied > p.fsMax){ phase='slide'; if(slipT<0) slipT = t; }
+    }
+    if (phase === 'slide'){
+      fric = p.fk; sliding = true;
+      a = (applied - p.fk)/p.m;          // F - μk N = m a
+      if (a < 0 && blockV <= 0){ a = 0; }
+      blockV += a*dt; if (blockV < 0) blockV = 0;
+      blockX += blockV*dt;
+    } else {
+      fric = applied; sliding = false; a = 0; blockV = 0;
+    }
+  } else {
+    // incline: net down-slope driving = wSlope - appliedUp; friction resists motion
+    var drive = p.wSlope - applied;        // + => tends to slide down
+    var need = Math.abs(drive);
+    if (phase !== 'slide' && need > p.fsMax){ phase='slide'; if(slipT<0) slipT=t; }
+    if (phase === 'slide'){
+      sliding = true; fric = p.fk;
+      var dir = drive > 0 ? 1 : -1;        // motion direction down(+)/up(-)
+      a = (drive - dir*p.fk)/p.m;
+      blockV += a*dt;                       // signed (down-slope +)
+      blockX += blockV*dt;
+    } else {
+      sliding = false; fric = Math.min(need, p.fsMax); a = 0; blockV = 0;
+    }
+  }
+  // record for chart (downsample)
+  if (!history.length || t - history[history.length-1].t >= 0.03){
+    history.push({t:t, applied:applied, fric:fric, fsmax:p.fsMax, sliding:sliding});
+  }
+  window.__fcFrame = {applied:applied, fric:fric, a:a, sliding:sliding, p:p, blockX:blockX, blockV:blockV, t:t};
+  return sliding;
+}
+
+function loop(ts){
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dtReal = Math.min(0.05, (ts - lastTs)/1000);
+  lastTs = ts;
+  var t = simT + dtReal;
+  var endT = (mode==='flat') ? rampDur + 2.4 : rampDur + 3.0;
+  if (t >= endT){ t = endT; phase = (phase==='slide')?'slide':phase; }
+  var p = physics();
+  advance(p, t, dtReal);
+  simT = t;
+  render();
+  if (t >= endT){ phase = 'done'; stopPlay(); return; }
+  animId = requestAnimationFrame(loop);
+}
+
+/* ===== Numeric readouts ===== */
+function update(){
+  var p = physics();
+  var fr = window.__fcFrame;
+  var applied, fric, a, sliding;
+  if (fr && fr.t === simT){
+    applied = fr.applied; fric = fr.fric; a = fr.a; sliding = fr.sliding;
+  } else {
+    // static snapshot (sim at rest)
+    applied = appliedAt(p, simT);
+    if (mode === 'flat'){
+      sliding = applied > p.fsMax;
+      fric = sliding ? p.fk : applied;
+      a = sliding ? (applied - p.fk)/p.m : 0;
+    } else {
+      var drive = p.wSlope - applied; var need = Math.abs(drive);
+      sliding = need > p.fsMax;
+      fric = sliding ? p.fk : Math.min(need, p.fsMax);
+      a = sliding ? (drive - (drive>0?1:-1)*p.fk)/p.m : 0;
+    }
+  }
+  setText('appliedCard', applied.toFixed(1) + ' N');
+  setText('fricCard', fric.toFixed(1) + ' N');
+  setText('fsCard', p.fsMax.toFixed(1) + ' N');
+  setText('fkCard', p.fk.toFixed(1) + ' N');
+  setText('nCard', p.N.toFixed(1) + ' N');
+  setText('accelCard', Math.abs(a).toFixed(2));
+  setText('phiCard', p.phi.toFixed(1) + '°');
+  var sc = el('slideCard'), sv = el('slideVal');
+  if (sv){
+    sv.textContent = sliding ? (L.statSliding||'Sliding') : (L.statStatic||'Static');
+    sc.className = 'stat-card ' + (sliding ? 'warn' : 'ok');
+  }
+  setBadge(sliding);
+  drawScene(p);
+  updateChart(p);
+}
+function setText(id, t){ var e = el(id); if(e) e.textContent = t; }
+
+/* ===== Canvas scene ===== */
+function drawArrow(ctx, x1, y1, x2, y2, color, label){
+  var dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy);
+  if (len < 3) return;
+  ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.4;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  var ang = Math.atan2(dy, dx);
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2 - 10*Math.cos(ang-0.4), y2 - 10*Math.sin(ang-0.4));
+  ctx.lineTo(x2 - 10*Math.cos(ang+0.4), y2 - 10*Math.sin(ang+0.4));
+  ctx.closePath(); ctx.fill();
+  if (label){ ctx.font = 'bold 11px Roboto Mono, monospace';
+    ctx.fillText(label, x2 + 5*Math.cos(ang), y2 + 5*Math.sin(ang) - 4); }
+  ctx.restore();
+}
+
+function drawScene(p){
+  var canvas = el('planeCanvas'); if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  var W = canvas.offsetWidth || 600, H = 300;
+  canvas.width = Math.round(W*dpr); canvas.height = Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+  var fr = window.__fcFrame || {};
+  var applied = (fr.t===simT? fr.applied : appliedAt(p, simT));
+  var sliding = (fr.t===simT? fr.sliding : (mode==='flat'? applied>p.fsMax : Math.abs(p.wSlope-applied)>p.fsMax));
+  var fric = (fr.t===simT? fr.fric : (sliding? p.fk : (mode==='flat'? applied : Math.min(Math.abs(p.wSlope-applied), p.fsMax))));
+  var fScale = 70 / Math.max(p.fsMax*1.6, p.m*g*0.5, 40); // px per N, normalized
+
+  if (mode === 'flat'){
+    var groundY = H*0.66;
+    // ground
+    ctx.strokeStyle = 'rgba(120,200,120,0.55)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(20, groundY); ctx.lineTo(W-20, groundY); ctx.stroke();
+    // hatching
+    ctx.strokeStyle = 'rgba(120,200,120,0.22)'; ctx.lineWidth = 1;
+    for (var x=24; x<W-20; x+=16){ ctx.beginPath(); ctx.moveTo(x, groundY); ctx.lineTo(x-10, groundY+10); ctx.stroke(); }
+    var bsz = 56;
+    var disp = Math.min((fr.blockX||blockX)*40, W - 120 - 90); // map metres to px, clamp
+    var bx = 90 + (disp>0?disp:0);
+    var by = groundY - bsz/2;
+    // block
+    ctx.save();
+    ctx.fillStyle = sliding ? '#e74c3c' : '#007BFF';
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx-bsz/2, by-bsz/2, bsz, bsz, 6) : ctx.rect(bx-bsz/2, by-bsz/2, bsz, bsz);
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='center';
+    ctx.fillText('m', bx, by+4); ctx.textAlign='left';
+    ctx.restore();
+    var cx = bx, cy = by;
+    // weight (down)
+    drawArrow(ctx, cx, cy, cx, cy + 46, '#aaa', L.wLabel||'W');
+    // normal (up)
+    drawArrow(ctx, cx, cy, cx, cy - 46, '#00B4D8', L.nLabel||'N');
+    // applied force (right)
+    if (applied > 0.5) drawArrow(ctx, cx+bsz/2, cy, cx+bsz/2 + Math.min(applied*fScale,150), cy, '#f39c12', L.fLabel||'F');
+    // friction (left, opposes)
+    if (fric > 0.5) drawArrow(ctx, cx-bsz/2, cy, cx-bsz/2 - Math.min(fric*fScale,150), cy, '#00b894', L.fricLabel||'f');
+    // hint
+    var hint = sliding ? (L.hintSlide) : (applied < p.fsMax*0.02 ? L.hintRamp : L.hintHold);
+    if (slipT>=0 && simT-slipT < 0.5 && sliding) hint = L.hintBreak;
+    ctx.fillStyle = sliding ? '#ff8a80' : '#7fd4ff'; ctx.font='bold 12px Noto Sans JP, sans-serif'; ctx.textAlign='center';
+    ctx.fillText(hint||'', W/2, 26); ctx.textAlign='left';
+  } else {
+    // incline
+    var th = p.th;
+    var ox = W*0.16, oy = H*0.82;
+    var baseLen = Math.min(W*0.7, (H*0.7)/Math.max(Math.sin(th),0.001));
+    baseLen = Math.min(baseLen, W*0.72);
+    var ex = ox + baseLen*Math.cos(th), ey = oy - baseLen*Math.sin(th);
+    // plane
+    ctx.strokeStyle='#9fb3c8'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ex,ey); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ex,ey); ctx.lineTo(ex,oy); ctx.closePath();
+    ctx.fillStyle='rgba(0,180,216,0.08)'; ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1; ctx.stroke();
+    // ground
+    ctx.strokeStyle='rgba(120,200,120,0.5)'; ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ex,oy); ctx.stroke();
+    // angle label
+    ctx.fillStyle='#7fd4ff'; ctx.font='bold 12px Roboto Mono';
+    ctx.fillText('θ='+p.theta.toFixed(0)+'°', ox+34, oy-8);
+    // block position along slope
+    var slope = Math.min(0.55 + (fr.blockX!==undefined?fr.blockX:blockX)*0.04, 0.82);
+    if (slope < 0.12) slope = 0.12;
+    var bcx = ox + baseLen*slope*Math.cos(th);
+    var bcy = oy - baseLen*slope*Math.sin(th);
+    var bs = 40;
+    var nrmx = Math.sin(th), nrmy = Math.cos(th);          // outward normal (px: up-left)
+    var alx = Math.cos(th), aly = -Math.sin(th);           // up-slope unit (px)
+    ctx.save();
+    ctx.translate(bcx - nrmx*bs/2, bcy - nrmy*bs/2);
+    ctx.rotate(-th);
+    ctx.fillStyle = sliding ? '#e74c3c' : '#007BFF';
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-bs/2,-bs/2,bs,bs,5) : ctx.rect(-bs/2,-bs/2,bs,bs); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.restore();
+    var px = bcx - nrmx*bs/2, py = bcy - nrmy*bs/2;
+    // normal (along outward normal: up-left)
+    drawArrow(ctx, px, py, px - nrmx*Math.min(p.N*fScale,60), py - nrmy*Math.min(p.N*fScale,60), '#00B4D8', L.nLabel||'N');
+    // weight (down)
+    drawArrow(ctx, px, py, px, py + Math.min(p.m*g*fScale,60), '#aaa', L.wLabel||'W');
+    // friction along slope (opposes net motion)
+    var drive = p.wSlope - applied;
+    var fdir = drive>0 ? 1 : -1; // +down => friction points up-slope
+    drawArrow(ctx, px, py, px + alx*fdir*Math.min(fric*fScale,80), py + aly*fdir*Math.min(fric*fScale,80), '#00b894', L.fricLabel||'f');
+    // applied force up-slope
+    if (applied > 0.5) drawArrow(ctx, px, py, px + alx*Math.min(applied*fScale,80), py + aly*Math.min(applied*fScale,80), '#f39c12', L.fLabel||'F');
   }
 
-  drawPlane(theta, mus, muk, m, N, FsMax, Fk, sliding, F);
-  updateChart(mus, muk, m);
-}function drawPlane(theta, mus, muk, m, N, FsMax, Fk, sliding, F){
-  const canvas = document.getElementById('planeCanvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-  canvas.height = 320 * window.devicePixelRatio;
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  const W = canvas.offsetWidth, H = 320;
-  ctx.clearRect(0, 0, W, H);
+  // state legend top-right
+  ctx.font = 'bold 12px Roboto Mono'; ctx.textAlign='right';
+  ctx.fillStyle = sliding ? '#ff8a80' : '#7fd4ff';
+  ctx.fillText('t = ' + simT.toFixed(2) + ' s', W-12, H-12);
+  ctx.textAlign='left';
+}
 
-  const th = theta * Math.PI / 180;
-  const cx = W * 0.55, cy = H * 0.72;
-  const len = Math.min(W, H) * 0.6;
-
-  // Draw inclined plane
-  ctx.save();
-  ctx.translate(cx, cy);
-  const px = -len * Math.cos(th), py = len * Math.sin(th);
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(px, -py);
-  ctx.strokeStyle = '#334';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // Surface fill
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(px, -py);
-  ctx.lineTo(px, 0);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(0,31,63,0.08)';
-  ctx.fill();
-  ctx.strokeStyle = '#aab';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Ground line
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(px, 0);
-  ctx.strokeStyle = '#aab';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Block
-  const bx = px * 0.55, by = -py * 0.55;
-  const bsize = 28;
-  ctx.save();
-  ctx.translate(bx, by);
-  ctx.rotate(-th);
-  ctx.fillStyle = sliding ? '#e74c3c' : '#007BFF';
-  ctx.beginPath();
-  ctx.roundRect(-bsize/2, -bsize/2, bsize, bsize, 4);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.restore();
-
-  // Normal force arrow (perpendicular to plane)
-  const nScale = Math.min(N / (m * 9.81) * 0.5, 0.7) * 70;
-  const nx = Math.sin(th) * nScale, ny = Math.cos(th) * nScale;
-  drawArrow(ctx, bx, by, bx + nx, by - ny, '#00B4D8', '法線力 N');
-
-  // Weight component along plane
-  const wScale = 50;
-  const wx = -Math.cos(th) * m * 9.81 * Math.sin(th) / (m * 9.81) * wScale;
-  const wy = Math.sin(th) * m * 9.81 * Math.sin(th) / (m * 9.81) * wScale;
-  // Draw gravity down
-  drawArrow(ctx, bx, by, bx, by + 50, '#aaa', '');
-
-  // Friction force arrow (along plane, upward)
-  const fric = sliding ? Fk : Math.min(FsMax, m * 9.81 * Math.sin(th * 1));
-  const fricScale = Math.min(fric / (m * 9.81 + 1), 1) * 60;
-  const ffx = Math.cos(th) * fricScale, ffy = Math.sin(th) * fricScale;
-  drawArrow(ctx, bx, by, bx + ffx, by - ffy, '#00b894', 'F_f');
-
-  // Applied force arrow (up the slope)
-  if (F > 0) {
-    const appScale = Math.min(F / (m * 9.81 + 1), 1.2) * 50;
-    const apx = -Math.cos(th) * appScale, apy = Math.sin(th) * appScale;
-    drawArrow(ctx, bx, by, bx + apx, by + apy, '#f39c12', 'F');
+/* ===== Chart: friction vs time ===== */
+function updateChart(p){
+  if (typeof Chart === 'undefined') return;
+  // synth a smooth curve over the ramp window so chart is meaningful even before play
+  var labels = [], appliedD = [], fricD = [], fsD = [];
+  var dur = (mode==='flat') ? rampDur + 1.8 : rampDur + 2.0;
+  var N = 90;
+  for (var i=0;i<=N;i++){
+    var t = dur*i/N;
+    var ap = appliedAt(p, t);
+    var sl, fr;
+    if (mode==='flat'){ sl = ap > p.fsMax; fr = sl ? p.fk : ap; }
+    else { var dr = Math.abs(p.wSlope - ap); sl = dr > p.fsMax; fr = sl ? p.fk : Math.min(dr,p.fsMax); }
+    labels.push(t.toFixed(2));
+    appliedD.push(+ap.toFixed(2));
+    fricD.push(+fr.toFixed(2));
+    fsD.push(+p.fsMax.toFixed(2));
   }
-
-  // Angle annotation
-  ctx.beginPath();
-  ctx.arc(0, 0, 30, -th, 0);
-  ctx.strokeStyle = '#007BFF';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  ctx.fillStyle = '#007BFF';
-  ctx.font = `bold 11px Roboto Mono, monospace`;
-  ctx.fillText('θ=' + theta + '°', 22, -8);
-
-  ctx.restore();
-
-  // Legend
-  ctx.font = '11px Noto Sans JP, sans-serif';
-  ctx.fillStyle = sliding ? '#e74c3c' : '#007BFF';
-  ctx.fillText(sliding ? '▶ 滑落中（動摩擦）' : '■ 静止（静摩擦）', 12, 16);
-}function drawArrow(ctx, x1, y1, x2, y2, color, label){
-  const dx = x2 - x1, dy = y2 - y1;
-  const len = Math.sqrt(dx*dx + dy*dy);
-  if (len < 4) return;
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-  // arrowhead
-  const angle = Math.atan2(dy, dx);
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - 9*Math.cos(angle-0.4), y2 - 9*Math.sin(angle-0.4));
-  ctx.lineTo(x2 - 9*Math.cos(angle+0.4), y2 - 9*Math.sin(angle+0.4));
-  ctx.closePath();
-  ctx.fill();
-  if (label) {
-    ctx.font = 'bold 10px Roboto Mono, monospace';
-    ctx.fillText(label, x2 + 4, y2 - 4);
-  }
-  ctx.restore();
-}function updateChart(mus, muk, m){
-  const angles = [];
-  const fsData = [], fkData = [];
-  for (let a = 0; a <= 80; a += 2) {
-    const th = a * Math.PI / 180;
-    const N = m * g * Math.cos(th);
-    angles.push(a);
-    fsData.push(+(mus * N).toFixed(2));
-    fkData.push(+(muk * N).toFixed(2));
-  }// Mark critical angle
-  const phi = Math.atan(mus) * 180 / Math.PI;
-
   if (chart){
-    chart.data.labels = angles;
-    chart.data.datasets[0].data = fsData;
-    chart.data.datasets[1].data = fkData;
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = appliedD;
+    chart.data.datasets[1].data = fricD;
+    chart.data.datasets[2].data = fsD;
     chart.update('none');
-  }else{
-    const ctx2 = document.getElementById('frictionChart').getContext('2d');
+  } else {
+    var ctx2 = el('frictionChart').getContext('2d');
     chart = new Chart(ctx2, {
-      type: 'line',
-      data: {
-        labels: angles,
-        datasets: [
-          { label: '最大静摩擦力 Fs_max (N)', data: fsData, borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,.1)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0 },{ label: '動摩擦力 Fk (N)', data: fkData, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,.07)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0 }
-        ]
-      },
-      options:{
-        responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,plugins: {
-          legend: { position: 'top', labels: { font: { size: 11 } } },
-          tooltip:{ mode: 'index', intersect: false }
-        },
-        scales:{
-          x: { title: { display: true, text: '傾斜角 θ (°)', font: { size: 11 } }, ticks:{ maxTicksLimit: 9 } },
-          y:{ title: { display: true, text: '摩擦力 (N)', font: { size: 11 } }, beginAtZero: true }
-        }
+      type:'line',
+      data:{ labels:labels, datasets:[
+        { label: L.chartApplied||'Applied F', data:appliedD, borderColor:'#f39c12', backgroundColor:'rgba(243,156,18,.08)', borderWidth:2, fill:false, tension:0, pointRadius:0 },
+        { label: L.chartFric||'Friction f', data:fricD, borderColor:'#00b894', backgroundColor:'rgba(0,184,148,.12)', borderWidth:2.4, fill:true, tension:0, pointRadius:0 },
+        { label: L.chartFs||'Max static', data:fsD, borderColor:'#e74c3c', borderDash:[6,4], borderWidth:1.5, fill:false, tension:0, pointRadius:0 }
+      ]},
+      options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:100,
+        plugins:{ legend:{ position:'top', labels:{ font:{size:11} } }, tooltip:{ mode:'index', intersect:false } },
+        scales:{ x:{ title:{ display:true, text:L.chartX||'time (s)', font:{size:11} }, ticks:{ maxTicksLimit:9 } },
+                 y:{ title:{ display:true, text:L.chartY||'Force (N)', font:{size:11} }, beginAtZero:true } }
       }
     });
   }
-}// Init sliders visual
-['musSlider','mukSlider','massSlider','angleSlider','forceSlider'].forEach(id =>{
-  const el = document.getElementById(id);
-  const pct = ((parseFloat(el.value) - parseFloat(el.min)) / (parseFloat(el.max) - parseFloat(el.min))) * 100;
-  el.style.setProperty('--pct', pct + '%');
+}
+
+/* ===== Mode buttons ===== */
+function setMode(m){
+  mode = m;
+  el('fcModeFlat').className = 'fc-mode-btn' + (m==='flat'?' active':'');
+  el('fcModeIncline').className = 'fc-mode-btn' + (m==='incline'?' active':'');
+  stopPlay();
+  resetAnim();
+}
+
+/* ===== Number input sync (param-edit fallback) ===== */
+['mus','muk','mass','angle','force'].forEach(function(name){
+  var sid = name==='mus'?'musSlider':name==='muk'?'mukSlider':name==='mass'?'massSlider':name==='angle'?'angleSlider':'forceSlider';
 });
 
-update();
-window.addEventListener('resize', () =>{
-  const {mus,muk,m,theta,F} = getValues();
-  const th = theta * Math.PI / 180;
-  const N = m * g * Math.cos(th);
-  drawPlane(theta, mus, muk, m, N, mus*N, muk*N, (m*g*Math.sin(th) - F) > mus*N, F);
+/* ===== Init ===== */
+['musSlider','mukSlider','massSlider','angleSlider','forceSlider'].forEach(function(id){
+  var e = el(id); if(!e) return;
+  e.style.setProperty('--pct', ((parseFloat(e.value)-parseFloat(e.min))/(parseFloat(e.max)-parseFloat(e.min)))*100 + '%');
 });
+if (el('fcModeFlat')) el('fcModeFlat').addEventListener('click', function(){ setMode('flat'); });
+if (el('fcModeIncline')) el('fcModeIncline').addEventListener('click', function(){ setMode('incline'); });
+
+// re-render on number-input edits too
+['musNum','mukNum','massNum','angleNum','forceNum'].forEach(function(id){
+  var e = el(id); if(!e) return;
+  e.addEventListener('input', function(){ el('presetSelect') && (['musNum','mukNum'].indexOf(id)>=0) && (el('presetSelect').value='cu'); resetAnim(); });
+});
+
+window.addEventListener('resize', function(){ drawScene(physics()); });
+
+resetAnim();
+})();
 </script>
 
 <section class="explanation">
@@ -581,6 +826,9 @@ window.addEventListener('resize', () =>{
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="friction-coefficient.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -634,8 +882,8 @@ window.addEventListener('resize', () =>{
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>材料ペアを選択します。スチール・ゴム・テフロンなどのプリセットから選ぶか、静止摩擦係数(μs)と動摩擦係数(μk)を直接入力してください。テフロンとスチールの組み合わせではμs=0.04、μk=0.03となります。</li>
-<li>傾斜角スライダーで0°から90°の範囲を設定し、物体の質量(1kg～100kg)を入力します。</li>
+<li>材料ペアを選択します。スチール・ゴム・テフロンなどのプリセットから選ぶか、静止摩擦係数(μs)と動摩擦係数(μk)を直接入力してください。テフロンとスチールの組み合わせではμs=0.04、μk=0.04となります。</li>
+<li>傾斜角スライダーで0°から80°の範囲を設定し、物体の質量(0.1kg～100kg)を入力します。</li>
 <li>シミュレーターが法線力N、摩擦角φ、および滑り判定(静止/動摩擦/自己ロック)をリアルタイム計算・表示します。</li>
 </ol>
 </div>
@@ -651,6 +899,16 @@ window.addEventListener('resize', () =>{
 <li>湿度や温度変化により、ゴム・テフロン材はμが±0.05変動する場合があります。安全設計では最悪値を想定してください。</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4274214591?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274214591.09._SCMZZZZZZ_.jpg" alt="土質力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">土質力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

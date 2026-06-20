@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "物質拡散シミュレーター",
       "description": "1次元Fick拡散方程式の厳密解（erfc関数）とArrheniusモデルによる温度依存性を可視化。鋼中炭素・シリコン中酸素などのプリセット材料で実務的な浸透計算が可能。",
       "url": "https://novasolver.jp/tools/diffusion-mass.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Fick拡散方程式の厳密解（erfc）", "Arrheniusモデルによる温度依存D(T)", "鋼中炭素・シリコン中酸素プリセット", "浸透深さ・到達時間の自動計算"],
       "keywords": "物質拡散,Fick則,拡散係数,Arrhenius,浸透深さ,浸炭,CAEシミュレーター",
       "datePublished": "2026-04-09",
@@ -75,7 +75,7 @@
         },{
           "@type": "Question",
           "name": "鋼中炭素と半導体（シリコン中酸素）では拡散係数はどれくらい違いますか？",
-          "acceptedAnswer": {"@type": "Answer", "text": "鋼中炭素のDは900℃で約10⁻¹¹ m²/sオーダーです。シリコン中酸素は1000℃で約10⁻¹⁹ m²/sオーダーと極めて小さく、半導体プロセスでは非常に長い時間や高温が必要です。このツールのプリセットで両者を比較できます。"}
+          "acceptedAnswer": {"@type": "Answer", "text": "鋼中炭素のDは900℃で約10⁻¹¹ m²/sオーダーです。シリコン中酸素は本ツールのプリセット（D₀=1.4×10⁻³, Q=300 kJ/mol）では1000℃で約10⁻¹⁶ m²/sと小さく、半導体プロセスでは非常に長い時間や高温が必要です。このツールのプリセットで両者を比較できます。"}
         }
       ]
     },{
@@ -224,9 +224,28 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">統計サマリー</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4759820477?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4759820477.09._SCMZZZZZZ_.jpg" alt="化学工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">化学工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 膜を通る定常拡散 — 分子が濃度勾配を下る</div>
+      <canvas id="filmCanvas" height="300" role="img" aria-label="膜を通る物質拡散のアニメーション。高濃度側から低濃度側へ分子がランダムウォークで移動し、定常状態の直線濃度プロファイルとフラックス矢印を表示します。"></canvas>
+      <div class="stat-cards" style="grid-template-columns:1fr 1fr 1fr 1fr;margin-top:12px">
+        <div class="stat-card"><div class="sv" id="scFlux">—</div><div class="sl">モル流束 N (mol/m²·s)</div></div>
+        <div class="stat-card"><div class="sv" id="scGrad">—</div><div class="sl">勾配 dC/dx (mol/m⁴)</div></div>
+        <div class="stat-card"><div class="sv" id="scDlive">—</div><div class="sl">拡散係数 D (m²/s)</div></div>
+        <div class="stat-card"><div class="sv" id="scRate">—</div><div class="sl">透過率 N·A (mol/s)</div></div>
+      </div>
+      <p style="font-size:.74rem;color:var(--muted);margin-top:8px">Fickの第1法則 $N=-D\,\dfrac{dC}{dx}$。定常膜では $N=D\,\dfrac{C_1-C_2}{L}$。矢印の長さ ∝ フラックス。左の高濃度側から右の低濃度側へ正味のドリフトが見えます。</p>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="scD">—</div><div class="sl">D (m²/s)</div></div>
@@ -253,6 +272,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 
 <script>
+(function(){
+"use strict";
 
 const R_gas = 8.314;
 
@@ -271,15 +292,18 @@ function erfc(x) {
 
 let currentPreset = 'steel';
 
-function setPreset(name){
+window.setPreset = function setPreset(name){
   currentPreset = name;
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (window.event && window.event.target) window.event.target.classList.add('active');
   const p = presets[name];
   document.getElementById('slD0exp').value = p.D0exp;
   document.getElementById('slQ').value = p.Q;
+  document.getElementById('slD0expNum').value = p.D0exp;
+  document.getElementById('valQ').value = p.Q;
   update();
-}function sliderPct(el){
+};
+function sliderPct(el){
   const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
   el.style.setProperty('--pct', ((val - min) / (max - min) * 100) + '%');
 }let chartConc = null, chartArr = null;
@@ -407,10 +431,183 @@ function initCharts(){
     }
   ];
   chartArr.update();
-}window.addEventListener('load', () =>{
+
+  // feed the live film-diffusion animation with current D and boundary state
+  film.setState(D, C0, xMaxMm);
+}
+window.update = update;
+
+/* ===== Steady-state film diffusion animation (Fick's 1st law) ===== */
+/* N = -D dC/dx ; for a film of thickness L with C1 at x=0, C2 at x=L:
+   steady linear profile C(x)=C1-(C1-C2)x/L, flux N = D(C1-C2)/L. */
+const film = (function(){
+  const canvas = document.getElementById('filmCanvas');
+  if (!canvas) return { setState: function(){}, start: function(){} };
+  const ctx = canvas.getContext('2d');
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let cssW = 0, cssH = 0;
+  function resize(){
+    const rect = canvas.parentElement.getBoundingClientRect();
+    cssW = Math.max(280, Math.floor(rect.width - 44));
+    cssH = 300;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // model state (SI). C2 fixed at 0 (low side) for clarity.
+  let D = 9.5e-12, C1 = 1000, L = 0.005;
+  // normalized hop speed for animation: faster D => faster visible drift
+  let driftNorm = 0.35;      // mean rightward (down-gradient) drift per frame, px
+  const A_film = 1e-4;       // assumed film area for transfer-rate readout (m^2, 1 cm^2)
+
+  // particles random-walking inside the film band
+  const particles = [];
+  let layout = null;
+
+  function computeLayout(){
+    const padL = 70, padR = 26, padT = 22, padB = 40;
+    const x0 = padL, x1 = cssW - padR;        // film left/right (x=0..L)
+    const yTop = padT, yBot = cssH - padB;
+    return { padL, padR, padT, padB, x0, x1, yTop, yBot, w: x1 - x0, h: yBot - yTop };
+  }
+
+  function seedParticles(){
+    particles.length = 0;
+    const lay = layout || computeLayout();
+    // number of particles ~ proportional to C1 (density), capped
+    const n = Math.max(40, Math.min(220, Math.round(C1 / 8)));
+    for (let i = 0; i < n; i++){
+      // bias initial x toward left (high concentration) using triangular dist
+      const u = Math.min(Math.random(), Math.random());
+      particles.push({
+        x: lay.x0 + u * lay.w,
+        y: lay.yTop + 6 + Math.random() * (lay.h - 12)
+      });
+    }
+  }
+
+  function setState(D_, C1_, L_mm){
+    D = D_; C1 = C1_; L = Math.max(1e-4, L_mm / 1000);
+    // map D (1e-16..1e-8 typical) to a visible drift speed
+    const logD = Math.log10(Math.max(D, 1e-20));
+    driftNorm = Math.max(0.04, Math.min(1.4, (logD + 16) * 0.16));
+    // readouts (Fick's 1st law, C2 = 0)
+    const grad = -(C1 - 0) / L;          // dC/dx  (mol/m^4)
+    const N = -D * grad;                 // = D(C1-C2)/L  (mol/m^2/s)
+    setTxt('scFlux', N.toExponential(2));
+    setTxt('scGrad', grad.toExponential(2));
+    setTxt('scDlive', D.toExponential(2));
+    setTxt('scRate', (N * A_film).toExponential(2));
+    if (!particles.length) seedParticles();
+  }
+  function setTxt(id, v){ const e = document.getElementById(id); if (e) e.textContent = v; }
+
+  function concAt(fx){ // fx in [0,1] across film; linear steady profile, C2=0
+    return C1 * (1 - fx);
+  }
+  function concColor(c){
+    const t = Math.max(0, Math.min(1, c / Math.max(C1, 1)));
+    // high conc = warm (orange), low = cool (blue)
+    const r = Math.round(40 + t * 200), g = Math.round(110 + (1 - t) * 40), b = Math.round(220 - t * 150);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function drawFrame(animate){
+    resize();
+    layout = computeLayout();
+    const lay = layout;
+    ctx.clearRect(0, 0, cssW, cssH);
+    ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, cssW, cssH);
+
+    // concentration color strip (background of film)
+    const STRIP = 60;
+    for (let i = 0; i < STRIP; i++){
+      const fx = i / (STRIP - 1);
+      ctx.fillStyle = concColor(concAt(fx));
+      ctx.globalAlpha = 0.22;
+      ctx.fillRect(lay.x0 + fx * lay.w, lay.yTop, lay.w / STRIP + 1, lay.h);
+    }
+    ctx.globalAlpha = 1;
+
+    // film border + reservoirs
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lay.x0, lay.yTop, lay.w, lay.h);
+    ctx.fillStyle = 'rgba(230,120,40,0.18)'; ctx.fillRect(lay.x0 - 26, lay.yTop, 26, lay.h);
+    ctx.fillStyle = 'rgba(40,120,220,0.18)'; ctx.fillRect(lay.x1, lay.yTop, 26, lay.h);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '11px Noto Sans JP'; ctx.textAlign = 'center';
+    ctx.fillText('高濃度 C₁', lay.x0, lay.yTop - 7);
+    ctx.fillText('低濃度 C₂≈0', lay.x1, lay.yTop - 7);
+    ctx.fillText('膜厚 L', (lay.x0 + lay.x1) / 2, lay.yBot + 26);
+
+    // steady-state linear concentration profile (overlay line)
+    ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 2.4; ctx.beginPath();
+    for (let i = 0; i <= 40; i++){
+      const fx = i / 40;
+      const cy = lay.yBot - (concAt(fx) / Math.max(C1, 1)) * lay.h;
+      const cx = lay.x0 + fx * lay.w;
+      if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#ffd54a'; ctx.font = 'bold 10px Roboto Mono'; ctx.textAlign = 'left';
+    ctx.fillText('定常 C(x) 直線', lay.x0 + 6, lay.yTop + 14);
+
+    // particles
+    if (animate){
+      for (const p of particles){
+        // random walk + net drift down-gradient (to the right)
+        p.x += driftNorm + (Math.random() - 0.5) * 3.0;
+        p.y += (Math.random() - 0.5) * 3.0;
+        if (p.y < lay.yTop + 3) p.y = lay.yTop + 3;
+        if (p.y > lay.yBot - 3) p.y = lay.yBot - 3;
+        // exited at low side -> reinject at high side (steady through-flux)
+        if (p.x > lay.x1 - 2){ p.x = lay.x0 + Math.random() * 4; p.y = lay.yTop + 6 + Math.random() * (lay.h - 12); }
+        if (p.x < lay.x0) p.x = lay.x0 + 1;
+      }
+    }
+    for (const p of particles){
+      const fx = (p.x - lay.x0) / lay.w;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, 7);
+      ctx.fillStyle = concColor(concAt(fx)); ctx.fill();
+    }
+
+    // flux arrows (length ∝ N = D(C1-C2)/L), pointing down-gradient (right)
+    const grad = -(C1 - 0) / L;
+    const N = -D * grad;
+    const Nref = 2e-6;                       // reference flux for arrow scale
+    const aLen = Math.max(10, Math.min(lay.w * 0.5, (N / Nref) * 70 + 12));
+    ctx.strokeStyle = '#00B4D8'; ctx.fillStyle = '#00B4D8'; ctx.lineWidth = 2.6;
+    for (let k = 0; k < 3; k++){
+      const ay = lay.yTop + lay.h * (0.28 + k * 0.22);
+      const ax0 = lay.x0 + lay.w * 0.18, ax1 = ax0 + aLen;
+      ctx.beginPath(); ctx.moveTo(ax0, ay); ctx.lineTo(ax1, ay); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax1, ay); ctx.lineTo(ax1 - 8, ay - 4); ctx.lineTo(ax1 - 8, ay + 4); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#00B4D8'; ctx.font = 'bold 11px Noto Sans JP'; ctx.textAlign = 'left';
+    ctx.fillText('フラックス N →', lay.x0 + lay.w * 0.18, lay.yTop + lay.h * 0.20);
+  }
+
+  let raf = null;
+  function loop(){ drawFrame(true); raf = requestAnimationFrame(loop); }
+  function start(){
+    resize(); layout = computeLayout(); seedParticles();
+    if (reduce){ drawFrame(false); }
+    else { if (raf) cancelAnimationFrame(raf); loop(); }
+  }
+  window.addEventListener('resize', function(){ if (reduce) drawFrame(false); });
+  return { setState: setState, start: start };
+})();
+
+window.addEventListener('load', () =>{
   initCharts();
+  film.start();
   update();
 });
+})();
 </script>
 
 <section class="explanation">
@@ -451,7 +648,7 @@ function initCharts(){
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">グラフの横軸（距離）の単位は何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">デフォルトではメートル（m）単位で表示されます。鋼中炭素の拡散ではµmオーダー、半導体酸素ではnmオーダーと用途で桁が大きく異なるため、シミュレーション結果の数値に合わせて適宜単位を読み替えてご利用ください。</div>
+    <div class="faq-a">横軸の距離はミリメートル（mm）単位で表示されます。鋼中炭素の浸炭ではµm〜mmオーダー、半導体ドーピングではnm〜µmオーダーと用途で桁が大きく異なるため、x範囲スライダーで表示幅を調整しながらご利用ください。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -471,6 +668,9 @@ function initCharts(){
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="diffusion-mass.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -521,6 +721,16 @@ function initCharts(){
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4759820477?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4759820477.09._SCMZZZZZZ_.jpg" alt="化学工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">化学工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

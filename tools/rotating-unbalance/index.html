@@ -51,12 +51,30 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
 .verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
 .verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 6px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+.live-ro.warn .rv{color:#ff6b5e}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.ru-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.ru-btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:.82rem;font-family:inherit;font-weight:600}
+.ru-btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.ru-spd{display:flex;gap:4px;margin-left:auto}
+.ru-spd-btn{padding:4px 9px;font-size:.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit}
+.ru-spd-btn.active{border-color:var(--accent);color:var(--accent);font-weight:700}
+.ru-presets{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 6px}
+.ru-preset-btn{padding:5px 11px;font-size:.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.ru-preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+#ruCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.ru-spd-btn,.ru-preset-btn{transition:none}}
 </style>
 <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "回転体の不釣合い振動シミュレーター",
       "description": "ばね支持された回転機械の不釣合い振動を計算。総質量・不釣合い質量・偏心距離・支持ばね剛性・減衰比・回転数を変えて、固有振動数・振動数比・振動振幅・基礎伝達力をリアルタイムで求め、共振を避ける設計ができる無料シミュレーターです。",
       "url": "https://novasolver.jp/tools/rotating-unbalance.html",
@@ -66,7 +84,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["回転体の不釣合いによる励振力の計算","ばね支持系の固有振動数・振動数比の算出","定常振動振幅と基礎への伝達力の計算","共振域（r≈1）の自動判定","振幅の共振カーブと振幅倍率カーブのグラフ"],
       "keywords": "回転不釣合い,振動,共振,固有振動数,振動数比,基礎伝達力,防振設計,振動工学",
       "inLanguage": "ja"
@@ -185,6 +203,15 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="param-desc">ロータの運転回転数</div>
       <input type="range" id="rpmRange" min="10" max="6000" step="10" value="1200" oninput="syncToNum('rpmRange','rpmNum');pct(this);compute()">
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right: visualization -->
@@ -203,9 +230,42 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
     </div>
 
     <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ物理量</div>
+      <div class="live-readouts">
+        <div class="live-ro"><div class="rv" id="roM">—</div><div class="rl">機械質量 M [kg]</div></div>
+        <div class="live-ro"><div class="rv" id="roMe">—</div><div class="rl">不釣合い m·e [kg·mm]</div></div>
+        <div class="live-ro"><div class="rv" id="roWn">—</div><div class="rl">固有角振動数 ωₙ [rad/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roW">—</div><div class="rl">角速度 ω [rad/s]</div></div>
+        <div class="live-ro accent"><div class="rv" id="roR">—</div><div class="rl">振動数比 r = ω/ωₙ</div></div>
+        <div class="live-ro"><div class="rv" id="roZeta">—</div><div class="rl">減衰比 ζ</div></div>
+        <div class="live-ro accent"><div class="rv" id="roX">—</div><div class="rl">振動振幅 X [mm]</div></div>
+        <div class="live-ro"><div class="rv" id="roMag">—</div><div class="rl">MX/(me) 倍率</div></div>
+        <div class="live-ro"><div class="rv" id="roFexc">—</div><div class="rl">励振力 m·e·ω² [N]</div></div>
+        <div class="live-ro"><div class="rv" id="roFtr">—</div><div class="rl">伝達力 F_tr [N]</div></div>
+        <div class="live-ro"><div class="rv" id="roPhase">—</div><div class="rl">位相角 φ [°]</div></div>
+        <div class="live-ro"><div class="rv" id="roMeM">—</div><div class="rl">高速漸近 me/M [mm]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
       <div class="chart-title"><i class="fas fa-fan"></i> 回転機械の振動 — アニメーション</div>
-      <canvas id="ruCanvas"></canvas>
+      <div class="ru-presets">
+        <button class="ru-preset-btn" type="button" data-ru-preset="below">共振以下</button>
+        <button class="ru-preset-btn" type="button" data-ru-preset="resonance">共振 r=1</button>
+        <button class="ru-preset-btn" type="button" data-ru-preset="above">共振以上 → me/M</button>
+        <button class="ru-preset-btn" type="button" data-ru-preset="sweep">起動スイープ</button>
+      </div>
+      <canvas id="ruCanvas" tabindex="0" role="img" aria-label="ばね支持された回転機械の不釣合い振動アニメーション。ロータの回転と機械全体の上下振動、振幅 X を表示します。"></canvas>
       <p class="canvas-hint">ばねとダンパで支持された機械ブロックの中でロータが回転し、不釣合い質量（橙の点）が遠心力を生みます。機械全体が振幅 X に比例して上下に振動します。</p>
+      <div class="ru-controls">
+        <button class="ru-btn" type="button" id="ruPlay"><i class="fas fa-play"></i> 再生</button>
+        <button class="ru-btn secondary" type="button" id="ruReset"><i class="fas fa-rotate-left"></i> リセット</button>
+        <div class="ru-spd">
+          <button class="ru-spd-btn" type="button" data-ru-speed="0.25">0.25×</button>
+          <button class="ru-spd-btn active" type="button" data-ru-speed="1">1×</button>
+          <button class="ru-spd-btn" type="button" data-ru-speed="2">2×</button>
+        </div>
+      </div>
     </div>
 
     <div class="chart-card">
@@ -302,6 +362,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 </section>
 
 
+
+
+
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
@@ -314,7 +377,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>圧縮機ロータ:総質量m=80kg、不釣合い0.8g×25mm(偏心モーメント20g・cm)、支持ばね剛性k=4500N/mm、減衰比ζ=0.08の場合。固有振動数f_n=√(4500000/(80×9.81))÷(2π)=30.2Hzとなり、1800rpm(30Hz)が共振域に該当。3000rpm(50Hz)運転では振動数比r=50/30.2=1.65、X=0.8×25/(4500×(1-1.65²))=0.31mm、不釣合い力F=0.008×25×(50×2π/60)²=1.03kNで基礎伝達力F_tr=1.03×(1+(2×0.08×1.65)²)/(1-1.65²)²+(2×0.08×1.65)²)=0.24kNと低減される</p>
+<p>機械総質量M=200kg、不釣合い質量m=0.5kg、偏心距離e=20mm、支持ばね剛性k=2×10⁶N/m、減衰比ζ=0.05、回転数N=1200rpmの場合。固有振動数f_n=√(k/M)/(2π)=√(2,000,000/200)/(2π)≈15.92Hz。角速度ω=2πN/60=125.7rad/s で振動数比r=ω/ω_n≈1.257（共振点 r=1 のすぐ上）。不釣合い力F=m·e·ω²=0.5×0.020×125.7²≈157.9N。定常振幅X=(m·e/M)·r²/√((1−r²)²+(2ζr)²)≈0.133mm。基礎伝達力F_tr=X·k·√(1+(2ζr)²)≈269N。回転数をさらに上げ r≫1 とすれば X は m·e/M=0.05mm に漸近する。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -325,6 +388,65 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 <li>支持ばねの剛性低下(劣化で20%減)も共振点をシフトさせるため、定期的なばね特性検査が必要</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="rotating-unbalance.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/torsional-vibration.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-wave-square"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ねじり振動解析シミュレーター（多慣性系）</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ねじり振動解析シミュレーター（多慣性系）は、2〜4慣性体・シャフト系のねじり振動固有値解析をリアルタイムで実行。固有振動数・モード形状・キャンベル線図を即座に可視化し、設計段階での振...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/critical-speed-shaft.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-wave-square"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">軸の危険速度（危険回転数）シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">円板を取付けた回転軸の危険速度（危険回転数）を計算。軸径・支持間距離・円板質量・運転回転数・支持条件を変えて、軸の曲げ剛性・静たわみ・固有振動数からホイール（ふれまわり）共振を避ける...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/rotor-balancing.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-wave-square"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">回転体のバランシング（影響係数法）シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">振動・音響の応答と周波数特性に関する隣接ツールへ移る前に、支配的な条件と指標の関係をつかむ構成です。</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/campbell-diagram.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-wave-square"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">キャンベル線図シミュレーター — ロータの危険速度</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">キャンベル線図シミュレーターは、回転機械の自然振動数とジャイロ効果による前進・後退分岐、エンジンオーダー線との交点から複数の危険速度をリアルタイムに可視化します。ロータの2モード×3...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/rotor-dynamics.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-wave-square"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ロータダイナミクス・臨界速度計算機</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ロータダイナミクス解析ツール「」の臨界速度計算機。Jeffcottロータモデルに基づき、質量・剛性・減衰比・偏心量を入力するだけで臨界速度Ncを即時計算。不釣り合い応答曲線をリアルタ...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/string-vibration-frequency.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-wave-square"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">弦の振動数（メルセンヌの法則）シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">張った弦の固有振動数をメルセンヌの法則で計算。長さ・張力・線密度・モード次数・境界条件を変えて、波の速さ・基本振動数・モード振動数・波長・周期・最も近い音名をリアルタイム表示する無料...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -339,6 +461,23 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 </footer>
 
 <script>
+(function(){
+"use strict";
+const RU_TXT = {
+  resBand:'共振域（危険）', below:'共振以下', above:'共振以上',
+  speedLbl:'回転数', resTag:'共振域！',
+  ngHead:'運転点が共振域（r=', ngMid:'、0.9〜1.1）にあります。振幅 ',
+  ngTail:' mm。回転による励振力は角速度の2乗で増えるため、回転数を共振点から離す・ロータをバランス取りして m·e を減らす・減衰を付加する、のいずれかが必要です。',
+  okHead:'運転点は共振域の外です（r=', okMid:'）。振幅 ', okF:' mm、不釣合い力 ', okFtr:' N、基礎伝達力 ', okEnd:' N。',
+  okAbove:' 共振より十分高速では振幅は m·e/M の一定値に漸近します。',
+  okBelow:' 起動・停止時には共振域 r≈1 を素早く通過させてください。',
+  ampSeries:'振動振幅 X(rpm)', ampPt:'現在の回転数',
+  magSeries:'振幅倍率 X/(m·e/M)', magPt:'現在の振動数比 r',
+  axN:'回転数 N (rpm)', axX:'振動振幅 X (mm)', axR:'振動数比 r = ω/ωₙ', axMag:'振幅倍率（無次元）',
+  machine:'機械 M（ロータ内蔵）', spring:'支持ばね k', damper:'ダンパ',
+  play:'<i class="fas fa-play"></i> 再生', pause:'<i class="fas fa-pause"></i> 一時停止'
+};
+
 // ===== shared state for the animation =====
 const RU = {rpm:1200, r:0, ampMm:0, near:false, ecc:20};
 
@@ -476,6 +615,26 @@ function compute(){
   magChart.data.datasets[1].data = mPoint;
   magChart.update('none');
 
+  // ----- live physics readouts -----
+  const mag   = unbFactor(r, zeta);                 // MX/(me)
+  const phase = Math.atan2(2*zeta*r, 1 - r*r);      // rad, 0..pi
+  const phaseDeg = (phase < 0 ? phase + Math.PI : phase) * 180/Math.PI;
+  const me    = mUnb*ecc;                           // kg·mm
+  const meM   = mUnb*(ecc)/Mtotal;                  // mm (me/M, since ecc in mm)
+  const setRO = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
+  setRO('roM',   Mtotal.toFixed(0));
+  setRO('roMe',  me.toFixed(2));
+  setRO('roWn',  omegaN.toFixed(1));
+  setRO('roW',   omega.toFixed(1));
+  setRO('roR',   r.toFixed(3));
+  setRO('roZeta',zeta.toFixed(3));
+  setRO('roX',   (X*1000).toFixed(3));
+  setRO('roMag', mag.toFixed(2));
+  setRO('roFexc',Funb.toFixed(1));
+  setRO('roFtr', Ftr.toFixed(0));
+  setRO('roPhase',phaseDeg.toFixed(1));
+  setRO('roMeM', meM.toFixed(3));
+
   // ----- update shared state for animation -----
   RU.rpm = rpm;
   RU.r = r;
@@ -483,15 +642,23 @@ function compute(){
   RU.near = near;
   RU.ecc = ecc;
 }
+window.compute = compute;
 
-// ===== Rotating-machine vibration animation =====
-(function(){
-  const cv = document.getElementById('ruCanvas');
-  const ctx = cv.getContext('2d');
-  let spin = 0;
-  let bobPhase = 0;
+// ===== Rotating-machine vibration animation + controller =====
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const cv = document.getElementById('ruCanvas');
+const ctx = cv.getContext('2d');
+let spin = 0;
+let bobPhase = 0;
+let playing = false;
+let speedMult = 1;
+let rafId = null;
+// sweep state
+let sweeping = false;
+let sweepT = 0;
+const SWEEP_MIN = 10, SWEEP_MAX = 6000, SWEEP_DUR = 8; // rpm range, seconds
 
-  function resize(){
+function resize(){
     const dpr = window.devicePixelRatio||1;
     const w = cv.parentElement.getBoundingClientRect().width;
     if(Math.abs(cv.width-w*dpr)>2 || cv.height!==260*dpr){
@@ -585,7 +752,7 @@ function compute(){
     const rotX = cx;
     const rotY = blockTop + blockH*0.5;
     const rotR = Math.min(blockH*0.34, blockW*0.16);
-    spin += 0.012 + RU.rpm/60*0.0016;
+    if(playing) spin += (0.012 + RU.rpm/60*0.0016)*speedMult;
 
     // rotor disc
     ctx.beginPath();
@@ -626,24 +793,24 @@ function compute(){
     ctx.fillStyle = 'rgba(255,255,255,.8)';
     ctx.font = '11px Roboto Mono, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('機械 M（ロータ内蔵）', cx, blockTop-10);
+    ctx.fillText(RU_TXT.machine, cx, blockTop-10);
     ctx.fillStyle = 'rgba(150,200,235,.9)';
-    ctx.fillText('支持ばね k', springX1, groundY+18);
+    ctx.fillText(RU_TXT.spring, springX1, groundY+18);
     ctx.fillStyle = 'rgba(225,160,85,.95)';
-    ctx.fillText('ダンパ', dampX, groundY+18);
+    ctx.fillText(RU_TXT.damper, dampX, groundY+18);
 
     // running speed label (top-left)
     ctx.textAlign = 'left';
     ctx.fillStyle = RU.near ? '#e17055' : '#00b894';
     ctx.font = 'bold 12px Roboto Mono, monospace';
-    ctx.fillText('回転数 '+RU.rpm.toFixed(0)+' rpm', 14, 26);
+    ctx.fillText(RU_TXT.speedLbl+' '+RU.rpm.toFixed(0)+' rpm', 14, 26);
     ctx.fillStyle = 'rgba(255,255,255,.55)';
     ctx.font = '10px Roboto Mono, monospace';
     ctx.fillText('r = '+RU.r.toFixed(3)+'   X = '+RU.ampMm.toFixed(3)+' mm', 14, 42);
     if(RU.near){
       ctx.fillStyle = '#d63031';
       ctx.font = 'bold 11px Roboto Mono, monospace';
-      ctx.fillText('共振域！', 14, 58);
+      ctx.fillText(RU_TXT.resTag, 14, 58);
     }
 
     // amplitude double-arrow on the right of the block
@@ -662,20 +829,80 @@ function compute(){
     ctx.font = '10px Roboto Mono, monospace';
     ctx.fillText('X', ax+6, blockTopRest+4);
 
-    // advance the bobbing phase at a rate tied to rpm
-    bobPhase += 0.05 + RU.rpm/60*0.012;
-    if(bobPhase>Math.PI*2) bobPhase -= Math.PI*2;
-
-    requestAnimationFrame(frame);
+    // advance the bobbing phase at a rate tied to rpm (only while playing)
+    if(playing){
+      bobPhase += (0.05 + RU.rpm/60*0.012)*speedMult;
+      if(bobPhase>Math.PI*2) bobPhase -= Math.PI*2;
+    }
   }
-  frame();
-})();
 
-// ===== init =====
-['mTotRange','mUnbRange','eccRange','kRange','zetaRange','rpmRange'].forEach(function(id){
-  pct(document.getElementById(id));
-});
-compute();
+  // ----- run loop -----
+  function setRpm(v){
+    const rng=document.getElementById('rpmRange'), num=document.getElementById('rpmNum');
+    v=Math.max(parseFloat(rng.min),Math.min(parseFloat(rng.max),v));
+    rng.value=v; if(num) num.value=Math.round(v);
+    if(typeof pct==='function') pct(rng);
+    compute();
+  }
+  let lastTs=0;
+  function loop(ts){
+    if(sweeping){
+      if(!lastTs) lastTs=ts;
+      const dt=(ts-lastTs)/1000; lastTs=ts;
+      sweepT += dt*speedMult;
+      const frac=Math.min(1, sweepT/SWEEP_DUR);
+      setRpm(SWEEP_MIN + (SWEEP_MAX-SWEEP_MIN)*frac);
+      if(frac>=1){ sweeping=false; }
+    } else { lastTs=0; }
+    frame();
+    rafId=requestAnimationFrame(loop);
+  }
+
+  // ----- controls -----
+  const btnPlay=document.getElementById('ruPlay');
+  function setPlaying(p){
+    playing=p;
+    btnPlay.innerHTML = p ? RU_TXT.pause : RU_TXT.play;
+  }
+  btnPlay.addEventListener('click',function(){ if(playing){setPlaying(false);} else {setPlaying(true);} });
+  document.getElementById('ruReset').addEventListener('click',function(){
+    sweeping=false; sweepT=0; spin=0; bobPhase=0; setPlaying(false); setRpm(1200); frame();
+  });
+  document.querySelectorAll('.ru-spd-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      speedMult=parseFloat(b.getAttribute('data-ru-speed'));
+      document.querySelectorAll('.ru-spd-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+  document.querySelectorAll('[data-ru-preset]').forEach(function(b){
+    b.addEventListener('click',function(){
+      const p=b.getAttribute('data-ru-preset');
+      const k=parseFloat(document.getElementById('kRange').value);
+      const M=parseFloat(document.getElementById('mTotRange').value);
+      const omN=Math.sqrt(k/M);
+      const rpmForR=(rr)=>omN*rr*60/(2*Math.PI);
+      sweeping=false; sweepT=0;
+      if(p==='below'){ setRpm(rpmForR(0.5)); setPlaying(true); }
+      else if(p==='resonance'){ setRpm(rpmForR(1.0)); setPlaying(true); }
+      else if(p==='above'){ setRpm(rpmForR(2.6)); setPlaying(true); }
+      else if(p==='sweep'){ spin=0; bobPhase=0; sweepT=0; sweeping=true; lastTs=0; setRpm(SWEEP_MIN); setPlaying(true); }
+    });
+  });
+
+  // ===== init =====
+  ['mTotRange','mUnbRange','eccRange','kRange','zetaRange','rpmRange'].forEach(function(id){
+    if(typeof pct==='function') pct(document.getElementById(id));
+  });
+  compute();
+  if(REDUCED){
+    setPlaying(false);
+    frame();           // single static frame
+  } else {
+    setPlaying(true);
+    rafId=requestAnimationFrame(loop);
+  }
+})();
 </script>
 
 <script src="/assets/sidebar-inject.v9.js" defer></script>

@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "噴流衝突冷却シミュレーター",
       "description": "ノズル流速・ノズル径・衝突距離比・温度差から、円形ノズルから板に衝突する空気噴流の Nusselt 数・熱伝達係数・熱流束をリアルタイムに計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/jet-impingement.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Reynolds 数と Nusselt 数のリアルタイム計算","滞留点での熱伝達係数 h と熱流束 q の表示","半径方向の熱伝達係数分布の可視化","Martin 型の近似相関式に基づく評価"],
       "keywords": "噴流衝突,衝突噴流,熱伝達,Nusselt 数,Martin 相関,電子機器冷却,ノズル,滞留点",
       "datePublished": "2026-05-16",
@@ -169,6 +169,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">流体は空気（ρ=1.2 kg/m³、ν=1.5×10⁻⁵ m²/s、k=0.026 W/(m·K)、Pr=0.71）で固定しています。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983372?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983372.09._SCMZZZZZZ_.jpg" alt="伝熱工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">伝熱工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -176,9 +185,10 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statRe">—</div><div class="sl">Reynolds 数 Re</div></div>
-        <div class="stat-card"><div class="sv" id="statNu">—</div><div class="sl">Nusselt 数 Nu</div></div>
-        <div class="stat-card"><div class="sv" id="statH">—</div><div class="sl">熱伝達係数 h</div></div>
-        <div class="stat-card"><div class="sv" id="statQ">—</div><div class="sl">熱流束 q=h·ΔT</div></div>
+        <div class="stat-card"><div class="sv" id="statNu">—</div><div class="sl">滞留点 Nusselt 数 Nu₀</div></div>
+        <div class="stat-card"><div class="sv" id="statH">—</div><div class="sl">滞留点 熱伝達係数 h₀</div></div>
+        <div class="stat-card"><div class="sv" id="statQ">—</div><div class="sl">滞留点 熱流束 q₀=h₀·ΔT</div></div>
+        <div class="stat-card"><div class="sv" id="statNuAvg">—</div><div class="sl">面平均 Nusselt 数 Nu̅</div></div>
       </div>
     </div>
 
@@ -211,226 +221,340 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Jet Impingement Cooling Simulator ==========
-var schemaCanvas = document.getElementById('schemaCanvas');
-var schemaCtx = schemaCanvas.getContext('2d');
-var profileCanvas = document.getElementById('profileCanvas');
-var profileCtx = profileCanvas.getContext('2d');
+// ========== Jet Impingement Cooling Simulator — v2 (live animation) ==========
+(function(){
+  var L = {
+    nozzle:'ノズル', plate:'衝突板', stag:'滞留点', walljet:'壁面噴流',
+    hr:'h(r/D)', haxis:'h [W/(m²·K)]', cool:'低温', hot:'高温',
+    nuLocal:'局所 Nu', peak:'ピーク'
+  };
+  var schemaCanvas = document.getElementById('schemaCanvas');
+  var profileCanvas = document.getElementById('profileCanvas');
+  if (!schemaCanvas || !profileCanvas) return;
+  var schemaCtx = schemaCanvas.getContext('2d');
+  var profileCtx = profileCanvas.getContext('2d');
 
-// Air properties (fixed)
-var NU_AIR = 1.5e-5;   // kinematic viscosity m^2/s
-var K_AIR  = 0.026;    // thermal conductivity W/(m.K)
-var PR_AIR = 0.71;     // Prandtl number
+  // Air properties (fixed)
+  var NU_AIR = 1.5e-5;   // kinematic viscosity m^2/s
+  var K_AIR  = 0.026;    // thermal conductivity W/(m.K)
+  var PR_AIR = 0.71;     // Prandtl number
 
-function getParams() {
-  var U  = parseFloat(document.getElementById('slU').value);
-  var Dmm = parseFloat(document.getElementById('slD').value);
-  var HD = parseFloat(document.getElementById('slHD').value);
-  var DT = parseFloat(document.getElementById('slDT').value);
-  var D  = Dmm / 1000.0; // mm -> m
-  return { U: U, Dmm: Dmm, D: D, HD: HD, DT: DT };
-}
+  var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function fmtInt(v) {
-  if (!isFinite(v)) return '—';
-  var a = Math.abs(v);
-  if (a >= 1e5) return v.toExponential(2);
-  if (a >= 1000) return v.toFixed(0);
-  if (a >= 100)  return v.toFixed(0);
-  if (a >= 10)   return v.toFixed(1);
-  return v.toFixed(2);
-}
-
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-
-function resizeCanvases() {
-  [schemaCanvas, profileCanvas].forEach(function (cv) {
-    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  });
-}
-
-function drawSchema(p, h0) {
-  var ctx = schemaCtx, W = __novaCanvasCssW(schemaCanvas), H = __novaCanvasCssH(schemaCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var cx = W * 0.5;
-  // nozzle geometry (in canvas px) — scale D in mm
-  var pxPerMm = Math.min(W, H) * 0.018; // visual scaling, not physical
-  var Dpx = Math.max(10, Math.min(60, p.Dmm * pxPerMm));
-  var HoverD = p.HD;
-  var jetGap = Math.max(60, Math.min(H * 0.5, Dpx * HoverD));
-  // top: nozzle
-  var nozTop = 20, nozBot = nozTop + 60;
-  ctx.fillStyle = '#46627f';
-  ctx.fillRect(cx - Dpx * 1.4, nozTop, Dpx * 2.8, 14);
-  ctx.fillRect(cx - Dpx * 0.6, nozTop + 14, Dpx * 1.2, 46);
-  // nozzle exit at nozBot
-  // plate at bottom
-  var plateY = nozBot + jetGap;
-  if (plateY > H - 30) plateY = H - 30;
-  // jet (blue arrow from nozzle to plate)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = Math.max(6, Dpx * 0.8);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cx, nozBot + 2);
-  ctx.lineTo(cx, plateY - 6);
-  ctx.stroke();
-  // arrow head at plate
-  ctx.fillStyle = '#00B4D8';
-  ctx.beginPath();
-  ctx.moveTo(cx, plateY - 2);
-  ctx.lineTo(cx - 7, plateY - 12);
-  ctx.lineTo(cx + 7, plateY - 12);
-  ctx.closePath();
-  ctx.fill();
-  // plate band (colored by local h, hot red at edges, cool at stagnation)
-  var plateXmin = 30, plateXmax = W - 30;
-  var bandY = plateY;
-  var bandH = 16;
-  var gradN = 60;
-  for (var i = 0; i < gradN; i++) {
-    var fx = i / (gradN - 1);
-    var x0 = plateXmin + fx * (plateXmax - plateXmin);
-    var x1 = plateXmin + ((i + 1) / (gradN - 1)) * (plateXmax - plateXmin);
-    var rOverD = Math.abs((x0 + x1) / 2 - cx) / Math.max(1, Dpx);
-    // local h fraction: stagnation = 1, decays with r/D
-    var hf = Math.exp(-0.35 * rOverD);
-    // hot plate: T_w; cooler near stagnation -> blue, hotter at edges -> red
-    var coolness = hf; // 0..1
-    var r = Math.round(220 - coolness * 170);
-    var g = Math.round(80 + coolness * 60);
-    var b = Math.round(70 + coolness * 170);
-    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
-    ctx.fillRect(x0, bandY, (x1 - x0) + 1, bandH);
+  function el(id){ return document.getElementById(id); }
+  function getParams(){
+    var U  = parseFloat(el('slU').value);
+    var Dmm = parseFloat(el('slD').value);
+    var HD = parseFloat(el('slHD').value);
+    var DT = parseFloat(el('slDT').value);
+    var D  = Dmm / 1000.0; // mm -> m
+    return { U:U, Dmm:Dmm, D:D, HD:HD, DT:DT };
   }
-  // plate base
-  ctx.fillStyle = '#3d567a';
-  ctx.fillRect(plateXmin, bandY + bandH, plateXmax - plateXmin, 8);
-  // stagnation marker
-  ctx.beginPath();
-  ctx.arc(cx, bandY - 2, 5, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFD166';
-  ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  // dimensions: H/D label between nozzle exit and plate
-  ctx.strokeStyle = 'rgba(207,227,247,0.6)';
-  ctx.setLineDash([4, 3]);
-  ctx.beginPath();
-  ctx.moveTo(cx + Dpx * 1.6, nozBot);
-  ctx.lineTo(cx + Dpx * 1.6, plateY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('H/D = ' + p.HD.toFixed(1), cx + Dpx * 1.6 + 6, (nozBot + plateY) / 2);
-  // labels
-  ctx.fillText('U = ' + p.U.toFixed(0) + ' m/s', 12, nozTop + 8);
-  ctx.fillText('D = ' + p.Dmm.toFixed(0) + ' mm', 12, nozTop + 24);
-  ctx.fillText('T_w − T_∞ = ' + p.DT.toFixed(0) + ' K', 12, bandY + bandH + 22);
-  ctx.fillStyle = '#FFD166';
-  ctx.fillText('滞留点 (h_0 = ' + fmtInt(h0) + ' W/(m²·K))', cx - 80, bandY - 10);
-}
-
-function drawProfile(p, h0) {
-  var ctx = profileCtx, W = __novaCanvasCssW(profileCanvas), H = __novaCanvasCssH(profileCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 56, my = 28;
-  var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
-  var gw = x1 - x0, gh = y0 - y1;
-  var rMax = 6.0; // r/D range
-  var hMax = Math.max(h0 * 1.1, 1e-3);
-  function px(r) { return x0 + (r / rMax) * gw; }
-  function py(hv) { return y0 - (hv / hMax) * gh; }
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-  // h(r/D) curve: exponential-like decay
-  var N = 140;
-  ctx.beginPath();
-  for (var i = 0; i <= N; i++) {
-    var r = rMax * i / N;
-    var hv = h0 * Math.exp(-0.35 * r);
-    if (i === 0) ctx.moveTo(px(r), py(hv)); else ctx.lineTo(px(r), py(hv));
+  function fmtInt(v){
+    if (!isFinite(v)) return '—';
+    var a = Math.abs(v);
+    if (a >= 1e5) return v.toExponential(2);
+    if (a >= 1000) return v.toFixed(0);
+    if (a >= 100)  return v.toFixed(0);
+    if (a >= 10)   return v.toFixed(1);
+    return v.toFixed(2);
   }
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  // stagnation marker (r=0)
-  var spx = px(0), spy = py(h0);
-  ctx.strokeStyle = 'rgba(255,209,102,0.6)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(spx, y0); ctx.lineTo(spx, spy); ctx.stroke();
-  ctx.beginPath(); ctx.arc(spx, spy, 5, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFD166';
-  ctx.fill();
-  // labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('r/D = 0', x0, y0 + 14);
-  ctx.textAlign = 'right';
-  ctx.fillText('r/D = ' + rMax.toFixed(0), x1, y0 + 14);
-  ctx.textAlign = 'left';
-  ctx.fillText('h [W/(m²·K)]', x0 + 4, y1 + 4);
-  ctx.fillStyle = '#FFD166';
-  ctx.fillText('滞留点 h_0 = ' + fmtInt(h0), spx + 8, spy - 6);
-}
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.U) || !isFinite(p.D) || p.D <= 0) return;
-  var Re = p.U * p.D / NU_AIR;
-  var prFactor = Math.pow(PR_AIR, 0.42);
-  var hdFactor = Math.pow(p.HD, -0.1);
-  var Nu = 1.0 * Math.pow(Re, 0.5) * prFactor * hdFactor;
-  var h  = Nu * K_AIR / p.D;
-  var qk = h * p.DT / 1000.0; // kW/m^2
-  document.getElementById('statRe').textContent = (Re >= 10000) ? Re.toExponential(1) : Re.toFixed(0);
-  document.getElementById('statNu').textContent = Nu.toFixed(0);
-  document.getElementById('statH').textContent  = h.toFixed(0) + ' W/(m²·K)';
-  document.getElementById('statQ').textContent  = qk.toFixed(1) + ' kW/m²';
-  drawSchema(p, h);
-  drawProfile(p, h);
-}
+  /* ===== Physics ===== */
+  // Stagnation Nu (Martin-type): Nu0 = Re^0.5 * Pr^0.42 * (H/D)^-0.1
+  // Local Nu(r/D): peaks at r/D=0, gaussian-like decay (single round jet).
+  function localNuFactor(rD){ return Math.exp(-0.69 * rD * rD); } // half at rD~1
+  function model(p){
+    var Re = p.U * p.D / NU_AIR;
+    var prF = Math.pow(PR_AIR, 0.42);
+    var hdF = Math.pow(p.HD, -0.1);
+    var Nu0 = Math.pow(Re, 0.5) * prF * hdF;     // stagnation Nu
+    var h0  = Nu0 * K_AIR / p.D;                  // stagnation h
+    var q0  = h0 * p.DT / 1000.0;                 // kW/m^2 at stagnation
+    // area-averaged Nu over r/D in [0, rMax] (disk average, weight 2*r)
+    var rMax = 6.0, Nsum = 0, wsum = 0, M = 120;
+    for (var i=0;i<=M;i++){
+      var rD = rMax*i/M;
+      var w = rD; // area weighting
+      Nsum += Nu0*localNuFactor(rD)*w; wsum += w;
+    }
+    var NuAvg = wsum>0 ? Nsum/wsum : Nu0;
+    return { Re:Re, Nu0:Nu0, h0:h0, q0:q0, NuAvg:NuAvg, rMax:rMax };
+  }
 
-function resetParams() {
-  var defs = { slU: 30, slD: 10, slHD: 6, slDT: 50 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slU'),  'slUVal',  0, '');
-  updateSlider(document.getElementById('slD'),  'slDVal',  0, '');
-  updateSlider(document.getElementById('slHD'), 'slHDVal', 1, '');
-  updateSlider(document.getElementById('slDT'), 'slDTVal', 0, '');
+  /* ===== HiDPI ===== */
+  function cssW(cv){ return parseFloat(cv.dataset.cssW) || cv.width / Math.min(window.devicePixelRatio||1,2.5); }
+  function cssH(cv){ return parseFloat(cv.dataset.cssH) || cv.height / Math.min(window.devicePixelRatio||1,2.5); }
+  function resizeCanvases(){
+    [schemaCanvas, profileCanvas].forEach(function(cv){
+      var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
+      var h = Math.round(w * 0.52);
+      var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+      cv.style.width = w + 'px';
+      cv.style.height = h + 'px';
+      cv.width = Math.round(w*dpr);
+      cv.height = Math.round(h*dpr);
+      cv.dataset.cssW = String(w);
+      cv.dataset.cssH = String(h);
+      var c = cv.getContext('2d');
+      if (c) c.setTransform(dpr,0,0,dpr,0,0);
+    });
+  }
+
+  /* color: cool(blue) -> hot(red) by fraction t (0=cool stagnation, 1=hot edge) */
+  function heatColor(t){
+    t = Math.max(0, Math.min(1, t));
+    var r = Math.round(40 + t*200);
+    var g = Math.round(120 + (0.5-Math.abs(t-0.5))*120);
+    var b = Math.round(230 - t*200);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  /* ===== Animated schematic: jet issuing, impinging, spreading as wall jet ===== */
+  var particles = [];
+  function spawnParticle(){
+    return { phase:0, t:Math.random(), side:(Math.random()<0.5?-1:1), r:0, life:0, jitter:(Math.random()-0.5) };
+  }
+
+  function drawSchema(p, m, time){
+    var ctx = schemaCtx, W = cssW(schemaCanvas), H = cssH(schemaCanvas);
+    ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
+    var cx = W*0.5;
+    var pxPerMm = Math.min(W,H)*0.020;
+    var Dpx = Math.max(8, Math.min(54, p.Dmm*pxPerMm));
+    var nozTop = 16, nozBot = nozTop + 54;
+    var jetGap = Math.max(54, Math.min(H*0.50, Dpx*p.HD));
+    var plateY = nozBot + jetGap;
+    if (plateY > H - 46) plateY = H - 46;
+    var plateXmin = 24, plateXmax = W - 24;
+    var halfW = Math.min(cx - plateXmin, plateXmax - cx);
+
+    // ---- heat-transfer color band on the plate (peaks under jet) ----
+    var bandH = 18, bandY = plateY;
+    var gradN = 80;
+    for (var i=0;i<gradN;i++){
+      var x0 = plateXmin + i/gradN*(plateXmax-plateXmin);
+      var x1 = plateXmin + (i+1)/gradN*(plateXmax-plateXmin);
+      var rD = Math.abs((x0+x1)/2 - cx)/Math.max(1,Dpx);
+      var hf = localNuFactor(rD);            // 1 at stagnation
+      // strong cooling (cool surface) at stagnation, hotter outward
+      ctx.fillStyle = heatColor(1 - hf);
+      ctx.fillRect(x0, bandY, (x1-x0)+1, bandH);
+    }
+    // plate base
+    ctx.fillStyle = '#33475f';
+    ctx.fillRect(plateXmin, bandY+bandH, plateXmax-plateXmin, 7);
+
+    // ---- local Nu(r) curve overlaid on the plate (peak under jet) ----
+    var curveTop = bandY - 4;
+    var curveAmp = Math.min(plateY - nozBot - 18, H*0.30);
+    ctx.beginPath();
+    for (var sx = plateXmin; sx <= plateXmax; sx += 3){
+      var rD2 = Math.abs(sx - cx)/Math.max(1,Dpx);
+      var hf2 = localNuFactor(rD2);
+      var yy = curveTop - hf2*curveAmp;
+      if (sx===plateXmin) ctx.moveTo(sx,yy); else ctx.lineTo(sx,yy);
+    }
+    ctx.strokeStyle = 'rgba(255,209,102,0.85)';
+    ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,209,102,0.10)';
+    ctx.lineTo(plateXmax, curveTop); ctx.lineTo(plateXmin, curveTop); ctx.closePath(); ctx.fill();
+
+    // ---- nozzle ----
+    ctx.fillStyle = '#5a7796';
+    ctx.fillRect(cx - Dpx*1.5, nozTop, Dpx*3.0, 12);
+    ctx.fillRect(cx - Dpx*0.62, nozTop+12, Dpx*1.24, 42);
+    ctx.fillStyle = '#0a1929';
+    ctx.fillRect(cx - Dpx*0.42, nozTop+12, Dpx*0.84, 42); // bore
+
+    // ---- jet core (downward) + wall-jet spread particles (animated) ----
+    var speedScale = 0.4 + p.U/100*1.4;
+    if (particles.length < 70){ particles.push(spawnParticle()); }
+    ctx.lineCap = 'round';
+    for (var k=0;k<particles.length;k++){
+      var pt = particles[k];
+      // advance
+      var adv = (prefersReduced ? 0 : 0.018*speedScale);
+      if (pt.phase === 0){
+        pt.life += adv;
+        var fy = pt.life;             // 0..1 down the jet
+        var jx = cx + pt.jitter*Dpx*0.5;
+        var jy = nozBot + fy*(plateY - nozBot - 2);
+        var alpha = 0.55;
+        ctx.strokeStyle = 'rgba(0,180,216,'+alpha+')';
+        ctx.lineWidth = Math.max(2, Dpx*0.16);
+        ctx.beginPath();
+        ctx.moveTo(jx, jy);
+        ctx.lineTo(jx, Math.min(plateY-2, jy + 7*speedScale));
+        ctx.stroke();
+        if (fy >= 1){ pt.phase = 1; pt.r = 0; pt.life = 0; }
+      } else {
+        pt.r += adv*1.1;
+        var rr = pt.r;                // 0..1 outward fraction
+        var wx = cx + pt.side*rr*halfW;
+        var wy = bandY - 3 - Math.exp(-2.4*rr)*Dpx*0.5; // hugs plate, thins out
+        var a2 = Math.max(0, 0.5*(1-rr));
+        ctx.strokeStyle = 'rgba(120,200,235,'+a2+')';
+        ctx.lineWidth = Math.max(1.5, Dpx*0.13*(1-0.6*rr));
+        ctx.beginPath();
+        ctx.moveTo(wx, wy);
+        ctx.lineTo(wx + pt.side*6*speedScale, wy);
+        ctx.stroke();
+        if (rr >= 1){ particles[k] = spawnParticle(); }
+      }
+    }
+
+    // central jet column (semi-transparent body)
+    var grd = ctx.createLinearGradient(0, nozBot, 0, plateY);
+    grd.addColorStop(0, 'rgba(0,180,216,0.30)');
+    grd.addColorStop(1, 'rgba(0,180,216,0.10)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.moveTo(cx - Dpx*0.42, nozBot);
+    ctx.lineTo(cx + Dpx*0.42, nozBot);
+    ctx.lineTo(cx + Dpx*0.62, plateY-2);
+    ctx.lineTo(cx - Dpx*0.62, plateY-2);
+    ctx.closePath(); ctx.fill();
+
+    // ---- stagnation marker (glow, pulsing) ----
+    var pulse = prefersReduced ? 1 : (0.7 + 0.3*Math.sin(time*0.006));
+    ctx.beginPath();
+    ctx.arc(cx, bandY-2, 5.5, 0, Math.PI*2);
+    ctx.fillStyle = '#FFD166';
+    ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 12*pulse; ctx.fill(); ctx.shadowBlur = 0;
+
+    // ---- H/D dimension ----
+    ctx.strokeStyle = 'rgba(207,227,247,0.55)';
+    ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(cx + halfW*0.78, nozBot); ctx.lineTo(cx + halfW*0.78, plateY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#cfe3f7';
+    ctx.font = '12px "Roboto Mono",monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('H/D = ' + p.HD.toFixed(1), cx + halfW*0.78 + 6, (nozBot+plateY)/2);
+    ctx.fillText('U = ' + p.U.toFixed(0) + ' m/s', 12, nozTop+8);
+    ctx.fillText('D = ' + p.Dmm.toFixed(0) + ' mm', 12, nozTop+24);
+    ctx.fillStyle = '#9fb6cc';
+    ctx.fillText(L.nozzle, cx - Dpx*1.5, nozTop+6);
+    ctx.fillText(L.walljet, plateXmin+4, bandY-8);
+    ctx.fillStyle = '#FFD166';
+    ctx.textAlign = 'center';
+    ctx.fillText(L.stag + ' · h₀=' + fmtInt(m.h0) + ' W/(m²·K)', cx, bandY + bandH + 22);
+    ctx.textAlign = 'left';
+  }
+
+  /* ===== Animated radial profile h(r/D) ===== */
+  function drawProfile(p, m, time){
+    var ctx = profileCtx, W = cssW(profileCanvas), H = cssH(profileCanvas);
+    ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
+    var x0 = 56, x1 = W-18, y0 = H-30, y1 = 24;
+    var gw = x1-x0, gh = y0-y1;
+    var rMax = m.rMax;
+    var hMax = Math.max(m.h0*1.12, 1e-3);
+    function px(r){ return x0 + (r/rMax)*gw; }
+    function py(hv){ return y0 - (hv/hMax)*gh; }
+    // grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1;
+    ctx.font = '10px "Roboto Mono",monospace';
+    for (var gi=0; gi<=5; gi++){
+      var xg = rMax*gi/5;
+      ctx.beginPath(); ctx.moveTo(px(xg), y1); ctx.lineTo(px(xg), y0); ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='center';
+      ctx.fillText(xg.toFixed(0), px(xg), y0+14);
+    }
+    // axes
+    ctx.strokeStyle = 'rgba(143,184,224,0.5)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y1); ctx.stroke();
+    // filled area under curve
+    ctx.beginPath();
+    var N = 160;
+    for (var i=0;i<=N;i++){
+      var rD = rMax*i/N;
+      var hv = m.h0*localNuFactor(rD);
+      var X = px(rD), Y = py(hv);
+      if (i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+    }
+    ctx.lineTo(px(rMax), y0); ctx.lineTo(px(0), y0); ctx.closePath();
+    ctx.fillStyle = 'rgba(0,180,216,0.12)'; ctx.fill();
+    // curve
+    ctx.beginPath();
+    for (var j=0;j<=N;j++){
+      var rD2 = rMax*j/N;
+      var hv2 = m.h0*localNuFactor(rD2);
+      if (j===0) ctx.moveTo(px(rD2), py(hv2)); else ctx.lineTo(px(rD2), py(hv2));
+    }
+    ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.5; ctx.stroke();
+    // moving sample marker sweeping out from stagnation (shows decay live)
+    var rNow = prefersReduced ? 0 : (rMax*0.5*(1+Math.sin(time*0.0016)));
+    var hNow = m.h0*localNuFactor(rNow);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath(); ctx.moveTo(px(rNow), y0); ctx.lineTo(px(rNow), py(hNow)); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px(rNow), py(hNow), 4, 0, Math.PI*2);
+    ctx.fillStyle = '#7fd4ff'; ctx.fill();
+    // stagnation peak marker
+    var spx = px(0), spy = py(m.h0);
+    ctx.strokeStyle = 'rgba(255,209,102,0.6)';
+    ctx.beginPath(); ctx.moveTo(spx,y0); ctx.lineTo(spx,spy); ctx.stroke();
+    ctx.beginPath(); ctx.arc(spx,spy,5,0,Math.PI*2); ctx.fillStyle='#FFD166'; ctx.fill();
+    // labels
+    ctx.fillStyle='#cfe3f7'; ctx.textAlign='left'; ctx.font='11px "Roboto Mono",monospace';
+    ctx.fillText(L.haxis, x0+4, y1-6);
+    ctx.fillStyle='#FFD166';
+    ctx.fillText(L.peak + ' h₀=' + fmtInt(m.h0), spx+8, spy-6);
+    ctx.fillStyle='#7fd4ff'; ctx.textAlign='center';
+    ctx.fillText('r/D=' + rNow.toFixed(1) + ' · h=' + fmtInt(hNow), px(rNow), py(hNow)-10);
+    ctx.textAlign='left';
+  }
+
+  /* ===== Stats ===== */
+  var curM = null, curP = null;
+  function compute(){
+    var p = getParams();
+    if (!isFinite(p.U) || !isFinite(p.D) || p.D <= 0) return;
+    var m = model(p);
+    curP = p; curM = m;
+    el('statRe').textContent  = (m.Re >= 10000) ? m.Re.toExponential(1) : m.Re.toFixed(0);
+    el('statNu').textContent  = m.Nu0.toFixed(0);
+    el('statH').textContent   = m.h0.toFixed(0) + ' W/(m²·K)';
+    el('statQ').textContent   = m.q0.toFixed(1) + ' kW/m²';
+    var nA = el('statNuAvg'); if (nA) nA.textContent = m.NuAvg.toFixed(0);
+  }
+  window.__jetCompute = compute;
+
+  /* ===== Animation loop ===== */
+  var animId = null;
+  function loop(time){
+    if (curP && curM){ drawSchema(curP, curM, time); drawProfile(curP, curM, time); }
+    animId = requestAnimationFrame(loop);
+  }
+
+  /* ===== Reset (global for inline onclick) ===== */
+  window.resetParams = function(){
+    var defs = { slU:30, slD:10, slHD:6, slDT:50 };
+    Object.keys(defs).forEach(function(id){ el(id).value = defs[id]; });
+    if (typeof updateSlider === 'function'){
+      updateSlider(el('slU'),'slUVal',0,'');
+      updateSlider(el('slD'),'slDVal',0,'');
+      updateSlider(el('slHD'),'slHDVal',1,'');
+      updateSlider(el('slDT'),'slDTVal',0,'');
+    }
+    compute();
+  };
+
+  window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
+
+  resizeCanvases();
   compute();
-}
-
-window.addEventListener('resize', function () { resizeCanvases(); compute(); });
-
-resizeCanvases();
-compute();
+  if (prefersReduced){
+    // single static frame
+    if (curP && curM){ drawSchema(curP, curM, 0); drawProfile(curP, curM, 0); }
+  } else {
+    animId = requestAnimationFrame(loop);
+  }
+})();
+// global compute() shim for inline oninput handlers
+function compute(){ if (window.__jetCompute) window.__jetCompute(); }
 </script>
 
 <section class="explanation">
@@ -498,6 +622,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="jet-impingement.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -551,27 +678,37 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>ノズル流速スライダー(0～50 m/s)を設定し、円形ノズルから噴出する空気の速度を決定</li>
-<li>ノズル直径スライダー(2～20 mm)を調整してノズル径Dを入力</li>
-<li>衝突距離比スライダー(H/D = 0.5～6)で平板までの距離を相対的に指定</li>
-<li>温度差スライダー(5～100 K)を設定して衝突板と空気の温度差ΔTを入力</li>
+<li>ノズル流速スライダー(1～100 m/s)を設定し、円形ノズルから噴出する空気の速度を決定</li>
+<li>ノズル直径スライダー(1～50 mm)を調整してノズル径Dを入力</li>
+<li>衝突距離比スライダー(H/D = 2～12)で平板までの距離を相対的に指定</li>
+<li>温度差スライダー(10～200 K)を設定して衝突板と空気の温度差ΔTを入力</li>
 <li>計算実行後、Reynolds数Re、Nusselt数Nu、熱伝達係数h、熱流束q = h·ΔTをリアルタイム表示</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>電子機器冷却の実例:ノズル流速U=25 m/s、直径D=6 mm、衝突距離比H/D=2.0、温度差ΔT=40 Kの場合、Re≈10,000、滞留点Nusselt数Nu≈130～150が得られます。空気の熱伝導率λ=0.026 W/(m·K)を用いると熱伝達係数h = Nu·λ/D ≈ 560 W/(m²·K)となり、衝突面積0.28 cm²での熱流束q = 560×40 ≈ 22.4 kW/m²を達成。ガラス強化では同じ流速で高温度差(ΔT=80 K)を設定するとq=44.8 kW/m²となり、冷却効率が倍増します。</p>
+<p>電子機器冷却の実例:ノズル流速U=25 m/s、直径D=6 mm、衝突距離比H/D=2.0、温度差ΔT=40 Kの場合、Re≈10,000、滞留点Nusselt数Nu≈81が得られます。空気の熱伝導率λ=0.026 W/(m·K)を用いると熱伝達係数h = Nu·λ/D ≈ 350 W/(m²·K)となり、熱流束q = h·ΔT ≈ 14.0 kW/m²を達成します。ガラス強化では同じ流速で高温度差(ΔT=80 K)を設定するとq≈28.0 kW/m²となり、温度差に比例して熱流束が倍増します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
-<li>H/D比が0.5以下では衝突核領域での激しい圧力勾配により、古典相関式の精度が低下するため、CFD検証推奨</li>
+<li>H/D比が小さい（本ツール下限の2付近）領域では衝突核（ポテンシャルコア）の影響で古典相関式の精度が低下するため、CFD検証推奨</li>
 <li>Re数が3,000未満では層流域となり、Nusselt数が急激に低下するため、実務冷却ではU≥15 m/sを確保</li>
 <li>電子部品冷却時は基板の局所热応力を回避するため、衝突面積当たりの热流束を25 kW/m²以下に制限</li>
 <li>温度差40 K以上の大温度差条件では空気物性値の変化を考慮し、膜温度(Tf = Tw + ΔT/2)での補正が必要</li>
-<li>複数ノズルアレイ設計時は隣接噴流の干渉領域(典型H/D=1.5付近)を避けてノズル配置</li>
+<li>複数ノズルアレイ設計時は隣接噴流の干渉やクロスフローを考慮し、ノズル間ピッチs/Dを適切に確保してノズル配置</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983372?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983372.09._SCMZZZZZZ_.jpg" alt="伝熱工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">伝熱工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

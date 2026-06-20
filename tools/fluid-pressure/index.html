@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "流体圧力・浮力シミュレーター",
       "description": "流体静圧・浮力・パスカルの原理をリアルタイム可視化。水深・流体密度・物体密度を操作して浮沈を体験できるインタラクティブシミュレーター。",
       "url": "https://novasolver.jp/tools/fluid-pressure.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["静水圧P=P₀+ρghの可視化","浮力F_b=ρVgのリアルタイム計算","パスカルの原理（油圧プレス）","潜水艦・船・油圧ジャッキのプリセット"],
       "keywords": "流体静力学,静水圧,浮力,パスカルの原理,アルキメデスの原理,油圧,CAE",
       "datePublished": "2026-04-08",
@@ -156,7 +156,7 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
       <label>プリセット</label>
       <select id="preset">
         <option value="none">カスタム</option>
-        <option value="submarine">潜水艦 (深海)</option>
+        <option value="submarine">潜水艦 (最大200m)</option>
         <option value="ship">鉄船 (浮力)</option>
         <option value="diver">スキューバダイバー</option>
         <option value="jack">油圧ジャッキ</option>
@@ -190,6 +190,15 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
       <label>入力力 F₁ <div class="num-wrap"><input type="number" class="num-input" id="F1Num" value="100" min="1" max="10000" step="1" oninput="syncFromNum('F1','F1Num')"><span class="num-unit">N</span></div> </label>
       <input type="range" id="F1" oninput="syncToNum('F1','F1Num')" min="1" max="10000" step="1" value="100">
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
   <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -217,11 +226,16 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
-
+"use strict";
+(function(){
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let currentMode = 'hydrostatic';
 let pressureChart;
+const G = 9.81, P0 = 101325;       // 大気圧 [Pa]
+let rafId = null, animPhase = 0;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fluidParticles = [];
 
 const fluids = {
   water: {rho: 1000, color: 'rgba(0,123,255,0.55)', name: '水'},
@@ -274,69 +288,153 @@ function getParams(){
   pressureChart.data.datasets[0].data = pressures;
   pressureChart.options.plugins.title.text = '深さ vs 静水圧';
   pressureChart.update('none');
+}function drawArrow(x0,y0,x1,y1,color,w){
+  ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w;
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+  const a=Math.atan2(y1-y0,x1-x0), hd=5+w*1.4;
+  ctx.beginPath(); ctx.moveTo(x1,y1);
+  ctx.lineTo(x1-hd*Math.cos(a-0.45),y1-hd*Math.sin(a-0.45));
+  ctx.lineTo(x1-hd*Math.cos(a+0.45),y1-hd*Math.sin(a+0.45));
+  ctx.closePath(); ctx.fill();
 }function drawHydrostatic(p){
+  // 水深 h での静水圧をリアルタイム可視化：三角形の圧力分布・深度プローブ・壁面圧力矢印
   const {rhoF, h} = p;
-  const g = 9.81;
-  const P_abs = 101325 + rhoF * g * h;
-  const P_gauge = rhoF * g * h;
+  const maxDepth = 200;
+  const P_abs = P0 + rhoF * G * h;        // 絶対圧 [Pa]
+  const P_gauge = rhoF * G * h;            // ゲージ圧 = ρgh [Pa]
   const W = __novaCanvasCssW(canvas), H = __novaCanvasCssH(canvas);
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#F8F9FA'; ctx.fillRect(0, 0, W, H);
+  // 背景（空・大気）
+  const bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#0a1628'); bg.addColorStop(1,'#0d2036');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-  // Tank
-  const tankX = W*0.15, tankW = W*0.7, tankH = H*0.8, tankY = H*0.1;
-  ctx.strokeStyle = '#6c757d'; ctx.lineWidth = 3;
-  ctx.strokeRect(tankX, tankY, tankW, tankH);
+  // タンク領域
+  const tankX = W*0.12, tankW = W*0.50, tankH = H*0.84, tankTop = H*0.10;
+  const surfaceY = tankTop + tankH*0.04;     // 水面
+  const bottomY  = tankTop + tankH;          // 底
+  const colH = bottomY - surfaceY;           // 水柱の画面高さ
 
-  // Water
-  const maxDepth = 200;
-  const waterFrac = Math.min(h / maxDepth, 1);
-  const waterH = tankH * 0.9;
-  const waterY = tankY + tankH - waterH;
-  const wGradient = ctx.createLinearGradient(tankX, waterY, tankX, waterY + waterH);
-  wGradient.addColorStop(0, 'rgba(0,180,216,0.4)');
-  wGradient.addColorStop(1, 'rgba(0,80,200,0.7)');
-  ctx.fillStyle = wGradient;
-  ctx.fillRect(tankX, waterY, tankW, waterH);
+  // 深さ→画面y の写像（probe の深さ h に対応）
+  const probeFrac = Math.min(h / maxDepth, 1);
+  const probeY = surfaceY + probeFrac * colH;
 
-  // Object at depth
-  const objY = tankY + 20 + waterFrac * (waterH - 60);
-  const objSize = 40;
-  const objX = tankX + tankW/2 - objSize/2;
-  ctx.fillStyle = '#dc3545';
+  // 水（密度で色味を変える）
+  const tint = rhoF >= 5000 ? '120,120,140' : (rhoF <= 900 ? '200,160,40' : '0,140,210');
+  const wg = ctx.createLinearGradient(tankX, surfaceY, tankX, bottomY);
+  wg.addColorStop(0, 'rgba('+tint+',0.35)');
+  wg.addColorStop(1, 'rgba('+tint+',0.78)');
+  ctx.fillStyle = wg;
+  ctx.fillRect(tankX, surfaceY, tankW, colH);
+
+  // 浮遊する流体粒子（穏やかな対流アニメ）
+  for(let i=0;i<fluidParticles.length;i++){
+    const fp = fluidParticles[i];
+    const px = tankX + fp.x*tankW;
+    const wob = Math.sin(animPhase*0.9 + fp.ph)*4;
+    const py = surfaceY + 6 + fp.y*(colH-12) + wob;
+    ctx.fillStyle = 'rgba(255,255,255,'+(0.10+0.10*fp.s).toFixed(3)+')';
+    ctx.beginPath(); ctx.arc(px+wob*0.4, py, 1.4+fp.s*1.6, 0, 7); ctx.fill();
+  }
+
+  // 揺らめく水面
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.roundRect(objX, objY, objSize, objSize, 4);
+  for(let x=0;x<=tankW;x+=4){
+    const yy = surfaceY + Math.sin(x*0.06 + animPhase*1.4)*2.2;
+    if(x===0) ctx.moveTo(tankX+x, yy); else ctx.lineTo(tankX+x, yy);
+  }
+  ctx.stroke();
+
+  // タンク枠
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(tankX, surfaceY-8); ctx.lineTo(tankX, bottomY);
+  ctx.lineTo(tankX+tankW, bottomY); ctx.lineTo(tankX+tankW, surfaceY-8);
+  ctx.stroke();
+
+  // === 壁面の三角形圧力分布（深さに線形：P=ρgh）===
+  const profX = tankX + tankW;             // 右壁を基準に外向きに描く
+  const maxBar = W*0.26;                    // 最大バー長（最深部）
+  const pAtBottom = rhoF*G*Math.min(h>0?h:maxDepth, maxDepth);  // スケール基準
+  const pScaleRef = Math.max(rhoF*G*maxDepth, 1);
+  // 三角形の塗り
+  ctx.beginPath();
+  ctx.moveTo(profX, surfaceY);
+  const Nseg = 22;
+  for(let i=0;i<=Nseg;i++){
+    const f = i/Nseg;
+    const depthHere = f*colH;
+    const yy = surfaceY + depthHere;
+    const pHere = rhoF*G*(f*Math.min(h>0?h:maxDepth, maxDepth)); // 線形
+    const len = (pHere/pScaleRef)*maxBar;
+    ctx.lineTo(profX + len, yy);
+  }
+  ctx.lineTo(profX, bottomY);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,107,53,0.22)';
   ctx.fill();
+  ctx.strokeStyle = 'rgba(255,107,53,0.85)'; ctx.lineWidth = 1.5; ctx.stroke();
+  // 圧力矢印（深くなるほど長い＝線形増加）
+  for(let i=1;i<=5;i++){
+    const f = i/5;
+    const yy = surfaceY + f*colH;
+    const pHere = rhoF*G*(f*Math.min(h>0?h:maxDepth, maxDepth));
+    const len = Math.max(8,(pHere/pScaleRef)*maxBar);
+    drawArrow(profX+len, yy, profX+3, yy, 'rgba(255,140,80,0.95)', 1.6);
+  }
+  ctx.fillStyle='rgba(255,170,120,0.9)'; ctx.font='10px Roboto Mono'; ctx.textAlign='left';
+  ctx.fillText('P ∝ 深さ', profX+6, surfaceY-2);
 
-  // Pressure arrows at object
-  const arrLen = Math.min(60, 10 + P_gauge / 5000);
-  ctx.strokeStyle = '#ff6b35'; ctx.lineWidth = 2;
-  // Left arrow →
-  ctx.beginPath(); ctx.moveTo(objX - arrLen, objY + objSize/2); ctx.lineTo(objX - 5, objY + objSize/2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(objX - 8, objY + objSize/2 - 5); ctx.lineTo(objX - 1, objY + objSize/2); ctx.lineTo(objX - 8, objY + objSize/2 + 5); ctx.fill();
-  // Right arrow ←
-  ctx.beginPath(); ctx.moveTo(objX + objSize + arrLen, objY + objSize/2); ctx.lineTo(objX + objSize + 5, objY + objSize/2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(objX + objSize + 8, objY + objSize/2 - 5); ctx.lineTo(objX + objSize + 1, objY + objSize/2); ctx.lineTo(objX + objSize + 8, objY + objSize/2 + 5); ctx.fill();
-  // Top arrow ↓
-  ctx.beginPath(); ctx.moveTo(objX + objSize/2, objY - arrLen); ctx.lineTo(objX + objSize/2, objY - 5); ctx.stroke();
-  // Bottom arrow ↑
-  ctx.beginPath(); ctx.moveTo(objX + objSize/2, objY + objSize + arrLen); ctx.lineTo(objX + objSize/2, objY + objSize + 5); ctx.stroke();
+  // === 深度プローブ（水深 h で圧力を表示）===
+  const probeX = tankX + tankW*0.5;
+  // プローブのライン
+  ctx.strokeStyle = 'rgba(255,213,74,0.5)'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(tankX, probeY); ctx.lineTo(tankX+tankW, probeY); ctx.stroke();
+  ctx.setLineDash([]);
+  // プローブ本体
+  ctx.fillStyle = '#ffd54a';
+  ctx.beginPath(); ctx.arc(probeX, probeY, 7, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#0a1628'; ctx.lineWidth = 1.5; ctx.stroke();
+  // プローブから全方向に作用する圧力矢印（等方性）
+  const isoLen = 8 + (P_gauge/pScaleRef)*40;
+  [[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
+    drawArrow(probeX, probeY, probeX+d[0]*isoLen, probeY+d[1]*isoLen, 'rgba(255,213,74,0.9)', 1.6);
+  });
+  // プローブ読み値ふきだし
+  const tag = 'P = '+(P_abs/1000).toFixed(1)+' kPa';
+  ctx.font='bold 11px Roboto Mono';
+  const tw = ctx.measureText(tag).width;
+  let bx = probeX+14, by = probeY-9;
+  if(bx+tw+10 > tankX+tankW) bx = probeX-14-tw-10;
+  ctx.fillStyle='rgba(10,22,40,0.9)';
+  ctx.fillRect(bx, by, tw+12, 18);
+  ctx.strokeStyle='#ffd54a'; ctx.lineWidth=1; ctx.strokeRect(bx, by, tw+12, 18);
+  ctx.fillStyle='#ffd54a'; ctx.textAlign='left';
+  ctx.fillText(tag, bx+6, by+13);
 
-  // Depth label
-  ctx.fillStyle = '#fff'; ctx.font = '12px Roboto Mono, monospace'; ctx.textAlign = 'center';
-  ctx.fillText('h = ' + h.toFixed(1) + ' m', tankX + tankW/2, waterY + 20);
+  // 深さラベル
+  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='11px Roboto Mono'; ctx.textAlign='right';
+  ctx.fillText('h = '+h.toFixed(1)+' m', tankX-4, probeY+4);
+  // 水面ラベル
+  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.textAlign='left';
+  ctx.fillText('水面 P₀='+(P0/1000).toFixed(1)+'kPa', tankX+4, surfaceY-12);
 
-  // Stats
+  // 注釈：式
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='right';
+  ctx.fillText('P = P₀ + ρgh', W-10, H-12);
+
+  // Stats（毎フレーム更新）
   document.getElementById('stat1label').textContent = '絶対圧 P';
   document.getElementById('stat1').textContent = (P_abs / 1000).toFixed(1) + ' kPa';
-  document.getElementById('stat2label').textContent = 'ゲージ圧';
+  document.getElementById('stat2label').textContent = 'ゲージ圧 ρgh';
   document.getElementById('stat2').textContent = (P_gauge / 1000).toFixed(2) + ' kPa';
-  document.getElementById('stat3label').textContent = '水圧 [atm]';
-  document.getElementById('stat3').textContent = (P_abs / 101325).toFixed(3) + ' atm';
+  document.getElementById('stat3label').textContent = '気圧換算';
+  document.getElementById('stat3').textContent = (P_abs / P0).toFixed(3) + ' atm';
   document.getElementById('stat4label').textContent = '水銀柱換算';
-  document.getElementById('stat4').textContent = (P_gauge / (13600 * 9.81 * 0.001)).toFixed(0) + ' mmHg';
+  document.getElementById('stat4').textContent = (P_gauge / (13600 * G * 0.001)).toFixed(0) + ' mmHg';
 
-  updatePressureChart(rhoF, Math.max(h * 2, 20));
+  updatePressureChart(rhoF, Math.max(h, 1));
 }function drawBuoyancy(p){
   const {rhoF, rhoO, vol} = p;
   const g = 9.81;
@@ -482,19 +580,31 @@ function getParams(){
   pressureChart.data.datasets[0].data = [F1, F2];
   pressureChart.options.plugins.title.text = 'パスカルの原理: F₂ = F₁×(A₂/A₁)';
   pressureChart.update('none');
-}function update(){
+}function drawFrame(){
   const p = getParams();
-  resizeCanvas();
   if (currentMode === 'hydrostatic') drawHydrostatic(p);
   else if (currentMode === 'buoyancy') drawBuoyancy(p);
   else drawPascal(p);
+}function update(){
+  // パラメータ変更時：サイズ再計算＋即時1フレーム描画
+  resizeCanvas();
+  drawFrame();
+}function animate(){
+  animPhase += 0.02;
+  // 動きがあるのは静水圧モードのみ（粒子・水面）
+  if (currentMode === 'hydrostatic') drawFrame();
+  rafId = requestAnimationFrame(animate);
+}function startAnim(){
+  if (reduceMotion){ update(); return; }   // 動きを抑制：静止フレーム
+  if (rafId) return;
+  rafId = requestAnimationFrame(animate);
 }// Presets
 
 document.getElementById('preset').addEventListener('change', e =>{
   const v = e.target.value;
   if (v === 'submarine') {
-    document.getElementById('rhoF').value = 1025; document.getElementById('hDepth').value = 300;
-    document.getElementById('rhoO').value = 1050; document.getElementById('vol').value = 2000;
+    document.getElementById('rhoF').value = 1025; document.getElementById('hDepth').value = 200;
+    document.getElementById('rhoO').value = 1050; document.getElementById('vol').value = 5;
     currentMode = 'hydrostatic'; setMode('hydrostatic');
   }else if (v === 'ship'){
     document.getElementById('rhoF').value = 1025; document.getElementById('rhoO').value = 300;
@@ -529,6 +639,7 @@ function setMode(mode){
 });
 
 function updateSliderLabels(){
+  ['rhoF','hDepth','rhoO','vol','A1','A2','F1'].forEach(id => syncToNum(id, id + 'Num'));
   }['rhoF','hDepth','rhoO','vol','A1','A2','F1'].forEach(id =>{
   document.getElementById(id).addEventListener('input', () => { updateSliderLabels(); update(); });
 });
@@ -554,10 +665,17 @@ function resizeCanvas() {
   var __novaCtx = canvas.getContext && canvas.getContext('2d');
   if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
 }window.addEventListener('resize', () =>{ resizeCanvas(); update(); });
+
+// 流体粒子をシード
+for(let i=0;i<46;i++){
+  fluidParticles.push({x:Math.random(), y:Math.random(), s:Math.random(), ph:Math.random()*6.28});
+}
 setupPressureChart();
 resizeCanvas();
 updateSliderLabels();
 setMode('hydrostatic');
+startAnim();
+})();
 </script>
 
 <section class="explanation">
@@ -619,6 +737,9 @@ setMode('hydrostatic');
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fluid-pressure.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -679,7 +800,7 @@ setMode('hydrostatic');
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>潜水艦の浮力計算：海水密度1025kg/m³、水深200mの場合、静圧は202.5kPaに達します。排水量2000m³の潜水艦では、浮力は2050万Nです。一方、船体質量が2000トンなら重力は196万N。浮力が勝るため浮上可能です。油圧ジャッキの場合、油密度860kg/m³、シリンダー直径100mm(面積0.00785m²)で、1MPa(100kgf/cm²)の圧力をかけると理論上78.5kNの推力が発生します</p>
+<p>潜水艦の浮力計算：海水密度1025kg/m³、水深200mの場合、ゲージ静圧は約2011kPa、絶対圧は約2112kPaに達します。排水量2000m³の潜水艦では、浮力は約2011万Nです。一方、船体質量が2000トンなら重力は約1962万N。浮力が勝るため浮上可能です。油圧ジャッキの場合、1MPaを断面積785mm²にかけると推力は約0.785kNです。なお1MPaは約10.2kgf/cm²です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -689,6 +810,16 @@ setMode('hydrostatic');
 <li>油圧システムでは流体が非圧縮性と仮定しますが、200MPa以上の超高圧ではパスカルの原理の適用精度が低下します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

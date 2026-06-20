@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "カルマン渦 シミュレーター",
       "description": "円柱周りのカルマン渦放出周波数 fs = St·V/D をリアルタイム計算。Reynolds 数、固有振動数比 fs/fn、ロックイン判定を可視化し、橋梁・煙突・配管の渦励振（VIV）評価に使える流体振動シミュレーター。",
       "url": "https://novasolver.jp/tools/karman-vortex.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["渦放出周波数の実時間計算","Reynolds 数の自動算出","Strouhal 数による fs = St·V/D の評価","fs/fn 比とロックイン判定 (0.85 < ratio < 1.15)","円柱後流の渦列可視化と V-fs 線図"],
       "keywords": "カルマン渦,Strouhal数,渦放出周波数,ロックイン,渦励振,Reynolds数,円柱後流,流力振動,自励振動,VIV",
       "datePublished": "2026-05-15",
@@ -102,6 +102,24 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #vortexCanvas,#chartCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+
+/* ===== v2 additions ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.15;word-break:break-word}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:4px 10px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.divider{height:1px;background:var(--border);margin:14px 0}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin:8px 0 4px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:16px;height:8px;border-radius:2px;display:inline-block}
+#flowCanvas{background:#0a1929;border-radius:8px;display:block;width:100%}
+#flowCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.preset-btn{transition:none}}
 </style>
 </head>
 <body>
@@ -131,459 +149,553 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="kvPreset('creep')">低Re 定常</button>
+        <button type="button" class="preset-btn" onclick="kvPreset('onset')">放出開始 Re≈47</button>
+        <button type="button" class="preset-btn" onclick="kvPreset('street')">カルマン渦列</button>
+        <button type="button" class="preset-btn" onclick="kvPreset('subcrit')">亜臨界 乱流後流</button>
+        <button type="button" class="preset-btn" onclick="kvPreset('turb')">高Re 乱流</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">流速 V</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slVVal" value="5.0" min="0.1" max="30.0" step="0.1" oninput="syncFromNum('slV','slVVal')"><span class="num-unit">m/s</span></div>
+        <label class="param-name" for="slRe">Reynolds数 Re</label>
+        <span class="param-value"><span id="slReVal">140</span></span>
       </div>
-      <input type="range" id="slV" min="0.1" max="30.0" step="0.1" value="5.0" oninput="syncToNum('slV','slVVal');updateSlider(this,'slVVal',0,'');compute()">
+      <input type="range" id="slRe" min="0" max="1000" step="1" value="388" oninput="kvOnParam()" aria-label="Reynolds数 Re">
     </div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">円柱直径 D</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slD_mmVal" value="50" min="1" max="200" step="1" oninput="syncFromNum('slD_mm','slD_mmVal')"><span class="num-unit">mm</span></div>
+        <label class="param-name" for="slD">円柱直径 D</label>
+        <span class="param-value"><span id="slDVal">50</span> mm</span>
       </div>
-      <input type="range" id="slD_mm" min="1" max="200" step="1" value="50" oninput="syncToNum('slD_mm','slD_mmVal');updateSlider(this,'slD_mmVal',0,'');compute()">
+      <input type="range" id="slD" min="1" max="200" step="1" value="50" oninput="kvOnParam()" aria-label="円柱直径 D">
     </div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">Strouhal 数 St</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slStVal" value="0.200" min="0.18" max="0.22" step="0.001" oninput="syncFromNum('slSt','slStVal')"><span class="num-unit">—</span></div>
+        <label class="param-name" for="slNu">動粘度 ν</label>
+        <span class="param-value"><span id="slNuVal">15.00</span> ×10⁻⁶ m²/s</span>
       </div>
-      <input type="range" id="slSt" min="0.18" max="0.22" step="0.001" value="0.200" oninput="syncToNum('slSt','slStVal');updateSlider(this,'slStVal',0,'');compute()">
+      <input type="range" id="slNu" min="0.5" max="50" step="0.1" value="15" oninput="kvOnParam()" aria-label="動粘度 ν">
     </div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">固有振動数 fn</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slFnVal" value="25" min="1" max="1000" step="1" oninput="syncFromNum('slFn','slFnVal')"><span class="num-unit">Hz</span></div>
+        <label class="param-name" for="slSt">Strouhal数 St</label>
+        <span class="param-value"><span id="slStVal">0.200</span></span>
       </div>
-      <input type="range" id="slFn" min="1" max="1000" step="1" value="25" oninput="syncToNum('slFn','slFnVal');updateSlider(this,'slFnVal',0,'');compute()">
+      <input type="range" id="slSt" min="0.12" max="0.30" step="0.001" value="0.200" oninput="kvOnParam()" aria-label="Strouhal数 St">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <label class="param-name" for="slDens">トレーサー密度</label>
+        <span class="param-value"><span id="slDensVal">50</span> %</span>
+      </div>
+      <input type="range" id="slDens" min="0" max="100" step="1" value="50" oninput="kvOnParam()" aria-label="トレーサー密度">
     </div>
 
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> V をスイープ</button>
-      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+      <button type="button" class="btn" id="btnPlay" onclick="kvTogglePlay()"><i class="fas fa-play"></i> 再生</button>
+      <button type="button" class="btn secondary" onclick="kvReset()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値 (V=5.0 m/s、D=50 mm、St=0.200、fn=25 Hz、空気 ν=1.5×10⁻⁵ m²/s) では fs = 20.0 Hz、Re ≈ 1.67×10⁴、fs/fn = 0.800、ロックイン「no」。V を 6.25 m/s 付近に上げると fs/fn = 1.00 となりロックイン域に入ります。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">Reynolds数を主操作量とし、U = Re·ν/D で流速を逆算します。Re&lt;47 で定常（渦なし）、Re≈47 で放出開始、Re≈100〜1000 で明瞭なカルマン渦列、高Reで乱流後流。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="Vibration engineering book" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">Amazon →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazon associate disclosure</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-      <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statFs">—</div><div class="sl">渦放出周波数 fs</div></div>
-        <div class="stat-card"><div class="sv" id="statRe">—</div><div class="sl">Reynolds 数</div></div>
-        <div class="stat-card"><div class="sv" id="statRatio">—</div><div class="sl">fs/fn</div></div>
-        <div class="stat-card"><div class="sv" id="statLockin">—</div><div class="sl">ロックイン</div></div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> 流れの領域</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roRe">—</div><div class="rl">Reynolds数</div></div>
+        <div class="live-ro"><div class="rv" id="roSt">—</div><div class="rl">Strouhal数 St</div></div>
+        <div class="live-ro"><div class="rv" id="roFs">—</div><div class="rl">放出周波数 fs</div></div>
+        <div class="live-ro"><div class="rv" id="roU">—</div><div class="rl">流速 U</div></div>
+        <div class="live-ro"><div class="rv" id="roReg">—</div><div class="rl">流れの領域</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-arrows-spin"></i> 円柱後流の渦列</div>
-      <canvas id="vortexCanvas"></canvas>
-      <p class="canvas-hint">中央の灰色の円柱に対し、流れ (左→右の白矢印) が当たって背後に上下交互の渦列を形成します。赤い渦は上側 (反時計回り)、青い渦は下側 (時計回り) を表し、間隔は流速と放出周波数から決まる波長 λ = V/fs に対応します。Re が 300 未満では渦は形成されず、2×10⁵ を超えると後流が広帯域乱流になります。</p>
+      <div class="chart-title"><i class="fas fa-water"></i> 円柱まわりの流れ（トレーサー粒子＋渦度カラーマップ）</div>
+      <canvas id="flowCanvas"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:rgba(255,170,120,0.95)"></i>上流トレーサー</span>
+        <span><i class="swatch" style="background:rgba(120,200,255,0.95)"></i>下流トレーサー</span>
+        <span><i class="swatch" style="background:rgba(255,90,90,0.7)"></i>渦度 +（反時計）</span>
+        <span><i class="swatch" style="background:rgba(90,150,255,0.7)"></i>渦度 −（時計）</span>
+      </div>
+      <p class="canvas-hint">灰色の円柱に左から流れが当たります。色付きの短い線はトレーサー粒子の流跡（ストリークライン）で、上流側は橙、下流側は青に着色。背景の赤／青は渦度（反時計回り／時計回り）。Re&lt;47 では流れは円柱に付着して渦は出ませんが、Re≳47 で上下交互のカルマン渦列が形成され、高Reでは後流が乱流化します。</p>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> V-fs 線図 (Strouhal 直線)</div>
-      <canvas id="chartCanvas"></canvas>
-      <p class="canvas-hint">横軸：流速 V (m/s、0.1〜30) / 縦軸：渦放出周波数 fs (Hz) / 青実線：fs = St·V/D / 緑水平線：構造物の固有振動数 fn / 黄色マーカー：現在の (V, fs) 動作点 / 黄色マーカーが緑線に近づくとロックイン (0.85 < fs/fn < 1.15) で危険域。設計では fn と fs を意図的にずらす、または減衰・ストレーキで渦放出を破壊します。</p>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
-      <p>渦放出周波数：円柱周りのカルマン渦は Strouhal 数 St で流速と直径から決まる周波数で交互に放出されます。</p>
-      $$f_s = \mathrm{St}\cdot\frac{V}{D}$$
-      <p style="margin-top:6px;">Reynolds 数 (空気 20°C、$\nu = 1.5\times10^{-5}$ m²/s)：</p>
-      $$\mathrm{Re} = \frac{V\,D}{\nu}$$
-      <p style="margin-top:6px;">ロックイン判定 (渦放出と構造振動の同期、振幅増大の危険域)：</p>
-      $$0.85 \lt  \frac{f_s}{f_n} \lt  1.15$$
-      <p style="margin-top:8px;">$V$ は流速 (m/s)、$D$ は円柱直径 (m)、$\mathrm{St}$ は Strouhal 数 (円柱で 0.20 程度)、$f_n$ は構造物の固有振動数 (Hz)。Re = 300〜2×10⁵ でカルマン渦が安定して放出されます。</p>
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 放出周波数 fs ＝ St·U/D の理論</div>
+      <p>渦放出周波数：カルマン渦は Strouhal 数 St で流速 U と直径 D から決まる周波数で交互に放出されます。</p>
+      $$f_s = \mathrm{St}\cdot\frac{U}{D}$$
+      <p style="margin-top:6px;">Reynolds 数（U は流速、D は直径、ν は動粘度）：</p>
+      $$\mathrm{Re} = \frac{U\,D}{\nu}$$
+      <p style="margin-top:8px;">放出の開始は Re ≈ 47、明瞭なカルマン渦列は Re ≈ 100〜1000、Re > 2×10⁵ で後流が乱流化します。円柱では亜臨界域で St ≈ 0.2 にほぼ一定です。</p>
     </div>
   </div>
 </div>
 
+<script>window.__KV_I18N = {"play": "再生", "pause": "一時停止", "onset": "渦放出 開始 Re≈47", "canvasAria": "円柱まわりの流れのアニメーション。トレーサー粒子と渦度カラーマップで、低Reの付着流と中Reのカルマン渦列を表示します。", "ann": {"creep": "Re<5: クリープ流（渦なし）", "attached": "Re<47: 定常（渦なし・付着流）", "street": "Re~100: カルマン渦列", "subcrit": "亜臨界: 乱流後流（St≈0.2）", "turb": "高Re: 広帯域乱流後流"}, "regName": {"creep": "クリープ流", "attached": "定常 付着流", "street": "カルマン渦列", "subcrit": "亜臨界 乱流後流", "turb": "乱流後流"}};</script>
 <script>
-// ========== Karman Vortex Simulator ==========
-var vortexCanvas = document.getElementById('vortexCanvas');
-var vortexCtx = vortexCanvas.getContext('2d');
-var chartCanvas = document.getElementById('chartCanvas');
-var chartCtx = chartCanvas.getContext('2d');
-var playing = false;
-var animId = null;
-var sweepDir = 1;
-var animPhase = 0;
-var NU_AIR = 1.5e-5; // air at 20 deg C, m^2/s
+// ===== Karman Vortex Simulator v2 — flow-field particle advection =====
+// Faithfully shows: attached creeping flow at low Re, alternating Karman
+// vortex street at moderate Re, broadband turbulent wake at high Re.
+"use strict";
+(function(){
+var T = window.__KV_I18N;
 
-function getParams() {
-  var V = parseFloat(document.getElementById('slV').value);
-  var D_mm = parseFloat(document.getElementById('slD_mm').value);
-  var St = parseFloat(document.getElementById('slSt').value);
-  var fn = parseFloat(document.getElementById('slFn').value);
-  var D = D_mm * 1e-3; // m
-  return { V: V, D_mm: D_mm, D: D, St: St, fn: fn };
+var canvas = document.getElementById('flowCanvas');
+var ctx = canvas.getContext('2d');
+
+var NU_AIR = 1.5e-5;            // m^2/s, air at 20C (for Re from V,D when driving by V)
+var playing = true;
+var rafId = null;
+var lastTs = 0;
+var simTime = 0;               // seconds of physical wake time accumulated
+var phase = 0;                 // shedding phase [0,1)
+var particles = [];
+var reduceMotion = false;
+try { reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+
+function el(id){ return document.getElementById(id); }
+function num(id){ return parseFloat(el(id).value); }
+
+// ---- driver: Reynolds number is the master control ----
+// We let the user set Re directly (log slider), plus U, D, viscosity as a
+// linked group. Re = U*D/nu. We keep Re authoritative; U,D,nu are display/derived.
+// Re slider is a 0..1000 linear track mapped logarithmically to Re in [0.5, 1e6]
+var RE_MIN = 0.5, RE_MAX = 1e6;
+function sliderToRe(s){
+  var t = s / 1000;
+  return RE_MIN * Math.pow(RE_MAX / RE_MIN, t);
+}
+function reToSlider(Re){
+  Re = Math.max(RE_MIN, Math.min(RE_MAX, Re));
+  return 1000 * Math.log(Re/RE_MIN) / Math.log(RE_MAX/RE_MIN);
 }
 
-function calcFs(p) {
-  if (!isFinite(p.V) || !isFinite(p.D) || p.D <= 0 || !isFinite(p.St)) return NaN;
-  return p.St * p.V / p.D;
-}
-function calcRe(p) {
-  if (!isFinite(p.V) || !isFinite(p.D) || p.D <= 0) return NaN;
-  return p.V * p.D / NU_AIR;
+function getParams(){
+  var Re = sliderToRe(num('slRe'));
+  var D_mm = num('slD');
+  var nu = num('slNu') * 1e-6;        // mm^2/s shown? no: slNu is in 1e-6 m^2/s units
+  var St = num('slSt');
+  var dens = num('slDens');           // tracer density 0..100
+  var D = D_mm * 1e-3;
+  // U implied by Re, D, nu:  U = Re*nu/D
+  var U = (D > 0 && nu > 0) ? Re * nu / D : 0;
+  return { Re:Re, D_mm:D_mm, D:D, nu:nu, St:St, dens:dens, U:U };
 }
 
-function fmtFs(v) {
+function calcFs(p){
+  if (!isFinite(p.U) || !isFinite(p.D) || p.D <= 0 || !isFinite(p.St)) return NaN;
+  return p.St * p.U / p.D;
+}
+
+// shedding regime classification
+function regime(Re){
+  if (Re < 5)    return 'creep';
+  if (Re < 47)   return 'attached';   // steady twin vortices, no shedding
+  if (Re < 1000) return 'street';     // laminar periodic Karman street
+  if (Re < 2e5)  return 'subcrit';    // subcritical, turbulent wake but St~0.2
+  return 'turb';                      // supercritical / broadband
+}
+function sheds(Re){ return Re >= 47; }
+
+// ---- number formatting ----
+function fmtRe(v){
   if (!isFinite(v) || v <= 0) return '—';
-  return v.toFixed(1) + ' Hz';
-}
-function fmtRe(v) {
-  if (!isFinite(v) || v <= 0) return '—';
-  // Format like 1.67e+4
+  if (v < 1000) return v.toFixed(v < 10 ? 1 : 0);
   var exp = Math.floor(Math.log10(v));
   var mant = v / Math.pow(10, exp);
-  return mant.toFixed(2) + 'e+' + exp;
+  return mant.toFixed(2) + '×10' + sup(exp);
 }
-function fmtRatio(v) {
+function sup(n){
+  var m = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻'};
+  return String(n).split('').map(function(c){return m[c]||c;}).join('');
+}
+function fmtU(v){ return (!isFinite(v)||v<0)?'—':(v<10?v.toFixed(2):v.toFixed(1))+' m/s'; }
+function fmtFs(v){
   if (!isFinite(v) || v <= 0) return '—';
-  return v.toFixed(3);
+  if (v < 1) return v.toFixed(3)+' Hz';
+  if (v < 100) return v.toFixed(2)+' Hz';
+  return v.toFixed(0)+' Hz';
 }
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-
-function resizeCanvases() {
-  [vortexCanvas, chartCanvas].forEach(function(cv){
-    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  });
+// ---- HiDPI canvas ----
+var cssW = 600, cssH = 300, dpr = 1;
+function resize(){
+  var w = Math.max(280, Math.min(canvas.parentElement.clientWidth - 28, 920));
+  cssW = w; cssH = Math.round(w * 0.46);
+  dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function drawVortex(p, fs) {
-  var ctx = vortexCtx, W = __novaCanvasCssW(vortexCanvas), H = __novaCanvasCssH(vortexCanvas);
+// geometry of the flow domain (in px)
+function geom(p){
+  var cx = cssW * 0.26;
+  var cy = cssH * 0.5;
+  var rPx = Math.max(9, Math.min(26, cssH * 0.085 * (0.6 + p.D_mm/120)));
+  return { cx:cx, cy:cy, r:rPx };
+}
+
+// ---- analytic-ish wake velocity field (px/s in screen space) ----
+// Base uniform flow Uvis (px/s) + cylinder potential-flow deflection + a
+// time-periodic alternating vortex train downstream (the Karman street).
+// Strength of the street scales with how strongly the regime sheds.
+function shedStrength(Re){
+  if (Re < 47) return 0;
+  // ramp up just past onset, saturate, then keep (turbulent still sheds visibly)
+  var s = Math.min(1, (Re - 47) / 220);
+  return s;
+}
+function turbulence(Re){
+  if (Re < 1000) return 0.0;
+  if (Re < 2e5) return 0.18;
+  return 0.5;
+}
+
+// visual flow speed (px/s): map log(Re) to a comfortable on-screen pace,
+// independent of absolute U so low-Re creeping flow still drifts slowly.
+function visSpeed(p){
+  var lr = Math.log10(Math.max(p.Re, 0.1));
+  // lr in [-1, 6] -> speed in [12, 150] px/s
+  var t = (lr + 1) / 7;
+  return 14 + Math.max(0, Math.min(1, t)) * 150;
+}
+
+function velAt(x, y, p, g, Uvis, t){
+  // uniform inflow
+  var u = Uvis, v = 0;
+  var dx = x - g.cx, dy = y - g.cy;
+  var r2 = dx*dx + dy*dy;
+  var R2 = g.r*g.r;
+  if (r2 < R2*1.02){ return {u:0, v:0, inside:true}; }
+  // doublet (cylinder) deflection — potential flow around a circle
+  var f = R2 / r2;
+  u += Uvis * f * (dy*dy - dx*dx) / r2;
+  v += Uvis * f * (-2*dx*dy) / r2;
+  // downstream Karman street: alternating point-ish vortices convecting
+  var sStr = shedStrength(p.Re);
+  if (sStr > 0 && dx > 0){
+    var lam = Math.max(40, g.r * 5.2);           // streamwise spacing (px)
+    var hsp = g.r * 1.15;                         // half lateral spacing
+    var conv = Uvis * 0.86;                       // vortices convect a bit slower than free stream
+    var circ = sStr * Uvis * g.r * 0.9;          // circulation scale
+    var nV = 5;
+    for (var k = -1; k < nV; k++){
+      // top row (CCW, +), bottom row (CW, -), staggered by lam/2
+      var xc1 = g.r*1.6 + k*lam - (conv*t % lam);
+      var yc1 = -hsp;
+      var s1 = 1;
+      var rx = dx - xc1, ry = dy - yc1;
+      var rr2 = rx*rx + ry*ry + 36;
+      var fall = Math.exp(-rr2/(lam*lam*0.5));
+      u += s1*circ * (-ry)/rr2 * fall;
+      v += s1*circ * ( rx)/rr2 * fall;
+      var xc2 = g.r*1.6 + lam*0.5 + k*lam - (conv*t % lam);
+      var yc2 = hsp;
+      var rx2 = dx - xc2, ry2 = dy - yc2;
+      var rr22 = rx2*rx2 + ry2*ry2 + 36;
+      var fall2 = Math.exp(-rr22/(lam*lam*0.5));
+      u += (-1)*circ * (-ry2)/rr22 * fall2;
+      v += (-1)*circ * ( rx2)/rr22 * fall2;
+    }
+  }
+  return {u:u, v:v, inside:false};
+}
+
+// ---- particles (dye tracers / streaklines) ----
+function targetCount(p){
+  var base = 130 + p.dens * 6;       // dens 0..100
+  return Math.round(base * (reduceMotion ? 0.6 : 1));
+}
+function spawn(p){ return { x: -4 - Math.random()*30, y: Math.random()*cssH, age: 0,
+  // colour band by lateral release position so streaklines reveal the street
+  band: 0 }; }
+function seedParticles(p){
+  particles = [];
+  var n = targetCount(p);
+  for (var i=0;i<n;i++){
+    var pt = spawn(p);
+    pt.x = Math.random()*cssW;
+    pt.band = pt.y < cssH*0.5 ? 0 : 1;
+    particles.push(pt);
+  }
+}
+
+function stepParticles(p, g, Uvis, dt, t){
+  var n = targetCount(p);
+  while (particles.length < n) particles.push(spawn(p));
+  if (particles.length > n) particles.length = n;
+  var turb = turbulence(p.Re);
+  for (var i=0;i<particles.length;i++){
+    var pt = particles[i];
+    var vel = velAt(pt.x, pt.y, p, g, Uvis, t);
+    if (vel.inside){
+      // re-inject at inlet
+      pt.x = -4 - Math.random()*20; pt.y = Math.random()*cssH; pt.age = 0;
+      pt.band = pt.y < cssH*0.5 ? 0 : 1;
+      continue;
+    }
+    var jitter = turb * Uvis * 0.25;
+    pt.x += (vel.u) * dt + (Math.random()-0.5)*jitter*dt;
+    pt.y += (vel.v) * dt + (Math.random()-0.5)*jitter*dt;
+    pt.age += dt;
+    if (pt.x > cssW + 6 || pt.y < -6 || pt.y > cssH + 6){
+      pt.x = -4 - Math.random()*20; pt.y = Math.random()*cssH; pt.age = 0;
+      pt.band = pt.y < cssH*0.5 ? 0 : 1;
+    }
+  }
+}
+
+// ---- vorticity tint sampling on a coarse grid (colormap background) ----
+function drawVorticity(p, g, Uvis, t){
+  if (p.Re < 47) return;            // no shed vorticity field to colour
+  var step = 14;
+  ctx.globalAlpha = 0.5;
+  var eps = 2.0;
+  for (var x = g.cx; x < cssW; x += step){
+    for (var y = 0; y < cssH; y += step){
+      var dx = x - g.cx;
+      if (dx < g.r*0.5) continue;
+      var a = velAt(x, y+eps, p, g, Uvis, t);
+      var b = velAt(x, y-eps, p, g, Uvis, t);
+      var c = velAt(x+eps, y, p, g, Uvis, t);
+      var d = velAt(x-eps, y, p, g, Uvis, t);
+      if (a.inside||b.inside||c.inside||d.inside) continue;
+      var wz = ((c.v - d.v) - (a.u - b.u)) / (2*eps); // dv/dx - du/dy
+      var mag = Math.max(-1, Math.min(1, wz * 0.10));
+      if (Math.abs(mag) < 0.05) continue;
+      if (mag > 0) ctx.fillStyle = 'rgba(255,90,90,'+(Math.abs(mag)*0.5).toFixed(3)+')';
+      else        ctx.fillStyle = 'rgba(90,150,255,'+(Math.abs(mag)*0.5).toFixed(3)+')';
+      ctx.fillRect(x - step/2, y - step/2, step, step);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function draw(p, g, Uvis, t){
   ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0,0,cssW,cssH);
 
-  var mx = 30, my = 26;
-  var cx = mx + 90; // cylinder center x
-  var cy = H / 2;  // cylinder center y
-  // Visual cylinder radius (scaled but bounded for readability)
-  var rPx = Math.max(8, Math.min(28, 6 + p.D_mm * 0.18));
+  // vorticity colormap background
+  drawVorticity(p, g, Uvis, t);
 
-  // Inflow arrows (left to right, white)
-  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  for (var k = 0; k < 4; k++) {
-    var yIn = 30 + (H - 60) * (k + 0.5) / 4;
-    var phaseIn = (animPhase + k * 0.13) % 1.0;
-    var xs = 6 + phaseIn * (cx - rPx - 30);
-    var xe = xs + 22;
-    drawArrow(ctx, xs, yIn, xe, yIn, 'rgba(255,255,255,0.6)');
+  // particles as short streaks coloured by band
+  for (var i=0;i<particles.length;i++){
+    var pt = particles[i];
+    var vel = velAt(pt.x, pt.y, p, g, Uvis, t);
+    if (vel.inside) continue;
+    var sp = Math.sqrt(vel.u*vel.u + vel.v*vel.v) + 1e-3;
+    var ln = Math.min(9, sp * 0.045);
+    var nx = vel.u/sp, ny = vel.v/sp;
+    ctx.strokeStyle = pt.band === 0 ? 'rgba(255,170,120,0.9)' : 'rgba(120,200,255,0.9)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(pt.x, pt.y);
+    ctx.lineTo(pt.x - nx*ln, pt.y - ny*ln);
+    ctx.stroke();
   }
 
-  // V label
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = 'bold 13px "Roboto Mono", monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('V = ' + p.V.toFixed(1) + ' m/s', 8, 18);
-
-  // Vortex street parameters
-  // wavelength (px): use Strouhal-based aspect mapping into a fixed visual extent
-  var streetStart = cx + rPx + 6;
-  var streetEnd = W - 16;
-  var streetLen = Math.max(40, streetEnd - streetStart);
-  // 4 cycle of alternating vortices spanning the wake
-  var nPairs = 4;
-  var lamPx = streetLen / (nPairs + 0.4);
-  var dxRow = lamPx / 2; // top-bottom offset
-  var yTop = cy - rPx * 1.4;
-  var yBot = cy + rPx * 1.4;
-  var rVortex = Math.max(7, Math.min(22, lamPx * 0.32));
-
-  // Convect vortices with animPhase
-  var shift = (animPhase % 1.0) * lamPx;
-
-  // Top row (red, CCW)
-  for (var i = -1; i < nPairs + 1; i++) {
-    var xv = streetStart + dxRow * 0.5 + i * lamPx + shift;
-    if (xv < streetStart - rVortex || xv > streetEnd + rVortex) continue;
-    drawVortexSwirl(ctx, xv, yTop, rVortex, '#ff6b6b', 1); // CCW
-  }
-  // Bottom row (blue, CW)
-  for (var j = -1; j < nPairs + 1; j++) {
-    var xv2 = streetStart + dxRow * 1.5 + j * lamPx + shift;
-    if (xv2 < streetStart - rVortex || xv2 > streetEnd + rVortex) continue;
-    drawVortexSwirl(ctx, xv2, yBot, rVortex, '#7fb6ff', -1); // CW
-  }
-
-  // Cylinder (gray)
+  // cylinder
   ctx.beginPath();
-  ctx.arc(cx, cy, rPx, 0, Math.PI * 2);
+  ctx.arc(g.cx, g.cy, g.r, 0, Math.PI*2);
   ctx.fillStyle = '#b0bec5';
   ctx.fill();
   ctx.strokeStyle = '#cfe3f7';
-  ctx.lineWidth = 1.4;
+  ctx.lineWidth = 1.6;
   ctx.stroke();
-  // Cylinder label
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = 'bold 11px "Noto Sans JP", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('D = ' + p.D_mm.toFixed(0) + ' mm', cx, cy + rPx + 14);
 
-  // fs label
+  // inflow arrows
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  for (var a=0;a<3;a++){
+    var ay = cssH*(a+1)/4;
+    if (Math.abs(ay-g.cy) < g.r+8) continue;
+    arrow(8, ay, 30, ay);
+  }
+
+  // labels
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = 'bold 12px "Roboto Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('U = ' + fmtU(p.U), 8, 16);
+  ctx.fillText('D = ' + p.D_mm.toFixed(0) + ' mm', 8, cssH-10);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#FFD166';
-  ctx.font = 'bold 12px "Roboto Mono", monospace';
-  ctx.fillText('fs = ' + fs.toFixed(1) + ' Hz', W - 8, 18);
+  ctx.fillText('Re = ' + fmtRe(p.Re), cssW-8, 16);
 
-  // Legend
-  ctx.font = '11px "Noto Sans JP", sans-serif';
-  var lx = W - 152, ly = H - 14;
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.fillRect(lx - 4, ly - 36, 152, 44);
-  ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.arc(lx + 6, ly - 26, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.fillText('上側の渦 (CCW)', lx + 18, ly - 22);
-  ctx.fillStyle = '#7fb6ff'; ctx.beginPath(); ctx.arc(lx + 6, ly - 10, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.fillText('下側の渦 (CW)', lx + 18, ly - 6);
-}
-
-function drawVortexSwirl(ctx, x, y, r, color, dir) {
-  // Glow
-  var grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-  grad.addColorStop(0, color);
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  // Spiral arms (2 turns)
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  for (var t = 0; t <= 4 * Math.PI; t += 0.18) {
-    var rr = r * (1 - t / (4 * Math.PI));
-    var ang = dir * t + animPhase * 6.28;
-    var xx = x + rr * Math.cos(ang);
-    var yy = y + rr * Math.sin(ang);
-    if (t === 0) ctx.moveTo(xx, yy);
-    else ctx.lineTo(xx, yy);
-  }
-  ctx.stroke();
-}
-
-function drawArrow(ctx, x1, y1, x2, y2, color) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-  var ang = Math.atan2(y2 - y1, x2 - x1);
-  var L = 5;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - L * Math.cos(ang - 0.45), y2 - L * Math.sin(ang - 0.45));
-  ctx.lineTo(x2 - L * Math.cos(ang + 0.45), y2 - L * Math.sin(ang + 0.45));
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawChart(p, fsCur) {
-  var ctx = chartCtx, W = __novaCanvasCssW(chartCanvas), H = __novaCanvasCssH(chartCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 60, mxR = 18, my = 30;
-  var x0 = mx, x1 = W - mxR, y0 = H - my, y1 = my;
-
-  var Vmin = 0.1, Vmax = 30.0;
-  // fs range: 0 to fs(Vmax) with some headroom; also include fn for marker
-  var fsAtMax = p.St * Vmax / p.D;
-  var fsAtMin = p.St * Vmin / p.D;
-  var yMaxF = Math.max(fsAtMax, p.fn) * 1.1;
-  var yMinF = 0;
-
-  function px(V) { return x0 + (V - Vmin) / (Vmax - Vmin) * (x1 - x0); }
-  function py(f) { return y0 - (f - yMinF) / (yMaxF - yMinF) * (y0 - y1); }
-
-  // Gridlines
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.lineWidth = 1;
-  ctx.font = '10px "Roboto Mono", monospace';
-  ctx.fillStyle = '#8fb8e0';
+  // regime annotation banner
+  var reg = regime(p.Re);
+  var ann = T.ann[reg];
+  ctx.font = 'bold 12px "Noto Sans JP", sans-serif';
   ctx.textAlign = 'center';
-  for (var iv = 0; iv <= 30; iv += 5) {
-    if (iv < Vmin) continue;
-    var X = px(iv);
-    ctx.beginPath(); ctx.moveTo(X, y0); ctx.lineTo(X, y1); ctx.stroke();
-    ctx.fillText(iv.toFixed(0), X, y0 + 14);
-  }
-  // Y gridlines (roughly 5 divs)
+  var tw = ctx.measureText(ann).width;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(cssW/2 - tw/2 - 10, cssH-30, tw+20, 20);
+  ctx.fillStyle = sheds(p.Re) ? '#9be7a3' : '#ffd166';
+  ctx.fillText(ann, cssW/2, cssH-16);
+
+  // onset marker note
   ctx.textAlign = 'right';
-  var nDiv = 5;
-  for (var jd = 0; jd <= nDiv; jd++) {
-    var fVal = yMinF + (yMaxF - yMinF) * jd / nDiv;
-    var Y = py(fVal);
-    ctx.beginPath(); ctx.moveTo(x0, Y); ctx.lineTo(x1, Y); ctx.stroke();
-    ctx.fillText(fVal.toFixed(0), x0 - 4, Y + 3);
-  }
-
-  // Axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-
-  // fn horizontal line (green)
-  var Yfn = py(p.fn);
-  if (Yfn >= y1 && Yfn <= y0) {
-    ctx.strokeStyle = 'rgba(155,231,163,0.85)';
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath(); ctx.moveTo(x0, Yfn); ctx.lineTo(x1, Yfn); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#9be7a3';
-    ctx.font = 'bold 10px "Noto Sans JP", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('fn = ' + p.fn.toFixed(0) + ' Hz (固有振動数)', x0 + 8, Yfn - 4);
-  }
-
-  // fs = St*V/D line (blue)
-  ctx.strokeStyle = '#7fdcff';
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.moveTo(px(Vmin), py(fsAtMin));
-  ctx.lineTo(px(Vmax), py(fsAtMax));
-  ctx.stroke();
-
-  // Current marker
-  if (isFinite(fsCur) && fsCur >= 0) {
-    var Xc = px(p.V);
-    var Yc = py(fsCur);
-    ctx.fillStyle = '#FFD166';
-    ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 8;
-    ctx.beginPath(); ctx.arc(Xc, Yc, 7, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 11px "Roboto Mono", monospace';
-    ctx.textAlign = 'left';
-    var lblX = Xc + 10;
-    if (lblX > x1 - 110) lblX = Xc - 130;
-    ctx.fillText('(V=' + p.V.toFixed(1) + ', fs=' + fsCur.toFixed(1) + ')', lblX, Yc - 8);
-  }
-
-  // Axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('流速 V (m/s)', (x0 + x1) / 2, H - 6);
-  ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('渦放出周波数 fs (Hz)', 0, 0);
-  ctx.restore();
-
-  // Legend
-  ctx.font = '11px "Noto Sans JP", sans-serif';
+  ctx.font = '10px "Roboto Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fillText(T.onset, cssW-8, cssH-10);
   ctx.textAlign = 'left';
-  var llx = x0 + 8, lly = y1 + 14;
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.fillRect(llx - 6, lly - 14, 220, 64);
-  ctx.fillStyle = '#7fdcff'; ctx.fillRect(llx, lly - 6, 14, 3);
-  ctx.fillStyle = '#fff'; ctx.fillText('fs = St·V/D (St=' + p.St.toFixed(3) + ')', llx + 18, lly);
-  ctx.fillStyle = '#9be7a3'; ctx.fillRect(llx, lly + 10, 14, 3);
-  ctx.fillStyle = '#fff'; ctx.fillText('fn 固有振動数', llx + 18, lly + 14);
-  ctx.fillStyle = '#FFD166'; ctx.beginPath(); ctx.arc(llx + 6, lly + 30, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.fillText('現在の (V, fs)', llx + 18, lly + 34);
 }
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.V) || !isFinite(p.D) || p.D <= 0 || !isFinite(p.St) || !isFinite(p.fn) || p.fn <= 0) return;
+function arrow(x1,y1,x2,y2){
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  var ang = Math.atan2(y2-y1, x2-x1), L=5;
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-L*Math.cos(ang-0.45), y2-L*Math.sin(ang-0.45));
+  ctx.lineTo(x2-L*Math.cos(ang+0.45), y2-L*Math.sin(ang+0.45));
+  ctx.closePath(); ctx.fill();
+}
+
+// ---- readouts ----
+function updateReadouts(p){
   var fs = calcFs(p);
-  var Re = calcRe(p);
-  var ratio = (isFinite(fs) && isFinite(p.fn) && p.fn > 0) ? fs / p.fn : NaN;
-  var lockin = (isFinite(ratio) && ratio > 0.85 && ratio < 1.15) ? 'yes' : 'no';
-
-  document.getElementById('statFs').textContent = fmtFs(fs);
-  document.getElementById('statRe').textContent = fmtRe(Re);
-  document.getElementById('statRatio').textContent = fmtRatio(ratio);
-  document.getElementById('statLockin').textContent = lockin;
-
-  drawVortex(p, fs);
-  drawChart(p, fs);
+  var reg = regime(p.Re);
+  el('roRe').textContent = fmtRe(p.Re);
+  el('roSt').textContent = sheds(p.Re) ? p.St.toFixed(3) : '—';
+  el('roFs').textContent = sheds(p.Re) ? fmtFs(fs) : '—';
+  el('roU').textContent  = fmtU(p.U);
+  el('roReg').textContent = T.regName[reg];
+  var roReg = el('roReg');
+  roReg.style.color = sheds(p.Re) ? '#9be7a3' : '#ffd166';
+  // sync the linked numeric displays
+  el('slReVal').textContent = fmtRe(p.Re);
+  el('slDVal').textContent = p.D_mm.toFixed(0);
+  el('slNuVal').textContent = (p.nu*1e6).toFixed(2);
+  el('slStVal').textContent = p.St.toFixed(3);
+  el('slDensVal').textContent = p.dens.toFixed(0);
 }
 
-function animationStep() {
-  if (!playing) return;
-  animPhase = (animPhase + 0.015) % 1.0;
-  var sl = document.getElementById('slV');
-  var cur = parseFloat(sl.value);
-  if (!isFinite(cur)) cur = 5.0;
-  cur += sweepDir * 0.1;
-  if (cur >= 30.0) { cur = 30.0; sweepDir = -1; }
-  if (cur <= 0.1) { cur = 0.1; sweepDir = 1; }
-  sl.value = cur.toFixed(1);
-  updateSlider(sl, 'slVVal', 0, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
+function updateSliderFill(id){
+  var e = el(id); if(!e) return;
+  var mn = parseFloat(e.min), mx = parseFloat(e.max);
+  var pct = ((parseFloat(e.value)-mn)/(mx-mn))*100;
+  e.style.setProperty('--pct', pct + '%');
 }
 
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> V をスイープ';
-    if (animId) cancelAnimationFrame(animId);
-  }
+function onParam(){
+  ['slRe','slD','slNu','slSt','slDens'].forEach(updateSliderFill);
+  var p = getParams();
+  updateReadouts(p);
+  if (!playing){ var g = geom(p); resize0check(); draw(p, geom(p), visSpeed(p), simTime); }
+}
+function resize0check(){ if (canvas.width === 0) resize(); }
+
+// ---- main loop ----
+function loop(ts){
+  if (!playing){ rafId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dt = Math.min(0.05, (ts - lastTs)/1000);
+  lastTs = ts;
+  var p = getParams();
+  var g = geom(p);
+  var Uvis = visSpeed(p);
+  var slow = reduceMotion ? 0.5 : 1;
+  simTime += dt * slow;
+  // shedding phase from physical fs (for any phase-coupled UI later)
+  var fs = calcFs(p);
+  if (isFinite(fs)) phase = (phase + fs*dt*slow) % 1.0;
+  stepParticles(p, g, Uvis, dt*slow, simTime);
+  draw(p, g, Uvis, simTime);
+  updateReadouts(p);
+  rafId = requestAnimationFrame(loop);
 }
 
-function resetParams() {
+function play(){
+  if (playing) return;
+  playing = true; lastTs = 0;
+  el('btnPlay').innerHTML = '<i class="fas fa-pause"></i> ' + T.pause;
+  if (!rafId) rafId = requestAnimationFrame(loop);
+}
+function pause(){
   playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> V をスイープ';
-  var defs = { slV: 5.0, slD_mm: 50, slSt: 0.200, slFn: 25 };
-  Object.keys(defs).forEach(function(id){
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slV'), 'slVVal', 0, '');
-  updateSlider(document.getElementById('slD_mm'), 'slD_mmVal', 0, '');
-  updateSlider(document.getElementById('slSt'), 'slStVal', 0, '');
-  updateSlider(document.getElementById('slFn'), 'slFnVal', 0, '');
-  compute();
+  if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+  el('btnPlay').innerHTML = '<i class="fas fa-play"></i> ' + T.play;
 }
+window.kvTogglePlay = function(){ playing ? pause() : play(); };
 
-window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
+window.kvReset = function(){
+  el('slRe').value = reToSlider(140);
+  el('slD').value = 50;
+  el('slNu').value = 15;     // 15e-6 m^2/s (air)
+  el('slSt').value = 0.200;
+  el('slDens').value = 50;
+  simTime = 0; phase = 0;
+  var p = getParams();
+  seedParticles(p);
+  onParam();
+};
 
-resizeCanvases();
-compute();
+window.kvPreset = function(name){
+  var P = {
+    creep:   { Re:2,     D:50, nu:15, St:0.200, dens:60 },
+    onset:   { Re:47,    D:50, nu:15, St:0.200, dens:60 },
+    street:  { Re:140,   D:50, nu:15, St:0.200, dens:55 },
+    subcrit: { Re:20000, D:50, nu:15, St:0.200, dens:50 },
+    turb:    { Re:500000, D:50, nu:15, St:0.270, dens:45 }
+  }[name];
+  if (!P) return;
+  el('slRe').value = reToSlider(P.Re); el('slD').value = P.D; el('slNu').value = P.nu;
+  el('slSt').value = P.St; el('slDens').value = P.dens;
+  var p = getParams(); seedParticles(p); onParam();
+  play();
+};
 
-// Continuous animation for the vortex street
-(function tick(){
-  if (!playing) {
-    animPhase = (animPhase + 0.008) % 1.0;
-    var p = getParams();
-    var fs = calcFs(p);
-    drawVortex(p, fs);
-  }
-  requestAnimationFrame(tick);
+// expose for inline oninput
+window.kvOnParam = onParam;
+
+// keyboard a11y on canvas
+canvas.setAttribute('tabindex','0');
+canvas.setAttribute('role','img');
+canvas.setAttribute('aria-label', T.canvasAria);
+canvas.addEventListener('keydown', function(e){
+  if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); window.kvTogglePlay(); }
+});
+
+window.addEventListener('resize', function(){ resize(); var p=getParams(); if(!playing) draw(p, geom(p), visSpeed(p), simTime); });
+
+// init
+resize();
+(function(){
+  var p = getParams();
+  seedParticles(p);
+  onParam();
+  el('btnPlay').innerHTML = '<i class="fas fa-pause"></i> ' + T.pause;
+  rafId = requestAnimationFrame(loop);
 })();
+})();
+
 </script>
 
 <section class="explanation">
@@ -651,6 +763,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="karman-vortex.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -704,10 +819,10 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>流速スライダー(slVVal)で0.1～5.0 m/sを設定し、円柱周辺の流れ場を定義</li>
+<li>流速スライダー(slVVal)で0.1～30 m/sを設定し、円柱周辺の流れ場を定義</li>
 <li>円柱直径スライダー(slD_mmVal)で5～100 mmの円柱サイズを入力してReynolds数Re=ρVD/μを自動計算</li>
 <li>Strouhal数スライダー(slStVal)で0.18～0.22の範囲を調整し、渦放出周波数fs=St×V/Dを決定</li>
-<li>円柱固有振動数スライダー(slFnVal)で1～50 Hzを設定してロックイン判定条件fs/fn=1.0±0.15を確認</li>
+<li>円柱固有振動数スライダー(slFnVal)で1～1000 Hzを設定してロックイン判定条件fs/fn=1.0±0.15を確認</li>
 <li>リアルタイム出力で渦放出周波数、Reynolds数、周波数比、ロックイン状態を監視</li>
 </ol>
 </div>
@@ -723,6 +838,16 @@ compute();
 <li>温度変化による流体粘度μ変動(水:20℃でμ=1.0 mPa·s、80℃でμ=0.36 mPa·s)でReynolds数が40%以上変動し、Strouhal数も0.19～0.22へシフト、季節性のある構造物は温度補正を含めた周期確認が必要</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="振動工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">振動工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

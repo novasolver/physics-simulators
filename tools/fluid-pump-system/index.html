@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ポンプ運転点計算ツール",
       "description": "ポンプのH-Q曲線とシステム曲線の交点（運転点）をリアルタイム計算。並列・直列運転に対応し、流量・揚程・効率・軸動力を即時算出。",
       "url": "https://novasolver.jp/tools/fluid-pump-system.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["H-Q曲線とシステム曲線のリアルタイム描画","Newton-Raphson法による運転点の自動算出","並列・直列運転の可視化","効率-Q曲線の表示","流量・揚程・効率・軸動力の即時計算"],
       "keywords": "ポンプ,H-Q曲線,運転点,システム曲線,並列運転,直列運転,揚程,流量,CAE,流体機械",
       "datePublished": "2026-04-09",
@@ -210,7 +210,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="panel-title">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -233,6 +241,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="stat-value" id="st-P">—<span class="stat-unit">kW</span></div>
       </div>
     </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-water"></i> 配管系統と運転点（ライブ）</div>
+      <canvas id="chart-sys" role="img" aria-label="ソースタンクからポンプ・配管・destinationタンクへ流れる配管系統の模式図。運転流量で流体がアニメーション表示されます。"></canvas>
+      <div class="stats-grid" style="margin-top:12px">
+        <div class="stat-card"><div class="stat-label">流速イメージ v</div><div class="sv" id="sv-vel">—<span class="stat-unit">m/s</span></div></div>
+        <div class="stat-card"><div class="stat-label">全揚程 H<sub>op</sub></div><div class="sv" id="sv-head">—<span class="stat-unit">m</span></div></div>
+        <div class="stat-card"><div class="stat-label">運転流量 Q<sub>op</sub></div><div class="sv" id="sv-flow">—<span class="stat-unit">m³/h</span></div></div>
+        <div class="stat-card"><div class="stat-label">軸動力 P</div><div class="sv" id="sv-pow">—<span class="stat-unit">kW</span></div></div>
+      </div>
     </div>
 
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> H-Q 曲線・システム曲線・運転点</div><canvas id="chart-hq"></canvas></div>
@@ -427,6 +445,190 @@ window.addEventListener('resize',update);
 update();
 </script>
 
+<script>
+/* v2 hero: piping system schematic + animated flow at the operating point */
+(function(){
+  "use strict";
+  const cv=document.getElementById('chart-sys');
+  if(!cv) return;
+  const ctx=cv.getContext('2d');
+  const $=id=>document.getElementById(id);
+  const num=el=>parseFloat(el&&el.value);
+  function getMode(){
+    const b=document.querySelector('.mode-btn.active');
+    if(!b) return 'single';
+    const t=(b.textContent||'').trim();
+    if(t.indexOf('並列')>=0) return 'parallel';
+    if(t.indexOf('直列')>=0) return 'series';
+    return 'single';
+  }
+  function pumpH(Q,H0,a){return H0-a*Q*Q;}
+  function effPumpH(Q,H0,a,m){
+    if(m==='parallel') return pumpH(Q/2,H0,a);
+    if(m==='series')   return 2*pumpH(Q,H0,a);
+    return pumpH(Q,H0,a);
+  }
+  function sysH(Q,Hs,R){return Hs+R*Q*Q;}
+  function solveOp(H0,a,Hs,R,m){
+    let Q=num($('sl-Qd'))||40;
+    for(let i=0;i<120;i++){
+      const f=effPumpH(Q,H0,a,m)-sysH(Q,Hs,R);
+      let df;
+      if(m==='parallel') df=-a*(Q/2)-2*R*Q;
+      else if(m==='series') df=-4*a*Q-2*R*Q;
+      else df=-2*a*Q-2*R*Q;
+      if(Math.abs(df)<1e-12) break;
+      const dQ=f/df; Q-=dQ;
+      if(Q<0) Q=0.01;
+      if(Math.abs(dQ)<1e-9) break;
+    }
+    return {Q:Math.max(0,Q),H:Math.max(0,sysH(Q,Hs,R))};
+  }
+  function etaOf(Q,Qd,m){
+    const Qpeak=(m==='parallel')?2*Qd:Qd, etaPeak=0.75, w=Qpeak*0.8;
+    return Math.max(0,Math.min(etaPeak, etaPeak*(1-((Q-Qpeak)/w)**2)));
+  }
+  function readState(){
+    const H0=Math.max(num($('sl-H0')),num($('sl-Hd'))+1);
+    const a=(H0-num($('sl-Hd')))/(num($('sl-Qd'))*num($('sl-Qd')));
+    const R=num($('sl-Hf'))/(num($('sl-Qd'))*num($('sl-Qd')));
+    const Hs=num($('sl-Hs')), Qd=num($('sl-Qd')), m=getMode();
+    const op=solveOp(H0,a,Hs,R,m);
+    const e=etaOf(op.Q,Qd,m);
+    const P=(op.Q>0&&e>0)?(1000*9.81*op.H*(op.Q/3600))/(e*1000):0;
+    // representative velocity (assume 0.1 m^2 reference cross-section), purely indicative
+    const v=op.Q/3600/0.1;
+    return {Hs:Hs,Qop:op.Q,Hop:op.H,P:P,e:e,v:v,Qmax:Math.max(Qd*2.5,op.Q*1.3,10)};
+  }
+  let W=0,Hc=300,dpr=1;
+  function resize(){
+    const cw=cv.parentElement.clientWidth||640;
+    dpr=Math.min(window.devicePixelRatio||1,2.5);
+    W=cw; Hc=Math.max(240,Math.min(320,Math.round(cw*0.46)));
+    cv.style.width=W+'px'; cv.style.height=Hc+'px';
+    cv.width=Math.round(W*dpr); cv.height=Math.round(Hc*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  // pipe path waypoints (CSS px) – source tank -> pump -> rise -> destination tank
+  function geom(s){
+    const liftFrac=Math.max(0,Math.min(1,s.Hs/55)); // map static head 0..55m
+    const baseY=Hc-46;
+    const topY=42+(1-liftFrac)*(Hc-150); // higher static head => destination tank higher
+    const srcX=58, pumpX=W*0.30, riseX=W*0.66, dstX=W-58;
+    return {srcX,pumpX,riseX,dstX,baseY,topY};
+  }
+  function pipePts(g){
+    return [
+      {x:g.srcX,y:g.baseY-30},   // source tank outlet
+      {x:g.pumpX-26,y:g.baseY},  // into pump
+      {x:g.pumpX+26,y:g.baseY},  // out of pump
+      {x:g.riseX,y:g.baseY},     // along floor
+      {x:g.riseX,y:g.topY},      // riser up
+      {x:g.dstX,y:g.topY}        // into destination tank
+    ];
+  }
+  function segLens(pts){
+    const L=[]; let tot=0;
+    for(let i=1;i<pts.length;i++){const d=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y);L.push(d);tot+=d;}
+    return {L,tot};
+  }
+  function ptAt(pts,segs,frac){
+    let d=frac*segs.tot;
+    for(let i=0;i<segs.L.length;i++){
+      if(d<=segs.L[i]){const t=segs.L[i]?d/segs.L[i]:0;return {x:pts[i].x+(pts[i+1].x-pts[i].x)*t,y:pts[i].y+(pts[i+1].y-pts[i].y)*t};}
+      d-=segs.L[i];
+    }
+    return pts[pts.length-1];
+  }
+  let phase=0;
+  function draw(s,animate){
+    resize();
+    const g=geom(s), pts=pipePts(g), segs=segLens(pts);
+    ctx.clearRect(0,0,W,Hc);
+    // background
+    ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,Hc);
+    // ground
+    ctx.strokeStyle='rgba(120,200,120,.35)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,Hc-14); ctx.lineTo(W,Hc-14); ctx.stroke();
+    // static-lift indicator
+    ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(g.dstX+30,g.baseY); ctx.lineTo(g.dstX+30,g.topY); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,213,74,.9)'; ctx.font='bold 11px "Roboto Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText('H_static='+s.Hs.toFixed(0)+'m', g.dstX-86, (g.baseY+g.topY)/2);
+    // tanks
+    function tank(x,y,label){
+      ctx.fillStyle='rgba(0,180,216,.18)'; ctx.strokeStyle='rgba(0,180,216,.7)'; ctx.lineWidth=2;
+      const tw=46,th=42;
+      ctx.beginPath(); ctx.rect(x-tw/2,y-th,tw,th); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='rgba(0,180,216,.45)'; ctx.fillRect(x-tw/2+2,y-th*0.6,tw-4,th*0.6-2);
+      ctx.fillStyle='rgba(255,255,255,.75)'; ctx.font='10px "Noto Sans JP",sans-serif'; ctx.textAlign='center';
+      ctx.fillText(label,x,y+13);
+    }
+    tank(g.srcX,g.baseY-2,'吸込');
+    tank(g.dstX,g.topY-2,'吐出');
+    // pipe (outer)
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.strokeStyle='#2a3a52'; ctx.lineWidth=14;
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke();
+    // pipe (inner fluid)
+    ctx.strokeStyle='#0e7490'; ctx.lineWidth=9;
+    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke();
+    // fitting markers (elbows)
+    ctx.fillStyle='#475569';
+    [pts[3],pts[4]].forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,7,0,7);ctx.fill();});
+    // flow particles along the pipe (speed ~ velocity)
+    const Qn=s.Qmax>0?Math.min(1,s.Qop/s.Qmax):0;
+    const nP=22;
+    ctx.fillStyle='#7fe3ff';
+    for(let i=0;i<nP;i++){
+      let f=((i/nP)+phase)%1;
+      const p=ptAt(pts,segs,f);
+      ctx.globalAlpha=0.85;
+      ctx.beginPath(); ctx.arc(p.x,p.y,2.6,0,7); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    // pump body
+    const px=g.pumpX, py=g.baseY;
+    const grd=ctx.createRadialGradient(px-4,py-4,3,px,py,24);
+    grd.addColorStop(0,'#4aa3ff'); grd.addColorStop(1,'#0056a8');
+    ctx.beginPath(); ctx.arc(px,py,22,0,7); ctx.fillStyle=grd; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    // impeller (spins with flow)
+    ctx.save(); ctx.translate(px,py); ctx.rotate(phase*Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=2.4;
+    for(let k=0;k<3;k++){ctx.rotate(Math.PI*2/3); ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(9,-3,14,4); ctx.stroke();}
+    ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 10px "Noto Sans JP",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('PUMP',px,py+34);
+    // operating-point caption
+    ctx.fillStyle='#7fe3ff'; ctx.font='bold 12px "Roboto Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText('運転点 Q='+s.Qop.toFixed(1)+' m³/h, H='+s.Hop.toFixed(1)+' m', 12, 20);
+    if(animate){ phase=(phase+0.0016+0.02*Qn)%1; }
+  }
+  function setStats(s){
+    const set=(id,val)=>{const el=$(id);if(el)el.firstChild?el.firstChild.nodeValue=val:el.textContent=val;};
+    function put(id,val){const el=$(id);if(!el)return;const u=el.querySelector('.stat-unit');el.textContent=val;if(u)el.appendChild(u);}
+    put('sv-vel',isFinite(s.v)?s.v.toFixed(2):'0');
+    put('sv-head',s.Hop.toFixed(1));
+    put('sv-flow',s.Qop.toFixed(1));
+    put('sv-pow',s.P.toFixed(2));
+  }
+  const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let raf=null;
+  function loop(){
+    const s=readState();
+    draw(s,!reduce);
+    setStats(s);
+    if(!reduce) raf=requestAnimationFrame(loop);
+  }
+  ['sl-H0','sl-Hd','sl-Qd','sl-Hs','sl-Hf'].forEach(id=>{const e=$(id);if(e)e.addEventListener('input',()=>{const s=readState();setStats(s);if(reduce)draw(s,false);});});
+  document.querySelectorAll('.mode-btn').forEach(b=>b.addEventListener('click',()=>{const s=readState();setStats(s);if(reduce)draw(s,false);}));
+  window.addEventListener('resize',()=>{if(reduce){const s=readState();draw(s,false);setStats(s);}});
+  if(reduce){const s=readState();draw(s,false);setStats(s);}
+  else loop();
+})();
+</script>
+
 <section class="explanation">
   <h2>ポンプ運転点計算ツールとは</h2>
   <div class="chat">
@@ -487,19 +689,22 @@ update();
 </section>
 
 
+
+
+
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>ポンプの定格揚程H0（m）と定格流量Q0（m³/h）をH0Num、sl-H0フィールドに入力します</li>
-<li>設計揚程Hd（m）と設計流量Qd（m³/h）をHdNum、sl-Hdフィールドに入力し、H-Q曲線の形状を定義します</li>
-<li>システム曲線の静揚程Hs（m）をHsNum、sl-Hsフィールドに入力してから計算ボタンをクリックします</li>
+<li>ポンプの締切揚程H0（m）をH0Num、設計流量Qd（m³/h）をQdNumフィールドに入力します</li>
+<li>設計揚程Hd（m）と設計流量Qd（m³/h）から、H=H0-aQ² のH-Q曲線形状を定義します</li>
+<li>システム曲線の静揚程Hs（m）と設計点での摩擦損失Hf（m）を入力すると、結果はリアルタイムで更新されます</li>
 <li>交点となる運転点の流量・揚程、ポンプ効率η（%）、軸動力P（kW）が自動算出されます</li>
-<li>並列運転時は各ポンプの流量合算、直列運転時は揚程合算でシステム曲線を修正入力してください</li>
+<li>並列・直列ボタンでポンプ曲線側を切り替えます。システム曲線はHsとHfから同じ式で計算されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>50×40-200型遠心ポンプ：H0=25m、Q0=150m³/h、Hd=20m、Qd=180m³/hを入力します。給水システムの静揚程Hs=8m、配管抵抗係数k=0.002を想定した場合、運転点は約流量130m³/h、揚程18.4mで交差します。この時のポンプ効率は78%、軸動力は約6.8kWとなります。密度1000kg/m³の水を送水する場合、実揚力は約18.4×130÷3600≒0.67トン/秒です。</p>
+<p>既定条件（H0=40m、Hd=30m、Qd=50m³/h、Hs=10m、Hf=15m、単独運転）では、H-Q曲線とシステム曲線の交点は流量Qop≈54.8m³/h、揚程Hop≈28.0mです。この時のポンプ効率は約73.9%、軸動力は約5.65kWとなります。並列・直列モードへ切り替えると、同じシステム曲線に対する運転点の移動を比較できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -510,6 +715,65 @@ update();
 <li>効率値が60%以下の運転点は避け、定格点±20%範囲の選定が耐久性向上につながります</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fluid-pump-system.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/pump-system-curve.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ポンプ動作点 シミュレーター — ポンプ曲線とシステム曲線の交点</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ポンプ性能曲線 H = H0 − kp·Q² とシステム曲線 H = H_static + ks·Q² の交点（動作点）をリアルタイムに計算。流量・揚程・水力動力・軸動力をスライダー...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/fluid-jet-pump.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ジェットポンプ（エジェクタ）シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ジェットポンプ（エジェクタ）の流量・圧力・エントレインメント比を簡単に計算できるシミュレーターです。動力流体の条件を調整するだけで動作がリアルタイムに可視化され、混合効率や圧縮比が瞬...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/fluid-machinery.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ポンプ・ファン性能曲線シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ポンプ・ファンの性能曲線をリアルタイムでシミュレーション。回転速度や配管抵抗を変更して動作点を計算し、キャビテーション（NPSH）評価も可能なツールです。ポンプ・ファン選定や性能予測...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/pump-selection.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ポンプ選定・システム曲線 シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">遠心ポンプのQ-H特性曲線とシステム曲線の交点（運転点）をリアルタイムで計算。効率曲線や軸動力の確認、並列・直列運転のシミュレーションも可能です。アフィニティ則を用いた回転数変更時の...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/centrifugal-pump.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">遠心ポンプ特性曲線シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">遠心ポンプの特性曲線(H-Q曲線)とシステム曲線をリアルタイムでシミュレーション。羽根車径や回転数、配管抵抗を変更して最適な運転点と最高効率点(BEP)を自動解析。ポンプ選定や相似則...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/pump-cavitation.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ポンプキャビテーション・NPSH 計算機</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ポンプキャビテーション・NPSH 計算機では、流量、圧力損失、流れの余裕の前提を変えたときに設計余裕がどう動くかを比較します。</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

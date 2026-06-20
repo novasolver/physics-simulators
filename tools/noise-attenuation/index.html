@@ -44,14 +44,14 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "騒音伝搬・距離減衰計算機",
       "description": "点音源・線音源・面音源の距離減衰をISO 9613-2モデルで計算。大気吸収・遮音壁挿入損失（Maekawa式）・地面効果を含む総合音伝搬減衰をリアルタイムグラフ表示。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/noise-attenuation.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -132,7 +132,7 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
   header>a:first-child{display:none}
   header h1{font-size:.9em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 80px)}
 }.panel,.chart-card,.right-col,.controls,.charts-area{max-width:100%;overflow-x:clip}
-canvas{max-width:100%}/* mobile-compact */
+canvas{max-width:100%}#waveCanvas{display:block;width:100%;border-radius:8px;background:#0a1628}/* mobile-compact */
 @media(max-width:860px){
   
   .hero h1{font-size:1.15rem;margin-bottom:4px}
@@ -285,7 +285,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="dS" min="1" max="200" step="1" value="10" oninput="syncToNum('dS','dSNum');syncSlider(this,'dSVal',0,'m');compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right -->
@@ -298,9 +306,18 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
     </div>
 
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-broadcast-tower"></i> 音の広がりと距離減衰（ライブ）</div>
+      <canvas id="waveCanvas" height="300" role="img" aria-label="音源から球面波が広がり、距離とともに弱まる様子のアニメーション。受音点での音圧レベルを表示します。"></canvas>
+      <div class="play-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+        <button class="toggle-btn" type="button" id="btnAnim" onclick="toggleAnim()"><i class="fas fa-pause"></i> 一時停止</button>
+        <span style="font-size:.72rem;color:var(--muted);line-height:1.5;">同心円＝広がる球面波。距離2倍ごとに点音源は −6 dB、線音源は −3 dB 弱まります。</span>
+      </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
-      <div class="stat-card"><div class="sv" id="sSPLr">—</div><div class="sl">SPL at r (dB)</div></div>
+      <div class="stat-card"><div class="sv" id="sSPLr">—</div><div class="sl">受音点SPL (dB)</div></div>
+      <div class="stat-card"><div class="sv" id="sAttTot">—</div><div class="sl">総減衰 (dB)</div></div>
       <div class="stat-card"><div class="sv" id="sGeoAtten">—</div><div class="sl">幾何減衰 (dB)</div></div>
       <div class="stat-card"><div class="sv" id="sAtmAtten">—</div><div class="sl">大気吸収 (dB)</div></div>
       <div class="stat-card"><div class="sv" id="sBarrierIL">—</div><div class="sl">遮音壁IL (dB)</div></div>
@@ -322,46 +339,56 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
+(function(){
+"use strict";
 const OCT_FREQS = [63,125,250,500,1000,2000,4000,8000];
-const OCT_LABELS = ['63Hz','125Hz','250Hz','500Hz','1kHz','2kHz','4kHz','8kHz'];
+const L = {
+  freqHint: '中心周波数: ',
+  splUnit: 'dB', mUnit: 'm',
+  xAxis: '距離 (m)', yAxis: 'SPL (dB)',
+  splLabel: 'SPL (dB)', evalLabel: '評価距離',
+  source: '音源', receiver: '受音点',
+  paused: '<i class="fas fa-play"></i> 再生', playing: '<i class="fas fa-pause"></i> 一時停止',
+  rule6: '点音源: −6 dB / 距離2倍', rule3: '線音源: −3 dB / 距離2倍'
+};
 
 let logScale = false;
+let chart = null;
+
+function $(id){ return document.getElementById(id); }
 
 function syncSlider(el, id, dec, unit){
   const v = +el.value;
-  var _ve=document.getElementById(id);if(_ve){if(_ve.tagName==='INPUT')_ve.value=v.toFixed(dec) + ' ' + unit;else _ve.textContent=v.toFixed(dec) + ' ' + unit;}
+  var _ve=$(id);if(_ve){if(_ve.tagName==='INPUT')_ve.value=v.toFixed(dec) + ' ' + unit;else _ve.textContent=v.toFixed(dec) + ' ' + unit;}
   const pct = ((v-+el.min)/(+el.max-+el.min)*100).toFixed(1)+'%';
   el.style.setProperty('--pct', pct);
-}function initSliders(){
+}
+function initSliders(){
   document.querySelectorAll('input[type=range]').forEach(el => {
     const v=+el.value, min=+el.min, max=+el.max;
     el.style.setProperty('--pct', ((v-min)/(max-min)*100).toFixed(1)+'%');
   });
-}function updateFreq(){
-  const idx = +document.getElementById('freq').value - 1;
-  document.getElementById('freqHint').textContent = '中心周波数: ' + OCT_FREQS[idx] + ' Hz';
-  const el = document.getElementById('freq');
+}
+function updateFreq(){
+  const idx = +$('freq').value - 1;
+  const h=$('freqHint'); if(h) h.textContent = L.freqHint + OCT_FREQS[idx] + ' Hz';
+  const el = $('freq');
   el.style.setProperty('--pct', ((idx)/7*100).toFixed(1)+'%');
-}// Atmospheric absorption coefficient alpha (dB/km) simplified after ISO 9613-1
+}
 
+// Atmospheric absorption coefficient alpha (dB/km) simplified after ISO 9613-1
 function atmosAlpha(f, T, RH){
-  // Simplified polynomial fit
-  const f_kHz = f/1000;
-  const alpha = 1.84e-11 * (T+273.15) * Math.sqrt(f_kHz) / (RH + 0.01) * f_kHz * f_kHz * 1e6;
-  // Use tabulated approximation
   const tableAlpha = {63:0.1,125:0.4,250:1.0,500:1.9,1000:3.7,2000:9.7,4000:32.8,8000:117};
   const base = tableAlpha[f] || 1.9;
-  // Temperature correction: higher T → lower absorption for most bands
-  const tCorr = 1 + (20 - T)*0.01;
-  // Humidity correction: peak around 50%
-  const rCorr = 1 + (50 - RH)*0.003;
-  return base * tCorr * rCorr;
-}// Maekawa barrier IL
+  const tCorr = 1 + (20 - T)*0.01;   // higher T -> slightly lower absorption
+  const rCorr = 1 + (50 - RH)*0.003; // peak near 50% RH
+  return Math.max(0, base * tCorr * rCorr);
+}
 
+// Maekawa barrier insertion loss
 function barrierIL(f, wallH, dS, dTotal){
-  if(wallH <= 0) return 0;
+  if(wallH <= 0 || dTotal <= dS) return 0;
   const dR = Math.max(1, dTotal - dS);
-  // Path length difference delta
   const direct = dTotal;
   const diffracted = Math.sqrt(dS*dS + wallH*wallH) + Math.sqrt(dR*dR + wallH*wallH);
   const delta = diffracted - direct;
@@ -369,98 +396,244 @@ function barrierIL(f, wallH, dS, dTotal){
   const lambda = 340/f;
   const N = 2*delta/lambda;
   return Math.max(0, 10*Math.log10(3 + 20*N));
-}function setScale(s){
-  logScale = s==='log';
-  document.getElementById('btnLin').classList.toggle('active', !logScale);
-  document.getElementById('btnLog').classList.toggle('active', logScale);
-  compute();
-}let chart = null;
-function compute(){
-  const splRef = +document.getElementById('splRef').value;
-  const dist = +document.getElementById('dist').value;
-  const freqIdx = +document.getElementById('freq').value - 1;
-  const f = OCT_FREQS[freqIdx];
-  const T = +document.getElementById('temp').value;
-  const RH = +document.getElementById('rh').value;
-  const groundAdd = +document.getElementById('ground').value;
-  const wallH = +document.getElementById('wallH').value;
-  const dS = +document.getElementById('dS').value;
-  const sourceType = document.getElementById('sourceType').value;
+}
 
-  // Generate distance array
+function setScale(s){
+  logScale = s==='log';
+  $('btnLin').classList.toggle('active', !logScale);
+  $('btnLog').classList.toggle('active', logScale);
+  compute();
+}
+
+// ---- shared params + SPL model (point: -6dB/doubling, line: -3dB/doubling) ----
+function getState(){
+  const freqIdx = +$('freq').value - 1;
+  const f = OCT_FREQS[freqIdx];
+  const st = {
+    splRef: +$('splRef').value,
+    dist: +$('dist').value,
+    f: f,
+    T: +$('temp').value,
+    RH: +$('rh').value,
+    groundAdd: +$('ground').value,
+    wallH: +$('wallH').value,
+    dS: +$('dS').value,
+    sourceType: $('sourceType').value
+  };
+  st.alpha = atmosAlpha(f, st.T, st.RH);
+  return st;
+}
+function splAt(r, st){
+  const geo = st.sourceType==='point' ? 20*Math.log10(r) : 10*Math.log10(r);
+  const atm = st.alpha * r / 1000;
+  const barrier = barrierIL(st.f, st.wallH, st.dS, r);
+  const gnd = st.groundAdd * Math.min(1, r/200);
+  return st.splRef - geo - atm - barrier - gnd;
+}
+
+function compute(){
+  const st = getState();
+
   const rArr = logScale
     ? Array.from({length:80},(_,i)=>Math.round(Math.pow(10, 0 + i*3/79)*10)/10).filter(r=>r>=1&&r<=2000)
     : Array.from({length:100},(_,i)=>1+i*(2000-1)/99);
+  const splArr = rArr.map(r => splAt(r, st));
 
-  const alpha = atmosAlpha(f, T, RH); // dB/km
+  const dist = st.dist;
+  const geo = st.sourceType==='point' ? 20*Math.log10(dist) : 10*Math.log10(dist);
+  const atm = st.alpha * dist / 1000;
+  const barrier = barrierIL(st.f, st.wallH, st.dS, dist);
+  const gnd = st.groundAdd * Math.min(1, dist/200);
+  const splR = st.splRef - geo - atm - barrier - gnd;
+  const attTot = geo + atm + barrier + gnd;
 
-  function splAt(r){
-    const geo = sourceType==='point' ? 20*Math.log10(r) : 10*Math.log10(r);
-    const atm = alpha * r / 1000;
-    const barrier = barrierIL(f, wallH, dS, r);
-    const gnd = groundAdd * Math.min(1, r/200);
-    return splRef - geo - atm - barrier - gnd;
-  }const splArr = rArr.map(r => splAt(r));
+  $('sSPLr').textContent = splR.toFixed(1);
+  const at=$('sAttTot'); if(at) at.textContent = attTot.toFixed(1);
+  $('sGeoAtten').textContent = geo.toFixed(1);
+  $('sAtmAtten').textContent = atm.toFixed(1);
+  $('sBarrierIL').textContent = barrier.toFixed(1);
+  $('sGroundAtten').textContent = gnd.toFixed(1);
 
-  // Stats at target distance
-  const geo = sourceType==='point' ? 20*Math.log10(dist) : 10*Math.log10(dist);
-  const atm = alpha * dist / 1000;
-  const barrier = barrierIL(f, wallH, dS, dist);
-  const gnd = groundAdd * Math.min(1, dist/200);
-  const splR = splRef - geo - atm - barrier - gnd;
-
-  document.getElementById('sSPLr').textContent = splR.toFixed(1);
-  document.getElementById('sGeoAtten').textContent = geo.toFixed(1);
-  document.getElementById('sAtmAtten').textContent = atm.toFixed(1);
-  document.getElementById('sBarrierIL').textContent = barrier.toFixed(1);
-  document.getElementById('sGroundAtten').textContent = gnd.toFixed(1);
-
-  // Chart
-  const ctx = document.getElementById('attChart').getContext('2d');
-  if(chart){ chart.destroy(); chart=null; }chart = new Chart(ctx,{
+  const ctx = $('attChart').getContext('2d');
+  if(chart){ chart.destroy(); chart=null; }
+  chart = new Chart(ctx,{
     type: 'line',
     data: {
       labels: rArr.map(r=>r<=1000?r.toFixed(0)+'m':r.toFixed(0)),
       datasets: [
-        {
-          label: 'SPL (dB)',
-          data: splArr,
-          borderColor: '#007BFF',
-          borderWidth: 2,
-          pointRadius: 0,
-          fill: false,
-          tension: 0.3
-        },{
-          label: '評価距離',
-          data: rArr.map(r=>(Math.abs(r-dist)<(2000/100*1.5)?splAt(dist):null)),
-          borderColor: '#e17055',
-          borderWidth: 0,
+        { label: L.splLabel, data: splArr, borderColor:'#007BFF', borderWidth:2, pointRadius:0, fill:false, tension:0.3 },
+        { label: L.evalLabel,
+          data: rArr.map(r=>(Math.abs(r-dist)<(2000/100*1.5)?splAt(dist,st):null)),
+          borderColor:'#e17055', borderWidth:0,
           pointRadius: rArr.map(r=>Math.abs(r-dist)<(2000/100*1.5)?6:0),
-          pointBackgroundColor: '#e17055',
-          showLine: false
-        }
+          pointBackgroundColor:'#e17055', showLine:false }
       ]
     },
     options:{
-      responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
-      plugins: { legend: { position:'top', labels:{color:'#1a1a2e',font:{size:12}} } },
+      responsive:true, maintainAspectRatio:false, resizeDelay:100, animation:false,
+      plugins:{ legend:{ position:'top', labels:{color:'#1a1a2e',font:{size:12}} } },
       scales:{
-        x: { ticks: { maxTicksLimit:10, color:'#6c757d' },
-          title:{ display:true, text:'距離 (m)', color:'#6c757d' },
-          grid:{ color:'rgba(0,0,0,.06)' }
-        },
-        y:{
-          title: { display:true, text:'SPL (dB)', color:'#6c757d' },
-          ticks:{ color:'#6c757d' },
-          grid:{ color:'rgba(0,0,0,.06)' }
-        }
+        x:{ ticks:{ maxTicksLimit:10, color:'#6c757d' }, title:{ display:true, text:L.xAxis, color:'#6c757d' }, grid:{ color:'rgba(0,0,0,.06)' } },
+        y:{ title:{ display:true, text:L.yAxis, color:'#6c757d' }, ticks:{ color:'#6c757d' }, grid:{ color:'rgba(0,0,0,.06)' } }
       }
     }
   });
-}updateFreq();
-initSliders();
-if (document.readyState === 'complete') compute();
-else window.addEventListener('load', function(){ compute(); }, { once: true });
+}
+
+/* ===== Hero animation: spreading wavefronts weakening with distance ===== */
+const wave = $('waveCanvas');
+const wctx = wave ? wave.getContext('2d') : null;
+let animOn = true, animId = null, phase = 0;
+let cssW = 0, cssH = 0;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function resizeWave(){
+  if(!wave) return;
+  const rect = wave.parentElement.getBoundingClientRect();
+  cssW = Math.max(260, Math.floor(rect.width - 24));
+  cssH = 300;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  wave.style.width = cssW + 'px';
+  wave.style.height = cssH + 'px';
+  wave.width = Math.round(cssW * dpr);
+  wave.height = Math.round(cssH * dpr);
+  wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// map dB attenuation (0..maxAtt) to a "warm->cool" color and alpha
+function levelColor(att, maxAtt, a){
+  const t = Math.max(0, Math.min(1, att / Math.max(1,maxAtt))); // 0 near source ... 1 far
+  // warm (hot/red ~ #ff5252) to cool (blue ~ #00B4D8)
+  const r = Math.round(255*(1-t) + 0*t);
+  const g = Math.round(82*(1-t) + 180*t);
+  const b = Math.round(82*(1-t) + 216*t);
+  return 'rgba('+r+','+g+','+b+','+a+')';
+}
+
+function drawWave(){
+  if(!wctx) return;
+  resizeWave();
+  const W = cssW, H = cssH;
+  wctx.clearRect(0,0,W,H);
+  wctx.fillStyle = '#0a1628'; wctx.fillRect(0,0,W,H);
+
+  const st = getState();
+  const isLine = st.sourceType==='line';
+  const sx = 64, sy = H/2;                       // source at left-center
+  const rxMax = W - 56;                          // rightmost pixel
+  const pxRange = rxMax - sx;                    // pixels for full distance range
+  const maxDist = 2000;                          // model max distance (m)
+  // log distance mapping so doubling steps are visible
+  const dToX = d => sx + pxRange * (Math.log10(Math.max(1,d)) / Math.log10(maxDist));
+  const xToD = x => Math.pow(10, ((x - sx)/pxRange) * Math.log10(maxDist));
+
+  // attenuation at full range for color normalisation
+  const maxAtt = (isLine?10:20)*Math.log10(maxDist);
+
+  // --- expanding wavefronts (concentric, fading + cooling with distance) ---
+  const ringCount = 7;
+  const speed = reduceMotion ? 0 : 0.006;
+  for(let i=0;i<ringCount;i++){
+    let frac = (phase + i/ringCount) % 1;        // 0..1 expansion progress
+    const d = Math.pow(10, frac*Math.log10(maxDist)); // distance of this ring (m)
+    const x = dToX(d);
+    const rad = x - sx;
+    if(rad < 2) continue;
+    const att = (isLine?10:20)*Math.log10(Math.max(1,d));
+    const a = (1 - frac) * 0.9;                   // fade as it expands
+    wctx.lineWidth = 2.2*(1-frac)+0.6;
+    wctx.strokeStyle = levelColor(att, maxAtt, a);
+    wctx.beginPath();
+    if(isLine){
+      // cylindrical: vertical wavefronts moving outward
+      wctx.moveTo(x, 24); wctx.lineTo(x, H-44);
+    } else {
+      wctx.arc(sx, sy, rad, -Math.PI*0.62, Math.PI*0.62);
+    }
+    wctx.stroke();
+  }
+
+  // --- ground line ---
+  wctx.strokeStyle='rgba(120,200,120,0.4)'; wctx.lineWidth=1.5;
+  wctx.beginPath(); wctx.moveTo(40, H-30); wctx.lineTo(W-20, H-30); wctx.stroke();
+
+  // distance ticks (doubling: 1,2,4,...,1024,2000)
+  wctx.font='10px Roboto Mono'; wctx.textAlign='center';
+  [1,2,4,8,16,32,64,125,250,500,1000,2000].forEach(d=>{
+    const x=dToX(d); if(x>sx+6 && x<W-10){
+      wctx.strokeStyle='rgba(255,255,255,0.10)'; wctx.lineWidth=1;
+      wctx.beginPath(); wctx.moveTo(x,24); wctx.lineTo(x,H-30); wctx.stroke();
+      wctx.fillStyle='rgba(255,255,255,0.4)'; wctx.fillText(d+'m', x, H-16);
+    }
+  });
+
+  // --- source ---
+  const pulse = reduceMotion ? 0 : 3*Math.abs(Math.sin(phase*Math.PI*2));
+  const sg = wctx.createRadialGradient(sx,sy,1,sx,sy,12+pulse);
+  sg.addColorStop(0,'#fff'); sg.addColorStop(1,'#ff5252');
+  wctx.beginPath(); wctx.arc(sx,sy,9+pulse,0,7); wctx.fillStyle=sg; wctx.fill();
+  wctx.fillStyle='rgba(255,255,255,0.8)'; wctx.font='11px Noto Sans JP'; wctx.textAlign='center';
+  wctx.fillText(L.source, sx, sy-18);
+  wctx.fillText(st.splRef.toFixed(0)+' dB', sx, sy+26);
+
+  // --- receiver at evaluation distance ---
+  const rx = Math.min(rxMax, Math.max(sx+12, dToX(st.dist)));
+  const splR = splAt(st.dist, st);
+  // receiver intensity bar height scaled to SPL
+  const lvl = Math.max(0, Math.min(1, (splR - 20)/ (st.splRef - 20 + 0.001)));
+  wctx.strokeStyle='rgba(255,213,74,0.9)'; wctx.lineWidth=1.5; wctx.setLineDash([4,4]);
+  wctx.beginPath(); wctx.moveTo(rx,24); wctx.lineTo(rx,H-30); wctx.stroke(); wctx.setLineDash([]);
+  // receiver marker
+  wctx.beginPath(); wctx.arc(rx, sy, 6, 0, 7);
+  wctx.fillStyle='#ffd54a'; wctx.fill();
+  wctx.strokeStyle='rgba(0,0,0,0.4)'; wctx.lineWidth=1; wctx.stroke();
+  // receiver readout label
+  wctx.fillStyle='#ffd54a'; wctx.font='bold 12px Roboto Mono'; wctx.textAlign='center';
+  const lblY = sy<H/2 ? sy+34 : sy-30;
+  wctx.fillText(splR.toFixed(1)+' dB', rx, sy-16);
+  wctx.fillStyle='rgba(255,255,255,0.7)'; wctx.font='10px Noto Sans JP';
+  wctx.fillText(L.receiver+' @'+st.dist.toFixed(0)+'m', rx, H-44);
+
+  // rule annotation
+  wctx.textAlign='left'; wctx.fillStyle='rgba(255,255,255,0.55)'; wctx.font='11px Noto Sans JP';
+  wctx.fillText(isLine ? L.rule3 : L.rule6, 44, 18);
+}
+
+function loop(){
+  if(!animOn) return;
+  phase = (phase + 0.006) % 1;
+  drawWave();
+  animId = requestAnimationFrame(loop);
+}
+function toggleAnim(){
+  animOn = !animOn;
+  const b=$('btnAnim'); if(b) b.innerHTML = animOn ? L.playing : L.paused;
+  if(animOn){ animId = requestAnimationFrame(loop); }
+  else if(animId){ cancelAnimationFrame(animId); animId=null; }
+}
+
+// expose handlers used by inline attributes
+window.syncSlider = syncSlider;
+window.initSliders = initSliders;
+window.updateFreq = updateFreq;
+window.setScale = setScale;
+window.compute = function(){ compute(); if(wctx) drawWave(); };
+window.toggleAnim = toggleAnim;
+
+function boot(){
+  updateFreq();
+  initSliders();
+  compute();
+  if(wctx){
+    resizeWave();
+    if(reduceMotion){ animOn=false; const b=$('btnAnim'); if(b) b.innerHTML=L.paused; drawWave(); }
+    else { animId = requestAnimationFrame(loop); }
+  }
+  window.addEventListener('resize', function(){ if(!animOn) drawWave(); });
+}
+if (document.readyState === 'complete') boot();
+else window.addEventListener('load', boot, { once: true });
+})();
 </script>
 
 
@@ -525,6 +698,9 @@ else window.addEventListener('load', function(){ compute(); }, { once: true });
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="noise-attenuation.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -580,13 +756,13 @@ else window.addEventListener('load', function(){ compute(); }, { once: true });
 <ol>
 <li>音源の参照音圧レベル(SPL)を入力します。例えば、建設機械パワーショベルは約88dB(A)、産業用コンプレッサーは約95dB(A)です。</li>
 <li>基準距離(通常1m)からの距離を設定します。距離減衰は20×log₁₀(r/r₀)で計算され、距離が2倍になると約6dB低下します。</li>
-<li>周波数帯域(125Hz～4kHz)と気温(0～40℃)を入力して計算実行ボタンをクリックします。ISO 9613-2では気温による大気吸収係数が変動するため、冬季と夏季で異なる結果になります。</li>
-<li>地面効果や遮音壁の有無をチェックして、総合的な音伝搬損失を評価します。</li>
+<li>周波数帯域(63Hz～8kHz)と気温(-10～40℃)を入力します。ISO 9613-2では気温による大気吸収係数が変動するため、冬季と夏季で異なる結果になります。</li>
+<li>地面効果の種類や遮音壁の高さを設定して、総合的な音伝搬損失を評価します。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>工場敷地境界での騒音評価例：参照音源92dB(A@1m)のプレス機械から50m離れた地点を計算する場合、幾何減衰は34dB、気温25℃での大気吸収が500Hzで約2dB、地面効果が硬質舗装上で約3dB減衰します。結果として受音点での予測音圧レベルは約53dB(A)となり、日本の工業地域基準値65dB(A)以下に収まります。高さ3m遮音壁を設置する場合、Fresnelパラメータに基づき約8dBの遮音性能が追加されます。</p>
+<p>工場敷地境界での騒音評価例：参照音源92dB(A@1m)のプレス機械から50m離れた地点を計算する場合、幾何減衰は約34.0dB、20℃・RH60%での大気吸収は500Hzで約0.1dB、硬質地面の補正は0dBです。結果として受音点での予測音圧レベルは約57.9dB(A)となります。高さ3m遮音壁を音源から10mに置く条件では、本モデルの挿入損失は約15.5dBです。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -596,6 +772,16 @@ else window.addEventListener('load', function(){ compute(); }, { once: true });
 <li>遮音壁計算では音波の回折を考慮しており、壁厚よりも高さと音源までの距離が重要です。幅の短い壁は側面回折により効果が減少するため、壁長と周囲配置を確認してください。</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

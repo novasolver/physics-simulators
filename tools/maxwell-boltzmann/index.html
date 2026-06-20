@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "マクスウェル・ボルツマン速度分布 シミュレーター",
       "description": "マクスウェル・ボルツマン速度分布シミュレーターで温度と分子量から理想気体の f(v) をリアルタイム計算する気体運動論ツールです。最確速度・平均速さ・RMS 速度・観測窓確率・累積確率を可視化します。",
       "url": "https://novasolver.jp/tools/maxwell-boltzmann.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["温度・分子量から f(v) を計算","最確速度 v_p・平均速さ・RMS 速度の表示","観測窓内確率と累積確率 P(V>v) の数値積分","異なる温度の分布曲線の比較"],
       "keywords": "マクスウェル・ボルツマン,速度分布,気体分子運動論,最確速度,RMS 速度,平均速さ,Maxwell-Boltzmann,統計力学",
       "datePublished": "2026-05-15",
@@ -102,6 +102,24 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #mbCanvas,#compCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.62rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.03em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:4px 10px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.toggle-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.82rem;font-family:inherit;cursor:pointer;transition:all .2s}
+.toggle-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.preset-btn,.toggle-btn{transition:none}}
 </style>
 </head>
 <body>
@@ -149,6 +167,14 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="param-group">
       <div class="param-label">
+        <span class="param-name">分子数 N</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slNVal" value="400" min="50" max="800" step="50" oninput="syncFromNum('slN','slNVal')"><span class="num-unit">個</span></div>
+      </div>
+      <input type="range" id="slN" min="50" max="800" step="50" value="400" oninput="syncToNum('slN','slNVal');updateSlider(this,'slNVal',0,'');mbReseed()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
         <span class="param-name">観測速度 v</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slVVal" value="500" min="0" max="3000" step="10" oninput="syncFromNum('slV','slVVal')"><span class="num-unit">m/s</span></div>
       </div>
@@ -165,34 +191,98 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">気体プリセット</div>
+    <div class="preset-row" id="gasPresets">
+      <button type="button" class="preset-btn" data-gas="2" onclick="setGas(2,this)">H₂</button>
+      <button type="button" class="preset-btn" data-gas="4" onclick="setGas(4,this)">He</button>
+      <button type="button" class="preset-btn active" data-gas="28" onclick="setGas(28,this)">N₂</button>
+      <button type="button" class="preset-btn" data-gas="32" onclick="setGas(32,this)">O₂</button>
+      <button type="button" class="preset-btn" data-gas="44" onclick="setGas(44,this)">CO₂</button>
+    </div>
+
+    <div style="font-size:0.75rem;color:var(--muted);margin:8px 0 6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">温度プリセット</div>
+    <div class="preset-row" id="tempPresets">
+      <button type="button" class="preset-btn" data-temp="100" onclick="setTemp(100,this)">寒冷 100K</button>
+      <button type="button" class="preset-btn active" data-temp="300" onclick="setTemp(300,this)">常温 300K</button>
+      <button type="button" class="preset-btn" data-temp="1000" onclick="setTemp(1000,this)">高温 1000K</button>
+    </div>
+
+    <div class="param-group" style="margin-top:10px;">
+      <div class="param-label">
+        <span class="param-name">2気体を比較</span>
+        <button class="toggle-btn" type="button" id="cmpToggle" onclick="toggleCompare()"><i class="fas fa-clone"></i> OFF</button>
+      </div>
+      <div id="cmpSub" style="display:none;">
+        <div class="param-group" style="margin-top:8px;">
+          <div class="param-label"><span class="param-name">比較気体 M₂</span>
+          <div class="num-wrap"><input type="number" class="num-input" id="slM2Val" value="4" min="1" max="200" step="1" oninput="syncFromNum('slM2','slM2Val')"><span class="num-unit">g/mol</span></div></div>
+          <input type="range" id="slM2" min="1" max="200" step="1" value="4" oninput="syncToNum('slM2','slM2Val');updateSlider(this,'slM2Val',0,'');compute()">
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 温度をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
+    <div class="play-row">
+      <span style="font-size:.72rem;color:var(--muted)">速度</span>
+      <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+      <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+      <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+    </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">分子量の例：H₂=2、He=4、N₂=28、O₂=32、Ar=40、CO₂=44。観測窓は v±Δv/2 の範囲で確率を集計します。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roVp">—</div><div class="rl">最確速度 v_p [m/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roVavg">—</div><div class="rl">平均速さ ⟨v⟩ [m/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roVrms">—</div><div class="rl">RMS 速度 v_rms [m/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roKE">—</div><div class="rl">平均運動エネルギー [eV]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-atom"></i> 分子の運動と速度ヒストグラム（mbCanvas）</div>
+      <canvas id="mbCanvas" tabindex="0" role="img" aria-label="気体分子がリアルタイムで運動するボックスと、速さのライブヒストグラムが理論曲線に収束する様子"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#4aa3ff"></i>遅い分子</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>中速</span>
+        <span><i class="swatch" style="background:#ff5252"></i>速い分子</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>理論 f(v)</span>
+        <span><i class="swatch" style="background:rgba(120,200,160,.8)"></i>ライブ集計</span>
+      </div>
+      <p class="canvas-hint">上：温度 T で M-B 分布からサンプリングした分子が衝突しながら運動（色＝速さ）。下：分子の速さのヒストグラム（緑）が理論 M-B 曲線（青）に収束。破線＝v_p／⟨v⟩／v_rms、黄シェード＝観測窓 [v−Δv/2, v+Δv/2]</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 温度・気体の比較</div>
+      <canvas id="compCanvas"></canvas>
+      <p class="canvas-hint" id="compHint">同じ分子量での温度依存性。橙＝T/2、青＝現在の T（強調）、赤＝2T。温度が上がると分布が右に広がりピークが低くなる</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-calculator"></i> 検証（既知解）</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statVp">—</div><div class="sl">最確速度 v_p</div></div>
         <div class="stat-card"><div class="sv" id="statVrms">—</div><div class="sl">RMS 速度 v_rms</div></div>
         <div class="stat-card"><div class="sv" id="statProb">—</div><div class="sl">観測窓内確率</div></div>
         <div class="stat-card"><div class="sv" id="statCum">—</div><div class="sl">P(V &gt; v) 累積確率</div></div>
       </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-area"></i> マクスウェル・ボルツマン分布 f(v)</div>
-      <canvas id="mbCanvas"></canvas>
-      <p class="canvas-hint">横軸＝速さ v (m/s)／縦軸＝確率密度 f(v)／青破線＝v_p、緑破線＝平均速さ、橙破線＝v_rms／黄点＝観測 v、シェード＝確率窓 [v−Δv/2, v+Δv/2]</p>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 温度比較（T/2、T、2T）</div>
-      <canvas id="compCanvas"></canvas>
-      <p class="canvas-hint">同じ分子量での温度依存性を可視化。橙＝T/2、青＝現在の T（強調）、赤＝2T。温度が上がると分布が右に広がり、ピークが低くなる</p>
     </div>
 
     <div class="chart-card">
@@ -210,315 +300,437 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Maxwell-Boltzmann Speed Distribution Simulator ==========
-var mbCanvas = document.getElementById('mbCanvas');
-var mbCtx = mbCanvas.getContext('2d');
-var compCanvas = document.getElementById('compCanvas');
-var compCtx = compCanvas.getContext('2d');
-var playing = false;
-var animId = null;
+/* ===== Maxwell-Boltzmann v2 engine (IIFE) =====
+   mbCanvas: live molecule box (top) + speed histogram converging to theory (bottom)
+   compCanvas: comparison of temperatures OR two gases */
+(function () {
+  "use strict";
+  var L = {
+    boxTitle: '分子ボックス（色＝速さ）',
+    histTitle: '速さヒストグラム → 理論 f(v)',
+    pause: '<i class="fas fa-pause"></i> 一時停止',
+    play: '<i class="fas fa-play"></i> 再生',
+    current: '現在',
+    compTemp: '同じ分子量での温度依存性。橙＝T/2、青＝現在の T（強調）、赤＝2T。温度が上がると分布が右に広がりピークが低くなる',
+    compGas: '同じ温度 T での気体比較。青＝気体1 (M₁)、赤＝気体2 (M₂)。軽い分子ほど分布が右（速い）に寄る'
+  };
 
-var K_B = 1.380649e-23;       // Boltzmann constant (J/K)
-var N_A = 6.02214076e23;      // Avogadro number
+  var mbCanvas = document.getElementById('mbCanvas');
+  var mbCtx = mbCanvas.getContext('2d');
+  var compCanvas = document.getElementById('compCanvas');
+  var compCtx = compCanvas.getContext('2d');
 
-function getParams() {
-  var T = parseFloat(document.getElementById('slT').value);
-  var Mg = parseFloat(document.getElementById('slM').value);
-  var v = parseFloat(document.getElementById('slV').value);
-  var dv = parseFloat(document.getElementById('slDeltaV').value);
-  var m = Mg * 1e-3 / N_A; // molecular mass kg
-  return { T: T, Mg: Mg, v: v, dv: dv, m: m };
-}
+  var K_B = 1.380649e-23;       // Boltzmann constant (J/K)
+  var N_A = 6.02214076e23;      // Avogadro number
+  var EV = 1.602176634e-19;     // J per eV
+  var DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Maxwell-Boltzmann speed pdf
-function fMB(v, m, T) {
-  if (v <= 0) return 0;
-  var a = m / (2 * Math.PI * K_B * T);
-  return 4 * Math.PI * Math.pow(a, 1.5) * v * v * Math.exp(-m * v * v / (2 * K_B * T));
-}
+  var playing = !reduceMotion;
+  var animId = null;
+  var lastTs = 0;
+  var speedMult = 1;
+  var compareGases = false;
 
-function vp_of(m, T) { return Math.sqrt(2 * K_B * T / m); }
-function vrms_of(m, T) { return Math.sqrt(3 * K_B * T / m); }
-function vmean_of(m, T) { return Math.sqrt(8 * K_B * T / (Math.PI * m)); }
+  var particles = [];     // {x,y,vx,vy} in pixel/sim units of the box
+  var histBins = [];      // live histogram counts (by speed bin in m/s)
+  var NBINS = 40;
+  var binMax = 3000;      // m/s upper bound for hist x-axis (dynamic)
 
-// Trapezoidal integration of f(v) over [a,b] with N segments
-function intF(a, b, m, T, N) {
-  if (b <= a) return 0;
-  var s = 0;
-  for (var i = 0; i < N; i++) {
-    var v0 = a + (b - a) * i / N;
-    var v1 = a + (b - a) * (i + 1) / N;
-    s += 0.5 * (fMB(v0, m, T) + fMB(v1, m, T)) * (v1 - v0);
+  function el(id){ return document.getElementById(id); }
+  function val(id){ return parseFloat(el(id).value); }
+
+  function getParams() {
+    var T = val('slT');
+    var Mg = val('slM');
+    var v = val('slV');
+    var dv = val('slDeltaV');
+    var n = val('slN');
+    var Mg2 = el('slM2') ? val('slM2') : 4;
+    return { T:T, Mg:Mg, v:v, dv:dv, n:n, m: Mg*1e-3/N_A, Mg2:Mg2, m2: Mg2*1e-3/N_A };
   }
-  return s;
-}
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
+  function fMB(v, m, T) {
+    if (v <= 0) return 0;
+    var a = m / (2 * Math.PI * K_B * T);
+    return 4 * Math.PI * Math.pow(a, 1.5) * v * v * Math.exp(-m * v * v / (2 * K_B * T));
+  }
+  function vp_of(m, T){ return Math.sqrt(2 * K_B * T / m); }
+  function vrms_of(m, T){ return Math.sqrt(3 * K_B * T / m); }
+  function vmean_of(m, T){ return Math.sqrt(8 * K_B * T / (Math.PI * m)); }
+  function keMean(T){ return 1.5 * K_B * T; } // mean translational KE (J)
 
-function resizeCanvases() {
-  [mbCanvas, compCanvas].forEach(function (cv) {
+  function intF(a, b, m, T, N) {
+    if (b <= a) return 0;
+    var s = 0;
+    for (var i = 0; i < N; i++) {
+      var v0 = a + (b - a) * i / N;
+      var v1 = a + (b - a) * (i + 1) / N;
+      s += 0.5 * (fMB(v0, m, T) + fMB(v1, m, T)) * (v1 - v0);
+    }
+    return s;
+  }
+
+  // Sample a speed from the M-B distribution: each velocity component ~ N(0, sigma), sigma=sqrt(kT/m)
+  function gauss(){
+    var u = 0, w = 0;
+    while (u === 0) u = Math.random();
+    while (w === 0) w = Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*w);
+  }
+  function sampleSpeed(m, T){
+    var sigma = Math.sqrt(K_B*T/m);
+    var a = gauss()*sigma, b = gauss()*sigma, c = gauss()*sigma;
+    return Math.sqrt(a*a + b*b + c*c);
+  }
+
+  function cssW(cv){ return parseFloat(cv.dataset.cssW) || cv.width/DPR; }
+  function cssH(cv){ return parseFloat(cv.dataset.cssH) || cv.height/DPR; }
+
+  function sizeCanvas(cv, ratio){
     var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  });
-}
+    var h = Math.round(w * ratio);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * DPR);
+    cv.height = Math.round(h * DPR);
+    cv.dataset.cssW = String(w);
+    cv.dataset.cssH = String(h);
+    var c = cv.getContext('2d');
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  function resizeCanvases(){
+    sizeCanvas(mbCanvas, 0.92);
+    sizeCanvas(compCanvas, 0.5);
+  }
 
-function drawAxes(ctx, W, H, mx, my, xLabel, yLabel) {
-  var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(xLabel, (x0 + x1) / 2, H - 4);
-  ctx.save();
-  ctx.translate(12, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText(yLabel, 0, 0);
-  ctx.restore();
-  return { x0: x0, x1: x1, y0: y0, y1: y1 };
-}
+  // particle box uses pixel-space velocities scaled so that v_rms maps to a fixed visual speed
+  function reseed(){
+    var p = getParams();
+    var W = cssW(mbCanvas);
+    var boxH = cssH(mbCanvas) * 0.52;
+    var n = Math.round(p.n);
+    var vrms = vrms_of(p.m, p.T);
+    var visScale = 70 / vrms; // px/s per (m/s)
+    particles = [];
+    for (var i=0;i<n;i++){
+      var spd = sampleSpeed(p.m, p.T);
+      var ang = Math.random()*2*Math.PI;
+      particles.push({
+        x: 12 + Math.random()*(W-24),
+        y: 12 + Math.random()*(boxH-24),
+        vx: Math.cos(ang)*spd*visScale,
+        vy: Math.sin(ang)*spd*visScale,
+        sMS: spd // true speed in m/s
+      });
+    }
+    histBins = new Array(NBINS).fill(0);
+    histCount = 0;
+    binMax = Math.max(5*vp_of(p.m, p.T), 100);
+  }
 
-function drawMB(p) {
-  var ctx = mbCtx, W = __novaCanvasCssW(mbCanvas), H = __novaCanvasCssH(mbCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 56, my = 28;
-  var ax = drawAxes(ctx, W, H, mx, my, 'v (m/s)', 'f(v)');
-  var x0 = ax.x0, x1 = ax.x1, y0 = ax.y0, y1 = ax.y1;
-  var gw = x1 - x0, gh = y0 - y1;
-  var vp = vp_of(p.m, p.T);
-  var vrms = vrms_of(p.m, p.T);
-  var vmean = vmean_of(p.m, p.T);
-  var XL = 0, XH = Math.max(5 * vp, p.v + p.dv);
-  var fpeak = fMB(vp, p.m, p.T);
-  var YH = fpeak * 1.1;
-  function px(v) { return x0 + (v - XL) / (XH - XL) * gw; }
-  function py(f) { return y0 - (f / YH) * gh; }
-  // grid + x ticks
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  var ntx = 6;
-  for (var i = 0; i <= ntx; i++) {
-    var vt = XL + (XH - XL) * i / ntx;
-    var xx = px(vt);
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-    ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText(vt.toFixed(0), xx, y0 + 14);
+  var histCount = 0;
+  function accumulateHist(){
+    // add current particle speeds into running histogram (EMA-like accumulation)
+    for (var i=0;i<particles.length;i++){
+      var idx = Math.floor(particles[i].sMS / binMax * NBINS);
+      if (idx >= 0 && idx < NBINS){ histBins[idx]++; histCount++; }
+    }
   }
-  // y ticks
-  ctx.textAlign = 'right';
-  for (var k = 0; k <= 5; k++) {
-    var fy = YH * k / 5;
-    var yy = py(fy);
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-    ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText(fy.toExponential(1), x0 - 4, yy + 3);
-  }
-  // shaded probability window
-  var vL = Math.max(0, p.v - p.dv / 2);
-  var vR = p.v + p.dv / 2;
-  ctx.fillStyle = 'rgba(255,209,102,0.20)';
-  ctx.beginPath();
-  ctx.moveTo(px(vL), y0);
-  var Nshade = 60;
-  for (var s = 0; s <= Nshade; s++) {
-    var vs = vL + (vR - vL) * s / Nshade;
-    ctx.lineTo(px(vs), py(fMB(vs, p.m, p.T)));
-  }
-  ctx.lineTo(px(vR), y0);
-  ctx.closePath();
-  ctx.fill();
-  // MB curve
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  var N = 240;
-  for (var j = 0; j <= N; j++) {
-    var vv = XL + (XH - XL) * j / N;
-    var xv = px(vv), yv = py(fMB(vv, p.m, p.T));
-    if (j === 0) ctx.moveTo(xv, yv); else ctx.lineTo(xv, yv);
-  }
-  ctx.stroke();
-  // vertical lines for vp, vmean, vrms
-  function vline(v, color, label) {
-    if (v < XL || v > XH) return;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.4;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.moveTo(px(v), y0);
-    ctx.lineTo(px(v), y1);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = color;
-    ctx.font = '10px "Roboto Mono",monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(label, px(v) + 4, y1 + 12);
-  }
-  vline(vp, '#00B4D8', 'v_p');
-  vline(vmean, '#5cd6a8', '⟨v⟩');
-  vline(vrms, '#FF9F43', 'v_rms');
-  // observed v marker
-  if (p.v >= XL && p.v <= XH) {
-    var fv = fMB(p.v, p.m, p.T);
-    var ox = px(p.v), oy = py(fv);
-    ctx.strokeStyle = 'rgba(255,209,102,0.6)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(ox, y0); ctx.lineTo(ox, oy); ctx.stroke();
-    ctx.beginPath(); ctx.arc(ox, oy, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFD166';
-    ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-  }
-}
 
-function drawComp(p) {
-  var ctx = compCtx, W = __novaCanvasCssW(compCanvas), H = __novaCanvasCssH(compCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 56, my = 28;
-  var ax = drawAxes(ctx, W, H, mx, my, 'v (m/s)', 'f(v)');
-  var x0 = ax.x0, x1 = ax.x1, y0 = ax.y0, y1 = ax.y1;
-  var gw = x1 - x0, gh = y0 - y1;
-  var temps = [p.T * 0.5, p.T, p.T * 2];
-  var colors = ['#FF9F43', '#00B4D8', '#FF6B6B'];
-  var widths = [2.0, 3.0, 2.0];
-  var labels = ['T/2 = ' + (p.T * 0.5).toFixed(0) + ' K', 'T = ' + p.T.toFixed(0) + ' K (現在)', '2T = ' + (p.T * 2).toFixed(0) + ' K'];
-  var vp_max = vp_of(p.m, p.T * 2);
-  var XL = 0, XH = Math.max(5 * vp_max, 100);
-  var fpeak_lo = fMB(vp_of(p.m, p.T * 0.5), p.m, p.T * 0.5);
-  var YH = fpeak_lo * 1.1;
-  function px(v) { return x0 + (v - XL) / (XH - XL) * gw; }
-  function py(f) { return y0 - (f / YH) * gh; }
-  // grid + ticks
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  var ntx = 6;
-  for (var i = 0; i <= ntx; i++) {
-    var vt = XL + (XH - XL) * i / ntx;
-    var xx = px(vt);
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-    ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText(vt.toFixed(0), xx, y0 + 14);
+  function speedColor(frac){
+    // frac 0..1 (slow..fast). blue -> yellow -> red
+    frac = Math.max(0, Math.min(1, frac));
+    if (frac < 0.5){
+      var t = frac/0.5;
+      return 'rgb('+Math.round(74+ (255-74)*t)+','+Math.round(163+(213-163)*t)+','+Math.round(255+(74-255)*t)+')';
+    } else {
+      var u = (frac-0.5)/0.5;
+      return 'rgb(255,'+Math.round(213+(82-213)*u)+','+Math.round(74+(82-74)*u)+')';
+    }
   }
-  ctx.textAlign = 'right';
-  for (var k = 0; k <= 5; k++) {
-    var fy = YH * k / 5;
-    var yy = py(fy);
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-    ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText(fy.toExponential(1), x0 - 4, yy + 3);
+
+  function stepParticles(dt){
+    var W = cssW(mbCanvas);
+    var boxH = cssH(mbCanvas)*0.52;
+    for (var i=0;i<particles.length;i++){
+      var pt = particles[i];
+      pt.x += pt.vx*dt; pt.y += pt.vy*dt;
+      if (pt.x < 6){ pt.x = 6; pt.vx = Math.abs(pt.vx); }
+      else if (pt.x > W-6){ pt.x = W-6; pt.vx = -Math.abs(pt.vx); }
+      if (pt.y < 6){ pt.y = 6; pt.vy = Math.abs(pt.vy); }
+      else if (pt.y > boxH-6){ pt.y = boxH-6; pt.vy = -Math.abs(pt.vy); }
+    }
   }
-  // 3 curves
-  var N = 240;
-  for (var c = 0; c < temps.length; c++) {
-    ctx.strokeStyle = colors[c];
-    ctx.lineWidth = widths[c];
-    ctx.beginPath();
-    for (var j = 0; j <= N; j++) {
-      var vv = XL + (XH - XL) * j / N;
-      var xv = px(vv), yv = py(fMB(vv, p.m, temps[c]));
-      if (j === 0) ctx.moveTo(xv, yv); else ctx.lineTo(xv, yv);
+
+  function drawBoxAndHist(p){
+    var ctx = mbCtx, W = cssW(mbCanvas), H = cssH(mbCanvas);
+    var boxH = H*0.52;
+    ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
+    // box border
+    ctx.strokeStyle = 'rgba(143,184,224,0.35)'; ctx.lineWidth = 1;
+    ctx.strokeRect(2, 2, W-4, boxH-4);
+    var vrms = vrms_of(p.m, p.T);
+    // draw particles colored by speed (relative to ~2*vrms)
+    for (var i=0;i<particles.length;i++){
+      var pt = particles[i];
+      var frac = pt.sMS / (2.2*vrms);
+      ctx.beginPath();
+      ctx.fillStyle = speedColor(frac);
+      ctx.arc(pt.x, pt.y, 2.6, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(207,227,247,0.85)';
+    ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+    ctx.fillText(L.boxTitle+'  T='+p.T.toFixed(0)+'K  M='+p.Mg.toFixed(0)+'g/mol', 8, 16);
+
+    // ===== histogram region =====
+    var hx0 = 56, hx1 = W-16, hy0 = H-26, hy1 = boxH+22;
+    var gw = hx1-hx0, gh = hy0-hy1;
+    function px(v){ return hx0 + v/binMax*gw; }
+    var vp = vp_of(p.m,p.T), vmean = vmean_of(p.m,p.T);
+    // theoretical peak for y-scale
+    var fpeak = fMB(vp, p.m, p.T);
+    var YH = fpeak*1.18;
+    function py(f){ return hy0 - (f/YH)*gh; }
+    // axes
+    ctx.strokeStyle = 'rgba(143,184,224,0.5)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(hx0,hy0); ctx.lineTo(hx1,hy0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hx0,hy0); ctx.lineTo(hx0,hy1); ctx.stroke();
+    ctx.fillStyle = '#8fb8e0'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    for (var t=0;t<=5;t++){
+      var vt = binMax*t/5; var xx = px(vt);
+      ctx.fillText(vt.toFixed(0), xx, hy0+13);
+    }
+    ctx.textAlign='left';
+    ctx.fillText('v (m/s)', (hx0+hx1)/2-20, H-2);
+    ctx.fillStyle='#cfe3f7'; ctx.fillText(L.histTitle, hx0, hy1-6);
+
+    // shaded probability window
+    var vL = Math.max(0, p.v - p.dv/2), vR = p.v + p.dv/2;
+    ctx.fillStyle = 'rgba(255,209,102,0.18)';
+    ctx.fillRect(px(vL), hy1, px(vR)-px(vL), hy0-hy1);
+
+    // live histogram bars (normalized to a density so it overlays the pdf)
+    if (histCount > 0){
+      var binW = binMax/NBINS;
+      ctx.fillStyle = 'rgba(120,200,160,0.78)';
+      for (var b=0;b<NBINS;b++){
+        var dens = (histBins[b]/histCount)/binW; // probability density
+        var bx = px(b*binW), bxe = px((b+1)*binW);
+        var byTop = py(dens);
+        if (byTop < hy1) byTop = hy1;
+        ctx.fillRect(bx+0.5, byTop, (bxe-bx)-1, hy0-byTop);
+      }
+    }
+    // theoretical MB curve
+    ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.4; ctx.beginPath();
+    var NC = 200;
+    for (var j=0;j<=NC;j++){
+      var vv = binMax*j/NC;
+      var xv = px(vv), yv = py(fMB(vv, p.m, p.T));
+      if (j===0) ctx.moveTo(xv,yv); else ctx.lineTo(xv,yv);
     }
     ctx.stroke();
+    // vp / vmean / vrms dashed markers
+    function vline(v,color,label){
+      if (v<0||v>binMax) return;
+      ctx.strokeStyle=color; ctx.lineWidth=1.3; ctx.setLineDash([5,4]);
+      ctx.beginPath(); ctx.moveTo(px(v),hy0); ctx.lineTo(px(v),hy1); ctx.stroke();
+      ctx.setLineDash([]); ctx.fillStyle=color; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='left';
+      ctx.fillText(label, px(v)+3, hy1+11);
+    }
+    vline(vp,'#00B4D8','v_p');
+    vline(vmean,'#5cd6a8','⟨v⟩');
+    vline(vrms,'#FF9F43','v_rms');
+    // observed v marker
+    if (p.v>=0 && p.v<=binMax){
+      var ox = px(p.v), oy = py(fMB(p.v,p.m,p.T));
+      ctx.beginPath(); ctx.arc(ox,oy,5,0,6.2832); ctx.fillStyle='#FFD166'; ctx.fill();
+    }
   }
-  // legend
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  for (var L = 0; L < labels.length; L++) {
-    ctx.fillStyle = colors[L];
-    ctx.fillText(labels[L], x0 + 8, y1 + 12 + L * 14);
+
+  function drawComp(p){
+    var ctx = compCtx, W = cssW(compCanvas), H = cssH(compCanvas);
+    ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
+    var mx=56, my=28, x0=mx, x1=W-16, y0=H-my, y1=my, gw=x1-x0, gh=y0-y1;
+    ctx.strokeStyle='rgba(143,184,224,0.5)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y1); ctx.stroke();
+    ctx.fillStyle='#cfe3f7'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('v (m/s)', (x0+x1)/2, H-4);
+
+    var series, labels;
+    if (compareGases){
+      series = [
+        { m:p.m,  T:p.T, color:'#00B4D8', w:3.0 },
+        { m:p.m2, T:p.T, color:'#FF6B6B', w:2.4 }
+      ];
+      labels = ['M₁ = '+p.Mg.toFixed(0)+' g/mol', 'M₂ = '+p.Mg2.toFixed(0)+' g/mol'];
+    } else {
+      series = [
+        { m:p.m, T:p.T*0.5, color:'#FF9F43', w:2.0 },
+        { m:p.m, T:p.T,     color:'#00B4D8', w:3.0 },
+        { m:p.m, T:p.T*2,   color:'#FF6B6B', w:2.0 }
+      ];
+      labels = ['T/2 = '+(p.T*0.5).toFixed(0)+' K', 'T = '+p.T.toFixed(0)+' K ('+L.current+')', '2T = '+(p.T*2).toFixed(0)+' K'];
+    }
+    // axis ranges
+    var XH = 0, YH = 0;
+    for (var s=0;s<series.length;s++){
+      var vpe = vp_of(series[s].m, series[s].T);
+      XH = Math.max(XH, 5*vpe);
+      YH = Math.max(YH, fMB(vpe, series[s].m, series[s].T));
+    }
+    XH = Math.max(XH, 100); YH = YH*1.12;
+    function px(v){ return x0 + v/XH*gw; }
+    function py(f){ return y0 - f/YH*gh; }
+    ctx.fillStyle='#8fb8e0'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    for (var t=0;t<=6;t++){
+      var vt = XH*t/6, xx=px(vt);
+      ctx.beginPath(); ctx.strokeStyle='rgba(143,184,224,0.16)';
+      ctx.moveTo(xx,y0); ctx.lineTo(xx,y1); ctx.stroke();
+      ctx.fillStyle='#8fb8e0'; ctx.fillText(vt.toFixed(0), xx, y0+13);
+    }
+    var N=220;
+    for (var c=0;c<series.length;c++){
+      ctx.strokeStyle=series[c].color; ctx.lineWidth=series[c].w; ctx.beginPath();
+      for (var j=0;j<=N;j++){
+        var vv = XH*j/N, xv=px(vv), yv=py(fMB(vv, series[c].m, series[c].T));
+        if (j===0) ctx.moveTo(xv,yv); else ctx.lineTo(xv,yv);
+      }
+      ctx.stroke();
+    }
+    ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='left';
+    for (var Li=0;Li<labels.length;Li++){
+      ctx.fillStyle=series[Li].color; ctx.fillText(labels[Li], x0+8, y1+12+Li*14);
+    }
   }
-}
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.T) || !isFinite(p.Mg) || !isFinite(p.v) || !isFinite(p.dv)) return;
-  var vp = vp_of(p.m, p.T);
-  var vrms = vrms_of(p.m, p.T);
-  // Probability window: f(v) * Δv (window approximation)
-  var fv = fMB(p.v, p.m, p.T);
-  var Pwin = fv * p.dv;
-  // Cumulative P(V > v_obs) via trapezoidal up to 5*vp
-  var Pcum = intF(p.v, 5 * vp, p.m, p.T, 2000);
-  document.getElementById('statVp').textContent = vp.toFixed(0) + ' m/s';
-  document.getElementById('statVrms').textContent = vrms.toFixed(0) + ' m/s';
-  document.getElementById('statProb').textContent = (Pwin * 100).toFixed(2) + ' %';
-  document.getElementById('statCum').textContent = (Pcum * 100).toFixed(1) + ' %';
-  drawMB(p);
-  drawComp(p);
-}
+  function updateReadouts(p){
+    var vp = vp_of(p.m,p.T), vavg = vmean_of(p.m,p.T), vrms = vrms_of(p.m,p.T);
+    el('roVp').textContent = vp.toFixed(0);
+    el('roVavg').textContent = vavg.toFixed(0);
+    el('roVrms').textContent = vrms.toFixed(0);
+    el('roKE').textContent = (keMean(p.T)/EV).toFixed(4);
+    // validation stat cards
+    var fv = fMB(p.v, p.m, p.T);
+    var Pwin = fv * p.dv;
+    var Pcum = intF(p.v, 6*vp, p.m, p.T, 2000);
+    el('statVp').textContent = vp.toFixed(0) + ' m/s';
+    el('statVrms').textContent = vrms.toFixed(0) + ' m/s';
+    el('statProb').textContent = (Pwin*100).toFixed(2) + ' %';
+    el('statCum').textContent = (Pcum*100).toFixed(1) + ' %';
+  }
 
-function animationStep() {
-  if (!playing) return;
-  var sl = document.getElementById('slT');
-  var v = parseFloat(sl.value) + 25;
-  if (v > 2000) v = 50;
-  sl.value = v;
-  updateSlider(sl, 'slTVal', 0, '');
+  // compute(): static recompute (no reseed); used by sliders V/Δv and presets after reseed
+  function compute(){
+    var p = getParams();
+    if (!isFinite(p.T)||!isFinite(p.Mg)||!isFinite(p.v)||!isFinite(p.dv)) return;
+    updateReadouts(p);
+    drawBoxAndHist(p);
+    drawComp(p);
+  }
+  window.compute = compute;
+
+  function loop(ts){
+    if (!playing){ animId = null; return; }
+    if (!lastTs) lastTs = ts;
+    var dt = Math.min(0.05, (ts-lastTs)/1000) * speedMult;
+    lastTs = ts;
+    stepParticles(dt);
+    accumulateHist();
+    compute();
+    animId = requestAnimationFrame(loop);
+  }
+  function startLoop(){
+    if (reduceMotion){ playing=false; return; }
+    playing = true; lastTs = 0;
+    el('playBtn').innerHTML = L.pause;
+    if (!animId) animId = requestAnimationFrame(loop);
+  }
+  function stopLoop(){
+    playing = false;
+    el('playBtn').innerHTML = L.play;
+    if (animId){ cancelAnimationFrame(animId); animId = null; }
+  }
+
+  window.togglePlay = function(){ playing ? stopLoop() : startLoop(); };
+
+  window.mbReseed = function(){ reseed(); compute(); };
+
+  window.setSpeed = function(s){
+    speedMult = s;
+    var btns = document.querySelectorAll('.speed-btn');
+    for (var i=0;i<btns.length;i++){
+      btns[i].classList.toggle('active', parseFloat(btns[i].dataset.speed)===s);
+    }
+  };
+
+  window.setGas = function(mg, btn){
+    el('slM').value = mg; el('slMVal').value = mg;
+    if (typeof updateSlider==='function') updateSlider(el('slM'),'slMVal',0,'');
+    var btns = document.querySelectorAll('#gasPresets .preset-btn');
+    for (var i=0;i<btns.length;i++) btns[i].classList.toggle('active', btns[i]===btn);
+    reseed(); compute();
+  };
+
+  window.setTemp = function(t, btn){
+    el('slT').value = t; el('slTVal').value = t;
+    if (typeof updateSlider==='function') updateSlider(el('slT'),'slTVal',0,'');
+    var btns = document.querySelectorAll('#tempPresets .preset-btn');
+    for (var i=0;i<btns.length;i++) btns[i].classList.toggle('active', btns[i]===btn);
+    reseed(); compute();
+  };
+
+  window.toggleCompare = function(){
+    compareGases = !compareGases;
+    var b = el('cmpToggle');
+    b.classList.toggle('active', compareGases);
+    b.innerHTML = compareGases ? '<i class="fas fa-clone"></i> ON' : '<i class="fas fa-clone"></i> OFF';
+    el('cmpSub').style.display = compareGases ? 'block' : 'none';
+    el('compHint').textContent = compareGases ? L.compGas : L.compTemp;
+    compute();
+  };
+
+  window.resetParams = function(){
+    var defs = { slT:300, slM:28, slV:500, slDeltaV:50, slN:400, slM2:4 };
+    Object.keys(defs).forEach(function(id){
+      if (el(id)){ el(id).value = defs[id]; if (el(id+'Val')) el(id+'Val').value = defs[id]; }
+    });
+    ['slT','slM','slV','slDeltaV','slN','slM2'].forEach(function(id){
+      if (el(id) && typeof updateSlider==='function') updateSlider(el(id), id+'Val', 0, '');
+    });
+    // reset gas/temp preset highlight
+    var gb = document.querySelectorAll('#gasPresets .preset-btn');
+    for (var i=0;i<gb.length;i++) gb[i].classList.toggle('active', gb[i].dataset.gas==='28');
+    var tb = document.querySelectorAll('#tempPresets .preset-btn');
+    for (var k=0;k<tb.length;k++) tb[k].classList.toggle('active', tb[k].dataset.temp==='300');
+    compareGases = false;
+    el('cmpToggle').classList.remove('active');
+    el('cmpToggle').innerHTML = '<i class="fas fa-clone"></i> OFF';
+    el('cmpSub').style.display = 'none';
+    el('compHint').textContent = L.compTemp;
+    reseed();
+    compute();
+    if (!reduceMotion) startLoop();
+  };
+
+  window.addEventListener('resize', function(){ resizeCanvases(); reseed(); compute(); });
+
+  // init
+  resizeCanvases();
+  reseed();
   compute();
-  animId = requestAnimationFrame(animationStep);
-}
-
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
+  if (reduceMotion){
+    // static frame: seed histogram with one batch so it shows a populated chart
+    for (var w=0; w<25; w++){ accumulateHist(); }
+    el('playBtn').innerHTML = L.play;
+    compute();
   } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> 温度をスイープ';
-    if (animId) cancelAnimationFrame(animId);
+    startLoop();
   }
-}
-
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> 温度をスイープ';
-  var defs = { slT: 300, slM: 28, slV: 500, slDeltaV: 50 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slT'), 'slTVal', 0, '');
-  updateSlider(document.getElementById('slM'), 'slMVal', 0, '');
-  updateSlider(document.getElementById('slV'), 'slVVal', 0, '');
-  updateSlider(document.getElementById('slDeltaV'), 'slDeltaVVal', 0, '');
-  compute();
-}
-
-window.addEventListener('resize', function () { resizeCanvases(); compute(); });
-
-resizeCanvases();
-compute();
+})();
 </script>
 
 <section class="explanation">
@@ -586,6 +798,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="maxwell-boltzmann.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -638,16 +853,26 @@ compute();
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>温度スライダー（slTVal）を100～1000 Kの範囲で調整し、気体分子の熱運動エネルギーを設定します</li><li>分子量スライダー（slMVal）で窒素（28 g/mol）、酸素（32 g/mol）、ヘリウム（4 g/mol）など対象物質を選択します</li><li>観測速度幅（slDeltaVVal）で速度解像度を0.1～50 m/sの間で指定し、分布曲線の粒度を制御します</li><li>速度範囲スライダー（slVVal）を0～2000 m/sで動かし、最確速度vₚ、RMS速度v_rms、および指定速度での確率密度を比較確認します</li></ol>
+<ol><li>温度スライダー（slTVal）を50～2000 Kの範囲で調整し、気体分子の熱運動エネルギーを設定します</li><li>分子量スライダー（slMVal）で窒素（28 g/mol）、酸素（32 g/mol）、ヘリウム（4 g/mol）など対象物質を選択します</li><li>確率窓幅（slDeltaVVal）を10～500 m/sの間で指定し、観測窓 v±Δv/2 内の確率を集計します</li><li>観測速度スライダー（slVVal）を0～3000 m/sで動かし、最確速度vₚ、RMS速度v_rms、および指定速度での確率密度・累積確率を比較確認します</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>300 K、窒素分子（M=28 g/mol）の場合：最確速度vₚ=√(2RT/M)=√(2×8.314×300/0.028)≈422 m/s、RMS速度v_rms=√(3RT/M)≈517 m/s。600 Kに加熱すると最確速度は597 m/s、RMS速度は731 m/sに上昇し、√T依存性が確認できます。観測窓幅Δv=10 m/sで速度400～410 m/sの確率は約0.8%となります。</p>
+<p>300 K、窒素分子（M=28 g/mol）の場合：最確速度vₚ=√(2RT/M)=√(2×8.314×300/0.028)≈422 m/s、RMS速度v_rms=√(3RT/M)≈517 m/s。600 Kに加熱すると最確速度は597 m/s、RMS速度は731 m/sに上昇し、√T依存性が確認できます。観測窓幅Δv=10 m/sで速度400～410 m/sの確率は約2.0%となります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
-<ul><li>圧縮機設計時に500 K、空気分子平均質量29 g/molでRMS速度≈658 m/sとなり、排気流速や衝撃損失の予測に用いられます</li><li>低温域（100 K以下）ではヘリウムの拡散速度が最確速度1380 m/sに達し、リークディテクションに応用されます</li><li>分布の裾野部分（高速分子の確率）は低温ほど急速に減少するため、化学反応の活性化エネルギー閾値を超える分子フラクションの評価に重要です</li><li>Maxwell-Boltzmann分布は平衡系を前提とするため、プラズマ状態や非平衡フローではBoltzmann因子の修正が必要です</li></ul>
+<ul><li>圧縮機設計時に500 K、空気分子平均質量29 g/molでRMS速度≈658 m/sとなり、排気流速や衝撃損失の予測に用いられます</li><li>ヘリウムは軽く（M=4）、室温300 Kでも最確速度が約1120 m/sと大きいため拡散が速く、リークディテクションに応用されます</li><li>分布の裾野部分（高速分子の確率）は低温ほど急速に減少するため、化学反応の活性化エネルギー閾値を超える分子フラクションの評価に重要です</li><li>Maxwell-Boltzmann分布は平衡系を前提とするため、プラズマ状態や非平衡フローではBoltzmann因子の修正が必要です</li></ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

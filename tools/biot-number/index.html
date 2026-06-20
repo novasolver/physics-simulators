@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ビオ数 シミュレーター",
       "description": "対流熱伝達率 h、固体熱伝導率 k、特性長 L_c、熱拡散率 α から、ビオ数 Bi = hL/k、集中容量モデルの適用領域、時定数 τ、無次元残差 T/T_0 をリアルタイムに計算する過渡熱伝導シミュレーター。",
       "url": "https://novasolver.jp/tools/biot-number.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ビオ数 Bi = hL_c/k による集中容量モデル可否のリアルタイム判定","集中容量モデルにおける時定数 τ = ρc_p L_c/h の計算と s/min/h の自動切替","t=τ における無次元残差 T/T_0 = exp(-1) の表示","Bi-無次元残差の領域マップ（Bi<0.1 集中容量、0.1<Bi<10 分布解析、Bi>10 表面集中）"],
       "keywords": "ビオ数,Biot,集中容量モデル,過渡熱伝導,時定数,フーリエ数,熱伝達,熱拡散率,特性長,温度応答",
       "datePublished": "2026-05-15",
@@ -163,36 +163,79 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <input type="range" id="slAlpha" min="0.05" max="200" step="0.05" value="13.00" oninput="syncToNum('slAlpha','slAlphaVal');updateSlider(this,'slAlphaVal',2,'');compute()">
     </div>
 
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">材料プリセット（k 自動設定）</span></div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setMaterial('copper')">銅 k=400</button>
+        <button type="button" class="preset-btn" onclick="setMaterial('steel')">鋼 k=50</button>
+        <button type="button" class="preset-btn" onclick="setMaterial('glass')">ガラス k=1</button>
+        <button type="button" class="preset-btn" onclick="setMaterial('plastic')">プラスチック k=0.2</button>
+      </div>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">シナリオ プリセット</span></div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setScenario('uniform')">均一 Bi&lt;0.1</button>
+        <button type="button" class="preset-btn" onclick="setScenario('gradient')">勾配 Bi&gt;0.1</button>
+        <button type="button" class="preset-btn" onclick="setScenario('highk')">高k金属</button>
+        <button type="button" class="preset-btn" onclick="setScenario('lowk')">低k＋高速流</button>
+      </div>
+    </div>
+
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> h をスイープ</button>
-      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 冷却を再生</button>
+      <button type="button" class="btn secondary" onclick="resetSim()"><i class="fas fa-redo"></i> 最初から</button>
+      <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-undo"></i> 既定値</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は鋼塊（h = 100 W/m²K の自然対流、k = 50 W/mK、L_c = 25 mm、α = 13 × 10⁻⁶ m²/s）。ρc_p = k/α で内部的に算出。判定基準は Bi &lt; 0.1（集中容量）、0.1 ≤ Bi ≤ 10（分布解析）、Bi &gt; 10（表面集中近似）。</p>
+    <div class="param-group" style="margin-top:8px">
+      <div class="param-label"><span class="param-name">再生速度</span></div>
+      <div class="preset-row" id="speedRow">
+        <button type="button" class="preset-btn speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+        <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="setSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+        <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+        <button type="button" class="preset-btn speed-btn" data-speed="4" onclick="setSpeed(4)">4×</button>
+      </div>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は鋼塊（h = 100 W/m²K の自然対流、k = 50 W/mK、L_c = 25 mm、α = 13 × 10⁻⁶ m²/s）。ρc_p = k/α で内部的に算出。判定基準は Bi &lt; 0.1（集中容量＝均一）、0.1 ≤ Bi ≤ 10（分布解析＝内部勾配）、Bi &gt; 10（表面集中近似）。左＝同条件で Bi&lt;0.1 にした均一物体、右＝現在の Bi の物体（高 Bi で内部勾配）。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-calculator"></i> ライブ計算結果</div>
       <div class="stat-cards">
         <div class="stat-card"><div class="sv" id="statBi">—</div><div class="sl">ビオ数 Bi = hL/k</div></div>
         <div class="stat-card"><div class="sv" id="statRegime">—</div><div class="sl">適用領域</div></div>
         <div class="stat-card"><div class="sv" id="statTau">—</div><div class="sl">時定数 τ</div></div>
+        <div class="stat-card"><div class="sv" id="statTime">—</div><div class="sl">経過時間 t</div></div>
+        <div class="stat-card"><div class="sv" id="statSurf">—</div><div class="sl">表面温度 θ_s</div></div>
+        <div class="stat-card"><div class="sv" id="statCore">—</div><div class="sl">中心温度 θ_c</div></div>
+        <div class="stat-card"><div class="sv" id="statGrad">—</div><div class="sl">勾配 θ_c−θ_s</div></div>
         <div class="stat-card"><div class="sv" id="statResidual">—</div><div class="sl">t=τ での T/T_0</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-cube"></i> 固体内部の温度勾配（断面図）</div>
+      <div class="chart-title"><i class="fas fa-cube"></i> 冷却中の温度マップ：均一 vs 内部勾配</div>
       <canvas id="objectCanvas"></canvas>
-      <p class="canvas-hint">固体（球の断面）に色グラデーションで表現／Bi が小さいほど均一色（lumped 近似）／Bi が大きいと中心と表面で色差が顕著／矢印 h（外部対流）と k（内部伝導）の比が Bi。</p>
+      <p class="canvas-hint">左＝同じ τ で <strong>Bi&lt;0.1</strong> にした物体：全体が <strong>一色のまま</strong>均一に冷える（集中容量＝勾配なし）。右＝現在の Bi の物体：<strong>表面が青く（冷）、中心が赤い（熱）</strong>＝可視化された内部温度勾配。色＝赤(熱)→青(冷)。h（外周の矢印）と k（内部）の比が Bi。<span id="hintRegime"></span></p>
     </div>
 
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-chart-area"></i> ビオ数の領域マップ（Bi-応答）</div>
       <canvas id="regimeCanvas"></canvas>
-      <p class="canvas-hint">横軸＝Bi（対数、0.01〜100）／縦軸＝無次元残差 ε = T/T_0 at t=τ／緑＝集中容量領域（Bi&lt;0.1）／黄＝分布解析領域（0.1&lt;Bi&lt;10）／赤＝表面集中領域（Bi&gt;10）／黄縦線＝現在の Bi。</p>
+      <p class="canvas-hint">横軸＝Bi（対数、0.001〜100）／縦軸＝t=τ における表面と中心の温度差（勾配の大きさ）／緑＝集中容量領域（Bi&lt;0.1、勾配ほぼ 0）／黄＝分布解析領域（0.1&lt;Bi&lt;10）／赤＝表面集中領域（Bi&gt;10）／黄縦線＋丸＝現在の Bi。Bi=0.1 を跨ぐと勾配が立ち上がる。</p>
     </div>
 
     <div class="chart-card">
@@ -212,450 +255,398 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Biot Number (Transient Conduction, Lumped Capacitance) ==========
+window.__BIOT_I18N__ = {"regimes": ["集中容量モデル可", "分布パラメータ解析", "表面集中近似"], "regShort": ["集中容量", "分布解析", "表面集中"], "regimeNote": ["内部はほぼ均一（集中容量が妥当）。", "表面が先に冷え内部に勾配（分布解析が必要）。", "表面が瞬時に流体温度、内部勾配が支配的。"], "play": "冷却を再生", "pause": "一時停止", "uniformTitle": "均一 Bi<0.1", "uniformSub": "(集中容量)", "gradientTitle": "内部勾配", "gradientSub": "(現在)", "hot": "熱", "cold": "冷", "gradLegend": "t=τ の表面-中心温度差", "gradAxis": "勾配 θ_c−θ_s"};
+</script>
+<script>
+// ========== Biot Number v2 — Transient cooling: uniform vs internal gradient ==========
+(function(){
+"use strict";
+var L = window.__BIOT_I18N__ || {};
 var objectCanvas = document.getElementById('objectCanvas');
 var objectCtx = objectCanvas.getContext('2d');
 var regimeCanvas = document.getElementById('regimeCanvas');
 var regimeCtx = regimeCanvas.getContext('2d');
+
 var playing = false;
 var animId = null;
-var sweepDir = 1;
+var lastTs = 0;
+var simTime = 0;
+var speedMult = 1;
+var prefersReduced = false;
+try { prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){ prefersReduced = false; }
 
-function getParams() {
-  var h     = parseFloat(document.getElementById('slH').value);
-  var k     = parseFloat(document.getElementById('slK').value);
-  var L_mm  = parseFloat(document.getElementById('slL_mm').value);
-  var aMu   = parseFloat(document.getElementById('slAlpha').value); // ×1e-6 m^2/s
-  var L_SI  = L_mm * 1e-3;       // m
-  var alpha = aMu * 1e-6;        // m^2/s
-  var rhoCp = (alpha > 0) ? (k / alpha) : 0; // J/(m^3·K)
-  return { h: h, k: k, L_mm: L_mm, L: L_SI, alphaMu: aMu, alpha: alpha, rhoCp: rhoCp };
+function $(id){ return document.getElementById(id); }
+
+function getParams(){
+  var h    = parseFloat($('slH').value);
+  var k    = parseFloat($('slK').value);
+  var L_mm = parseFloat($('slL_mm').value);
+  var aMu  = parseFloat($('slAlpha').value);
+  var L_SI = L_mm * 1e-3;
+  var alpha = aMu * 1e-6;
+  var rhoCp = (alpha > 0) ? (k / alpha) : 0;
+  return { h:h, k:k, L_mm:L_mm, L:L_SI, alphaMu:aMu, alpha:alpha, rhoCp:rhoCp };
 }
 
-function biot(p)      { return (p.k > 0) ? (p.h * p.L / p.k) : 0; }
-function tauLumped(p) { return (p.h > 0) ? (p.rhoCp * p.L / p.h) : 0; } // seconds
+function biot(p){ return (p.k > 0) ? (p.h * p.L / p.k) : 0; }
+function tauLumped(p){ return (p.h > 0) ? (p.rhoCp * p.L / p.h) : 0; }
 
-function classifyBiot(Bi) {
-  if (Bi < 0.1) return 0;       // lumped
-  if (Bi <= 10) return 1;       // distributed
-  return 2;                     // surface-limited
+function classifyBiot(Bi){
+  if (Bi < 0.1) return 0;
+  if (Bi <= 10) return 1;
+  return 2;
 }
+function regimeLabel(idx){ return L.regimes[idx]; }
+function regimeColor(idx){ return ['#48d18b','#f0c750','#ff7b7b'][idx]; }
 
-function regimeLabel(idx) {
-  return ['集中容量モデル可', '分布パラメータ解析', '表面集中近似'][idx];
+function formatTau(s){
+  if (!isFinite(s) || s <= 0) return '0.0 s';
+  if (s < 60) return s.toFixed(1) + ' s';
+  if (s < 3600) return (s/60).toFixed(1) + ' min';
+  return (s/3600).toFixed(2) + ' h';
 }
-function regimeColor(idx) {
-  return ['#48d18b', '#f0c750', '#ff7b7b'][idx];
-}
-
-function formatTau(tau_s) {
-  if (!isFinite(tau_s) || tau_s <= 0) return '0.00 s';
-  if (tau_s < 60) return tau_s.toFixed(2) + ' s';
-  if (tau_s < 3600) return (tau_s / 60).toFixed(1) + ' min';
-  return (tau_s / 3600).toFixed(2) + ' h';
-}
-
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
+function formatTime(s){
+  if (!isFinite(s) || s < 0) return '0.0 s';
+  if (s < 90) return s.toFixed(1) + ' s';
+  if (s < 5400) return (s/60).toFixed(1) + ' min';
+  return (s/3600).toFixed(2) + ' h';
 }
 
-function resizeCanvases() {
+// ---- Sphere one-term series (distributed / Heisler) ----
+// Bi_r = h r / k with sphere radius r = 3 L_c (L_c = V/A = r/3).
+// Eigenvalue lambda1 solves: 1 - lambda*cot(lambda) = Bi_r  (0<lambda<pi)
+function eigenLambda1(Bir){
+  if (Bir <= 0) return 1e-6;
+  var lo = 1e-4, hi = Math.PI - 1e-4;
+  function f(x){ return 1 - x/Math.tan(x) - Bir; }
+  for (var i=0;i<80;i++){
+    var mid = 0.5*(lo+hi);
+    if (f(mid) > 0) hi = mid; else lo = mid;
+  }
+  return 0.5*(lo+hi);
+}
+function coefC1(l){
+  var num = 4*(Math.sin(l) - l*Math.cos(l));
+  var den = 2*l - Math.sin(2*l);
+  return (Math.abs(den) < 1e-9) ? 1 : num/den;
+}
+function sphereTheta(eta, l, C1, Fo){
+  var damp = C1 * Math.exp(-l*l*Fo);
+  if (eta < 1e-4) return damp;
+  return damp * Math.sin(l*eta) / (l*eta);
+}
+
+function modelState(p){
+  var Bi = biot(p);
+  var tau = tauLumped(p);
+  var r = 3 * p.L;
+  var Fo = (r > 0) ? (p.alpha * simTime) / (r*r) : 0;
+  var Bir = 3 * Bi;
+  var l = eigenLambda1(Bir);
+  var C1 = coefC1(l);
+  var thetaCore = sphereTheta(0, l, C1, Fo);
+  var thetaSurf = sphereTheta(1, l, C1, Fo);
+  thetaCore = Math.max(0, Math.min(1.2, thetaCore));
+  thetaSurf = Math.max(0, Math.min(1.2, thetaSurf));
+  var thetaLump = (tau > 0) ? Math.exp(-simTime/tau) : 1;
+  thetaLump = Math.max(0, Math.min(1, thetaLump));
+  return { Bi:Bi, tau:tau, Fo:Fo, l:l, C1:C1,
+           thetaCore:thetaCore, thetaSurf:thetaSurf, thetaLump:thetaLump,
+           gradient: Math.max(0, thetaCore - thetaSurf) };
+}
+
+// gradient magnitude at t = tau (metric for regime map): Fo = 1/(9 Bi)
+function gradientAtTau(Bi){
+  var Bir = 3*Bi;
+  var l = eigenLambda1(Bir);
+  var C1 = coefC1(l);
+  var Fo = 1/(9*Bi);
+  var c = sphereTheta(0,l,C1,Fo), s = sphereTheta(1,l,C1,Fo);
+  return Math.max(0, Math.min(1, c) - Math.max(0, s));
+}
+
+function tempColor(t){
+  t = Math.max(0, Math.min(1, t));
+  var r,g,b;
+  if (t < 0.5){ var u=t/0.5; r=Math.round(40*(1-u)+250*u); g=Math.round(120*(1-u)+220*u); b=Math.round(220*(1-u)+90*u); }
+  else { var u2=(t-0.5)/0.5; r=Math.round(250*(1-u2)+225*u2); g=Math.round(220*(1-u2)+60*u2); b=Math.round(90*(1-u2)+55*u2); }
+  return 'rgb('+r+','+g+','+b+')';
+}
+
+function __novaCanvasCssW(c){ return parseFloat(c.dataset.cssW) || c.width/Math.min(window.devicePixelRatio||1,2.5); }
+function __novaCanvasCssH(c){ return parseFloat(c.dataset.cssH) || c.height/Math.min(window.devicePixelRatio||1,2.5); }
+
+function resizeCanvases(){
   [objectCanvas, regimeCanvas].forEach(function(cv){
     var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.55);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+    var W = w, H = Math.round(w*0.55);
+    var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    cv.style.width = W+'px'; cv.style.height = H+'px';
+    cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+    cv.dataset.cssW = String(W); cv.dataset.cssH = String(H);
+    var cx = cv.getContext && cv.getContext('2d');
+    if (cx) cx.setTransform(dpr,0,0,dpr,0,0);
   });
 }
 
-// Color ramp: cold (blue) to hot (red)
-function tempColor(t) {
-  // t in [0,1], 0 = cold (blue), 1 = hot (red)
-  t = Math.max(0, Math.min(1, t));
-  // Interpolate blue -> cyan -> yellow -> red
-  var r, g, b;
-  if (t < 0.5) {
-    var u = t / 0.5;
-    r = Math.round(40 * (1 - u) + 250 * u);
-    g = Math.round(120 * (1 - u) + 220 * u);
-    b = Math.round(220 * (1 - u) + 90 * u);
-  } else {
-    var u2 = (t - 0.5) / 0.5;
-    r = Math.round(250 * (1 - u2) + 220 * u2);
-    g = Math.round(220 * (1 - u2) + 70 * u2);
-    b = Math.round(90 * (1 - u2) + 60 * u2);
-  }
-  return 'rgb(' + r + ',' + g + ',' + b + ')';
-}
-
-// Approximate normalized internal temperature profile T(r/R) at t = tau
-// theta(eta) where eta = r/R, surface eta=1, center eta=0
-// For lumped (Bi small): uniform = exp(-1) everywhere
-// For Bi large: surface ~ 0, center ~ 1 (slowly cooling)
-// Use heuristic: theta_center = exp(-1/(1 + Bi)) ; theta_surface = exp(-1*(1 + Bi))/(1+Bi)
-// Just a visual heuristic for the gradient — true series solution is omitted.
-function profileEta(eta, Bi) {
-  // Bi small -> nearly uniform around exp(-1)
-  // Bi large -> profile spreads: center high, surface low
-  // We blend lumped (Bi -> 0) with a quadratic-in-eta profile (Bi -> infinity)
-  var weight = Bi / (Bi + 1.0); // 0..1
-  var thetaLumped = Math.exp(-1);
-  var thetaCenter = 1.0 - 0.3 * (1 - Math.exp(-0.5 / (Bi + 0.05)));
-  var thetaSurface = Math.exp(-1 - 0.5 * Bi);
-  if (thetaSurface < 0.02) thetaSurface = 0.02;
-  // distributed profile (quadratic): theta(eta) = thetaSurface + (thetaCenter - thetaSurface) * (1 - eta*eta)
-  var thetaDist = thetaSurface + (thetaCenter - thetaSurface) * (1 - eta * eta);
-  return (1 - weight) * thetaLumped + weight * thetaDist;
-}
-
-function drawObject(p) {
-  var ctx = objectCtx, W = __novaCanvasCssW(objectCanvas), H = __novaCanvasCssH(objectCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = 'rgba(143,184,224,0.4)';
-  ctx.lineWidth = 1.2;
-  ctx.strokeRect(8, 8, W - 16, H - 16);
-
-  var Bi = biot(p);
-  var idx = classifyBiot(Bi);
-
-  // Solid sphere cross-section drawn as concentric rings with color gradient
-  var cx = W * 0.42;
-  var cy = H * 0.55;
-  var Rpx = Math.min(W * 0.30, H * 0.40);
-  var nRings = 36;
-  for (var i = nRings; i >= 1; i--) {
-    var eta = i / nRings;
-    var theta = profileEta(eta, Bi); // dimensionless temperature
+function drawSphere(ctx, cx, cy, Rpx, kind, st){
+  var nRings = 40;
+  for (var i=nRings; i>=1; i--){
+    var eta = i/nRings;
+    var theta;
+    if (kind === 'uniform'){ theta = st.thetaLump; }
+    else {
+      var v = sphereTheta(eta, st.l, st.C1, st.Fo);
+      theta = Math.max(0, Math.min(1.2, v));
+    }
     ctx.fillStyle = tempColor(theta);
     ctx.beginPath();
-    ctx.arc(cx, cy, Rpx * eta, 0, Math.PI * 2);
+    ctx.arc(cx, cy, Rpx*eta, 0, Math.PI*2);
     ctx.fill();
   }
-  // Outline
   ctx.strokeStyle = 'rgba(220,235,250,0.9)';
   ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.arc(cx, cy, Rpx, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Title and labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '13px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('固体（球）断面', cx, 28);
-
-  // L_c arrow (center -> surface)
-  ctx.strokeStyle = '#FFD166';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx + Rpx, cy);
-  ctx.stroke();
-  function arrowHead(x, y, dx, dy) {
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x - dx + 4, y - dy - 4);
-    ctx.lineTo(x - dx - 4, y - dy + 4);
-    ctx.closePath();
-    ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, Rpx, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = '#7fdcff'; ctx.fillStyle = '#7fdcff'; ctx.lineWidth = 1.2;
+  for (var a=0;a<8;a++){
+    var ang = (a/8)*Math.PI*2;
+    var x1 = cx+(Rpx+15)*Math.cos(ang), y1 = cy+(Rpx+15)*Math.sin(ang);
+    var x2 = cx+(Rpx+3)*Math.cos(ang),  y2 = cy+(Rpx+3)*Math.sin(ang);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    var nx=Math.cos(ang), ny=Math.sin(ang);
+    ctx.beginPath(); ctx.moveTo(x2,y2);
+    ctx.lineTo(x2+5*nx+3*ny, y2+5*ny-3*nx);
+    ctx.lineTo(x2+5*nx-3*ny, y2+5*ny+3*nx);
+    ctx.closePath(); ctx.fill();
   }
-  ctx.fillStyle = '#FFD166';
-  arrowHead(cx + Rpx, cy, 6, 0);
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('L_c', cx + Rpx * 0.5, cy - 6);
-
-  // h convection arrows (around the sphere)
-  ctx.strokeStyle = '#7fdcff';
-  ctx.lineWidth = 1.3;
-  ctx.fillStyle = '#7fdcff';
-  for (var a = 0; a < 8; a++) {
-    var ang = (a / 8) * Math.PI * 2;
-    var x1 = cx + (Rpx + 16) * Math.cos(ang);
-    var y1 = cy + (Rpx + 16) * Math.sin(ang);
-    var x2 = cx + (Rpx + 4) * Math.cos(ang);
-    var y2 = cy + (Rpx + 4) * Math.sin(ang);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-    // small arrowhead toward sphere
-    var nx = Math.cos(ang), ny = Math.sin(ang);
-    ctx.beginPath();
-    ctx.moveTo(x2, y2);
-    ctx.lineTo(x2 + 5 * nx + 3 * ny, y2 + 5 * ny - 3 * nx);
-    ctx.lineTo(x2 + 5 * nx - 3 * ny, y2 + 5 * ny + 3 * nx);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Right side: ratio bar (k vs h*L)
-  var rx0 = W * 0.74;
-  var rx1 = W - 24;
-  var ry0 = H * 0.20;
-  var ry1 = H * 0.86;
-  ctx.strokeStyle = 'rgba(143,184,224,0.4)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(rx0, ry0, rx1 - rx0, ry1 - ry0);
-  // Internal resistance ~ L/k, surface resistance ~ 1/h
-  // Bi = (L/k) / (1/h) = h L / k
-  var Rint = (p.k > 0) ? (p.L / p.k) : 0;
-  var Rsurf = (p.h > 0) ? (1.0 / p.h) : 0;
-  var Rsum = Rint + Rsurf;
-  var fInt = Rsum > 0 ? Rint / Rsum : 0;
-  var totalH = ry1 - ry0;
-  var intH = totalH * fInt;
-  // top: internal (red), bottom: surface (blue)
-  ctx.fillStyle = '#FF7B7B';
-  ctx.fillRect(rx0, ry0, rx1 - rx0, intH);
-  ctx.fillStyle = '#7fdcff';
-  ctx.fillRect(rx0, ry0 + intH, rx1 - rx0, totalH - intH);
-  // labels
-  ctx.fillStyle = '#0a1929';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  if (intH > 14) ctx.fillText('内部抵抗 L/k', (rx0 + rx1) / 2, ry0 + intH / 2 + 4);
-  if (totalH - intH > 14) ctx.fillText('表面抵抗 1/h', (rx0 + rx1) / 2, ry0 + intH + (totalH - intH) / 2 + 4);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.textAlign = 'center';
-  ctx.fillText('抵抗比 Bi = (L/k)/(1/h)', (rx0 + rx1) / 2, ry0 - 8);
-  ctx.fillText('Bi = ' + Bi.toFixed(3), (rx0 + rx1) / 2, ry1 + 16);
-
-  // Regime label bottom-left
-  ctx.fillStyle = regimeColor(idx);
-  ctx.font = 'bold 12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText(regimeLabel(idx), 16, H - 14);
-
-  // Readout
-  ctx.fillStyle = 'rgba(207,227,247,0.7)';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText('h = ' + p.h.toFixed(0) + ' W/m²K   k = ' + p.k.toFixed(1) + ' W/mK   L_c = ' + p.L_mm.toFixed(0) + ' mm   α = ' + p.alphaMu.toFixed(2) + 'e-6 m²/s', W - 14, H - 14);
 }
 
-function drawRegime(p) {
+function drawObject(p, st){
+  var ctx = objectCtx, W = __novaCanvasCssW(objectCanvas), H = __novaCanvasCssH(objectCanvas);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = 'rgba(143,184,224,0.4)'; ctx.lineWidth = 1.2;
+  ctx.strokeRect(8,8,W-16,H-16);
+
+  var idx = classifyBiot(st.Bi);
+  var Rpx = Math.min(W*0.18, H*0.34);
+  var leftCx = W*0.27, rightCx = W*0.73, cy = H*0.52;
+
+  drawSphere(ctx, leftCx, cy, Rpx, 'uniform', st);
+  drawSphere(ctx, rightCx, cy, Rpx, 'gradient', st);
+
+  ctx.strokeStyle = '#FFD166'; ctx.fillStyle = '#FFD166'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(rightCx, cy); ctx.lineTo(rightCx+Rpx, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(rightCx+Rpx, cy);
+  ctx.lineTo(rightCx+Rpx-7, cy-4); ctx.lineTo(rightCx+Rpx-7, cy+4); ctx.closePath(); ctx.fill();
+  ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('L_c', rightCx+Rpx*0.5, cy-6);
+
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(L.uniformTitle, leftCx, 26);
+  ctx.fillText(L.uniformSub, leftCx, 42);
+  ctx.fillText(L.gradientTitle, rightCx, 26);
+  ctx.fillText(L.gradientSub + ' Bi=' + (st.Bi<1?st.Bi.toFixed(4):st.Bi.toFixed(2)), rightCx, 42);
+
+  ctx.font = '11px "Roboto Mono",monospace'; ctx.fillStyle = 'rgba(207,227,247,0.85)';
+  ctx.fillText('theta = ' + st.thetaLump.toFixed(3), leftCx, cy+Rpx+22);
+  ctx.fillText('c=' + st.thetaCore.toFixed(3) + ' s=' + st.thetaSurf.toFixed(3), rightCx, cy+Rpx+22);
+
+  ctx.fillStyle = regimeColor(idx); ctx.font = 'bold 12px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText(regimeLabel(idx), 16, H-14);
+  ctx.fillStyle = 'rgba(207,227,247,0.7)'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'right';
+  ctx.fillText('h='+p.h.toFixed(0)+' k='+p.k.toFixed(1)+' L_c='+p.L_mm.toFixed(0)+'mm  t='+formatTime(simTime), W-14, H-14);
+
+  var cbX = W-150, cbY = 16, cbW = 120, cbH = 9;
+  for (var s2=0;s2<cbW;s2++){ ctx.fillStyle = tempColor(1 - s2/cbW); ctx.fillRect(cbX+s2, cbY, 1, cbH); }
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1; ctx.strokeRect(cbX,cbY,cbW,cbH);
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '9px "Roboto Mono",monospace';
+  ctx.textAlign='left'; ctx.fillText(L.hot, cbX, cbY+cbH+11);
+  ctx.textAlign='right'; ctx.fillText(L.cold, cbX+cbW, cbY+cbH+11);
+}
+
+function drawRegime(p, st){
   var ctx = regimeCtx, W = __novaCanvasCssW(regimeCanvas), H = __novaCanvasCssH(regimeCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
   var mx = 56, my = 30;
-  var x0 = mx, x1 = W - 14, y0 = H - my, y1 = my + 4;
-  var gw = x1 - x0, gh = y0 - y1;
-
-  // X: Bi log scale 0.01 .. 100
-  var BiMin = 0.01, BiMax = 100;
+  var x0 = mx, x1 = W-14, y0 = H-my, y1 = my+4;
+  var gw = x1-x0, gh = y0-y1;
+  var BiMin = 0.001, BiMax = 100;
   var lxMin = Math.log10(BiMin), lxMax = Math.log10(BiMax);
-  // Y: residual epsilon = T/T_0 in [0, 1.05]
-  var yMin = 0.0, yMax = 1.05;
+  var yMin = 0, yMax = 1.0;
+  function px(Bi){ return x0 + (Math.log10(Bi)-lxMin)/(lxMax-lxMin)*gw; }
+  function py(v){ return y0 - (v-yMin)/(yMax-yMin)*gh; }
 
-  function px(Bi) { return x0 + (Math.log10(Bi) - lxMin) / (lxMax - lxMin) * gw; }
-  function py(v)  { return y0 - (v - yMin) / (yMax - yMin) * gh; }
+  ctx.fillStyle = 'rgba(72,209,139,0.10)'; ctx.fillRect(px(BiMin), y1, px(0.1)-px(BiMin), y0-y1);
+  ctx.fillStyle = 'rgba(240,199,80,0.10)'; ctx.fillRect(px(0.1), y1, px(10)-px(0.1), y0-y1);
+  ctx.fillStyle = 'rgba(255,123,123,0.10)'; ctx.fillRect(px(10), y1, px(BiMax)-px(10), y0-y1);
 
-  // Region shading: green (<0.1), yellow (0.1..10), red (>10)
-  // Green
-  ctx.fillStyle = 'rgba(72,209,139,0.10)';
-  ctx.fillRect(px(BiMin), y1, px(0.1) - px(BiMin), y0 - y1);
-  // Yellow
-  ctx.fillStyle = 'rgba(240,199,80,0.10)';
-  ctx.fillRect(px(0.1), y1, px(10) - px(0.1), y0 - y1);
-  // Red
-  ctx.fillStyle = 'rgba(255,123,123,0.10)';
-  ctx.fillRect(px(10), y1, px(BiMax) - px(10), y0 - y1);
-
-  // Region boundaries
-  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-  ctx.setLineDash([4, 4]);
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(px(0.1), y0); ctx.lineTo(px(0.1), y1); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(px(10), y0);  ctx.lineTo(px(10), y1);  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px(0.1),y0); ctx.lineTo(px(0.1),y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px(10),y0);  ctx.lineTo(px(10),y1);  ctx.stroke();
   ctx.setLineDash([]);
 
-  // Region labels
-  ctx.fillStyle = '#48d18b';
-  ctx.font = 'bold 11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('集中容量', (px(BiMin) + px(0.1)) / 2, y1 + 14);
-  ctx.fillStyle = '#f0c750';
-  ctx.fillText('分布解析', (px(0.1) + px(10)) / 2, y1 + 14);
-  ctx.fillStyle = '#ff7b7b';
-  ctx.fillText('表面集中', (px(10) + px(BiMax)) / 2, y1 + 14);
+  ctx.font = 'bold 11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#48d18b'; ctx.fillText(L.regShort[0], (px(BiMin)+px(0.1))/2, y1+14);
+  ctx.fillStyle = '#f0c750'; ctx.fillText(L.regShort[1], (px(0.1)+px(10))/2, y1+14);
+  ctx.fillStyle = '#ff7b7b'; ctx.fillText(L.regShort[2], (px(10)+px(BiMax))/2, y1+14);
 
-  // Gridlines + ticks
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.lineWidth = 1;
-  ctx.textAlign = 'center';
-  var xticks = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100];
-  for (var i = 0; i < xticks.length; i++) {
-    var Xt = xticks[i];
-    var xx = px(Xt);
-    if (xx < x0 - 1 || xx > x1 + 1) continue;
-    ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
-    ctx.fillText(Xt < 1 ? Xt.toString() : Xt.toFixed(0), xx, y0 + 14);
+  ctx.strokeStyle = 'rgba(143,184,224,0.18)'; ctx.fillStyle = '#8fb8e0';
+  ctx.font = '10px "Roboto Mono",monospace'; ctx.lineWidth = 1; ctx.textAlign = 'center';
+  var xticks = [0.001,0.01,0.1,1,10,100];
+  for (var i=0;i<xticks.length;i++){
+    var xx = px(xticks[i]);
+    if (xx < x0-1 || xx > x1+1) continue;
+    ctx.beginPath(); ctx.moveTo(xx,y0); ctx.lineTo(xx,y1); ctx.stroke();
+    ctx.fillText(String(xticks[i]), xx, y0+14);
   }
   ctx.textAlign = 'right';
-  for (var yi = 0; yi <= 5; yi++) {
-    var v = yi / 5;
-    var yy = py(v);
-    ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    ctx.fillText(v.toFixed(1), x0 - 4, yy + 3);
-  }
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+  for (var yi=0;yi<=5;yi++){ var v=yi/5; var yy=py(v); ctx.beginPath(); ctx.moveTo(x0,yy); ctx.lineTo(x1,yy); ctx.stroke(); ctx.fillText(v.toFixed(1), x0-4, yy+3); }
+  ctx.strokeStyle = 'rgba(143,184,224,0.55)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y1); ctx.stroke();
 
-  // Residual curve epsilon(Bi) at t=tau: for lumped exact, epsilon = exp(-1) ~ 0.368
-  // For higher Bi, surface drops faster but bulk lags; volume-averaged is messy.
-  // Draw two reference curves:
-  //   (a) lumped reference: horizontal at e^(-1) = 0.368
-  //   (b) center temperature heuristic at t = tau (approximate)
-  // (a)
-  ctx.strokeStyle = 'rgba(74,198,255,0.95)';
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  var ybase = py(Math.exp(-1));
-  ctx.moveTo(x0, ybase); ctx.lineTo(x1, ybase);
-  ctx.stroke();
-  // (b)
-  ctx.strokeStyle = 'rgba(255,90,90,0.85)';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  var first = true;
-  var N = 80;
-  for (var kk = 0; kk <= N; kk++) {
-    var lxv = lxMin + (lxMax - lxMin) * kk / N;
+  ctx.strokeStyle = 'rgba(255,90,90,0.9)'; ctx.lineWidth = 2.2; ctx.beginPath();
+  var first = true, N = 120;
+  for (var kk=0;kk<=N;kk++){
+    var lxv = lxMin + (lxMax-lxMin)*kk/N;
     var Biv = Math.pow(10, lxv);
-    // center temperature heuristic at t=tau: blend exp(-1) at low Bi with slower decay at high Bi
-    var w = Biv / (Biv + 1.0);
-    var ec = (1 - w) * Math.exp(-1) + w * (1.0 - 0.3 * (1 - Math.exp(-0.5 / (Biv + 0.05))));
-    if (ec > 1.0) ec = 1.0;
-    if (ec < 0.0) ec = 0.0;
-    var X = px(Biv), Y = py(ec);
-    if (first) { ctx.moveTo(X, Y); first = false; } else ctx.lineTo(X, Y);
+    var g = gradientAtTau(Biv);
+    var X = px(Biv), Y = py(g);
+    if (first){ ctx.moveTo(X,Y); first=false; } else ctx.lineTo(X,Y);
   }
   ctx.stroke();
 
-  // Legend
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  var lx0 = x1 - 168, ly0 = y1 + 8;
-  function legendItem(yy, color, txt) {
-    ctx.strokeStyle = color; ctx.lineWidth = 2.0;
-    ctx.beginPath(); ctx.moveTo(lx0, yy); ctx.lineTo(lx0 + 22, yy); ctx.stroke();
-    ctx.fillStyle = '#cfe3f7'; ctx.fillText(txt, lx0 + 26, yy + 3);
-  }
-  legendItem(ly0,      'rgba(74,198,255,0.95)', '集中容量 exp(-1)');
-  legendItem(ly0 + 14, 'rgba(255,90,90,0.85)',  '中心温度（近似）');
+  ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  var lx0 = x0+8, ly0 = y1+10;
+  ctx.strokeStyle = 'rgba(255,90,90,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(lx0,ly0); ctx.lineTo(lx0+22,ly0); ctx.stroke();
+  ctx.fillStyle = '#cfe3f7'; ctx.fillText(L.gradLegend, lx0+26, ly0+3);
 
-  // Current Bi marker
-  var Bi = biot(p);
-  if (Bi >= BiMin && Bi <= BiMax) {
-    var resNow = Math.exp(-1); // residual at t=tau by lumped definition
+  var Bi = st.Bi;
+  if (Bi >= BiMin && Bi <= BiMax){
+    var g0 = gradientAtTau(Bi);
     var cxm = px(Bi);
-    ctx.strokeStyle = '#FFD166';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(cxm, y0); ctx.lineTo(cxm, y1);
-    ctx.stroke();
-    var cym = py(resNow);
-    ctx.beginPath();
-    ctx.arc(cxm, cym, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFD166';
-    ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(cxm,y0); ctx.lineTo(cxm,y1); ctx.stroke();
+    var cym = py(g0);
+    ctx.beginPath(); ctx.arc(cxm,cym,6,0,Math.PI*2);
+    ctx.fillStyle = '#FFD166'; ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
   }
-  // Axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('Bi (log)', (x0 + x1) / 2, H - 6);
-  ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('T/T_0 at t = τ', 0, 0);
-  ctx.restore();
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('Bi (log)', (x0+x1)/2, H-6);
+  ctx.save(); ctx.translate(14,(y0+y1)/2); ctx.rotate(-Math.PI/2); ctx.fillText(L.gradAxis, 0, 0); ctx.restore();
 }
 
-function compute() {
+function compute(){
   var p = getParams();
-  if (!isFinite(p.h) || !isFinite(p.k) || !isFinite(p.L) || !isFinite(p.alpha)) return;
-  var Bi  = biot(p);
-  var idx = classifyBiot(Bi);
-  var tau = tauLumped(p);
-  var residual = Math.exp(-1);
-  document.getElementById('statBi').textContent       = Bi.toFixed(4);
-  document.getElementById('statRegime').textContent   = regimeLabel(idx);
-  document.getElementById('statTau').textContent      = formatTau(tau);
-  document.getElementById('statResidual').textContent = residual.toFixed(3);
-  drawObject(p);
-  drawRegime(p);
+  if (!isFinite(p.h)||!isFinite(p.k)||!isFinite(p.L)||!isFinite(p.alpha)) return;
+  var st = modelState(p);
+  var idx = classifyBiot(st.Bi);
+  $('statBi').textContent = st.Bi < 1 ? st.Bi.toFixed(4) : st.Bi.toFixed(3);
+  $('statRegime').textContent = regimeLabel(idx);
+  $('statTau').textContent = formatTau(st.tau);
+  $('statTime').textContent = formatTime(simTime);
+  $('statSurf').textContent = st.thetaSurf.toFixed(3);
+  $('statCore').textContent = st.thetaCore.toFixed(3);
+  $('statGrad').textContent = st.gradient.toFixed(3);
+  $('statResidual').textContent = Math.exp(-1).toFixed(3);
+  var hr = $('hintRegime');
+  if (hr) hr.textContent = ' ' + L.regimeNote[idx];
+  drawObject(p, st);
+  drawRegime(p, st);
 }
 
-function animationStep() {
+function animationStep(ts){
   if (!playing) return;
-  var sl = document.getElementById('slH');
-  var cur = parseFloat(sl.value);
-  if (!isFinite(cur)) cur = 100;
-  var factor = sweepDir > 0 ? 1.06 : (1.0 / 1.06);
-  cur = cur * factor;
-  if (cur > 5000) { cur = 5000; sweepDir = -1; }
-  if (cur < 5)    { cur = 5;    sweepDir = 1; }
-  cur = Math.round(cur / 5) * 5;
-  if (cur < 5) cur = 5;
-  if (cur > 5000) cur = 5000;
-  sl.value = cur;
-  updateSlider(sl, 'slHVal', 0, '');
+  if (!lastTs) lastTs = ts;
+  var p = getParams();
+  var tau = tauLumped(p);
+  var dtReal = (ts - lastTs)/1000; lastTs = ts;
+  if (dtReal > 0.1) dtReal = 0.1;
+  var simPerSec = (tau > 0 ? tau : 1) * (5/6) * speedMult;
+  simTime += dtReal * simPerSec;
+  if (tau > 0 && simTime > 6*tau){ simTime = 0; }
   compute();
   animId = requestAnimationFrame(animationStep);
 }
 
-function togglePlay() {
+function togglePlay(){
   playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+  var btn = $('playBtn');
+  if (playing){
+    btn.innerHTML = '<i class="fas fa-pause"></i> ' + L.pause;
+    lastTs = 0;
     animId = requestAnimationFrame(animationStep);
   } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> h をスイープ';
+    btn.innerHTML = '<i class="fas fa-play"></i> ' + L.play;
     if (animId) cancelAnimationFrame(animId);
   }
 }
-
-function resetParams() {
+function setSpeed(v){
+  speedMult = v;
+  var btns = document.querySelectorAll('#speedRow .speed-btn');
+  btns.forEach(function(b){
+    var on = parseFloat(b.dataset.speed) === v;
+    b.classList.toggle('active', on);
+    b.style.borderColor = on ? 'var(--accent)' : '';
+    b.style.color = on ? 'var(--accent)' : '';
+  });
+}
+function resetSim(){ simTime = 0; compute(); }
+function stopPlay(){
   playing = false;
   if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> h をスイープ';
-  var defs = { slH: 100, slK: 50, slL_mm: 25, slAlpha: 13.00 };
-  Object.keys(defs).forEach(function(id){
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slH'),     'slHVal',     0, '');
-  updateSlider(document.getElementById('slK'),     'slKVal',     1, '');
-  updateSlider(document.getElementById('slL_mm'),  'slL_mmVal',  0, '');
-  updateSlider(document.getElementById('slAlpha'), 'slAlphaVal', 2, '');
-  compute();
+  $('playBtn').innerHTML = '<i class="fas fa-play"></i> ' + L.play;
+}
+
+function setSliders(o){
+  if (o.h != null){ $('slH').value = o.h; updateSlider($('slH'),'slHVal',0,''); }
+  if (o.k != null){ $('slK').value = o.k; updateSlider($('slK'),'slKVal',1,''); }
+  if (o.L != null){ $('slL_mm').value = o.L; updateSlider($('slL_mm'),'slL_mmVal',0,''); }
+  if (o.a != null){ $('slAlpha').value = o.a; updateSlider($('slAlpha'),'slAlphaVal',2,''); }
+}
+
+var MATERIALS = {
+  copper:  { k:400, a:117 },
+  steel:   { k:50,  a:13 },
+  glass:   { k:1,   a:0.5 },
+  plastic: { k:0.2, a:0.13 }
+};
+function setMaterial(name){
+  var m = MATERIALS[name]; if (!m) return;
+  setSliders({ k:m.k, a:m.a });
+  resetSim();
+}
+function setScenario(name){
+  stopPlay();
+  if (name === 'uniform')       setSliders({ h:50,  k:400, L:20, a:117 });
+  else if (name === 'gradient') setSliders({ h:50,  k:0.2, L:20, a:0.13 });
+  else if (name === 'highk')    setSliders({ h:200, k:400, L:30, a:117 });
+  else if (name === 'lowk')     setSliders({ h:500, k:0.2, L:30, a:0.13 });
+  resetSim();
+}
+function resetParams(){
+  stopPlay();
+  setSliders({ h:100, k:50, L:25, a:13.00 });
+  setSpeed(1);
+  resetSim();
 }
 
 window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
 
+window.togglePlay = togglePlay;
+window.setSpeed = setSpeed;
+window.resetSim = resetSim;
+window.resetParams = resetParams;
+window.setMaterial = setMaterial;
+window.setScenario = setScenario;
+
 resizeCanvases();
+if (prefersReduced){
+  var p0 = getParams();
+  simTime = tauLumped(p0);
+}
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -723,6 +714,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="biot-number.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -785,7 +779,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>厚さ20mm、鋼製フランジが150℃の油に浸漬される場合：h=800 W/m²K、k=50 W/mK、L_c=10mm、α=1.3×10⁻⁵ m²/sとすると、Bi=hL_c/k=0.16となり集中容量モデルは不適切です。一方、厚さ5mmのアルミ板（h=50、k=160、L_c=2.5mm、α=6.3×10⁻⁵）ではBi=0.0078で集中容量が適用でき、時定数τ=L_c²/α=0.99秒、時定数到達時に無次元温度T/T_0=0.368となります</p>
+<p>厚さ20mm、鋼製フランジが150℃の油に浸漬される場合：h=800 W/m²K、k=50 W/mK、L_c=10mm、α=1.3×10⁻⁵ m²/sとすると、Bi=hL_c/k=0.16となり集中容量モデルは不適切です。一方、厚さ5mmのアルミ板（h=50、k=160、L_c=2.5mm、α=6.3×10⁻⁵）ではBi=0.00078で集中容量が完全に適用でき、内部の熱拡散特性時間 L_c²/α=0.099秒、時定数到達時に無次元温度T/T_0=0.368となります</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -795,6 +789,16 @@ compute();
 <li>鋳物や複合材は熱伝導率が異方的なため、代表値ではなく材料データシートの実測値を使用し、集中容量モデルの適用限界を慎重に判断してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

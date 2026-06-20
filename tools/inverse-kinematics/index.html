@@ -122,14 +122,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ロボットアーム逆運動学計算機",
       "description": "2R平面・3R空間ロボットアームの逆運動学をリアルタイム計算。エルボーアップ/ダウン解の同時表示、特異点検出、到達可能領域の可視化、関節角度制限の設定が可能。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/inverse-kinematics.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -280,7 +280,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <div style="font-size:0.72rem;color:var(--muted);margin-top:3px;">θ₁: ±150°, θ₂: ±170°, θ₃: ±170°</div>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4274223213?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274223213.09._SCMZZZZZZ_.jpg" alt="ロボット工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">ロボット工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -315,10 +323,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
       <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 逆運動学解</div><canvas id="ikCanvas" height="420"></canvas></div>
-
-      <div style="margin-top:14px;">
-        <canvas class="ux-chartjs-canvas" id="wsChart" height="160" style="background:#fff;border-radius:8px;"></canvas>
-      </div>
+      <div class="play-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px"><button class="btn" type="button" id="playBtn" onclick="ikPlay()"><i class="fas fa-pause"></i> 一時停止</button><button class="btn secondary" type="button" id="followBtn" onclick="ikFollow()"><i class="fas fa-route"></i> 目標を自動追従</button><span style="font-size:.72rem;color:var(--muted)">スライダーを動かすと手動操作に切替わります</span></div>
     
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
@@ -333,313 +338,322 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 
 <script>
-const ikCanvas = document.getElementById('ikCanvas');
-const ctx = ikCanvas.getContext('2d');
-let mode = '2R';
-let limitsEnabled = false;
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id);};
+var ikCanvas=$('ikCanvas'), ctx=ikCanvas.getContext('2d');
+var mode='2R', limitsEnabled=false, playing=true, animId=null;
+var followPath=true;
+var phase=0;
+var RM=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function setMode(m){
-  mode = m;
-  document.getElementById('btn2R').classList.toggle('active', m === '2R');
-  document.getElementById('btn3R').classList.toggle('active', m === '3R');
-  document.getElementById('L3group').style.display = m === '3R' ? '' : 'none';
-  document.getElementById('tzGroup').style.display = m === '3R' ? '' : 'none';
-  compute();
-}function toggleLimits(){
-  limitsEnabled = !limitsEnabled;
-  const btn = document.getElementById('limitToggle');
-  btn.classList.toggle('active', limitsEnabled);
-  btn.innerHTML = limitsEnabled ? '<i class="fas fa-lock"></i> ON' : '<i class="fas fa-lock-open"></i> OFF';
-  compute();
-}function getParams(){
-  return {
-    L1: parseFloat(document.getElementById('L1').value),
-    L2: parseFloat(document.getElementById('L2').value),
-    L3: parseFloat(document.getElementById('L3').value),
-    tx: parseFloat(document.getElementById('tx').value),
-    ty: parseFloat(document.getElementById('ty').value),
-    tz: parseFloat(document.getElementById('tz').value)
-  };
-}function solve2R(L1, L2, tx, ty){
-  const d2 = tx*tx + ty*ty;
-  const c2 = (d2 - L1*L1 - L2*L2) / (2*L1*L2);
-  if (Math.abs(c2) > 1) return null;
-  const s2_pos = Math.sqrt(1 - c2*c2);
-  const solutions = [];
-  for (const s2 of [s2_pos, -s2_pos]) {
-    const t2 = Math.atan2(s2, c2);
-    const t1 = Math.atan2(ty, tx) - Math.atan2(L2*s2, L1 + L2*c2);
-    if (limitsEnabled) {
-      if (Math.abs(t1) > 150*Math.PI/180) continue;
-      if (Math.abs(t2) > 170*Math.PI/180) continue;
-    }solutions.push({ t1, t2 });
+var TXT={
+  down:'エルボーダウン', up:'エルボーアップ', target:'目標点',
+  reach:'到達可能', noreach:'不到達', conv:'収束失敗', sing:'\u26a0 特異点近傍',
+  follow:'<i class="fas fa-route"></i> 目標を自動追従', pausef:'<i class="fas fa-hand-pointer"></i> 手動（スライダー）',
+  play:'<i class="fas fa-pause"></i> 一時停止', stop:'<i class="fas fa-play"></i> 再生',
+  ws:'到達可能領域'
+};
+
+function num(id,d){var e=$(id);return e?parseFloat(e.value):d;}
+function getP(){return{L1:num('L1',200),L2:num('L2',150),L3:num('L3',120),tx:num('tx',200),ty:num('ty',150),tz:num('tz',100)};}
+
+function solve2R(L1,L2,x,y){
+  var d2=x*x+y*y;
+  var c2=(d2-L1*L1-L2*L2)/(2*L1*L2);
+  if(Math.abs(c2)>1) return null;
+  var s2p=Math.sqrt(1-c2*c2);
+  var sols=[];
+  var cand=[s2p,-s2p];
+  for(var k=0;k<cand.length;k++){
+    var s2=cand[k];
+    var t2=Math.atan2(s2,c2);
+    var t1=Math.atan2(y,x)-Math.atan2(L2*s2,L1+L2*c2);
+    if(limitsEnabled){
+      if(Math.abs(t1)>150*Math.PI/180) continue;
+      if(Math.abs(t2)>170*Math.PI/180) continue;
+    }
+    sols.push({t1:t1,t2:t2});
   }
-  return solutions.length > 0 ? solutions : null;
-}function jacobian2R(L1, L2, t1, t2){
-  const J = [
-    [-L1*Math.sin(t1) - L2*Math.sin(t1+t2), -L2*Math.sin(t1+t2)],
-    [ L1*Math.cos(t1) + L2*Math.cos(t1+t2),  L2*Math.cos(t1+t2)]
-  ];
-  return J;
-}function det2x2(J){
-  return J[0][0]*J[1][1] - J[0][1]*J[1][0];
-}function solve3R_iterative(L1, L2, L3, tx, ty, tz){
-  let t1 = Math.atan2(ty, tx);
-  let r = Math.sqrt(tx*tx + ty*ty);
-  let t2 = 0.3, t3 = -0.3;
-  for (let i = 0; i < 20; i++) {
-    const c1 = Math.cos(t1), s1 = Math.sin(t1);
-    const c2 = Math.cos(t2), s2 = Math.sin(t2);
-    const c23 = Math.cos(t2+t3), s23 = Math.sin(t2+t3);
-    const ex = (L1*c2 + L2*c23)*c1 - tx;
-    const ey = (L1*c2 + L2*c23)*s1 - ty;
-    const ez = -L1*s2 - L2*s23 - tz;
-    const err = Math.sqrt(ex*ex + ey*ey + ez*ez);
-    if (err < 0.1) break;
-    const J = [
-      [-(L1*c2+L2*c23)*s1, (-L1*s2-L2*s23)*c1, -L2*s23*c1],
-      [ (L1*c2+L2*c23)*c1, (-L1*s2-L2*s23)*s1, -L2*s23*s1],
-      [0, -L1*c2-L2*c23, -L2*c23]
-    ];
-    const JtJ = matMul(transpose3(J), J);
-    const lam = 0.01;
-    for (let k = 0; k < 3; k++) JtJ[k][k] += lam;
-    const Jte = matVec(transpose3(J), [-ex, -ey, -ez]);
-    const dth = solveLU3(JtJ, Jte);
-    t1 += 0.5*dth[0]; t2 += 0.5*dth[1]; t3 += 0.5*dth[2];
-    if (limitsEnabled) {
-      t1 = Math.max(-150*Math.PI/180, Math.min(150*Math.PI/180, t1));
-      t2 = Math.max(-170*Math.PI/180, Math.min(170*Math.PI/180, t2));
-      t3 = Math.max(-170*Math.PI/180, Math.min(170*Math.PI/180, t3));
+  return sols.length?sols:null;
+}
+function jac2R(L1,L2,t1,t2){
+  return [[-L1*Math.sin(t1)-L2*Math.sin(t1+t2),-L2*Math.sin(t1+t2)],
+          [ L1*Math.cos(t1)+L2*Math.cos(t1+t2), L2*Math.cos(t1+t2)]];
+}
+function det2(J){return J[0][0]*J[1][1]-J[0][1]*J[1][0];}
+
+function lu3(A,b){
+  var M=[A[0].slice(),A[1].slice(),A[2].slice()], x=b.slice();
+  for(var p=0;p<3;p++) for(var r=p+1;r<3;r++){var f=M[r][p]/M[p][p];for(var c=p;c<3;c++)M[r][c]-=f*M[p][c];x[r]-=f*x[p];}
+  var s=[0,0,0];
+  for(var i=2;i>=0;i--){s[i]=x[i];for(var j=i+1;j<3;j++)s[i]-=M[i][j]*s[j];s[i]/=M[i][i];}
+  return s;
+}
+function solve3R(L1,L2,L3,tx,ty,tz){
+  var t1=Math.atan2(ty,tx), t2=0.3, t3=-0.3;
+  for(var i=0;i<24;i++){
+    var c1=Math.cos(t1),s1=Math.sin(t1),c2=Math.cos(t2),s2=Math.sin(t2),
+        c23=Math.cos(t2+t3),s23=Math.sin(t2+t3);
+    var ex=(L1*c2+L2*c23)*c1-tx, ey=(L1*c2+L2*c23)*s1-ty, ez=-L1*s2-L2*s23-tz;
+    if(Math.sqrt(ex*ex+ey*ey+ez*ez)<0.1) break;
+    var J=[[-(L1*c2+L2*c23)*s1,(-L1*s2-L2*s23)*c1,-L2*s23*c1],
+           [ (L1*c2+L2*c23)*c1,(-L1*s2-L2*s23)*s1,-L2*s23*s1],
+           [0,-L1*c2-L2*c23,-L2*c23]];
+    var Jt=[[J[0][0],J[1][0],J[2][0]],[J[0][1],J[1][1],J[2][1]],[J[0][2],J[1][2],J[2][2]]];
+    var A=[[0,0,0],[0,0,0],[0,0,0]];
+    for(var r=0;r<3;r++)for(var cc=0;cc<3;cc++)for(var kk=0;kk<3;kk++)A[r][cc]+=Jt[r][kk]*J[kk][cc];
+    for(var dd=0;dd<3;dd++)A[dd][dd]+=0.01;
+    var b=[Jt[0][0]*-ex+Jt[0][1]*-ey+Jt[0][2]*-ez,
+           Jt[1][0]*-ex+Jt[1][1]*-ey+Jt[1][2]*-ez,
+           Jt[2][0]*-ex+Jt[2][1]*-ey+Jt[2][2]*-ez];
+    var d=lu3(A,b);
+    t1+=0.5*d[0];t2+=0.5*d[1];t3+=0.5*d[2];
+    if(limitsEnabled){
+      t1=Math.max(-150*Math.PI/180,Math.min(150*Math.PI/180,t1));
+      t2=Math.max(-170*Math.PI/180,Math.min(170*Math.PI/180,t2));
+      t3=Math.max(-170*Math.PI/180,Math.min(170*Math.PI/180,t3));
     }
-  }const c1=Math.cos(t1),s1=Math.sin(t1),c2=Math.cos(t2),s2=Math.sin(t2),c23=Math.cos(t2+t3),s23=Math.sin(t2+t3);
-  const px = (L1*c2+L2*c23)*c1;
-  const py = (L1*c2+L2*c23)*s1;
-  const pz = -L1*s2-L2*s23;
-  const err = Math.sqrt((px-tx)**2+(py-ty)**2+(pz-tz)**2);
-  return{ t1, t2, t3, err };
-}function transpose3(M){ return [[M[0][0],M[1][0],M[2][0]],[M[0][1],M[1][1],M[2][1]],[M[0][2],M[1][2],M[2][2]]]; }function matMul(A, B){
-  const C = [[0,0,0],[0,0,0],[0,0,0]];
-  for (let i=0;i<3;i++) for (let j=0;j<3;j++) for (let k=0;k<3;k++) C[i][j]+=A[i][k]*B[k][j];
-  return C;
-}function matVec(M, v){ return [0,1,2].map(i=>M[i][0]*v[0]+M[i][1]*v[1]+M[i][2]*v[2]); }function solveLU3(A, b){
-  const M = A.map(r=>[...r]);
-  const x = [...b];
-  for (let p=0;p<3;p++) {
-    for (let r=p+1;r<3;r++) {
-      const f = M[r][p]/M[p][p];
-      for (let c=p;c<3;c++) M[r][c]-=f*M[p][c];
-      x[r]-=f*x[p];
-    }
-  }const sol = [0,0,0];
-  for (let i=2;i>=0;i--){ sol[i]=x[i]; for (let j=i+1;j<3;j++) sol[i]-=M[i][j]*sol[j]; sol[i]/=M[i][i]; }
-  return sol;
-}let wsChartInst = null;
-function initWSChart(){
-  const cEl = document.getElementById('wsChart');
-  if (wsChartInst) wsChartInst.destroy();
-  const data = [];
-  for (let a = 0; a <= 360; a += 5) {
-    const rad = a * Math.PI / 180;
-    data.push({ x: Math.cos(rad), y: Math.sin(rad) });
-  }wsChartInst = new Chart(cEl,{
-    type: 'scatter',
-    data: { datasets: [{
-      label: '到達可能境界（正規化）',
-      data,
-      pointRadius: 2,
-      borderColor: 'rgba(0,180,216,0.8)',
-      backgroundColor: 'rgba(0,180,216,0.15)',
-      showLine: true,
-      fill: true
-    }]},
-    options:{
-      responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
-      plugins: { legend: { display: true } },
-      scales:{
-        x: { type:'linear', title: { display: true, text: 'ワークスペース境界（関節空間）' } },
-        y:{ display: false }
+  }
+  var fc1=Math.cos(t1),fs1=Math.sin(t1),fc2=Math.cos(t2),fs2=Math.sin(t2),
+      fc23=Math.cos(t2+t3),fs23=Math.sin(t2+t3);
+  var px=(L1*fc2+L2*fc23)*fc1, py=(L1*fc2+L2*fc23)*fs1, pz=-L1*fs2-L2*fs23;
+  return{t1:t1,t2:t2,t3:t3,err:Math.sqrt((px-tx)*(px-tx)+(py-ty)*(py-ty)+(pz-tz)*(pz-tz))};
+}
+
+var cssW=0,cssH=420;
+function resize(){
+  var rect=ikCanvas.parentElement.getBoundingClientRect();
+  cssW=Math.max(280,Math.min(Math.floor(rect.width-44),760));
+  var dpr=Math.min(window.devicePixelRatio||1,2.5);
+  ikCanvas.style.width=cssW+'px'; ikCanvas.style.height=cssH+'px';
+  ikCanvas.width=Math.round(cssW*dpr); ikCanvas.height=Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+function bg(W,H){
+  ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+  for(var i=0;i<W;i+=40){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,H);ctx.stroke();}
+  for(var j=0;j<H;j+=40){ctx.beginPath();ctx.moveTo(0,j);ctx.lineTo(W,j);ctx.stroke();}
+}
+function workspace(cx,cy,sc,L1,L2){
+  var rMax=(L1+L2)*sc, rMin=Math.abs(L1-L2)*sc;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,rMax,0,2*Math.PI);
+  if(rMin>1) ctx.arc(cx,cy,rMin,0,2*Math.PI,true);
+  ctx.fillStyle='rgba(0,123,255,0.07)'; ctx.fill();
+  ctx.strokeStyle='rgba(0,123,255,0.32)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(cx,cy,rMax,0,2*Math.PI); ctx.stroke();
+  if(rMin>1){ctx.beginPath();ctx.arc(cx,cy,rMin,0,2*Math.PI);ctx.stroke();}
+  ctx.fillStyle='rgba(0,123,255,0.5)'; ctx.font='10px Roboto Mono';
+  ctx.fillText(TXT.ws, cx-rMax+6, cy-rMax+14);
+  ctx.strokeStyle='rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.moveTo(cx-rMax-18,cy); ctx.lineTo(cx+rMax+18,cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx,cy-rMax-18); ctx.lineTo(cx,cy+rMax+18); ctx.stroke();
+  ctx.restore();
+}
+function arm2R(cx,cy,sc,L1,L2,t1,t2,color,main){
+  var x1=cx+L1*sc*Math.cos(t1), y1=cy-L1*sc*Math.sin(t1);
+  var x2=x1+L2*sc*Math.cos(t1+t2), y2=y1-L2*sc*Math.sin(t1+t2);
+  ctx.save();
+  ctx.lineWidth=main?6:3; ctx.strokeStyle=color; ctx.lineCap='round';
+  if(!main) ctx.globalAlpha=0.55;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x1,y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  var R=main?7:5, joints=[[cx,cy],[x1,y1],[x2,y2]];
+  for(var i=0;i<3;i++){
+    ctx.beginPath(); ctx.arc(joints[i][0],joints[i][1],R,0,2*Math.PI);
+    ctx.fillStyle=i===0?'#cfe3ff':color; ctx.fill();
+    if(i===0){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();}
+  }
+  if(main){
+    ctx.strokeStyle=color; ctx.lineWidth=3;
+    var a=t1+t2, gx=Math.cos(a), gy=-Math.sin(a), nx=-gy, ny=gx, g=9;
+    ctx.beginPath(); ctx.moveTo(x2+nx*g,y2+ny*g); ctx.lineTo(x2+nx*g+gx*7,y2+ny*g+gy*7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2-nx*g,y2-ny*g); ctx.lineTo(x2-nx*g+gx*7,y2-ny*g+gy*7); ctx.stroke();
+    ctx.globalAlpha=1;
+    ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='11px Roboto Mono';
+    ctx.fillText('θ₁='+(t1*180/Math.PI).toFixed(0)+'°', x1+9,y1-9);
+    ctx.fillText('θ₂='+(t2*180/Math.PI).toFixed(0)+'°', (x1+x2)/2+9,(y1+y2)/2-9);
+  }
+  ctx.restore();
+}
+function arm3R(cx,cy,sc,L1,L2,L3,t1,t2,t3){
+  var c1=Math.cos(t1),s1=Math.sin(t1),c2=Math.cos(t2),s2=Math.sin(t2),
+      c23=Math.cos(t2+t3),s23=Math.sin(t2+t3);
+  function pr(X,Y,Z){return{px:cx+(X*0.8+Z*0.3)*sc,py:cy-(Y*0.8+Z*0.2)*sc};}
+  var p0={px:cx,py:cy};
+  var p1=pr(L1*c2*c1,L1*c2*s1,-L1*s2);
+  var p2=pr((L1*c2+L2*c23)*c1,(L1*c2+L2*c23)*s1,-L1*s2-L2*s23);
+  var p3=pr((L1*c2+L2*c23+L3)*c1,(L1*c2+L2*c23+L3)*s1,-L1*s2-L2*s23);
+  var cols=['#4aa3ff','#00d4a0','#ffb74d'], segs=[[p0,p1],[p1,p2],[p2,p3]];
+  for(var i=0;i<3;i++){
+    var a=segs[i][0], b=segs[i][1];
+    ctx.save(); ctx.strokeStyle=cols[i]; ctx.lineWidth=5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(a.px,a.py); ctx.lineTo(b.px,b.py); ctx.stroke();
+    ctx.fillStyle=cols[i]; ctx.beginPath(); ctx.arc(b.px,b.py,6,0,2*Math.PI); ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle='#cfe3ff'; ctx.beginPath(); ctx.arc(cx,cy,7,0,2*Math.PI); ctx.fill();
+}
+function target(px,py,reachable){
+  ctx.save();
+  var col=reachable?'rgba(255,200,60,0.95)':'rgba(255,90,90,0.95)';
+  ctx.strokeStyle=col; ctx.lineWidth=2; var r=9;
+  ctx.beginPath(); ctx.moveTo(px-r,py); ctx.lineTo(px+r,py); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px,py-r); ctx.lineTo(px,py+r); ctx.stroke();
+  ctx.beginPath(); ctx.arc(px,py,r,0,2*Math.PI); ctx.globalAlpha=0.7; ctx.stroke();
+  ctx.restore();
+}
+function legend(items){
+  ctx.save(); ctx.font='11px sans-serif'; var lx=10;
+  for(var i=0;i<items.length;i++){
+    var lab=items[i][0], col=items[i][1];
+    ctx.fillStyle=col; ctx.fillRect(lx,8,14,3);
+    ctx.fillStyle='rgba(255,255,255,0.82)'; ctx.fillText(lab,lx+18,17);
+    lx+=ctx.measureText(lab).width+40;
+  }
+  ctx.restore();
+}
+function setSV(id,v){var e=$(id);if(e)e.innerHTML=v;}
+
+function pathPoint(ph,reach){
+  var rr=reach*(0.55+0.30*Math.sin(ph*0.7));
+  return{x:rr*Math.cos(ph), y:Math.abs(rr*Math.sin(ph*1.3))*0.9+reach*0.08};
+}
+
+function frame(){
+  resize();
+  var W=cssW,H=cssH;
+  ctx.clearRect(0,0,W,H); bg(W,H);
+  var p=getP();
+  var cx=W*0.42, cy=H*0.6;
+  var sc=Math.min(W,H)/(2*(p.L1+p.L2+(mode==='3R'?p.L3:0)+60));
+
+  var tx=p.tx, ty=p.ty;
+  if(followPath && !RM){
+    var reach=(p.L1+p.L2);
+    var pt=pathPoint(phase,reach);
+    tx=pt.x; ty=pt.y;
+    if($('tx'))$('tx').value=Math.round(tx);
+    if($('ty'))$('ty').value=Math.round(ty);
+    if($('txValNum'))$('txValNum').value=Math.round(tx);
+    if($('tyValNum'))$('tyValNum').value=Math.round(ty);
+  }
+
+  if(mode==='2R'){
+    workspace(cx,cy,sc,p.L1,p.L2);
+    var dist=Math.sqrt(tx*tx+ty*ty);
+    var sols=solve2R(p.L1,p.L2,tx,ty);
+    var reachable=!!sols;
+    if(followPath && !RM){
+      ctx.strokeStyle='rgba(255,200,60,0.18)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      var reach2=(p.L1+p.L2), first=true;
+      for(var ph=0;ph<=Math.PI*2+0.01;ph+=0.1){
+        var q=pathPoint(ph,reach2);
+        var sx=cx+q.x*sc, sy=cy-q.y*sc;
+        if(first){ctx.moveTo(sx,sy);first=false;}else ctx.lineTo(sx,sy);
       }
+      ctx.stroke(); ctx.setLineDash([]);
     }
-  });
-}function compute(){
-  const p = getParams();
-  resizeCanvas();
-  const W = ikCanvas.width, H = ikCanvas.height;
-  ctx.clearRect(0, 0, W, H);
-  drawBg(W, H);
-
-  const cx = W/2, cy = H*0.6;
-  const scale = Math.min(W, H) / (2*(p.L1+p.L2+p.L3+50));
-
-  if (mode === '2R') {
-    const sols = solve2R(p.L1, p.L2, p.tx, p.ty);
-    drawWorkspace2R(cx, cy, scale, p.L1, p.L2);
-    drawTarget(cx + p.tx*scale, cy - p.ty*scale);
-
-    if (!sols) {
-      document.getElementById('statT1').textContent = '—';
-      document.getElementById('statT2').textContent = '—';
-      document.getElementById('statErr').textContent = '—';
-      document.getElementById('statDet').textContent = '—';
-      document.getElementById('statReach').innerHTML = '<span class="warn-badge">不到達</span>';
-      document.getElementById('statSing').textContent = '—';
-      return;
-    }const colors = ['rgba(0,123,255,0.9)', 'rgba(0,184,148,0.9)'];
-    const labels = ['エルボーダウン', 'エルボーアップ'];
-    sols.forEach((s, i) =>{
-      drawArm2R(cx, cy, scale, p.L1, p.L2, s.t1, s.t2, colors[i], i===0);
-    });
-
-    const s = sols[0];
-    const J = jacobian2R(p.L1, p.L2, s.t1, s.t2);
-    const detJ = det2x2(J);
-    const singDist = Math.abs(detJ) / (p.L1*p.L2);
-
-    document.getElementById('statT1').textContent = (s.t1*180/Math.PI).toFixed(1)+'°';
-    document.getElementById('statT2').textContent = (s.t2*180/Math.PI).toFixed(1)+'°';
-    document.getElementById('statErr').textContent = '0.0';
-    document.getElementById('statDet').textContent = detJ.toFixed(0);
-    document.getElementById('statReach').innerHTML = '<span class="ok-badge">到達可能</span>';
-    document.getElementById('statSing').textContent = singDist.toFixed(3);
-
-    if (Math.abs(detJ) < 5000){
-      ctx.save();
-      ctx.fillStyle = 'rgba(225,112,85,0.9)';
-      ctx.font = 'bold 13px sans-serif';
-      ctx.fillText('⚠ 特異点近傍', 10, 24);
-      ctx.restore();
+    target(cx+tx*sc,cy-ty*sc,reachable);
+    if(reachable){
+      var cDown='rgba(0,123,255,0.95)', cUp='rgba(0,184,148,0.95)';
+      if(sols[1]) arm2R(cx,cy,sc,p.L1,p.L2,sols[1].t1,sols[1].t2,cUp,false);
+      arm2R(cx,cy,sc,p.L1,p.L2,sols[0].t1,sols[0].t2,cDown,true);
+      var s=sols[0], J=jac2R(p.L1,p.L2,s.t1,s.t2), dJ=det2(J);
+      var singDist=Math.abs(dJ)/(p.L1*p.L2);
+      setSV('statT1',(s.t1*180/Math.PI).toFixed(1)+'°');
+      setSV('statT2',(s.t2*180/Math.PI).toFixed(1)+'°');
+      setSV('statErr','0.0');
+      setSV('statDet',dJ.toFixed(0));
+      setSV('statReach','<span class="ok-badge">'+TXT.reach+'</span>');
+      setSV('statSing',singDist.toFixed(3));
+      if(Math.abs(dJ)<5000){
+        ctx.save(); ctx.fillStyle='rgba(255,140,90,0.95)'; ctx.font='bold 13px sans-serif';
+        ctx.fillText(TXT.sing,12,H-14); ctx.restore();
+      }
+      legend([[TXT.down,cDown],[TXT.up,cUp],[TXT.target,'rgba(255,200,60,0.95)']]);
+    }else{
+      var ang=Math.atan2(ty,tx);
+      arm2R(cx,cy,sc,p.L1,p.L2,ang,0,'rgba(150,160,180,0.85)',true);
+      setSV('statT1',(ang*180/Math.PI).toFixed(1)+'°');
+      setSV('statT2','0.0°');
+      setSV('statErr',Math.max(0,dist-(p.L1+p.L2)).toFixed(1));
+      setSV('statDet','0');
+      setSV('statReach','<span class="warn-badge">'+TXT.noreach+'</span>');
+      setSV('statSing','0.000');
+      legend([[TXT.noreach,'rgba(150,160,180,0.9)'],[TXT.target,'rgba(255,90,90,0.95)']]);
     }
-
-    drawLegend2R(W);
+    ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='10px Roboto Mono'; ctx.textAlign='right';
+    ctx.fillText('r='+dist.toFixed(0)+'mm', W-12, H-12); ctx.textAlign='left';
   }else{
-    const res = solve3R_iterative(p.L1, p.L2, p.L3, p.tx, p.ty, p.tz);
-    drawArm3R_proj(cx, cy, scale, p.L1, p.L2, p.L3, res.t1, res.t2, res.t3);
-    drawTarget(cx + p.tx*scale*0.7, cy - p.ty*scale*0.7);
-    const reachable = res.err < 10;
-    document.getElementById('statT1').textContent = (res.t1*180/Math.PI).toFixed(1)+'°';
-    document.getElementById('statT2').textContent = (res.t2*180/Math.PI).toFixed(1)+'°';
-    document.getElementById('statErr').textContent = res.err.toFixed(1);
-    document.getElementById('statDet').textContent = '—';
-    document.getElementById('statReach').innerHTML = reachable ? '<span class="ok-badge">到達可能</span>' : '<span class="warn-badge">収束失敗</span>';
-    document.getElementById('statSing').textContent = '—';
+    var r3=solve3R(p.L1,p.L2,p.L3,tx,ty,p.tz);
+    arm3R(cx,cy,sc,p.L1,p.L2,p.L3,r3.t1,r3.t2,r3.t3);
+    target(cx+tx*sc*0.7,cy-ty*sc*0.7,r3.err<10);
+    setSV('statT1',(r3.t1*180/Math.PI).toFixed(1)+'°');
+    setSV('statT2',(r3.t2*180/Math.PI).toFixed(1)+'°');
+    setSV('statErr',r3.err.toFixed(1));
+    setSV('statDet','—');
+    setSV('statReach',r3.err<10?'<span class="ok-badge">'+TXT.reach+'</span>':'<span class="warn-badge">'+TXT.conv+'</span>');
+    setSV('statSing','—');
   }
 }
 
-function resizeCanvas() {
-  const dpr = window.devicePixelRatio || 1;
-  const rect = ikCanvas.parentElement.getBoundingClientRect();
-  const w = Math.min(rect.width - 44, 800);
-  ikCanvas.width = w * dpr;
-  ikCanvas.height = 420 * dpr;
-  ikCanvas.style.width = w + 'px';
-  ikCanvas.style.height = '420px';
-  ctx.scale(dpr, dpr);
-}function drawBg(W, H){
-  const dpr = window.devicePixelRatio || 1;
-  const w = W/dpr, h = H/dpr;
-  ctx.fillStyle = '#0a1628';
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < w; i += 40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,h); ctx.stroke(); }for (let j = 0; j < h; j += 40){ ctx.beginPath(); ctx.moveTo(0,j); ctx.lineTo(w,j); ctx.stroke(); }
-}function drawWorkspace2R(cx, cy, scale, L1, L2){
-  const rMax = (L1+L2)*scale, rMin = Math.abs(L1-L2)*scale;
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, rMax, 0, 2*Math.PI);
-  if (rMin > 1) {
-    ctx.arc(cx, cy, rMin, 0, 2*Math.PI, true);
-  }ctx.fillStyle = 'rgba(0,123,255,0.06)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(0,123,255,0.3)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, 2*Math.PI); ctx.stroke();
-  if (rMin > 1){ ctx.beginPath(); ctx.arc(cx, cy, rMin, 0, 2*Math.PI); ctx.stroke(); }
-  // Axes
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.beginPath(); ctx.moveTo(cx-rMax-20, cy); ctx.lineTo(cx+rMax+20, cy); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cx, cy-rMax-20); ctx.lineTo(cx, cy+rMax+20); ctx.stroke();
-  ctx.restore();
-}function drawArm2R(cx, cy, scale, L1, L2, t1, t2, color, showLabels){
-  const x1 = cx + L1*scale*Math.cos(t1);
-  const y1 = cy - L1*scale*Math.sin(t1);
-  const x2 = x1 + L2*scale*Math.cos(t1+t2);
-  const y2 = y1 - L2*scale*Math.sin(t1+t2);
-  ctx.save();
-  ctx.lineWidth = showLabels ? 4 : 3;
-  ctx.strokeStyle = color;
-  ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x1, y1); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-  [cx, cy, x1, y1, x2, y2].forEach((v, i) => {
-    if (i % 2 === 0) {
-      ctx.beginPath();
-      ctx.arc(v, [cy,y1,y2][i/2], showLabels ? 7 : 5, 0, 2*Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
-    }
-  });
-  if (showLabels){
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = '11px Roboto Mono';
-    ctx.fillText(`θ₁=${(t1*180/Math.PI).toFixed(1)}°`, x1+8, y1-8);
-    ctx.fillText(`θ₂=${(t2*180/Math.PI).toFixed(1)}°`, x2+8, y2-8);
-  }
-  ctx.restore();
-}function drawArm3R_proj(cx, cy, scale, L1, L2, L3, t1, t2, t3){
-  const c1=Math.cos(t1), s1=Math.sin(t1), c2=Math.cos(t2), s2=Math.sin(t2);
-  const c23=Math.cos(t2+t3), s23=Math.sin(t2+t3);
-  const proj = (x3d, y3d, z3d) => ({ px: cx + (x3d*0.8+z3d*0.3)*scale, py: cy - (y3d*0.8+z3d*0.2)*scale });
-  const p0 ={ px: cx, py: cy };
-  const p1 = proj(L1*c2*c1, L1*c2*s1, -L1*s2);
-  const p2 = proj((L1*c2+L2*c23)*c1, (L1*c2+L2*c23)*s1, -L1*s2-L2*s23);
-  const p3 = proj((L1*c2+L2*c23+L3*1)*c1, (L1*c2+L2*c23+L3)*s1, -L1*s2-L2*s23);
-  const colors = ['rgba(0,123,255,0.9)','rgba(0,184,148,0.9)','rgba(255,183,77,0.9)'];
-  [[p0,p1],[p1,p2],[p2,p3]].forEach(([a,b],i) =>{
-    ctx.save();
-    ctx.strokeStyle = colors[i]; ctx.lineWidth = 4; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(a.px, a.py); ctx.lineTo(b.px, b.py); ctx.stroke();
-    ctx.fillStyle = colors[i];
-    ctx.beginPath(); ctx.arc(b.px, b.py, 6, 0, 2*Math.PI); ctx.fill();
-    ctx.restore();
-  });
-}function drawTarget(tx, ty){
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,100,100,0.9)';
-  ctx.lineWidth = 2;
-  const r = 8;
-  ctx.beginPath(); ctx.moveTo(tx-r, ty); ctx.lineTo(tx+r, ty); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(tx, ty-r); ctx.lineTo(tx, ty+r); ctx.stroke();
-  ctx.beginPath(); ctx.arc(tx, ty, r, 0, 2*Math.PI);
-  ctx.strokeStyle = 'rgba(255,100,100,0.5)';
-  ctx.stroke();
-  ctx.restore();
-}function drawLegend2R(W){
-  const items = [['エルボーダウン', 'rgba(0,123,255,0.9)'], ['エルボーアップ', 'rgba(0,184,148,0.9)'], ['目標点', 'rgba(255,100,100,0.9)']];
-  ctx.save();
-  ctx.font = '11px sans-serif';
-  let lx = 10;
-  items.forEach(([label, color]) => {
-    ctx.fillStyle = color;
-    ctx.fillRect(lx, 8, 14, 3);
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.fillText(label, lx+18, 17);
-    lx += ctx.measureText(label).width + 38;
-  });
-  ctx.restore();
-}// Init
+function loop(){
+  if(!playing){animId=null;return;}
+  phase+=0.012;
+  frame();
+  animId=requestAnimationFrame(loop);
+}
+function start(){ if(RM){frame();return;} if(!animId){playing=true;animId=requestAnimationFrame(loop);} }
+function stop(){ playing=false; if(animId){cancelAnimationFrame(animId);animId=null;} }
 
-window.addEventListener('load', () =>{
-  setMode('2R');
-  initWSChart();
-  ['L1','L2','L3','tx','ty','tz'].forEach(id => {
-    const el = document.getElementById(id);
-    updateSlider(el, id+'Val', 0, 'mm');
-  });
-  compute();
+window.setMode=function(m){
+  mode=m;
+  var b2=$('btn2R'),b3=$('btn3R');
+  if(b2)b2.classList.toggle('active',m==='2R');
+  if(b3)b3.classList.toggle('active',m==='3R');
+  if($('L3group'))$('L3group').style.display=m==='3R'?'':'none';
+  if($('tzGroup'))$('tzGroup').style.display=m==='3R'?'':'none';
+  if(RM)frame();
+};
+window.toggleLimits=function(){
+  limitsEnabled=!limitsEnabled;
+  var b=$('limitToggle');
+  if(b){b.classList.toggle('active',limitsEnabled);
+    b.innerHTML=limitsEnabled?'<i class="fas fa-lock"></i> ON':'<i class="fas fa-lock-open"></i> OFF';}
+  if(RM)frame();
+};
+window.compute=function(){
+  if(followPath){
+    followPath=false;
+    var fb=$('followBtn'); if(fb)fb.innerHTML=TXT.pausef;
+  }
+  if(RM)frame();
+};
+window.ikFollow=function(){
+  followPath=!followPath;
+  var fb=$('followBtn');
+  if(fb)fb.innerHTML=followPath?TXT.follow:TXT.pausef;
+  if(RM)frame();
+};
+window.ikPlay=function(){
+  if(playing)stop(); else start();
+  var pb=$('playBtn'); if(pb)pb.innerHTML=playing?TXT.play:TXT.stop;
+};
+
+window.addEventListener('resize',function(){ if(RM||!playing)frame(); });
+window.addEventListener('load',function(){
+  if($('L3group'))$('L3group').style.display='none';
+  if($('tzGroup'))$('tzGroup').style.display='none';
+  var ids=['L1','L2','L3','tx','ty','tz'];
+  for(var i=0;i<ids.length;i++){ if(window.updateSlider&&$(ids[i])){try{updateSlider($(ids[i]),ids[i]+'Val',0,'mm');}catch(e){}} }
+  frame();
+  start();
 });
-window.addEventListener('resize', compute);
+})();
 </script>
 
 <section class="explanation">
@@ -655,7 +669,7 @@ window.addEventListener('resize', compute);
       <div class="bub">え、同じ目標位置なのに、アームの形が2通りあるときがあります！「エルボーアップ」と「エルボーダウン」って表示されます。どうして解が2つ出るんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">良いところに気が付いたね。2リンクのアームの場合、手先を同じ位置に持っていく方法は、肘を上に向けるか下に向けるかの2通りが一般的にあるんだ。数式的には、$s_2 = \pm\sqrt{1-c_2^2}$ のプラスかマイナスかの選択に対応している。実務では、周りの機械にぶつからない方や、関節の可動範囲内にある方を選ぶんだよ。画面上の「解の切替」ボタンを押して、2つの姿勢を見比べてみて。</div>
+      <div class="bub">良いところに気が付いたね。2リンクのアームの場合、手先を同じ位置に持っていく方法は、肘を上に向けるか下に向けるかの2通りが一般的にあるんだ。数式的には、$s_2 = \pm\sqrt{1-c_2^2}$ のプラスかマイナスかの選択に対応している。実務では、周りの機械にぶつからない方や、関節の可動範囲内にある方を選ぶんだよ。このツールでは2つの姿勢（エルボーアップ／ダウン）が同時に色分け表示されるので、見比べてみて。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">「特異点」って表示が出ることがあります。アームがピンと伸びきった状態で、動かそうとすると急に暴れるみたいな…あれは何が起きているんですか？</div>
@@ -716,6 +730,9 @@ window.addEventListener('resize', compute);
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="inverse-kinematics.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -779,7 +796,7 @@ window.addEventListener('resize', compute);
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>PLCロボット（SCARA型相当）でL₁=200mm、L₂=180mm、L₃=60mmのとき、目標位置(x,y,z)=(280mm, 150mm, -50mm)を指定した場合：解析解によりθ₁=23.4°、θ₂=-67.2°、θ₃=112.5°が得られ、先端誤差は0.8mm以下、det(J)=5420で特異点から安全です。目標位置が(450mm, 0mm)の場合、リーチ範囲L₁+L₂=380mmを超過するため「到達不可」と判定されます。</p>
+<p>2R平面モードの既定値（L₁=200mm、L₂=150mm、目標(x,y)=(200mm, 150mm)）では、到達距離は√(200²+150²)=250mmで、到達可能範囲 |L₁−L₂|=50mm 〜 L₁+L₂=350mm の内側にあります。解析解はエルボーダウン解 θ₁=0.0°・θ₂=90.0°（およびエルボーアップ解）を返し、ヤコビ行列式 det(J)=30000、特異点距離 |det(J)|/(L₁L₂)=1.0 で特異点から十分離れています。目標位置が(360mm, 0mm)の場合、L₁+L₂=350mm を超過するため「不到達」と判定されます。なお3R空間モードの反復解は現状リンクL₃を順運動学に組み込んでおらず、L₃は到達計算に影響しません（参考表示）。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -789,6 +806,16 @@ window.addEventListener('resize', compute);
 <li>3自由度逆運動学の収束不安定領域（例：θ₂が±160°超）では初期値を-90°に設定し、最大反復回数50回で打ち切り</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4274223213?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274223213.09._SCMZZZZZZ_.jpg" alt="ロボット工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">ロボット工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

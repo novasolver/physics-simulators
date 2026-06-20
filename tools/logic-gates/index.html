@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "論理ゲート・論理回路シミュレーター",
       "description": "AND・OR・NOT・NAND・NOR・XOR・XNOR全ゲートの動作をインタラクティブに可視化。真理値表を自動生成。半加算器・全加算器・SRフリップフロップ・2ビットカウンタのプリセットを搭載。",
       "url": "https://novasolver.jp/tools/logic-gates.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["7種類の基本ゲート（AND/OR/NOT/NAND/NOR/XOR/XNOR）","真理値表の自動生成","IEEEシンボルのcanvas描画","LEDインジケーターによる入出力表示","半加算器・全加算器・フリップフロップ・カウンタプリセット"],
       "keywords": "論理ゲート,真理値表,半加算器,全加算器,フリップフロップ,デジタル回路,ブール代数",
       "datePublished": "2026-04-08",
@@ -252,7 +252,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="tab-btn" style="width:100%;margin-bottom:8px;font-size:0.9rem" onclick="counterStep()"><i class="fas fa-step-forward"></i> クロック +1</button>
       <button class="tab-btn" style="width:100%;font-size:0.9rem" onclick="counterReset()"><i class="fas fa-undo"></i> リセット</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -271,6 +279,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <h2 id="gateTheoryTitle">ANDゲート</h2>
         <div id="gateTheoryText">両入力が1のときのみ出力が1。論理積（A・B）。<br>ブール式: <strong>Y = A · B</strong></div>
       </div>
+      <div class="lg-controls" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px"><button id="autoBtn" class="preset-btn" onclick="toggleAuto()"><i class="fas fa-play"></i> 真理値表を自動再生</button><button class="preset-btn" onclick="lgPreset('AND')">AND</button><button class="preset-btn" onclick="lgPreset('XOR')">XOR</button><button class="preset-btn" onclick="lgPreset('NAND')">NAND</button><button class="preset-btn" onclick="lgPreset('ha-demo')">半加算器 1+1</button><button class="preset-btn" onclick="lgPreset('fa-demo')">全加算器 1+1+1</button><button class="preset-btn" onclick="lgPreset('sr-set')">SR セット</button><button class="preset-btn" onclick="lgPreset('sr-hold')">SR 保持</button><button class="preset-btn" onclick="lgPreset('sr-reset')">SR リセット</button></div>
     </div>
 
     <!-- Half Adder View -->
@@ -356,360 +365,460 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-function __novaCanvasCssW(canvas){ return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5); }
-function __novaCanvasCssH(canvas){ return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5); }
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
+window.LG_I18N = {
+  booleanLabel: 'ブール式',
+  decimal: '10進数',
+  stateLabel: '状態',
+  auto: { play: '真理値表を自動再生', stop: '停止' },
+  srStates: { forbidden: '禁止状態', set: 'セット', reset: 'リセット', hold: '保持' },
+  counterHeader: ['クロック','Q1','Q0','10進'],
+  gateInfo: {
+    AND:  { title:'ANDゲート', bool:'Y = A · B', desc:'両入力が1のときのみ出力1。論理積。' },
+    OR:   { title:'ORゲート', bool:'Y = A + B', desc:'少なくとも1つの入力が1なら出力1。論理和。' },
+    NOT:  { title:'NOTゲート（インバータ）', bool:'Y = Ā', desc:'入力を反転する。入力が0→出力1、入力が1→出力0。' },
+    NAND: { title:'NANDゲート', bool:'Y = ̄(A·B)', desc:'ANDの反転。汎用ゲート—これだけで全論理関数を実現可能。' },
+    NOR:  { title:'NORゲート', bool:'Y = ̄(A+B)', desc:'ORの反転。汎用ゲート。' },
+    XOR:  { title:'XORゲート（排他的論理和）', bool:'Y = A ⊕ B', desc:'入力が異なるとき出力1。加算器・パリティ回路に必須。' },
+    XNOR: { title:'XNORゲート', bool:'Y = ̄(A⊕B)', desc:'入力が等しいとき出力1。一致検出回路に使用。' }
+  }
+};
+</script>
+<script>
+// ==== NovaSolver Logic Gates v2 engine (animated signal flow) ====
+(function(){
+'use strict';
+var I = (window.LG_I18N || {});
+var DPR = function(){ return Math.min(window.devicePixelRatio || 1, 2.5); };
+var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function hidpi(canvas, cssW, cssH, ctx){
+  var dpr = DPR();
+  canvas.setAttribute('data-ux-no-scale','1');
+  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || 600));
+  var h = Math.max(1, Math.round(cssH || 320));
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+  canvas.dataset.cssW = String(w); canvas.dataset.cssH = String(h);
+  if (ctx && ctx.setTransform) ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { w:w, h:h };
 }
 
 // ---- State ----
+var curGate = 'AND', curTab = 'single';
+var srQ = 0, counterVal = 0;
+var inA = 0, inB = 0;
+var haA = 0, haB = 0;
+var faA = 0, faB = 0, faCin = 0;
+var srS = 0, srR = 0;
+var drawSR_forbidden = false;
 
-let curGate = 'AND', curTab = 'single';
-let srQ = 0; // SR FF state
+// Pulse animation per view: phase 0..1
+var pulse = { single:0, halfadder:0, fulladder:0, srff:0, counter:0 };
+var pulseActive = { single:false, halfadder:false, fulladder:false, srff:false, counter:false };
+var pulseStart = {};
+var PULSE_DUR = 520;
 
-let counterVal = 0;
+function trigger(view){
+  if (REDUCED){ pulse[view] = 1; pulseActive[view] = false; return; }
+  pulse[view] = 0; pulseActive[view] = true; pulseStart[view] = performance.now();
+}
 
-// ---- Gate Logic ----
-
-const gateLogic = {
-  AND: (a,b) => a & b, OR: (a,b) => a | b, NOT: (a,b) => a^1,
-  NAND: (a,b) => ((a & b))^1, NOR: (a,b) => (a | b)^1,
-  XOR: (a,b) => a ^ b, XNOR: (a,b) => (a ^ b)^1
+// ---- Gate logic ----
+var gateLogic = {
+  AND:function(a,b){return a & b;}, OR:function(a,b){return a | b;}, NOT:function(a){return a^1;},
+  NAND:function(a,b){return (a & b)^1;}, NOR:function(a,b){return (a | b)^1;},
+  XOR:function(a,b){return a ^ b;}, XNOR:function(a,b){return (a ^ b)^1;}
 };
-const gateInfo ={
-  AND:  { title:'ANDゲート', bool:'Y = A · B', desc:'両入力が1のときのみ出力1。論理積。' },
-  OR:{ title:'ORゲート', bool:'Y = A + B', desc:'少なくとも1つの入力が1なら出力1。論理和。' },
-  NOT:{ title:'NOTゲート（インバータ）', bool:'Y = Ā', desc:'入力を反転する。入力が0→出力1、入力が1→出力0。' },
-  NAND:{ title:'NANDゲート', bool:'Y = ̄(A·B)', desc:'ANDの反転。汎用ゲート—これだけで全論理関数を実現可能。' },
-  NOR:{ title:'NORゲート', bool:'Y = ̄(A+B)', desc:'ORの反転。汎用ゲート。' },
-  XOR:{ title:'XORゲート（排他的論理和）', bool:'Y = A ⊕ B', desc:'入力が異なるとき出力1。加算器・パリティ回路に必須。' },
-  XNOR:{ title:'XNORゲート', bool:'Y = ̄(A⊕B)', desc:'入力が等しいとき出力1。一致検出回路に使用。' }
-};
+var gateInfo = I.gateInfo || {};
 
-function switchTab(tab, btn){
-  curTab = tab;
-  document.querySelectorAll('.panel > .tab-bar .tab-btn, .panel .tab-btn[style*="text-align"]').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const views = ['single','halfadder','fulladder','srff','counter'];
-  views.forEach(v => {
-    document.getElementById(v+'View').style.display = v === tab ? 'block' : 'none';
-    const p = document.getElementById(v+'Panel');
-    if (p) p.style.display = v === tab ? 'block' : 'none';
-  });
-  if (tab === 'single') updateGate();
-  else if (tab === 'halfadder') updateHA();
-  else if (tab === 'fulladder') updateFA();
-  else if (tab === 'srff') updateSR();
-  else if (tab === 'counter') updateCounter();
-}function selectGate(gate, btn){
-  curGate = gate;
-  document.querySelectorAll('.gate-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const isNot = gate === 'NOT';
-  document.getElementById('inputB_row').style.display = isNot ? 'none' : '';
-  updateGate();
-}function updateGate(){
-  const a = document.getElementById('inputA').checked ? 1 : 0;
-  const b = document.getElementById('inputB').checked ? 1 : 0;
-  const out = gateLogic[curGate](a, b);
+function wireColor(on){ return on ? '#27ae60' : '#9aa3ad'; }
+function lerp(a,b,t){ return a + (b-a)*t; }
 
-  document.getElementById('aVal').textContent = a;
-  document.getElementById('bVal').textContent = b;
+function wire(ctx, x1,y1,x2,y2, on, phase, lw){
+  ctx.lineWidth = lw || 2.5;
+  ctx.strokeStyle = wireColor(on);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  if (on && phase > 0 && phase < 1){
+    var px = lerp(x1,x2,phase), py = lerp(y1,y2,phase);
+    ctx.save();
+    ctx.shadowColor = 'rgba(94,255,126,0.9)'; ctx.shadowBlur = 12;
+    ctx.fillStyle = '#7dffa0';
+    ctx.beginPath(); ctx.arc(px,py,4.2,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function segPhase(p, from, to){
+  if (p <= from) return 0;
+  if (p >= to) return 1;
+  return (p - from) / (to - from);
+}
+
+function setLed(id, v){ var el=document.getElementById(id); if(!el) return; el.classList.toggle('on', v===1); el.classList.toggle('off', v===0); }
+
+// =================== SINGLE GATE ===================
+function updateGate(){
+  inA = document.getElementById('inputA').checked ? 1 : 0;
+  inB = document.getElementById('inputB').checked ? 1 : 0;
+  var isNot = curGate === 'NOT';
+  var out = isNot ? gateLogic.NOT(inA) : gateLogic[curGate](inA, inB);
+  document.getElementById('aVal').textContent = inA;
+  document.getElementById('bVal').textContent = inB;
   document.getElementById('outVal').textContent = out;
-
-  const setLed = (id, v) => { const el = document.getElementById(id); el.classList.toggle('on', v===1); el.classList.toggle('off', v===0); };
-  setLed('ledA', a); setLed('ledB', b); setLed('ledOut', out);
-
-  const info = gateInfo[curGate];
+  setLed('ledA', inA); setLed('ledB', isNot?0:inB); setLed('ledOut', out);
+  var info = gateInfo[curGate] || {title:curGate, bool:'', desc:''};
   document.getElementById('gateTheoryTitle').textContent = info.title;
-  document.getElementById('gateTheoryText').innerHTML = info.desc + '<br>ブール式: <strong>' + info.bool + '</strong>';
-  const isNot = curGate === 'NOT';
-  document.getElementById('outLabel').textContent = isNot ? 'Y = NOT A' : `Y = A ${curGate} B`;
-
+  document.getElementById('gateTheoryText').innerHTML = info.desc + '<br>' + (I.booleanLabel||'Boolean') + ': <strong>' + info.bool + '</strong>';
+  document.getElementById('outLabel').textContent = isNot ? 'Y = NOT A' : ('Y = A ' + curGate + ' B');
   buildTruthTable(curGate);
-  drawGateSymbol(curGate, a, b, out);
-}function buildTruthTable(gate){
-  const tbody = document.getElementById('truthTable');
-  const isNot = gate === 'NOT';
-  const a_cur = document.getElementById('inputA').checked ? 1 : 0;
-  const b_cur = document.getElementById('inputB').checked ? 1 : 0;
-  let rows = '';
-  const header = isNot ? '<tr><th>A</th><th>Y</th></tr>' : '<tr><th>A</th><th>B</th><th>Y</th></tr>';
-  if (isNot) {
-    for (let a = 0; a <= 1; a++) {
-      const out = gateLogic[gate](a,0);
-      const hl = a === a_cur ? ' class="highlight"' : '';
-      rows += `<tr${hl}><td class="${a?'val1':'val0'}">${a}</td><td class="${out?'val1':'val0'}">${out}</td></tr>`;
+  trigger('single');
+}
+
+function buildTruthTable(gate){
+  var tbody = document.getElementById('truthTable');
+  var isNot = gate === 'NOT';
+  var rows = '';
+  var header = isNot ? '<tr><th>A</th><th>Y</th></tr>' : '<tr><th>A</th><th>B</th><th>Y</th></tr>';
+  if (isNot){
+    for (var a=0;a<=1;a++){
+      var o = gateLogic.NOT(a);
+      var hl = (a===inA) ? ' class="highlight"' : '';
+      rows += '<tr'+hl+'><td class="'+(a?'val1':'val0')+'">'+a+'</td><td class="'+(o?'val1':'val0')+'">'+o+'</td></tr>';
     }
-  }else{
-    for (let a = 0; a <= 1; a++) for (let b = 0; b <= 1; b++) {
-      const out = gateLogic[gate](a,b);
-      const hl = (a === a_cur && b === b_cur) ? ' class="highlight"' : '';
-      rows += `<tr${hl}><td class="${a?'val1':'val0'}">${a}</td><td class="${b?'val1':'val0'}">${b}</td><td class="${out?'val1':'val0'}">${out}</td></tr>`;
+  } else {
+    for (var a2=0;a2<=1;a2++) for (var b2=0;b2<=1;b2++){
+      var o2 = gateLogic[gate](a2,b2);
+      var hl2 = (a2===inA && b2===inB) ? ' class="highlight"' : '';
+      rows += '<tr'+hl2+'><td class="'+(a2?'val1':'val0')+'">'+a2+'</td><td class="'+(b2?'val1':'val0')+'">'+b2+'</td><td class="'+(o2?'val1':'val0')+'">'+o2+'</td></tr>';
     }
   }
-  tbody.innerHTML = '<thead>' + header + '</thead><tbody>' + rows + '</tbody>';
-}function drawGateSymbol(gate, a, b, out){
-  const canvas = document.getElementById('gateCanvas');
-  const W = canvas.offsetWidth || 280;
-  const ctx = canvas.getContext('2d');
-  __novaHiDpiCanvas(canvas, W, 160, ctx);
-  ctx.clearRect(0, 0, W, 160);
-  ctx.fillStyle = '#f0f4ff';
-  ctx.fillRect(0, 0, W, 160);
+  tbody.innerHTML = '<thead>'+header+'</thead><tbody>'+rows+'</tbody>';
+}
 
-  const cx = W/2, cy = 80, gw = 80, gh = 60;
-  const gx = cx - gw/2, gy = cy - gh/2;
-  const isNot = gate === 'NOT';
-  const inColor1 = a ? '#27ae60' : '#888';
-  const inColor2 = b ? '#27ae60' : '#888';
-  const outColor = out ? '#27ae60' : '#888';
-
-  ctx.lineWidth = 2.5;
-  // Input wires
-  ctx.strokeStyle = inColor1;
-  ctx.beginPath(); ctx.moveTo(gx - 40, isNot ? cy : cy - 14); ctx.lineTo(gx, isNot ? cy : cy - 14); ctx.stroke();
-  if (!isNot) {
-    ctx.strokeStyle = inColor2;
-    ctx.beginPath(); ctx.moveTo(gx - 40, cy + 14); ctx.lineTo(gx, cy + 14); ctx.stroke();
-  }
-  // Output wire
-  ctx.strokeStyle = outColor;
-  ctx.beginPath(); ctx.moveTo(gx + gw + (gate==='NOT'?8:0), cy); ctx.lineTo(gx + gw + 40 + (gate==='NOT'?8:0), cy); ctx.stroke();
-
-  // Gate body
+function drawGateBody(ctx, gate, gx, gy, gw, gh, cx, cy){
   ctx.strokeStyle = '#001F3F'; ctx.fillStyle = '#e8f0ff'; ctx.lineWidth = 2.5;
-  if (gate === 'AND' || gate === 'NAND') {
+  if (gate==='AND'||gate==='NAND'){
     ctx.beginPath();
-    ctx.moveTo(gx, gy); ctx.lineTo(gx + gw/2, gy);
-    ctx.arc(gx + gw/2, cy, gh/2, -Math.PI/2, Math.PI/2);
-    ctx.lineTo(gx, gy + gh); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    if (gate === 'NAND') { ctx.beginPath(); ctx.arc(gx+gw+5, cy, 5, 0, 2*Math.PI); ctx.fill(); ctx.stroke(); }
-  }else if (gate === 'OR' || gate === 'NOR' || gate === 'XOR' || gate === 'XNOR'){
+    ctx.moveTo(gx,gy); ctx.lineTo(gx+gw/2,gy);
+    ctx.arc(gx+gw/2,cy,gh/2,-Math.PI/2,Math.PI/2);
+    ctx.lineTo(gx,gy+gh); ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (gate==='NAND'){ ctx.beginPath(); ctx.arc(gx+gw+5,cy,5,0,2*Math.PI); ctx.fill(); ctx.stroke(); }
+  } else if (gate==='OR'||gate==='NOR'||gate==='XOR'||gate==='XNOR'){
     ctx.beginPath();
-    ctx.moveTo(gx + 10, gy);
-    ctx.quadraticCurveTo(gx + gw*0.8, gy, gx + gw, cy);
-    ctx.quadraticCurveTo(gx + gw*0.8, gy + gh, gx + 10, gy + gh);
-    ctx.quadraticCurveTo(gx + gw*0.25, cy, gx + 10, gy);
+    ctx.moveTo(gx+10,gy);
+    ctx.quadraticCurveTo(gx+gw*0.8,gy,gx+gw,cy);
+    ctx.quadraticCurveTo(gx+gw*0.8,gy+gh,gx+10,gy+gh);
+    ctx.quadraticCurveTo(gx+gw*0.25,cy,gx+10,gy);
     ctx.fill(); ctx.stroke();
-    if (gate === 'XOR' || gate === 'XNOR') {
-      ctx.beginPath();
-      ctx.moveTo(gx + 4, gy); ctx.quadraticCurveTo(gx - 10 + gw*0.25, cy, gx + 4, gy + gh);
-      ctx.stroke();
-    }if (gate === 'NOR' || gate === 'XNOR'){ ctx.beginPath(); ctx.arc(gx+gw+5, cy, 5, 0, 2*Math.PI); ctx.fill(); ctx.stroke(); }
-  }else if (gate === 'NOT'){
-    ctx.beginPath();
-    ctx.moveTo(gx, gy); ctx.lineTo(gx + gw, cy); ctx.lineTo(gx, gy + gh); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(gx+gw+5, cy, 5, 0, 2*Math.PI); ctx.fill(); ctx.stroke();
-  }// Gate label
-  ctx.fillStyle = '#001F3F'; ctx.font = 'bold 13px Roboto Mono'; ctx.textAlign = 'center';
-  ctx.fillText(gate, cx, cy + 5);
-  ctx.textAlign = 'left';
-
-  // Input labels
-  ctx.font = 'bold 13px Roboto Mono';
-  ctx.fillStyle = inColor1;
-  ctx.fillText('A=' + a, gx - 60, isNot ? cy + 5 : cy - 10);
-  if (!isNot){ ctx.fillStyle = inColor2; ctx.fillText('B=' + b, gx - 60, cy + 22); }ctx.fillStyle = outColor;
-  ctx.fillText('Y=' + out, gx + gw + 50, cy + 5);
-
-  // LEDs
-  const ledR = 8;
-  const drawLed = (x, y, val) =>{
-    ctx.beginPath(); ctx.arc(x, y, ledR, 0, 2*Math.PI);
-    ctx.fillStyle = val ? '#27ae60' : '#ccc';
-    ctx.fill();
-    if (val) { ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(x-3, y-3, ledR/3, 0, 2*Math.PI); ctx.fill(); }
-  };
-  drawLed(gx - 60, isNot ? cy - 16 : cy - 22, a);
-  if (!isNot) drawLed(gx - 60, cy + 12, b);
-  drawLed(gx + gw + 70, cy - 12, out);
-}// ---- Half Adder ----
-
-function toggleAdderBit(id, type){
-  const btn = document.getElementById(id);
-  const cur = parseInt(btn.textContent);
-  const nxt = cur ^ 1;
-  btn.textContent = nxt;
-  btn.classList.toggle('one', nxt === 1);
-  if (type === 'ha') updateHA();
-  else if (type === 'fa') updateFA();
-  else if (type === 'sr') updateSR();
-}function updateHA(){
-  const a = parseInt(document.getElementById('haA').textContent);
-  const b = parseInt(document.getElementById('haB').textContent);
-  const sum = a ^ b, carry = a & b;
-
-  const out = document.getElementById('haOutput');
-  out.innerHTML = `
-    <div class="adder-out-item"><span class="aov" style="color:${sum?'var(--green)':'var(--muted)'}">${sum}</span><span class="aol">Sum</span></div>
-    <div class="adder-out-item"><span class="aov" style="color:${carry?'var(--red)':'var(--muted)'}">${carry}</span><span class="aol">Carry</span></div>
-    <div class="adder-out-item"><span class="aov" style="color:var(--accent)">${a}+${b}=${a+b}</span><span class="aol">10進数</span></div>
-  `;
-
-  let rows = '<thead><tr><th>A</th><th>B</th><th>Sum</th><th>Carry</th></tr></thead><tbody>';
-  for (let ia = 0; ia <= 1; ia++) for (let ib = 0; ib <= 1; ib++) {
-    const s = ia^ib, c = ia&ib;
-    const hl = (ia===a && ib===b) ? ' class="highlight"' : '';
-    rows += `<tr${hl}><td>${ia}</td><td>${ib}</td><td class="${s?'val1':'val0'}">${s}</td><td class="${c?'val1':'val0'}">${c}</td></tr>`;
+    if (gate==='XOR'||gate==='XNOR'){ ctx.beginPath(); ctx.moveTo(gx+4,gy); ctx.quadraticCurveTo(gx-10+gw*0.25,cy,gx+4,gy+gh); ctx.stroke(); }
+    if (gate==='NOR'||gate==='XNOR'){ ctx.beginPath(); ctx.arc(gx+gw+5,cy,5,0,2*Math.PI); ctx.fill(); ctx.stroke(); }
+  } else if (gate==='NOT'){
+    ctx.beginPath(); ctx.moveTo(gx,gy); ctx.lineTo(gx+gw,cy); ctx.lineTo(gx,gy+gh); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(gx+gw+5,cy,5,0,2*Math.PI); ctx.fill(); ctx.stroke();
   }
-  document.getElementById('haTable').innerHTML = rows + '</tbody>';
-  drawHaCircuit(a, b, sum, carry);
-}function drawHaCircuit(a, b, sum, carry){
-  const canvas = document.getElementById('haCanvas');
-  const W = canvas.offsetWidth || 320;
-  const ctx = canvas.getContext('2d');
-  __novaHiDpiCanvas(canvas, W, 180, ctx);
-  ctx.clearRect(0,0,W,180); ctx.fillStyle='#f0f4ff'; ctx.fillRect(0,0,W,180);
-  ctx.font = 'bold 12px Roboto Mono'; ctx.textAlign = 'center';
+  ctx.fillStyle='#001F3F'; ctx.font='bold 13px Roboto Mono, monospace'; ctx.textAlign='center';
+  ctx.fillText(gate, cx, cy+5); ctx.textAlign='left';
+}
 
-  // XOR gate for Sum
-  drawMiniGate(ctx, W*0.35, 65, 'XOR', a, b, sum, 'Sum');
-  // AND gate for Carry
-  drawMiniGate(ctx, W*0.35, 125, 'AND', a, b, carry, 'Carry');
+function drawSingle(p){
+  var canvas = document.getElementById('gateCanvas');
+  if (!canvas) return;
+  var W = canvas.clientWidth || canvas.offsetWidth || 280;
+  var ctx = canvas.getContext('2d');
+  hidpi(canvas, W, 160, ctx);
+  ctx.clearRect(0,0,W,160); ctx.fillStyle='#f0f4ff'; ctx.fillRect(0,0,W,160);
+  var isNot = curGate==='NOT';
+  var out = isNot ? gateLogic.NOT(inA) : gateLogic[curGate](inA,inB);
+  var cx=W/2, cy=80, gw=80, gh=60, gx=cx-gw/2, gy=cy-gh/2;
+  var pIn = segPhase(p, 0, 0.55), pOut = segPhase(p, 0.55, 1);
+  wire(ctx, gx-40, isNot?cy:cy-14, gx, isNot?cy:cy-14, inA===1, pIn);
+  if (!isNot) wire(ctx, gx-40, cy+14, gx, cy+14, inB===1, pIn);
+  drawGateBody(ctx, curGate, gx, gy, gw, gh, cx, cy);
+  var ox = gx+gw+(isNot?8:0);
+  wire(ctx, ox, cy, ox+40, cy, out===1, pOut);
+  ctx.font='bold 13px Roboto Mono, monospace'; ctx.textAlign='left';
+  ctx.fillStyle = inA?'#27ae60':'#888'; ctx.fillText('A='+inA, gx-66, isNot?cy+5:cy-10);
+  if (!isNot){ ctx.fillStyle = inB?'#27ae60':'#888'; ctx.fillText('B='+inB, gx-66, cy+22); }
+  ctx.fillStyle = out?'#27ae60':'#888'; ctx.fillText('Y='+out, ox+46, cy+5);
+}
 
-  // Input labels
-  ctx.textAlign = 'left'; ctx.font = 'bold 13px Roboto Mono';
-  ctx.fillStyle = a ? '#27ae60' : '#888'; ctx.fillText('A='+a, 10, 70);
-  ctx.fillStyle = b ? '#27ae60' : '#888'; ctx.fillText('B='+b, 10, 130);
-}function drawMiniGate(ctx, cx, cy, type, a, b, out, outLabel){
-  const gw = 50, gh = 36;
-  const gx = cx - gw/2, gy = cy - gh/2;
-  ctx.strokeStyle = '#001F3F'; ctx.fillStyle = '#e8f0ff'; ctx.lineWidth = 1.8;
+// =================== MINI GATE ===================
+function drawMiniGate(ctx, cx, cy, type, a, b, out, label, phase){
+  var gw=50, gh=36, gx=cx-gw/2, gy=cy-gh/2;
+  var bubble = (type==='NAND'||type==='NOR'||type==='XNOR');
+  var pIn = segPhase(phase, 0, 0.6), pOut = segPhase(phase, 0.6, 1);
+  wire(ctx, gx-34, cy-10, gx, cy-10, a===1, pIn, 1.8);
+  if (type!=='NOT') wire(ctx, gx-34, cy+10, gx, cy+10, b===1, pIn, 1.8);
+  ctx.strokeStyle='#001F3F'; ctx.fillStyle='#e8f0ff'; ctx.lineWidth=1.8;
   ctx.beginPath();
-  if (type === 'AND') {
-    ctx.moveTo(gx, gy); ctx.lineTo(gx+gw/2, gy);
-    ctx.arc(gx+gw/2, cy, gh/2, -Math.PI/2, Math.PI/2);
-    ctx.lineTo(gx, gy+gh); ctx.closePath();
-  }else{
-    ctx.moveTo(gx+6, gy);
-    ctx.quadraticCurveTo(gx+gw*0.8, gy, gx+gw, cy);
-    ctx.quadraticCurveTo(gx+gw*0.8, gy+gh, gx+6, gy+gh);
-    ctx.quadraticCurveTo(gx+gw*0.25, cy, gx+6, gy);
+  if (type==='AND'||type==='NAND'){
+    ctx.moveTo(gx,gy); ctx.lineTo(gx+gw/2,gy);
+    ctx.arc(gx+gw/2,cy,gh/2,-Math.PI/2,Math.PI/2);
+    ctx.lineTo(gx,gy+gh); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else {
+    ctx.moveTo(gx+6,gy);
+    ctx.quadraticCurveTo(gx+gw*0.8,gy,gx+gw,cy);
+    ctx.quadraticCurveTo(gx+gw*0.8,gy+gh,gx+6,gy+gh);
+    ctx.quadraticCurveTo(gx+gw*0.25,cy,gx+6,gy);
     ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(gx+2, gy); ctx.quadraticCurveTo(gx-8+gw*0.25, cy, gx+2, gy+gh); ctx.stroke();
+    if (type==='XOR'||type==='XNOR'){ ctx.beginPath(); ctx.moveTo(gx+2,gy); ctx.quadraticCurveTo(gx-8+gw*0.25,cy,gx+2,gy+gh); ctx.stroke(); }
   }
-  ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#001F3F'; ctx.font = '10px Roboto Mono'; ctx.textAlign = 'center';
+  if (bubble){ ctx.beginPath(); ctx.arc(gx+gw+5,cy,5,0,2*Math.PI); ctx.fill(); ctx.stroke(); }
+  ctx.fillStyle='#001F3F'; ctx.font='10px Roboto Mono, monospace'; ctx.textAlign='center';
   ctx.fillText(type, cx, cy+4);
+  var outX = bubble ? gx+gw+10 : gx+gw;
+  wire(ctx, outX, cy, outX+30, cy, out===1, pOut, 1.8);
+  ctx.fillStyle = out?'#27ae60':'#888'; ctx.textAlign='left'; ctx.font='bold 11px Roboto Mono, monospace';
+  ctx.fillText(label+'='+out, outX+32, cy+4);
+}
 
-  // Wires
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = a ? '#27ae60':'#aaa';
-  ctx.beginPath(); ctx.moveTo(gx-35, cy-10); ctx.lineTo(gx, cy-10); ctx.stroke();
-  ctx.strokeStyle = b ? '#27ae60':'#aaa';
-  ctx.beginPath(); ctx.moveTo(gx-35, cy+10); ctx.lineTo(gx, cy+10); ctx.stroke();
-  ctx.strokeStyle = out ? '#27ae60':'#aaa';
-  ctx.beginPath(); ctx.moveTo(gx+gw, cy); ctx.lineTo(gx+gw+30, cy); ctx.stroke();
-  ctx.fillStyle = out ? '#27ae60':'#888';
-  ctx.textAlign = 'left'; ctx.font = 'bold 11px Roboto Mono';
-  ctx.fillText(outLabel+'='+out, gx+gw+32, cy+4);
-}// ---- Full Adder ----
+// =================== HALF ADDER ===================
+function toggleAdderBit(id, type){
+  var btn = document.getElementById(id);
+  var nxt = (parseInt(btn.textContent,10) ^ 1);
+  btn.textContent = nxt; btn.classList.toggle('one', nxt===1);
+  if (type==='ha') updateHA(); else if (type==='fa') updateFA(); else if (type==='sr') updateSR();
+}
 
+function updateHA(){
+  haA = parseInt(document.getElementById('haA').textContent,10);
+  haB = parseInt(document.getElementById('haB').textContent,10);
+  var sum = haA ^ haB, carry = haA & haB;
+  document.getElementById('haOutput').innerHTML =
+    '<div class="adder-out-item"><span class="aov" style="color:'+(sum?'var(--green)':'var(--muted)')+'">'+sum+'</span><span class="aol">Sum</span></div>'+
+    '<div class="adder-out-item"><span class="aov" style="color:'+(carry?'var(--red)':'var(--muted)')+'">'+carry+'</span><span class="aol">Carry</span></div>'+
+    '<div class="adder-out-item"><span class="aov" style="color:var(--accent)">'+haA+'+'+haB+'='+(haA+haB)+'</span><span class="aol">'+(I.decimal||'Decimal')+'</span></div>';
+  var rows='<thead><tr><th>A</th><th>B</th><th>Sum</th><th>Carry</th></tr></thead><tbody>';
+  for (var ia=0;ia<=1;ia++) for (var ib=0;ib<=1;ib++){
+    var s=ia^ib, c=ia&ib, hl=(ia===haA&&ib===haB)?' class="highlight"':'';
+    rows+='<tr'+hl+'><td>'+ia+'</td><td>'+ib+'</td><td class="'+(s?'val1':'val0')+'">'+s+'</td><td class="'+(c?'val1':'val0')+'">'+c+'</td></tr>';
+  }
+  document.getElementById('haTable').innerHTML = rows+'</tbody>';
+  trigger('halfadder');
+}
+
+function drawHA(p){
+  var canvas=document.getElementById('haCanvas'); if(!canvas) return;
+  var W=canvas.clientWidth||canvas.offsetWidth||320, ctx=canvas.getContext('2d');
+  hidpi(canvas,W,180,ctx); ctx.clearRect(0,0,W,180); ctx.fillStyle='#f0f4ff'; ctx.fillRect(0,0,W,180);
+  var sum=haA^haB, carry=haA&haB;
+  drawMiniGate(ctx, W*0.4, 65, 'XOR', haA, haB, sum, 'Sum', p);
+  drawMiniGate(ctx, W*0.4, 130, 'AND', haA, haB, carry, 'Carry', p);
+  ctx.textAlign='left'; ctx.font='bold 13px Roboto Mono, monospace';
+  ctx.fillStyle=haA?'#27ae60':'#888'; ctx.fillText('A='+haA, 8, 70);
+  ctx.fillStyle=haB?'#27ae60':'#888'; ctx.fillText('B='+haB, 8, 135);
+}
+
+// =================== FULL ADDER ===================
 function updateFA(){
-  const a = parseInt(document.getElementById('faA').textContent);
-  const b = parseInt(document.getElementById('faB').textContent);
-  const cin = parseInt(document.getElementById('faCin').textContent);
-  const sum = a ^ b ^ cin;
-  const cout = (a & b) | (cin & (a ^ b));
-
-  const out = document.getElementById('faOutput');
-  out.innerHTML = `
-    <div class="adder-out-item"><span class="aov" style="color:${sum?'var(--green)':'var(--muted)'}">${sum}</span><span class="aol">Sum</span></div>
-    <div class="adder-out-item"><span class="aov" style="color:${cout?'var(--red)':'var(--muted)'}">${cout}</span><span class="aol">Cout</span></div>
-    <div class="adder-out-item"><span class="aov" style="color:var(--accent)">${a}+${b}+${cin}=${a+b+cin}</span><span class="aol">10進数</span></div>
-  `;
-
-  let rows = '<thead><tr><th>A</th><th>B</th><th>Cin</th><th>Sum</th><th>Cout</th></tr></thead><tbody>';
-  for (let ia=0;ia<=1;ia++) for(let ib=0;ib<=1;ib++) for(let ic=0;ic<=1;ic++) {
-    const s=ia^ib^ic, c=(ia&ib)|(ic&(ia^ib));
-    const hl=(ia===a&&ib===b&&ic===cin)?' class="highlight"':'';
-    rows+=`<tr${hl}><td>${ia}</td><td>${ib}</td><td>${ic}</td><td class="${s?'val1':'val0'}">${s}</td><td class="${c?'val1':'val0'}">${c}</td></tr>`;
+  faA=parseInt(document.getElementById('faA').textContent,10);
+  faB=parseInt(document.getElementById('faB').textContent,10);
+  faCin=parseInt(document.getElementById('faCin').textContent,10);
+  var sum=faA^faB^faCin, cout=(faA&faB)|(faCin&(faA^faB));
+  document.getElementById('faOutput').innerHTML =
+    '<div class="adder-out-item"><span class="aov" style="color:'+(sum?'var(--green)':'var(--muted)')+'">'+sum+'</span><span class="aol">Sum</span></div>'+
+    '<div class="adder-out-item"><span class="aov" style="color:'+(cout?'var(--red)':'var(--muted)')+'">'+cout+'</span><span class="aol">Cout</span></div>'+
+    '<div class="adder-out-item"><span class="aov" style="color:var(--accent)">'+faA+'+'+faB+'+'+faCin+'='+(faA+faB+faCin)+'</span><span class="aol">'+(I.decimal||'Decimal')+'</span></div>';
+  var rows='<thead><tr><th>A</th><th>B</th><th>Cin</th><th>Sum</th><th>Cout</th></tr></thead><tbody>';
+  for (var ia=0;ia<=1;ia++) for (var ib=0;ib<=1;ib++) for (var ic=0;ic<=1;ic++){
+    var s=ia^ib^ic, c=(ia&ib)|(ic&(ia^ib)), hl=(ia===faA&&ib===faB&&ic===faCin)?' class="highlight"':'';
+    rows+='<tr'+hl+'><td>'+ia+'</td><td>'+ib+'</td><td>'+ic+'</td><td class="'+(s?'val1':'val0')+'">'+s+'</td><td class="'+(c?'val1':'val0')+'">'+c+'</td></tr>';
   }
-  document.getElementById('faTable').innerHTML = rows + '</tbody>';
-  drawFaCircuit(a,b,cin,sum,cout);
-}function drawFaCircuit(a, b, cin, sum, cout){
-  const canvas = document.getElementById('faCanvas');
-  const W = canvas.offsetWidth || 320;
-  const ctx = canvas.getContext('2d');
-  __novaHiDpiCanvas(canvas, W, 200, ctx); ctx.clearRect(0,0,W,200);
-  ctx.fillStyle='#f0f4ff'; ctx.fillRect(0,0,W,200);
-  drawMiniGate(ctx, W*0.38, 55, 'XOR', a, b, a^b, 'A⊕B');
-  drawMiniGate(ctx, W*0.38, 110, 'XOR', a^b, cin, sum, 'Sum');
-  drawMiniGate(ctx, W*0.38, 165, 'AND', a, b, a&b, 'Cout');
-  ctx.textAlign='left'; ctx.font='bold 12px Roboto Mono';
-  ctx.fillStyle=a?'#27ae60':'#888'; ctx.fillText('A='+a, 8, 58);
-  ctx.fillStyle=b?'#27ae60':'#888'; ctx.fillText('B='+b, 8, 113);
-  ctx.fillStyle=cin?'#27ae60':'#888'; ctx.fillText('Cin='+cin, 8, 168);
-}// ---- SR FF ----
+  document.getElementById('faTable').innerHTML = rows+'</tbody>';
+  trigger('fulladder');
+}
 
+function drawFA(p){
+  var canvas=document.getElementById('faCanvas'); if(!canvas) return;
+  var W=canvas.clientWidth||canvas.offsetWidth||320, ctx=canvas.getContext('2d');
+  hidpi(canvas,W,200,ctx); ctx.clearRect(0,0,W,200); ctx.fillStyle='#f0f4ff'; ctx.fillRect(0,0,W,200);
+  var p1=segPhase(p,0,0.5), p2=segPhase(p,0.5,1);
+  var sum=faA^faB^faCin, cout=(faA&faB)|(faCin&(faA^faB));
+  drawMiniGate(ctx, W*0.38, 55, 'XOR', faA, faB, faA^faB, 'A^B', p1);
+  drawMiniGate(ctx, W*0.38, 110, 'XOR', faA^faB, faCin, sum, 'Sum', p2);
+  drawMiniGate(ctx, W*0.38, 165, 'AND', faA, faB, faA&faB, 'A.B', p1);
+  drawMiniGate(ctx, W*0.66, 165, 'OR', faA&faB, faCin&(faA^faB), cout, 'Cout', p2);
+  ctx.textAlign='left'; ctx.font='bold 12px Roboto Mono, monospace';
+  ctx.fillStyle=faA?'#27ae60':'#888'; ctx.fillText('A='+faA, 6, 58);
+  ctx.fillStyle=faB?'#27ae60':'#888'; ctx.fillText('B='+faB, 6, 113);
+  ctx.fillStyle=faCin?'#27ae60':'#888'; ctx.fillText('Cin='+faCin, 6, 168);
+}
+
+// =================== SR LATCH ===================
 function updateSR(){
-  const s = parseInt(document.getElementById('srS').textContent);
-  const r = parseInt(document.getElementById('srR').textContent);
-  let qnew = srQ, forbidden = false;
-  if (s===1 && r===0) { qnew = 1; }else if (s===0 && r===1){ qnew = 0; }else if (s===1 && r===1){ forbidden = true; }else{ qnew = srQ; }// hold
-  srQ = forbidden ? srQ : qnew;
-  const qbar = srQ ^ 1;
-  const state = s===1&&r===1 ? '⚠ 禁止状態' : s===1&&r===0 ? 'セット' : s===0&&r===1 ? 'リセット' : '保持';
-  const out = document.getElementById('srOutput');
-  out.innerHTML = `
-    <div class="adder-out-item"><span class="aov" style="color:${srQ?'var(--green)':'var(--muted)'}">${srQ}</span><span class="aol">Q</span></div>
-    <div class="adder-out-item"><span class="aov" style="color:${qbar?'var(--green)':'var(--muted)'}">${qbar}</span><span class="aol">Q̄</span></div>
-    <div class="adder-out-item" style="grid-column:span 1"><span class="aov" style="font-size:0.9rem;color:${forbidden?'var(--red)':'var(--accent)'}">${state}</span><span class="aol">状態</span></div>
-  `;
-  drawSrCircuit(s, r, srQ, qbar, forbidden);
-}function drawSrCircuit(s, r, q, qbar, forbidden){
-  const canvas = document.getElementById('srCanvas');
-  const W = canvas.offsetWidth || 320;
-  const ctx = canvas.getContext('2d');
-  __novaHiDpiCanvas(canvas, W, 180, ctx); ctx.clearRect(0,0,W,180);
-  ctx.fillStyle='#f0f4ff'; ctx.fillRect(0,0,W,180);
-  // Draw two NAND gates
-  drawMiniGate(ctx, W*0.38, 60, 'AND', s, q^1, q, 'Q');
-  drawMiniGate(ctx, W*0.38, 120, 'AND', r, q, qbar, 'Q̄');
-  ctx.textAlign='left'; ctx.font='bold 12px Roboto Mono';
-  ctx.fillStyle=s?'#27ae60':'#888'; ctx.fillText('S='+s, 8, 63);
-  ctx.fillStyle=r?'#27ae60':'#888'; ctx.fillText('R='+r, 8, 123);
-  if (forbidden) {
-    ctx.fillStyle='#e74c3c'; ctx.font='bold 11px Noto Sans JP';
-    ctx.fillText('⚠ 禁止', W/2-25, 170);
+  srS=parseInt(document.getElementById('srS').textContent,10);
+  srR=parseInt(document.getElementById('srR').textContent,10);
+  var forbidden=false;
+  if (srS===1 && srR===0) srQ=1;
+  else if (srS===0 && srR===1) srQ=0;
+  else if (srS===1 && srR===1) forbidden=true;
+  var qbar = srQ ^ 1;
+  var st = I.srStates || {forbidden:'Forbidden', set:'Set', reset:'Reset', hold:'Hold'};
+  var state = forbidden ? ('⚠ '+st.forbidden) : (srS===1&&srR===0 ? st.set : (srS===0&&srR===1 ? st.reset : st.hold));
+  document.getElementById('srOutput').innerHTML =
+    '<div class="adder-out-item"><span class="aov" style="color:'+(srQ?'var(--green)':'var(--muted)')+'">'+srQ+'</span><span class="aol">Q</span></div>'+
+    '<div class="adder-out-item"><span class="aov" style="color:'+(qbar?'var(--green)':'var(--muted)')+'">'+qbar+'</span><span class="aol">Q̄</span></div>'+
+    '<div class="adder-out-item"><span class="aov" style="font-size:0.9rem;color:'+(forbidden?'var(--red)':'var(--accent)')+'">'+state+'</span><span class="aol">'+(I.stateLabel||'State')+'</span></div>';
+  drawSR_forbidden = forbidden;
+  trigger('srff');
+}
+
+function drawSR(p){
+  var canvas=document.getElementById('srCanvas'); if(!canvas) return;
+  var W=canvas.clientWidth||canvas.offsetWidth||320, ctx=canvas.getContext('2d');
+  hidpi(canvas,W,180,ctx); ctx.clearRect(0,0,W,180); ctx.fillStyle='#f0f4ff'; ctx.fillRect(0,0,W,180);
+  var qbar = srQ ^ 1;
+  drawMiniGate(ctx, W*0.4, 60, 'NOR', srR, qbar, srQ, 'Q', p);
+  drawMiniGate(ctx, W*0.4, 120, 'NOR', srS, srQ, qbar, 'Q̄', p);
+  ctx.textAlign='left'; ctx.font='bold 12px Roboto Mono, monospace';
+  ctx.fillStyle=srS?'#27ae60':'#888'; ctx.fillText('S='+srS, 6, 63);
+  ctx.fillStyle=srR?'#27ae60':'#888'; ctx.fillText('R='+srR, 6, 123);
+  if (drawSR_forbidden){
+    ctx.fillStyle='#e74c3c'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('⚠ '+((I.srStates&&I.srStates.forbidden)||'Forbidden'), W/2, 170);
   }
-}// ---- Counter ----
+}
 
+// =================== COUNTER ===================
 function updateCounter(){
-  const b1 = (counterVal >> 1) & 1;
-  const b0 = counterVal & 1;
-  const c1 = document.getElementById('cbit1'), c0 = document.getElementById('cbit0');
-  c1.textContent = b1; c0.textContent = b0;
-  c1.classList.toggle('one', b1===1); c1.classList.toggle('off', b1===0);
-  c0.classList.toggle('one', b0===1); c0.classList.toggle('off', b0===0);
-  document.getElementById('counterDec').textContent = counterVal;
-
-  let rows = '<thead><tr><th>クロック</th><th>Q1</th><th>Q0</th><th>10進</th></tr></thead><tbody>';
-  for (let i=0;i<=3;i++) {
-    const hl = i===counterVal?' class="highlight"':'';
-    rows+=`<tr${hl}><td>${i}</td><td class="${((i>>1)&1)?'val1':'val0'}">${(i>>1)&1}</td><td class="${(i&1)?'val1':'val0'}">${i&1}</td><td>${i}</td></tr>`;
+  var b1=(counterVal>>1)&1, b0=counterVal&1;
+  var c1=document.getElementById('cbit1'), c0=document.getElementById('cbit0');
+  c1.textContent=b1; c0.textContent=b0;
+  c1.classList.toggle('one',b1===1); c1.classList.toggle('off',b1===0);
+  c0.classList.toggle('one',b0===1); c0.classList.toggle('off',b0===0);
+  document.getElementById('counterDec').textContent=counterVal;
+  var h = I.counterHeader || ['Clock','Q1','Q0','Decimal'];
+  var rows='<thead><tr><th>'+h[0]+'</th><th>'+h[1]+'</th><th>'+h[2]+'</th><th>'+h[3]+'</th></tr></thead><tbody>';
+  for (var i=0;i<=3;i++){
+    var hl=(i===counterVal)?' class="highlight"':'';
+    rows+='<tr'+hl+'><td>'+i+'</td><td class="'+(((i>>1)&1)?'val1':'val0')+'">'+((i>>1)&1)+'</td><td class="'+((i&1)?'val1':'val0')+'">'+(i&1)+'</td><td>'+i+'</td></tr>';
   }
   document.getElementById('counterTable').innerHTML = rows+'</tbody>';
-}function counterStep(){ counterVal = (counterVal + 1) % 4; updateCounter(); }function counterReset(){ counterVal = 0; updateCounter(); }// ---- Init ----
-updateGate();
-updateHA();
-updateFA();
-updateSR();
-updateCounter();
+}
+function counterStep(){ counterVal=(counterVal+1)%4; updateCounter(); }
+function counterReset(){ counterVal=0; updateCounter(); }
+
+// =================== TAB SWITCH ===================
+function switchTab(tab, btn){
+  curTab = tab;
+  stopAuto();
+  document.querySelectorAll('.panel .tab-btn[style*="text-align"]').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var views=['single','halfadder','fulladder','srff','counter'];
+  views.forEach(function(v){
+    var vw=document.getElementById(v+'View'); if(vw) vw.style.display = v===tab?'block':'none';
+    var pn=document.getElementById(v+'Panel'); if(pn) pn.style.display = v===tab?'block':'none';
+  });
+  if (tab==='single') updateGate();
+  else if (tab==='halfadder') updateHA();
+  else if (tab==='fulladder') updateFA();
+  else if (tab==='srff') updateSR();
+  else if (tab==='counter') updateCounter();
+}
+
+function selectGate(gate, btn){
+  curGate = gate;
+  document.querySelectorAll('.gate-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  document.getElementById('inputB_row').style.display = (gate==='NOT') ? 'none' : '';
+  updateGate();
+}
+
+// =================== AUTO-CYCLE ===================
+var autoTimer = null, autoIdx = 0;
+function autoLabel(playing){
+  var btn = document.getElementById('autoBtn'); if(!btn) return;
+  var L = I.auto || {play:'Auto-cycle', stop:'Stop'};
+  btn.innerHTML = '<i class="fas fa-'+(playing?'stop':'play')+'"></i> '+(playing?L.stop:L.play);
+}
+function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; autoLabel(false); } }
+function setBit(id,v){ var b=document.getElementById(id); if(!b) return; b.textContent=v; b.classList.toggle('one', v===1); }
+function applyAutoStep(){
+  if (curTab==='single'){
+    var isNot = curGate==='NOT';
+    var n = isNot ? 2 : 4;
+    autoIdx = autoIdx % n;
+    var a = isNot ? autoIdx : (autoIdx>>1)&1;
+    var b = isNot ? 0 : autoIdx&1;
+    document.getElementById('inputA').checked = a===1;
+    if (!isNot) document.getElementById('inputB').checked = b===1;
+    updateGate();
+  } else if (curTab==='halfadder'){
+    autoIdx = autoIdx % 4;
+    setBit('haA',(autoIdx>>1)&1); setBit('haB',autoIdx&1); updateHA();
+  } else if (curTab==='fulladder'){
+    autoIdx = autoIdx % 8;
+    setBit('faA',(autoIdx>>2)&1); setBit('faB',(autoIdx>>1)&1); setBit('faCin',autoIdx&1); updateFA();
+  } else if (curTab==='srff'){
+    var seq=[[1,0],[0,0],[0,1],[0,0]];
+    var sr=seq[autoIdx%4]; setBit('srS',sr[0]); setBit('srR',sr[1]); updateSR();
+  } else if (curTab==='counter'){
+    counterStep();
+  }
+  autoIdx++;
+}
+function toggleAuto(){
+  if (autoTimer){ stopAuto(); return; }
+  autoIdx=0; autoLabel(true); applyAutoStep();
+  autoTimer = setInterval(applyAutoStep, 1100);
+}
+
+// =================== PRESETS ===================
+function switchTabByName(tab){
+  var map={single:0,halfadder:1,fulladder:2,srff:3,counter:4};
+  var btns=document.querySelectorAll('.panel .tab-btn[style*="text-align"]');
+  switchTab(tab, btns[map[tab]]);
+}
+function preset(kind){
+  stopAuto();
+  if (kind==='ha-demo'){
+    switchTabByName('halfadder'); setBit('haA',1); setBit('haB',1); updateHA();
+  } else if (kind==='fa-demo'){
+    switchTabByName('fulladder'); setBit('faA',1); setBit('faB',1); setBit('faCin',1); updateFA();
+  } else if (kind==='sr-set'){
+    switchTabByName('srff'); setBit('srS',1); setBit('srR',0); updateSR();
+  } else if (kind==='sr-hold'){
+    switchTabByName('srff'); setBit('srS',1); setBit('srR',0); updateSR(); setBit('srS',0); setBit('srR',0); updateSR();
+  } else if (kind==='sr-reset'){
+    switchTabByName('srff'); setBit('srS',0); setBit('srR',1); updateSR();
+  } else {
+    switchTabByName('single');
+    document.querySelectorAll('.gate-btn').forEach(function(b){ b.classList.toggle('active', b.textContent===kind); });
+    curGate = kind;
+    document.getElementById('inputB_row').style.display = (kind==='NOT')?'none':'';
+    document.getElementById('inputA').checked = true;
+    document.getElementById('inputB').checked = (kind!=='NOT');
+    updateGate();
+  }
+}
+
+// =================== RENDER LOOP ===================
+function frame(now){
+  ['single','halfadder','fulladder','srff','counter'].forEach(function(v){
+    if (pulseActive[v]){
+      var t = (now - (pulseStart[v]||now)) / PULSE_DUR;
+      if (t>=1){ pulse[v]=1; pulseActive[v]=false; } else pulse[v]=t;
+    }
+  });
+  if (curTab==='single') drawSingle(pulse.single);
+  else if (curTab==='halfadder') drawHA(pulse.halfadder);
+  else if (curTab==='fulladder') drawFA(pulse.fulladder);
+  else if (curTab==='srff') drawSR(pulse.srff);
+  requestAnimationFrame(frame);
+}
+
+window.switchTab=switchTab; window.selectGate=selectGate; window.updateGate=updateGate;
+window.toggleAdderBit=toggleAdderBit; window.counterStep=counterStep; window.counterReset=counterReset;
+window.toggleAuto=toggleAuto; window.lgPreset=preset;
+
+function init(){
+  updateGate(); updateHA(); updateFA(); updateSR(); updateCounter();
+  autoLabel(false);
+  requestAnimationFrame(frame);
+}
+if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+})();
 </script>
 
 <section class="explanation">
@@ -746,7 +855,7 @@ updateCounter();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">フリップフロップのプリセットはどのような動作を体験できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">プリセットでは、代表的なRSフリップフロップやDフリップフロップの回路が組まれており、NANDやNORゲートを使った状態保持の仕組みを可視化できます。クロック信号や入力の変化に応じて出力がどのように変化するか、タイミングを追いながら確認できるため、記憶回路の基本を直感的に理解できます。</div>
+    <div class="faq-a">プリセットでは、SRラッチと2ビットカウンタの回路を確認でき、NORゲートを使った状態保持や、カウンタの状態遷移を可視化できます。S/R入力やカウント操作に応じて出力がどのように変化するかを追えるため、記憶回路の基本を直感的に理解できます。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">論理式と回路図の対応がわかりません。どう確認すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -756,7 +865,7 @@ updateCounter();
 <h2>実世界での応用</h2>
 <div class="fblock">
   <p><strong>中央演算処理装置（CPU）：</strong>CPU内部の演算回路（ALU）は、無数の論理ゲート（特にNAND, NOR）の組み合わせで構成されています。加算、減算、比較などのあらゆる演算は、半加算器や全加算器を基本ブロックとして実現されています。</p>
-  <p><strong>メモリ（RAM, レジスタ）：</strong>データを一時的に記憶するためにはフリップフロップ回路が使われます。SRフリップフロップはNANDゲートを組み合わせて作られ、1ビットの情報を「記憶」する基本素子です。これが大量に集積されてメモリチップとなります。</p>
+  <p><strong>メモリ（RAM, レジスタ）：</strong>データを一時的に記憶するためにはフリップフロップ回路が使われます。SRラッチはNORゲートを組み合わせて作られ、1ビットの情報を「記憶」する基本素子です。これが大量に集積されてメモリチップとなります。</p>
   <p><strong>デジタル信号処理：</strong>エンコーダ、デコーダ、マルチプレクサなどの制御・選択回路は、論理ゲートを組み合わせて設計されます。例えば、複数の入力信号から1つを選び出す動作は、入力パターンに応じた論理で制御されます。</p>
   <p><strong>組み込みシステムと制御：</strong>家電製品や自動車のECU（電子制御ユニット）では、センサーからの入力（ON/OFF）を論理的に判断し、アクチュエーターを駆動するための簡単な論理回路が多用されています。信頼性が高く、消費電力の少ないCMOSロジックICの形で実装されます。</p>
 
@@ -770,6 +879,9 @@ updateCounter();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="logic-gates.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -832,17 +944,27 @@ updateCounter();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>4ビットバイナリ加算器の設計でinputA=1011（11）、inputB=0101（5）とした場合、AND・OR・XORゲートの組み合わせにより合計16（10000）を得ます。全加算器では各ビット位置でキャリー信号が伝播し、最終出力ピンのVCC=5V時に論理1、GND=0V時に論理0として検出されます。実装レベルではCMOS IC（4008型）やFPGA上で同一アルゴリズムが動作します。</p>
+<p>1ビット全加算器でA=1、B=0、Cin=1を入力すると、A⊕B=1、Sum=A⊕B⊕Cin=0、Cout=(A AND B) OR (Cin AND (A⊕B))=1となります。3つの1ビット入力の合計2（2進数10）が、Sum=0とCout=1として表されることを確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
 <li>NOT素子は単一入力のため、inputA値のみが反映されます。inputBは無視されます</li>
 <li>XORゲートは奇偶判定用途に用いられ、デジタル通信の誤り検出回路に採用されます</li>
-<li>フリップフロップ回路ではクロック周波数(CLK)の設定により遅延時間が変化するため、最大動作周波数(fmax)の確認が必須です</li>
+
 <li>シミュレーション結果とハードウェア実装では伝播遅延(tpd)の差異が生じるため、タイミング図で余裕度を検証してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

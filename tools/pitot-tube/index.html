@@ -46,7 +46,22 @@
 html,body{overflow-x:hidden}
 body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 #pitotCanvas{display:block;width:100%;height:260px;background:#020d1a;border-radius:8px}
+#pitotCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .canvas-hint{font-size:.73rem;color:var(--muted);margin-top:6px;text-align:center}
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:4px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.pitot-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pitot-presets .preset-btn{padding:4px 10px;font-size:.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.pitot-presets .preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.play-row .spd{display:flex;gap:4px;margin-left:auto}
+.play-row .speed-btn{padding:4px 10px;font-size:.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit}
+.play-row .speed-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+@media (prefers-reduced-motion: reduce){.ebar-fill{transition:none}}
 .verdict{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:600;line-height:1.5}
 .verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
 .verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
@@ -56,7 +71,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ピトー管 流速測定シミュレーター",
       "description": "ピトー管（ピトー静圧管）の差圧から流速・体積流量・質量流量・レイノルズ数・動圧をベルヌーイの式でリアルタイム計算。空気・水のプリセット、ピトー管係数、ダクト径を変えて流量測定を学べる無料シミュレーターです。",
       "url": "https://novasolver.jp/tools/pitot-tube.html",
@@ -66,7 +81,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["差圧からの流速計算（ベルヌーイの式）","体積流量・質量流量の算出","レイノルズ数による層流・乱流判定","流体プリセット（空気20℃ / 水20℃ / カスタム）","流速vs差圧・流量vsダクト径のグラフ"],
       "keywords": "ピトー管,ピトー静圧管,流速測定,ベルヌーイの式,動圧,差圧,流量計,流体力学",
       "inLanguage": "ja"
@@ -179,6 +194,15 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="param-desc">流量とレイノルズ数の計算に使用</div>
       <input type="range" id="dRange" min="10" max="2000" step="5" value="200" oninput="syncToNum('dRange','dNum');pct(this);compute()">
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right: visualization -->
@@ -197,9 +221,36 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
     </div>
 
     <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（流れの中で更新）</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roV">—</div><div class="rl">流速 v [m/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roP0">—</div><div class="rl">全圧 p₀ [Pa]</div></div>
+        <div class="live-ro"><div class="rv" id="roPs">—</div><div class="rl">静圧 pₛ [Pa]</div></div>
+        <div class="live-ro"><div class="rv" id="roQ">—</div><div class="rl">動圧 q=½ρv² [Pa]</div></div>
+        <div class="live-ro"><div class="rv" id="roDh">—</div><div class="rl">マノメータ高 Δh [mm]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
       <div class="chart-title"><i class="fas fa-wind"></i> ピトー管とダクト流れ — 流線アニメーション</div>
-      <canvas id="pitotCanvas"></canvas>
-      <p class="canvas-hint">先端のよどみ点で全圧、側面孔で静圧を取り出し、その差をU字管マノメータの液柱差で示します。流速ベクトルは管壁付近で小さく、中央で大きくなります。</p>
+      <div class="pitot-presets">
+        <button class="preset-btn" type="button" onclick="setPitotPreset('sea')">海面・標準</button>
+        <button class="preset-btn" type="button" onclick="setPitotPreset('cruise')">巡航速度</button>
+        <button class="preset-btn" type="button" onclick="setPitotPreset('low')">低速</button>
+        <button class="preset-btn" type="button" onclick="setPitotPreset('altitude')">高高度・希薄空気</button>
+        <button class="preset-btn" type="button" onclick="setPitotPreset('water')">水（配管）</button>
+      </div>
+      <canvas id="pitotCanvas" tabindex="0" role="img" aria-label="ピトー管をよぎる空気の流線アニメーション。先端のよどみ点、側面の静圧孔、U字管マノメータを表示します。"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="togglePitotPlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="resetPitot()"><i class="fas fa-redo"></i> リセット</button>
+        <div class="spd">
+          <button class="speed-btn" type="button" data-spd="0.5" onclick="setPitotSpeed(0.5)">0.5×</button>
+          <button class="speed-btn active" type="button" data-spd="1" onclick="setPitotSpeed(1)">1×</button>
+          <button class="speed-btn" type="button" data-spd="2" onclick="setPitotSpeed(2)">2×</button>
+        </div>
+      </div>
+      <p class="canvas-hint">先端のよどみ点で流れが止まり全圧 p₀（圧力最大）に、側面孔で静圧 pₛ を取り出し、その差 q=½ρv² をU字管マノメータの液柱差で示します。流速を変えると動圧は v² に比例して変化します。</p>
     </div>
 
     <div class="chart-card">
@@ -294,6 +345,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 </section>
 
 
+
+
+
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
@@ -306,7 +360,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>ダクト径φ150mm、測定差圧50 Pa、空気密度1.2 kg/m³、補正係数cp=0.98の場合：流速V = 0.98√(2×50/1.2) = 9.1 m/s、体積流量Q = (π×0.075²)×9.1 = 153 L/s、質量流量183 kg/h、レイノルズ数Re = 91,000(乱流領域)となります。マッハ数M = 9.1/340 = 0.027なので圧縮性効果は無視可能です。</p>
+<p>ダクト径φ150mm、測定差圧50 Pa、空気密度1.2 kg/m³、補正係数cp=0.98の場合：流速V = 0.98√(2×50/1.2) = 8.9 m/s、体積流量Q = (π×0.075²)×8.9 = 158 L/s、質量流量 = 1.2×0.158 = 0.19 kg/s（約680 kg/h）、レイノルズ数Re = 89,000(乱流領域)となります。マッハ数M = 8.9/340 = 0.026なので圧縮性効果は無視可能です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -317,6 +371,65 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 <li>L/D比30以上離れた位置での測定が基本。曲がり直後や弁直後は乱れが強く、5～10回の測定平均を取ってください。</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="pitot-tube.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/u-tube-manometer.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">U字管マノメータ シミュレーター — 差圧測定</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">U字管マノメータ シミュレーターは、配管内2点間の差圧を水銀などの重い液柱の高さ差からリアルタイム計算します。マノメータ流体・配管流体・標高差を変えて、静水力学的バランスによる差圧測...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/drag-terminal-velocity.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">空気抵抗・終端速度シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">空気抵抗と終端速度を直感的に学べる無料シミュレーターです。スカイダイバーや野球ボールなど多彩なプリセットで、質量や断面積を変えながら落下運動をリアルタイムに可視化。CAEシミュレーシ...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/settling-velocity.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">終端沈降速度シミュレーター — 球形粒子の沈降と抗力係数</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">終端沈降速度シミュレーターは、球形粒子の終端速度を Reynolds 域別に反復計算します。粒子径・密度・流体粘度を変えて、Stokes 域・中間域・Newton 域での沈降挙動と抗...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/shock-tube.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">衝撃波管シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">衝撃波管シミュレーター「」は、1次元リーマン問題の厳密解をリアルタイムに計算・可視化します。衝撃波、接触不連続、希薄波の挙動を直感的に解析可能。ソッド衝撃波管から強い衝撃波、爆風波ま...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/tunnel-fire-cfd-ventilation.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">トンネル火災 換気・臨界風速シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">道路トンネル火災の煙制御を Heselden-Thomas / Kennedy 式で計算。火災規模・ジェットファン推力・本数・トンネル断面から臨界風速 V_c と実現気流速度を比較し...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/turbomachinery-velocity.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-water"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ターボ機械速度三角形シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ターボ機械の羽根車入口・出口条件を入力すると、速度三角形を自動描画。周方向成分、子午面方向成分を可視化し、オイラーの仕事方程式から比仕事や圧力比を即座に計算します。設計・学習に役立つ...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -339,7 +452,7 @@ const FLUIDS = {
 };
 
 // shared state for the animation
-const PT = {V:0, dp:250, rho:1.225, isAir:true, mach:0, regime:'turbulent'};
+const PT = {V:0, dp:250, rho:1.225, isAir:true, mach:0, regime:'turbulent', dh:0};
 
 // ===== Chart.js setup =====
 const velChart = new Chart(document.getElementById('velChart').getContext('2d'),{
@@ -481,21 +594,59 @@ function compute(){
   flowChart.data.datasets[1].data = fPoint;
   flowChart.update('none');
 
+  // ----- live readouts (total/static/dynamic pressure, manometer height) -----
+  // Reference static pressure: 1 atm at sea level, scaled down for thin air at altitude.
+  const ps = 101325 * (rho / 1.225);           // Pa (illustrative static pressure)
+  const p0 = ps + q;                            // Pa (stagnation = static + dynamic)
+  // Manometer: water column height for the differential pressure, dh = dp/(rho_water*g)
+  const dh = dp / (998 * 9.81) * 1000;          // mm of water
+  document.getElementById('roV').textContent  = V.toFixed(2);
+  document.getElementById('roP0').textContent = p0.toFixed(0);
+  document.getElementById('roPs').textContent = ps.toFixed(0);
+  document.getElementById('roQ').textContent  = q.toFixed(1);
+  document.getElementById('roDh').textContent = dh.toFixed(1);
+
   // ----- update shared state for animation -----
-  PT.V=V; PT.dp=dp; PT.rho=rho; PT.isAir=isAir; PT.mach=mach; PT.regime=regime;
+  PT.V=V; PT.dp=dp; PT.rho=rho; PT.isAir=isAir; PT.mach=mach; PT.regime=regime; PT.dh=dh;
+}
+
+// ===== presets (drive the existing controls) =====
+function setPitotPreset(name){
+  const cfg = {
+    sea:      {fluid:'air',   dp:250,  rho:1.225},
+    cruise:   {fluid:'air',   dp:3000, rho:1.225},
+    low:      {fluid:'air',   dp:60,   rho:1.225},
+    altitude: {fluid:'custom',dp:1000, rho:0.4},
+    water:    {fluid:'water', dp:5000, rho:998}
+  }[name];
+  if(!cfg) return;
+  document.getElementById('fluidSel').value = cfg.fluid;
+  const dpR=document.getElementById('dpRange'), dpN=document.getElementById('dpNum');
+  dpR.value=cfg.dp; dpN.value=cfg.dp; pct(dpR);
+  if(cfg.fluid==='custom'){
+    const rR=document.getElementById('rhoRange'), rN=document.getElementById('rhoNum');
+    rR.value=cfg.rho; rN.value=cfg.rho; pct(rR);
+  }
+  compute();
 }
 
 // ===== Pitot tube + duct flow animation =====
-(function(){
+var PitotAnim = (function(){
+  const LBL = {profile:'流速分布', stag:'よどみ点 p₀（v=0）', stat:'静圧孔 pₛ',
+               laminar:'層流', turbulent:'乱流', liquid:'（液体）'};
   const cv = document.getElementById('pitotCanvas');
   const ctx = cv.getContext('2d');
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const particles = [];
   for(let i=0;i<70;i++){
     particles.push({x:Math.random(), lane:Math.random(), sp:0.4+Math.random()*0.6});
   }
+  let playing = !reduceMotion;
+  let speed = 1;
+  let rafId = null;
 
   function resize(){
-    const dpr = window.devicePixelRatio||1;
+    const dpr = Math.min(window.devicePixelRatio||1, 2.5);
     const w = cv.parentElement.getBoundingClientRect().width;
     if(Math.abs(cv.width-w*dpr)>2 || cv.height!==260*dpr){
       cv.width = w*dpr; cv.height = 260*dpr; cv.style.height='260px';
@@ -503,15 +654,15 @@ function compute(){
     ctx.setTransform(dpr,0,0,dpr,0,0);
   }
 
-  function frame(){
+  function draw(advance){
     resize();
-    const W = cv.width/(window.devicePixelRatio||1);
+    const dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    const W = cv.width/dpr;
     const H = 260;
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle = '#020d1a';
     ctx.fillRect(0,0,W,H);
 
-    // ----- duct geometry -----
     const ductTop = 36, ductBot = 168;
     const ductH = ductBot - ductTop;
     const ductMid = (ductTop+ductBot)/2;
@@ -522,20 +673,26 @@ function compute(){
     ctx.beginPath(); ctx.moveTo(0,ductTop); ctx.lineTo(W,ductTop); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0,ductBot); ctx.lineTo(W,ductBot); ctx.stroke();
 
-    // speed factor (visual): scale by sqrt of dp so motion is lively but bounded
-    const vis = Math.max(0.25, Math.min(2.6, Math.sqrt(PT.dp/250)));
+    // streamline density / particle speed scales with actual flow speed V
+    const vis = Math.max(0.25, Math.min(2.8, PT.V/8));
+    const noseX = W*0.40, stemX = W*0.86, tubeR = 7, tubeY = ductMid;
 
-    // ----- flowing particles (parabolic velocity profile) -----
+    // ----- flowing particles with stagnation: flow stops at the nose -----
     for(let i=0;i<particles.length;i++){
       const p = particles[i];
-      // velocity profile: faster mid-duct, slower near walls
       const prof = 1 - Math.pow(2*(p.lane-0.5),2)*0.85;
-      p.x += 0.006*p.sp*vis*prof;
-      if(p.x>1){ p.x-=1; p.lane=Math.random(); }
-      const px = p.x*W;
+      const px0 = p.x*W;
       const py = ductTop + 6 + p.lane*(ductH-12);
-      const len = 7 + 16*prof*Math.min(1.4,vis);
-      ctx.strokeStyle = 'rgba(120,190,255,'+(0.25+0.4*prof)+')';
+      // slow the flow as it approaches the stagnation region near the nose centreline
+      const nearNose = Math.abs(py-tubeY) < 18 && px0 < noseX+6;
+      const stagFactor = nearNose ? Math.max(0.04, Math.abs(py-tubeY)/18) : 1;
+      if(advance){
+        p.x += 0.006*p.sp*vis*prof*stagFactor*speed;
+        if(p.x>1){ p.x-=1; p.lane=Math.random(); }
+      }
+      const px = p.x*W;
+      const len = (7 + 16*prof*Math.min(1.6,vis))*stagFactor;
+      ctx.strokeStyle = 'rgba(120,190,255,'+(0.22+0.4*prof*stagFactor)+')';
       ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.moveTo(px,py); ctx.lineTo(px-len,py);
@@ -550,7 +707,7 @@ function compute(){
     for(let k=0;k<=6;k++){
       const ly = ductTop+6 + k/6*(ductH-12);
       const prof = 1 - Math.pow(2*(k/6-0.5),2)*0.85;
-      const alen = 8 + 40*prof*Math.min(1.3,vis);
+      const alen = 8 + 40*prof*Math.min(1.6,vis);
       ctx.beginPath(); ctx.moveTo(profX,ly); ctx.lineTo(profX+alen,ly); ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(profX+alen,ly);
@@ -561,15 +718,9 @@ function compute(){
     ctx.fillStyle = 'rgba(255,210,120,.8)';
     ctx.font = '9px Roboto Mono, monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('流速分布', profX-4, ductTop-6);
+    ctx.fillText(LBL.profile, profX-4, ductTop-6);
 
-    // ----- pitot-static tube inserted from the right -----
-    const tubeY = ductMid;
-    const noseX = W*0.40;                 // stagnation nose position
-    const stemX = W*0.86;                 // where stem exits the duct
-    const tubeR = 7;
-
-    // L-shaped pitot tube: horizontal part to nose, vertical stem up
+    // ----- L-shaped pitot-static tube -----
     ctx.strokeStyle = 'rgba(210,225,240,.95)';
     ctx.lineWidth = tubeR*2;
     ctx.lineCap = 'round';
@@ -578,7 +729,6 @@ function compute(){
     ctx.lineTo(stemX, tubeY);
     ctx.lineTo(stemX, ductTop-2);
     ctx.stroke();
-    // inner total-pressure line
     ctx.strokeStyle = 'rgba(0,180,216,.9)';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -587,7 +737,12 @@ function compute(){
     ctx.lineTo(stemX, ductTop-2);
     ctx.stroke();
 
-    // ----- stagnation point at the rounded nose (total-pressure hole) -----
+    // ----- stagnation point (pressure max, v=0): pulsing halo emphasises the showcase -----
+    const pulse = playing ? (0.5+0.5*Math.sin(Date.now()/260)) : 0.6;
+    ctx.beginPath();
+    ctx.arc(noseX, tubeY, 9+3*pulse, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,90,75,'+(0.10+0.18*pulse)+')';
+    ctx.fill();
     ctx.fillStyle = '#ff5a4b';
     ctx.beginPath();
     ctx.arc(noseX, tubeY, 5.5, 0, Math.PI*2);
@@ -595,7 +750,6 @@ function compute(){
     ctx.strokeStyle = 'rgba(255,255,255,.6)';
     ctx.lineWidth = 1;
     ctx.stroke();
-    // converging streamlines toward the stagnation point
     ctx.strokeStyle = 'rgba(255,120,100,.55)';
     ctx.lineWidth = 1.2;
     for(let s=-2;s<=2;s++){
@@ -608,45 +762,36 @@ function compute(){
     ctx.fillStyle = 'rgba(255,150,130,.95)';
     ctx.font = '9px Roboto Mono, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('よどみ点 p0', noseX, tubeY+22);
+    ctx.fillText(LBL.stag, noseX, tubeY+22);
 
     // ----- side-facing static-pressure tap -----
     const staticX = noseX + (stemX-noseX)*0.46;
     ctx.fillStyle = '#00b894';
-    ctx.beginPath();
-    ctx.arc(staticX, tubeY-tubeR, 3.2, 0, Math.PI*2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(staticX, tubeY+tubeR, 3.2, 0, Math.PI*2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(staticX, tubeY-tubeR, 3.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(staticX, tubeY+tubeR, 3.2, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = 'rgba(80,220,180,.95)';
-    ctx.fillText('静圧孔 ps', staticX, tubeY-tubeR-7);
+    ctx.fillText(LBL.stat, staticX, tubeY-tubeR-7);
 
-    // ----- U-tube manometer (top-right) showing the height difference -----
-    const manX = W-66, manTop = 16, manBot = 120;
-    const manW = 26;
+    // ----- U-tube manometer: column difference grows with dp (and so with v²) -----
+    const manX = W-66, manTop = 16, manBot = 120, manW = 26;
     if(manX > stemX+30){
       ctx.strokeStyle = 'rgba(180,200,220,.8)';
       ctx.lineWidth = 2;
-      // U shape
       ctx.beginPath();
       ctx.moveTo(manX-manW/2, manTop);
       ctx.lineTo(manX-manW/2, manBot-10);
       ctx.arc(manX, manBot-10, manW/2, Math.PI, 0, true);
       ctx.lineTo(manX+manW/2, manTop);
       ctx.stroke();
-      // liquid column: height difference proportional to dp
       const colMax = (manBot-10) - manTop - 8;
       const dh = colMax*Math.max(0.04,Math.min(1, PT.dp/20000*6));
       const baseLvl = manBot-14;
-      const leftLvl  = baseLvl - colMax*0.30 - dh/2;   // total-pressure side lower? draw legibly
+      const leftLvl  = baseLvl - colMax*0.30 - dh/2;
       const rightLvl = baseLvl - colMax*0.30 + dh/2;
       ctx.fillStyle = 'rgba(0,180,216,.55)';
       ctx.fillRect(manX-manW/2+1, leftLvl, manW/2-1, baseLvl-leftLvl);
       ctx.fillRect(manX+1, rightLvl, manW/2-1, baseLvl-rightLvl);
-      ctx.fillStyle = 'rgba(0,180,216,.55)';
       ctx.fillRect(manX-manW/2+1, baseLvl, manW-2, 6);
-      // dp label
       ctx.fillStyle = 'rgba(200,225,245,.9)';
       ctx.font = '9px Roboto Mono, monospace';
       ctx.textAlign = 'center';
@@ -654,20 +799,54 @@ function compute(){
       ctx.fillText(PT.dp.toFixed(0)+'Pa', manX, manBot+12);
     }
 
-    // ----- live status (top-left) -----
+    // ----- live status overlay (bottom-left) -----
     ctx.fillStyle = PT.regime==='laminar' ? '#00b894' : '#e1a055';
     ctx.font = 'bold 12px Roboto Mono, monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('V = '+PT.V.toFixed(2)+' m/s', 8, ductBot+24);
+    ctx.fillText('v = '+PT.V.toFixed(2)+' m/s   q = '+(PT.rho*PT.V*PT.V/2).toFixed(0)+' Pa', 8, ductBot+24);
     ctx.fillStyle = 'rgba(255,255,255,.5)';
     ctx.font = '10px Roboto Mono, monospace';
-    const regimeJa = PT.regime==='laminar' ? '層流' : '乱流';
-    ctx.fillText(regimeJa+(PT.isAir?'  M='+PT.mach.toFixed(2):'  （液体）'), 8, ductBot+40);
-
-    requestAnimationFrame(frame);
+    const regimeTxt = PT.regime==='laminar' ? LBL.laminar : LBL.turbulent;
+    ctx.fillText(regimeTxt+(PT.isAir?'  M='+PT.mach.toFixed(2):'  '+LBL.liquid), 8, ductBot+40);
   }
-  frame();
+
+  function frame(){
+    draw(true);
+    if(playing){ rafId = requestAnimationFrame(frame); } else { rafId = null; }
+  }
+  function start(){ if(!playing){ playing=true; if(!rafId) rafId=requestAnimationFrame(frame); } }
+  function stop(){ playing=false; if(rafId){ cancelAnimationFrame(rafId); rafId=null; } draw(false); }
+
+  if(reduceMotion){ draw(false); }
+  else { rafId = requestAnimationFrame(frame); }
+
+  return {
+    isPlaying:function(){ return playing; },
+    play:start, pause:stop,
+    setSpeed:function(s){ speed=s; },
+    reset:function(){
+      for(let i=0;i<particles.length;i++){ particles[i].x=Math.random(); particles[i].lane=Math.random(); }
+      draw(false);
+    },
+    redraw:function(){ draw(false); }
+  };
 })();
+
+function togglePitotPlay(){
+  const btn = document.getElementById('btnPlay');
+  if(PitotAnim.isPlaying()){ PitotAnim.pause(); btn.innerHTML='<i class="fas fa-play"></i> 再生'; }
+  else { PitotAnim.play(); btn.innerHTML='<i class="fas fa-pause"></i> 一時停止'; }
+}
+function resetPitot(){
+  setPitotPreset('sea');
+  PitotAnim.reset();
+}
+function setPitotSpeed(s){
+  PitotAnim.setSpeed(s);
+  document.querySelectorAll('.speed-btn').forEach(function(b){
+    b.classList.toggle('active', parseFloat(b.dataset.spd)===s);
+  });
+}
 
 // ===== init =====
 ['dpRange','rhoRange','cpRange','dRange'].forEach(function(id){

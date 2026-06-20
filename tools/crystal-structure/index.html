@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "結晶構造シミュレーター",
       "description": "SC・BCC・FCC・HCP・ダイヤモンド構造の充填率・配位数・格子定数をリアルタイム計算し、ブラッグ条件でミラー指数から面間隔と回折角を求めるインタラクティブツール。",
       "url": "https://novasolver.jp/tools/crystal-structure.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["5種類の結晶構造（SC/BCC/FCC/HCP/Diamond）","充填率・配位数・格子定数のリアルタイム計算","ミラー指数入力によるブラッグ角計算","ユニットセル2D投影の可視化"],
       "keywords": "結晶構造,SC,BCC,FCC,HCP,ダイヤモンド,充填率,ブラッグ条件,ミラー指数,格子定数",
       "datePublished": "2026-04-09",
@@ -204,7 +204,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <input type="range" id="lambdaSlider" min="0.5" max="3.0" step="0.01" value="1.54" oninput="syncToNum('lambdaSlider','lambdaVal')">
     </div>
     <div class="bragg-result" id="braggResult">計算中...</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -225,30 +233,23 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
-}
-
-
-const STRUCTS = {
-  SC:      { Z:1,  CN:6,  pf: Math.PI/6,                 color:'#00B4D8', label:'単純立方 (SC)' },
-  BCC:{ Z:2,  CN:8,  pf: Math.PI*Math.sqrt(3)/8,    color:'#007BFF', label:'体心立方 (BCC)' },
-  FCC:{ Z:4,  CN:12, pf: Math.PI/(3*Math.sqrt(2)),  color:'#0056b3', label:'面心立方 (FCC)' },
-  HCP:{ Z:6,  CN:12, pf: Math.PI/(3*Math.sqrt(2)),  color:'#00a884', label:'六方最密 (HCP)' },
-  Diamond:{ Z:8,  CN:4,  pf: Math.PI*Math.sqrt(3)/16,   color:'#e17055', label:'ダイヤモンド' }
+/* ===== Crystal Structure v2 — animated rotating 3D unit cell (single IIFE) ===== */
+(function(){
+"use strict";
+var L = {
+  scLabel:'単純立方 (SC)', bccLabel:'体心立方 (BCC)', fccLabel:'面心立方 (FCC)',
+  hcpLabel:'六方最密 (HCP)', diaLabel:'ダイヤモンド構造',
+  cell:'ユニットセル（回転中）', pf:'充填率', cn:'配位数', atoms:'原子/胞', a:'格子定数 a',
+  braggNoCubic:'HCPは六方晶計算（立方晶近似外）', braggEnter:'hkl を入力してください',
+  braggNoDiff:'回折不可（λ > 2d）'
 };
-
+var STRUCTS = {
+  SC:      { Z:1,  CN:6,  pf: Math.PI/6,                color:'#00B4D8', label:L.scLabel },
+  BCC:     { Z:2,  CN:8,  pf: Math.PI*Math.sqrt(3)/8,   color:'#4aa3ff', label:L.bccLabel },
+  FCC:     { Z:4,  CN:12, pf: Math.PI/(3*Math.sqrt(2)), color:'#1e7bff', label:L.fccLabel },
+  HCP:     { Z:6,  CN:12, pf: Math.PI/(3*Math.sqrt(2)), color:'#00d4a0', label:L.hcpLabel },
+  Diamond: { Z:8,  CN:4,  pf: Math.PI*Math.sqrt(3)/16,  color:'#e17055', label:L.diaLabel }
+};
 function getA(s, r){
   if(s==='SC')      return 2*r;
   if(s==='BCC')     return 4*r/Math.sqrt(3);
@@ -256,264 +257,267 @@ function getA(s, r){
   if(s==='HCP')     return 2*r;
   if(s==='Diamond') return 8*r/Math.sqrt(3);
   return 2*r;
-}let currentStruct = 'BCC';
-const rSlider = document.getElementById('rSlider');
-const lambdaSlider = document.getElementById('lambdaSlider');
+}
 
-function updateRange(el){
-  const min=+el.min, max=+el.max, val=+el.value;
-  el.style.setProperty('--pct', ((val-min)/(max-min)*100)+'%');
-}function compute(){
-  const r = +rSlider.value;
-  const lam = +lambdaSlider.value;
-  const s = currentStruct;
-  const st = STRUCTS[s];
-  const a = getA(s, r);
+/* fractional atom positions (0..1) for each structure */
+function atomsOf(s){
+  var corners = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1]];
+  if(s==='SC') return {pts:corners.slice(), type:'cube'};
+  if(s==='BCC') return {pts:corners.concat([[0.5,0.5,0.5]]), type:'cube'};
+  if(s==='FCC'){
+    var faces=[[0.5,0.5,0],[0.5,0.5,1],[0.5,0,0.5],[0.5,1,0.5],[0,0.5,0.5],[1,0.5,0.5]];
+    return {pts:corners.concat(faces), type:'cube'};
+  }
+  if(s==='Diamond'){
+    var faces=[[0.5,0.5,0],[0.5,0.5,1],[0.5,0,0.5],[0.5,1,0.5],[0,0.5,0.5],[1,0.5,0.5]];
+    var inner=[[0.25,0.25,0.25],[0.75,0.75,0.25],[0.75,0.25,0.75],[0.25,0.75,0.75]];
+    return {pts:corners.concat(faces).concat(inner), type:'cube', inner:inner};
+  }
+  /* HCP: hexagonal prism, bottom + top rings + centers + 3 mid-layer atoms */
+  var pts=[]; var i;
+  for(i=0;i<6;i++){ var ang=i*Math.PI/3; pts.push([Math.cos(ang),Math.sin(ang),-1]); }
+  for(i=0;i<6;i++){ var ang2=i*Math.PI/3; pts.push([Math.cos(ang2),Math.sin(ang2),1]); }
+  pts.push([0,0,-1]); pts.push([0,0,1]);
+  var mid=[[0,0.577,0],[0.5,-0.289,0],[-0.5,-0.289,0]];
+  for(i=0;i<mid.length;i++) pts.push(mid[i]);
+  return {pts:pts, type:'hex'};
+}
 
-  var _erv=document.getElementById('rVal');if(_erv){if(_erv.tagName==='INPUT')_erv.value=r.toFixed(2);else _erv.textContent=r.toFixed(2);}
-  var _elv=document.getElementById('lambdaVal');if(_elv){if(_elv.tagName==='INPUT')_elv.value=lam.toFixed(2);else _elv.textContent=lam.toFixed(2);}
-  document.getElementById('resA').textContent = a.toFixed(3);
-  document.getElementById('resZ').textContent = st.Z;
-  document.getElementById('resPF').textContent = (st.pf*100).toFixed(1);
-  document.getElementById('resCN').textContent = st.CN;
+var canvas = document.getElementById('crystalCanvas');
+var ctx = canvas ? canvas.getContext('2d') : null;
+var rSlider = document.getElementById('rSlider');
+var lambdaSlider = document.getElementById('lambdaSlider');
+var currentStruct = 'BCC';
+var ang = 0.6;
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Bragg
-  const h = +document.getElementById('mh').value || 0;
-  const k = +document.getElementById('mk').value || 0;
-  const l = +document.getElementById('ml').value || 0;
-  const hkl2 = h*h+k*k+l*l;
-  const resTwoTheta = document.getElementById('resTwoTheta');
-  if(hkl2 > 0 && s !== 'HCP') {
-    const d = a / Math.sqrt(hkl2);
-    const sinT = lam / (2*d);
-    if(Math.abs(sinT) <= 1) {
-      const theta = Math.asin(sinT)*180/Math.PI;
-      document.getElementById('braggResult').innerHTML =
-        `d<sub>${h}${k}${l}</sub> = <span>${d.toFixed(3)}Å</span><br>` +
-        `2θ = <span>${(2*theta).toFixed(2)}°</span><br>` +
-        `θ = <span>${theta.toFixed(2)}°</span>`;
-      resTwoTheta.textContent = (2*theta).toFixed(2);
+function el(id){ return document.getElementById(id); }
+function updateRange(e){
+  if(!e) return;
+  var min=+e.min, max=+e.max, val=+e.value;
+  e.style.setProperty('--pct', ((val-min)/(max-min)*100)+'%');
+}
+
+/* ---- compute results + Bragg + chart ---- */
+function compute(){
+  var r = +rSlider.value;
+  var lam = +lambdaSlider.value;
+  var s = currentStruct;
+  var st = STRUCTS[s];
+  var a = getA(s, r);
+
+  var _erv=el('rVal'); if(_erv){ if(_erv.tagName==='INPUT')_erv.value=r.toFixed(2); else _erv.textContent=r.toFixed(2); }
+  var _elv=el('lambdaVal'); if(_elv){ if(_elv.tagName==='INPUT')_elv.value=lam.toFixed(2); else _elv.textContent=lam.toFixed(2); }
+  if(el('resA')) el('resA').textContent = a.toFixed(3);
+  if(el('resZ')) el('resZ').textContent = st.Z;
+  if(el('resPF')) el('resPF').textContent = (st.pf*100).toFixed(1);
+  if(el('resCN')) el('resCN').textContent = st.CN;
+
+  var h = +el('mh').value || 0, k = +el('mk').value || 0, l = +el('ml').value || 0;
+  var hkl2 = h*h+k*k+l*l;
+  var resTwoTheta = el('resTwoTheta');
+  if(hkl2 > 0 && s !== 'HCP'){
+    var d = a / Math.sqrt(hkl2);
+    var sinT = lam / (2*d);
+    if(Math.abs(sinT) <= 1){
+      var theta = Math.asin(sinT)*180/Math.PI;
+      el('braggResult').innerHTML =
+        'd<sub>'+h+k+l+'</sub> = <span>'+d.toFixed(3)+'Å</span><br>'+
+        '2θ = <span>'+(2*theta).toFixed(2)+'°</span><br>'+
+        'θ = <span>'+theta.toFixed(2)+'°</span>';
+      if(resTwoTheta) resTwoTheta.textContent = (2*theta).toFixed(2);
     }else{
-      document.getElementById('braggResult').innerHTML = `d<sub>${h}${k}${l}</sub> = <span>${(a/Math.sqrt(hkl2)).toFixed(3)} Å</span><br><span style="color:#e17055">回折不可（λ > 2d）</span>`;
-      resTwoTheta.textContent = '—';
+      el('braggResult').innerHTML = 'd<sub>'+h+k+l+'</sub> = <span>'+(a/Math.sqrt(hkl2)).toFixed(3)+' Å</span><br><span style="color:#e17055">'+L.braggNoDiff+'</span>';
+      if(resTwoTheta) resTwoTheta.textContent = '—';
     }
   }else if(s === 'HCP'){
-    document.getElementById('braggResult').innerHTML = '<span style="color:var(--muted)">HCPは六方晶計算（立方晶近似外）</span>';
-    resTwoTheta.textContent = '—';
+    el('braggResult').innerHTML = '<span style="color:var(--muted)">'+L.braggNoCubic+'</span>';
+    if(resTwoTheta) resTwoTheta.textContent = '—';
   }else{
-    document.getElementById('braggResult').innerHTML = '<span style="color:var(--muted)">hkl を入力してください</span>';
-    resTwoTheta.textContent = '—';
+    el('braggResult').innerHTML = '<span style="color:var(--muted)">'+L.braggEnter+'</span>';
+    if(resTwoTheta) resTwoTheta.textContent = '—';
   }
-
-  drawCrystal(s, r, a);
   updatePackingChart();
 }
 
-// ---- Canvas drawing ----
+/* ---- HiDPI ---- */
+var cssW=0, cssH=0;
+function resizeCrystal(){
+  var parent = canvas.parentElement;
+  var rect = parent.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width - 44));
+  cssH = 400;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
 
-function drawCrystal(s, r, a) {
-  const canvas = document.getElementById('crystalCanvas');
-  const ctx = canvas.getContext('2d');const __novaDims0 = __novaHiDpiCanvas(canvas, canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height, ctx);
-const W = __novaDims0.w, H = __novaDims0.h;
+/* 3D rotate (about Z spin + fixed X tilt) and isometric-ish projection */
+function project(p, cx, cy, scale, a){
+  /* center the cell on origin */
+  var x = p[0]-0.5, y = p[1]-0.5, z = p[2]-0.5;
+  /* spin about vertical (y) axis */
+  var ca=Math.cos(a), sa=Math.sin(a);
+  var x1 = x*ca - z*sa;
+  var z1 = x*sa + z*ca;
+  var y1 = y;
+  /* tilt about x axis (fixed) */
+  var tilt = 0.62, ct=Math.cos(tilt), st2=Math.sin(tilt);
+  var y2 = y1*ct - z1*st2;
+  var z2 = y1*st2 + z1*ct;
+  /* perspective */
+  var f = 3.2;
+  var pp = f/(f - z2*0.9);
+  return { sx: cx + x1*scale*pp, sy: cy - y2*scale*pp, depth: z2 };
+}
+function projectHex(p, cx, cy, scale, a){
+  var x=p[0]*0.55, y=p[2]*0.62, z=p[1]*0.55;
+  var ca=Math.cos(a), sa=Math.sin(a);
+  var x1 = x*ca - z*sa, z1 = x*sa + z*ca, y1=y;
+  var tilt=0.5, ct=Math.cos(tilt), st2=Math.sin(tilt);
+  var y2=y1*ct - z1*st2, z2=y1*st2 + z1*ct;
+  var f=3.2, pp=f/(f - z2*0.9);
+  return { sx: cx + x1*scale*pp, sy: cy - y2*scale*pp, depth: z2 };
+}
+
+function ball(x,y,rad,col,alpha){
+  if(alpha===undefined) alpha=1;
+  var g = ctx.createRadialGradient(x-rad*0.35, y-rad*0.35, rad*0.05, x, y, rad);
+  g.addColorStop(0, 'rgba(255,255,255,'+(alpha*0.95)+')');
+  g.addColorStop(0.35, col);
+  g.addColorStop(1, 'rgba(0,12,32,'+alpha+')');
+  ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+  ctx.lineWidth=0.8; ctx.strokeStyle='rgba(255,255,255,'+(alpha*0.25)+')'; ctx.stroke();
+}
+
+function drawScene(){
+  if(!ctx) return;
+  resizeCrystal();
+  var W=cssW, H=cssH;
   ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#020d1a'; ctx.fillRect(0,0,W,H);
 
-  // Dark background
-  ctx.fillStyle = '#020d1a';
-  ctx.fillRect(0,0,W,H);
+  var s = currentStruct;
+  var st = STRUCTS[s];
+  var col = st.color;
+  var r = +rSlider.value;
+  var a = getA(s, r);
+  var cx = W*0.34, cy = H*0.52;
+  var scale = Math.min(W*0.42, H*0.78);
 
-  // Title
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.font = '14px "Roboto Mono", monospace';
-  ctx.fillText(STRUCTS[s].label + '  ユニットセル投影', 16, 24);
+  ctx.fillStyle='rgba(255,255,255,0.6)';
+  ctx.font='13px "Roboto Mono", monospace';
+  ctx.fillText(st.label+' · '+L.cell, 14, 22);
 
-  const col = STRUCTS[s].color;
-  const scale = Math.min(W/2, H) * 0.32;
+  var data = atomsOf(s);
+  var proj = (data.type==='hex') ? projectHex : project;
+  var hexScale = (data.type==='hex') ? scale*0.78 : scale;
 
-  // Draw unit cell for each structure
-  if(s === 'SC') drawSC(ctx, W, H, scale, col, r, a);
-  else if(s === 'BCC') drawBCC(ctx, W, H, scale, col, r, a);
-  else if(s === 'FCC') drawFCC(ctx, W, H, scale, col, r, a);
-  else if(s === 'HCP') drawHCP(ctx, W, H, scale, col, r, a);
-  else if(s === 'Diamond') drawDiamond(ctx, W, H, scale, col, r, a);
-}function drawAtom(ctx, x, y, radius, col, alpha=1){
-  const grad = ctx.createRadialGradient(x-radius*0.3, y-radius*0.3, radius*0.05, x, y, radius);
-  grad.addColorStop(0, `rgba(255,255,255,${alpha*0.9})`);
-  grad.addColorStop(0.3, col);
-  grad.addColorStop(1, `rgba(0,15,40,${alpha})`);
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI*2);
-  ctx.fillStyle = grad;
-  ctx.fill();
-}function drawBox(ctx, cx, cy, size){
-  ctx.strokeStyle = 'rgba(0,180,216,0.4)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([4,4]);
-  ctx.strokeRect(cx-size/2, cy-size/2, size, size);
-  ctx.setLineDash([]);
-}function drawSC(ctx, W, H, scale, col, r, a){
-  // Front face: 4 corner atoms
-  const cx = W/4, cy = H/2;
-  const s = scale;
-  const atomR = Math.min(s*0.5*(r/a), 28);
-  drawBox(ctx, cx, cy, s*1.4);
-  const corners = [[-1,-1],[1,-1],[1,1],[-1,1]];
-  corners.forEach(([dx,dy]) => drawAtom(ctx, cx+dx*s*0.7, cy+dy*s*0.7, atomR, col));
+  /* cube/prism edges */
+  ctx.lineWidth=1.4;
+  ctx.strokeStyle='rgba(0,180,216,0.45)';
+  if(data.type==='cube'){
+    var corners=[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+    var edges=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+    var pc = corners.map(function(c){ return proj(c,cx,cy,hexScale,ang); });
+    edges.forEach(function(e){
+      ctx.beginPath(); ctx.moveTo(pc[e[0]].sx,pc[e[0]].sy); ctx.lineTo(pc[e[1]].sx,pc[e[1]].sy); ctx.stroke();
+    });
+  } else {
+    var bottom=[], top=[], i;
+    for(i=0;i<6;i++){ var an=i*Math.PI/3; bottom.push(proj([Math.cos(an),Math.sin(an),-1],cx,cy,hexScale,ang)); }
+    for(i=0;i<6;i++){ var an2=i*Math.PI/3; top.push(proj([Math.cos(an2),Math.sin(an2),1],cx,cy,hexScale,ang)); }
+    for(i=0;i<6;i++){
+      var j=(i+1)%6;
+      ctx.beginPath(); ctx.moveTo(bottom[i].sx,bottom[i].sy); ctx.lineTo(bottom[j].sx,bottom[j].sy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(top[i].sx,top[i].sy); ctx.lineTo(top[j].sx,top[j].sy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bottom[i].sx,bottom[i].sy); ctx.lineTo(top[i].sx,top[i].sy); ctx.stroke();
+    }
+  }
 
-  // Info text
-  const ix = W/2+20, iy = H/2 - 80;
-  ctx.fillStyle = '#fff';
-  ctx.font = '13px "Noto Sans JP", sans-serif';
-  ctx.fillText(`格子定数 a = 2r`, ix, iy);
-  ctx.fillText(`= ${(a).toFixed(3)} Å`, ix, iy+22);
-  ctx.fillStyle = 'rgba(0,180,216,0.9)';
-  ctx.fillText(`Z = 1 原子/胞`, ix, iy+52);
-  ctx.fillText(`充填率 52.4%`, ix, iy+74);
-  ctx.fillText(`配位数 6`, ix, iy+96);
-}function drawBCC(ctx, W, H, scale, col, r, a){
-  const cx = W/4, cy = H/2;
-  const s = scale;
-  const atomR = Math.min(s*0.5*(r/a)*Math.sqrt(3)/2, 28);
-  drawBox(ctx, cx, cy, s*1.4);
-  const corners = [[-1,-1],[1,-1],[1,1],[-1,1]];
-  corners.forEach(([dx,dy]) => drawAtom(ctx, cx+dx*s*0.7, cy+dy*s*0.7, atomR*0.85, col));
-  drawAtom(ctx, cx, cy, atomR, col); // center
+  /* atoms sorted back-to-front */
+  var projected = data.pts.map(function(p){
+    var pr = proj(p,cx,cy,hexScale,ang);
+    pr.isInner = data.inner ? data.inner.some(function(q){ return q[0]===p[0]&&q[1]===p[1]&&q[2]===p[2]; }) : false;
+    return pr;
+  });
+  projected.sort(function(a2,b2){ return a2.depth - b2.depth; });
+  var atomR = Math.min(W,H)*0.085;
+  if(s==='Diamond') atomR *= 0.78;
+  projected.forEach(function(pr){
+    var dz = (pr.depth+1.4)/2.8;
+    var rr = atomR*(0.78 + 0.34*dz);
+    var c = pr.isInner ? '#ffd54a' : col;
+    ball(pr.sx, pr.sy, rr, c, 0.55+0.45*dz);
+  });
 
-  const ix = W/2+20, iy = H/2 - 80;
-  ctx.fillStyle = '#fff';
-  ctx.font = '13px "Noto Sans JP", sans-serif';
-  ctx.fillText(`格子定数 a = 4r/√3`, ix, iy);
-  ctx.fillText(`= ${(a).toFixed(3)} Å`, ix, iy+22);
-  ctx.fillStyle = 'rgba(0,123,255,0.9)';
-  ctx.fillText(`Z = 2 原子/胞`, ix, iy+52);
-  ctx.fillText(`充填率 68.0%`, ix, iy+74);
-  ctx.fillText(`配位数 8`, ix, iy+96);
-}function drawFCC(ctx, W, H, scale, col, r, a){
-  const cx = W/4, cy = H/2;
-  const s = scale;
-  const atomR = Math.min(s*0.5*(r/a)*Math.sqrt(2), 28);
-  drawBox(ctx, cx, cy, s*1.4);
-  const corners = [[-1,-1],[1,-1],[1,1],[-1,1]];
-  corners.forEach(([dx,dy]) => drawAtom(ctx, cx+dx*s*0.7, cy+dy*s*0.7, atomR*0.85, col));
-  const edges = [[0,-1],[1,0],[0,1],[-1,0]];
-  edges.forEach(([dx,dy]) => drawAtom(ctx, cx+dx*s*0.7, cy+dy*s*0.7, atomR, col));
+  /* on-canvas live stats */
+  var ix = W*0.70, iy = H*0.30;
+  ctx.fillStyle='#fff'; ctx.font='13px "Noto Sans JP", sans-serif';
+  ctx.fillText(L.a+' = '+a.toFixed(3)+' Å', ix, iy);
+  ctx.fillStyle=col;
+  ctx.fillText('Z = '+st.Z+' '+L.atoms, ix, iy+24);
+  ctx.fillText(L.pf+' '+(st.pf*100).toFixed(1)+'%', ix, iy+46);
+  ctx.fillText(L.cn+' '+st.CN, ix, iy+68);
+}
 
-  const ix = W/2+20, iy = H/2 - 80;
-  ctx.fillStyle = '#fff';
-  ctx.font = '13px "Noto Sans JP", sans-serif';
-  ctx.fillText(`格子定数 a = 2r√2`, ix, iy);
-  ctx.fillText(`= ${(a).toFixed(3)} Å`, ix, iy+22);
-  ctx.fillStyle = 'rgba(0,86,179,0.9)';
-  ctx.fillText(`Z = 4 原子/胞`, ix, iy+52);
-  ctx.fillText(`充填率 74.0%`, ix, iy+74);
-  ctx.fillText(`配位数 12`, ix, iy+96);
-}function drawHCP(ctx, W, H, scale, col, r, a){
-  const cx = W/4, cy = H/2;
-  const s = scale * 0.85;
-  const atomR = Math.min(s*0.28, 26);
-  // Hexagonal top view: 6 corners + center
-  const hex = [];
-  for(let i=0;i<6;i++) {
-    const ang = i*Math.PI/3;
-    hex.push([cx + s*0.7*Math.cos(ang), cy + s*0.7*Math.sin(ang)]);
-  }ctx.strokeStyle = 'rgba(0,168,132,0.4)';
-  ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
-  ctx.beginPath(); hex.forEach(([x,y],i) => i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)); ctx.closePath(); ctx.stroke();
-  ctx.setLineDash([]);
-  hex.forEach(([x,y]) => drawAtom(ctx, x, y, atomR*0.85, col));
-  drawAtom(ctx, cx, cy, atomR, col);
-
-  const ix = W/2+20, iy = H/2 - 80;
-  ctx.fillStyle = '#fff';
-  ctx.font = '13px "Noto Sans JP", sans-serif';
-  ctx.fillText(`a = 2r, c = 2r√(8/3)`, ix, iy);
-  ctx.fillText(`a=${(a).toFixed(3)}, c=${(a*Math.sqrt(8/3)).toFixed(3)} Å`, ix, iy+22);
-  ctx.fillStyle = 'rgba(0,168,132,0.9)';
-  ctx.fillText(`Z = 6 原子/胞`, ix, iy+52);
-  ctx.fillText(`充填率 74.0%`, ix, iy+74);
-  ctx.fillText(`配位数 12`, ix, iy+96);
-}function drawDiamond(ctx, W, H, scale, col, r, a){
-  const cx = W/4, cy = H/2;
-  const s = scale;
-  const atomR = Math.min(s*0.5*(r/a)*Math.sqrt(3)/4, 22);
-  drawBox(ctx, cx, cy, s*1.4);
-  // corners
-  const corners = [[-1,-1],[1,-1],[1,1],[-1,1]];
-  corners.forEach(([dx,dy]) => drawAtom(ctx, cx+dx*s*0.7, cy+dy*s*0.7, atomR*0.8, col));
-  // edge centers
-  const edges = [[0,-1],[1,0],[0,1],[-1,0]];
-  edges.forEach(([dx,dy]) => drawAtom(ctx, cx+dx*s*0.7, cy+dy*s*0.7, atomR*0.8, col));
-  // tetrahedral interior (projected)
-  drawAtom(ctx, cx+s*0.35, cy-s*0.35, atomR, col);
-  drawAtom(ctx, cx-s*0.35, cy+s*0.35, atomR, col);
-
-  const ix = W/2+20, iy = H/2 - 80;
-  ctx.fillStyle = '#fff';
-  ctx.font = '13px "Noto Sans JP", sans-serif';
-  ctx.fillText(`格子定数 a = 8r/√3`, ix, iy);
-  ctx.fillText(`= ${(a).toFixed(3)} Å`, ix, iy+22);
-  ctx.fillStyle = 'rgba(225,112,85,0.9)';
-  ctx.fillText(`Z = 8 原子/胞`, ix, iy+52);
-  ctx.fillText(`充填率 34.0%`, ix, iy+74);
-  ctx.fillText(`配位数 4`, ix, iy+96);
-}// ---- Packing chart ----
-
-let packChart = null;
+/* ---- packing chart ---- */
+var packChart = null;
 function updatePackingChart(){
-  const labels = ['SC', 'BCC', 'FCC', 'HCP', 'Diamond'];
-  const pfs = [
-    STRUCTS.SC.pf, STRUCTS.BCC.pf, STRUCTS.FCC.pf, STRUCTS.HCP.pf, STRUCTS.Diamond.pf
-  ].map(v => +(v*100).toFixed(1));
-  const colors = labels.map(l => l===currentStruct ? STRUCTS[l].color : STRUCTS[l].color+'88');
-
-  if(packChart) {
+  var cv = document.getElementById('packingChart');
+  if(!cv || typeof Chart==='undefined') return;
+  var labels = ['SC','BCC','FCC','HCP','Diamond'];
+  var pfs = labels.map(function(l){ return +(STRUCTS[l].pf*100).toFixed(1); });
+  var colors = labels.map(function(l){ return l===currentStruct ? STRUCTS[l].color : STRUCTS[l].color+'88'; });
+  if(packChart){
     packChart.data.datasets[0].data = pfs;
     packChart.data.datasets[0].backgroundColor = colors;
     packChart.update('none');
     return;
-  }packChart = new Chart(document.getElementById('packingChart'),{
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: '充填率 (%)',
-        data: pfs,
-        backgroundColor: colors,
-        borderRadius: 6,
-        borderSkipped: false
-      }]
-    },
+  }
+  packChart = new Chart(cv, {
+    type:'bar',
+    data:{ labels:labels, datasets:[{ label:L.pf+' (%)', data:pfs, backgroundColor:colors, borderRadius:6, borderSkipped:false }] },
     options:{
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,plugins: {
-        legend: { display: false },
-        title:{ display: true, text: '結晶構造別 充填率比較', color: '#1a1a2e', font: { size: 13 } }
-      },
-      scales:{
-        y: {
-          min: 0, max: 85,
-          title: { display: true, text: '充填率 (%)', color: '#6c757d' },
-          grid:{ color: 'rgba(0,0,0,0.05)' }
-        },
-        x:{ grid: { display: false } }
-      }
+      responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:100,
+      plugins:{ legend:{display:false}, title:{display:true, text:L.pf+' — SC/BCC/FCC/HCP/Diamond', color:'#1a1a2e', font:{size:13}} },
+      scales:{ y:{ min:0, max:85, title:{display:true, text:L.pf+' (%)', color:'#6c757d'}, grid:{color:'rgba(0,0,0,0.05)'} }, x:{ grid:{display:false} } }
     }
   });
-}// Event listeners
+}
 
-document.querySelectorAll('.struct-btn').forEach(btn =>{
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.struct-btn').forEach(b => b.classList.remove('active'));
+/* ---- rAF loop ---- */
+var rafId = null;
+function loop(){
+  ang += 0.012;
+  drawScene();
+  rafId = requestAnimationFrame(loop);
+}
+
+/* ---- events ---- */
+var btns = document.querySelectorAll('.struct-btn');
+btns.forEach(function(btn){
+  btn.addEventListener('click', function(){
+    btns.forEach(function(b){ b.classList.remove('active'); });
     btn.classList.add('active');
     currentStruct = btn.dataset.s;
     compute();
+    if(reduce) drawScene();
   });
 });
-rSlider.addEventListener('input', () =>{ syncToNum('rSlider','rVal'); updateRange(rSlider); compute(); });
-lambdaSlider.addEventListener('input', () =>{ syncToNum('lambdaSlider','lambdaVal'); updateRange(lambdaSlider); compute(); });
-['mh','mk','ml'].forEach(id => document.getElementById(id).addEventListener('input', compute));
+if(rSlider) rSlider.addEventListener('input', function(){ if(typeof syncToNum==='function') syncToNum('rSlider','rVal'); updateRange(rSlider); compute(); if(reduce) drawScene(); });
+if(lambdaSlider) lambdaSlider.addEventListener('input', function(){ if(typeof syncToNum==='function') syncToNum('lambdaSlider','lambdaVal'); updateRange(lambdaSlider); compute(); });
+['mh','mk','ml'].forEach(function(id){ var e=el(id); if(e) e.addEventListener('input', compute); });
+window.addEventListener('resize', function(){ if(reduce) drawScene(); });
 
 updateRange(rSlider);
 updateRange(lambdaSlider);
 compute();
+if(reduce){ drawScene(); } else { rafId = requestAnimationFrame(loop); }
+})();
 </script>
 
 <section class="explanation">
@@ -523,13 +527,13 @@ compute();
       <div class="bub">このシミュレーターで「充填率」って出てきますけど、FCCとBCCでどっちが大きいんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大まかに言うと、FCC（面心立方格子）の方がBCC（体心立方格子）よりギュッと詰まってるんだ。FCCは約74%、BCCは約68%だね。例えば上の「構造」ドロップダウンをFCCに変えて、原子半径「r」のスライダーを動かしてみて。充填率の数字は変わらないけど、原子がどう並んでるか3Dで見えるよ。</div>
+      <div class="bub">大まかに言うと、FCC（面心立方格子）の方がBCC（体心立方格子）より密に詰まっている。FCCは約74%、BCCは約68%だ。上の構造ボタンでFCCを選び、原子半径rのスライダーを動かしてみて。充填率の数字は変わらないが、2D投影で原子配置を確認できる。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">え、そうなんですか！「配位数」も一緒に出てきますが、これは何を数えてるんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">ある原子に「一番近い隣人」が何人いるかを数えたものだよ。FCCは12個で最大、BCCは8個。配位数が大きいほど、充填率も高くなる傾向があるんだ。実際にBCCからFCCに切り替えると、3Dモデルで中心の原子に接する原子の数が増えるのがわかるはず。</div>
+      <div class="bub">ある原子に「一番近い隣人」が何人いるかを数えたものだよ。FCCは12個で最大、BCCは8個。配位数が大きいほど、充填率も高くなる傾向がある。BCCからFCCへ切り替えると、2D投影と数値で配位数の違いを確認できる。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">なるほど！じゃあ下の「ブラッグ条件」のところで「hkl」とか「回折角」って出てくるのは、実験で使うんですか？</div>
@@ -568,12 +572,15 @@ compute();
 <h2>よくある誤解と注意点</h2>
 <div class="fblock">
 <p>まず、このツールを使う上で気をつけてほしいのが「原子半径 r」と「格子定数 a」の関係だ。シミュレーター上で r を動かすと a も連動して変わるけど、これは<strong>原子が剛体球で、かつ隙間なく接している理想的な状態</strong>を仮定した計算だからね。実際の材料では、原子間の結合の性質（金属結合、共有結合など）によってこの関係は崩れる。例えば、実在する鉄（BCC）の格子定数から逆算した「原子半径」は、この幾何学的な式 $a = 4r / \sqrt{3}$ から求める値と完全には一致しないんだ。ツールはあくまで基本原理を理解するための「理想モデル」と心得よう。</p>
-<p>次に、ブラッグ条件の計算で「回折角 θ」と表示される角度について。これは<strong>入射X線と結晶面のなす角（ブラッグ角）</strong>であって、よくある誤解は「検出器の位置（2θ）」と混同すること。実際のX線回折装置では、試料に対して入射角θ、検出器は2θの位置に移動して測定する。ツールでλ=0.154 nm (CuKα線)、FCCのa=0.3615 nm (Al)、hkl=(111)とするとθ≈19.3°と計算されるけど、実験プロトコルではこの角度を試料の傾き角として設定し、検出器は約38.6°の位置でピークを探すことになるんだ。</p>
-<p>最後に、HCP（六方最密構造）の「充填率」がFCCとほぼ同じ約74%になる理由だ。3Dモデルを見ると原子の並びが大きく異なるのに、と思うよね。ここで理解すべきは、<strong>「最密充填」という状態が本質的に同じ空間充填効率を持つ</strong>ということ。FCCはABCABC…、HCPはABAB…という積層順序の違いだけなんだ。充填率や配位数（どちらも12）といった大局的な性質は同じになる。ツールで両方の構造を回転させて、最密面（FCCなら{111}面、HCPなら底面）がどう連なっているか観察してみると、この「積層の違い」が実感できるよ。</p>
+<p>次に、ブラッグ条件の計算で「回折角 θ」と表示される角度について。これは<strong>入射X線と結晶面のなす角（ブラッグ角）</strong>であって、よくある誤解は「検出器の位置（2θ）」と混同すること。実際のX線回折装置では、試料に対して入射角θ、検出器は2θの位置に移動して測定する。ツールでλ=0.154 nm (CuKα線)、FCCのa=0.3615 nm (Cu)、hkl=(111)とするとθ≈21.7°と計算され、実験プロトコルでは試料の傾き角をその値に、検出器を約43.3°の位置に設定してピークを探すことになるんだ。</p>
+<p>最後に、HCP（六方最密構造）の「充填率」がFCCとほぼ同じ約74%になる理由だ。ここで理解すべきは、<strong>「最密充填」という状態が本質的に同じ空間充填効率を持つ</strong>ということ。FCCはABCABC…、HCPはABAB…という積層順序の違いだけで、充填率や配位数（どちらも12）といった大局的な性質は同じになる。本ツールでは2D投影と数値でこの違いを確認する。</p>
 
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="crystal-structure.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -635,16 +642,26 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>FCC鉄（オーステナイト）でrVal=1.27 Å、ミラー指数(200)、λ=1.541 Åの場合：格子定数a=3.59 Å、充填率74%、配位数12、面間隔d=1.795 Åが得られ、ブラッグ角θ=28.3°となります。一方BCC鉄（フェライト、r=1.24 Å）では格子定数a=2.87 Å、充填率68%、配位数8となり、同一ミラー指数でもd値が異なるため回折パターンで相構造判定が可能です。</p>
+<p>FCC鉄（オーステナイト）でrVal=1.27 Å、ミラー指数(200)、λ=1.541 Åの場合：格子定数a=3.59 Å、充填率74%、配位数12、面間隔d=1.795 Åが得られ、ブラッグ角θ=25.4°、2θ=50.8°となります。一方BCC鉄（フェライト、r=1.24 Å）では格子定数a=2.87 Å、充填率68%、配位数8となり、同一ミラー指数でもd値が異なるため回折パターンで相構造判定が可能です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>HCP構造（チタン、マグネシウム）はc/a比（通常1.58～1.63）の入力が必須です。規格値を外れると実際の回折スペクトルと乖離します</li>
-<li>ダイヤモンド構造のミラー指数は面心立方の2倍周期となるため、禁制反射（h+k+l=奇数）では0強度になります。(111)指数で確認してください</li>
+<li>HCP構造は理想c/a比1.633の2D投影として表示します。このページにはc/a比入力欄はないため、実材料の精密計算には実測格子定数を使う別ツールで確認してください</li>
+<li>Diamond構造では(111)反射は許容され、混合奇偶の指数は禁制、全偶数ではh+k+lが4の倍数のとき強い反射になります。本ツールは幾何学的なBragg角を表示し、構造因子の消滅則は適用しません</li>
 <li>X線回折測定で高角度（2θ>80°）を使用する場合、波長色収差により実測値は±0.2°の誤差を生じるため、複数面での同時解析を推奨します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

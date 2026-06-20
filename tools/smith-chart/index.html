@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "スミスチャートシミュレーター",
       "description": "正規化負荷インピーダンスから反射係数・VSWR・波長をリアルタイムに計算し、定抵抗円と定リアクタンス円のスミスチャート上に1点プロットする教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/smith-chart.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["正規化負荷インピーダンスからの反射係数 Γ の計算","定抵抗円・定リアクタンス円のスミスチャート描画","|Γ| 円とプロット点による視覚化","VSWR と自由空間波長の同時表示"],
       "keywords": "スミスチャート,反射係数,VSWR,正規化インピーダンス,定抵抗円,定リアクタンス円,伝送線路,高周波",
       "datePublished": "2026-05-17",
@@ -102,6 +102,22 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #smithCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1929,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:4px 10px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:0.7rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:16px;height:3px;border-radius:2px;display:inline-block}
+#smithCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){ input[type=range]::-webkit-slider-thumb{transition:none} }
 </style>
 </head>
 <body>
@@ -163,12 +179,43 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <input type="range" id="slFreq" min="0.1" max="100" step="0.1" value="2.4" oninput="syncToNum('slFreq','slFreqVal');updateSlider(this,'slFreqVal',1,'');compute()">
     </div>
 
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">線路長（負荷へ向かう）d</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slLine" value="0" min="0" max="0.5" step="0.005" oninput="updateSlider(this,null,3,'');compute()"><span class="num-unit">λ</span></div>
+      </div>
+      <input type="range" id="slLineR" min="0" max="0.5" step="0.005" value="0" oninput="document.getElementById('slLine').value=this.value;updateSlider(this,null,3,'');compute()">
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:3px;">発生器側へ d だけ進むと Γ が時計回りに回転（λ/2 で1周）。</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div style="margin-bottom:10px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setPreset('matched')">整合 z=1</button>
+        <button type="button" class="preset-btn" onclick="setPreset('open')">開放</button>
+        <button type="button" class="preset-btn" onclick="setPreset('short')">短絡</button>
+        <button type="button" class="preset-btn" onclick="setPreset('vswr2')">2:1 VSWR</button>
+        <button type="button" class="preset-btn" onclick="setPreset('rotate')">線路で回転</button>
+      </div>
+    </div>
+
     <div class="divider"></div>
 
     <div class="btn-group">
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">周波数は波長 λ = c/f の表示にのみ使用し、反射係数 Γ には影響しません（無損失伝送線の終端反射のみを計算）。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -183,9 +230,36 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（入力端の値）</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roGamma">—</div><div class="rl">|Γ| ∠ φ</div></div>
+        <div class="live-ro"><div class="rv" id="roVSWR">—</div><div class="rl">VSWR</div></div>
+        <div class="live-ro"><div class="rv" id="roRL">—</div><div class="rl">リターンロス [dB]</div></div>
+        <div class="live-ro"><div class="rv" id="roZin">—</div><div class="rl">入力 Z_in [Ω]</div></div>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted)" id="roNote">負荷端（d=0）。線路長を進めると入力端の値に切り替わります。</div>
+    </div>
+
+    <div class="chart-card">
       <div class="chart-title"><i class="fas fa-bullseye"></i> スミスチャート（Γ 平面）</div>
-      <canvas id="smithCanvas"></canvas>
-      <p class="canvas-hint">赤＝定抵抗円 (r=0.2,0.5,1,2,5)／青＝定リアクタンス円 (x=±0.2,±0.5,±1,±2,±5)／緑破線＝|Γ| 円／黄点＝現在の Γ</p>
+      <canvas id="smithCanvas" tabindex="0" role="img" aria-label="スミスチャート。反射係数 Γ の点・|Γ| 円・伝送線路に沿った回転を表示します。"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-play"></i> 線路で回転</button>
+        <button class="btn secondary" type="button" onclick="resetLine()"><i class="fas fa-rotate-left"></i> d=0 に戻す</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+          <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+          <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#e74c3c"></i>定抵抗円</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>定リアクタンス円</span>
+        <span><i class="swatch" style="background:#00b894"></i>|Γ|（VSWR）円</span>
+        <span><i class="swatch" style="background:#FFD166"></i>現在の Γ</span>
+        <span><i class="swatch" style="background:rgba(255,255,255,.5)"></i>負荷 Γ_L</span>
+      </div>
+      <p class="canvas-hint">赤＝定抵抗円 (r=0.2,0.5,1,2,5)／青＝定リアクタンス円 (x=±0.2,±0.5,±1,±2,±5)／緑破線＝|Γ| 円／黄点＝現在の Γ。負荷から発生器へ向かうと Γ は時計回りに回転します。</p>
     </div>
 
     <div class="chart-card">
@@ -207,216 +281,305 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Smith Chart Simulator ==========
+// ========== Smith Chart Simulator v2 (animated, IIFE-isolated) ==========
+(function(){
+"use strict";
 var smithCanvas = document.getElementById('smithCanvas');
 var ctx = smithCanvas.getContext('2d');
 var C_LIGHT = 2.99792458e8; // m/s
+var TXT = {
+  matched: 'Γ = 0  (z = 1, 整合)',
+  load: '負荷端（d=0）。線路長を進めると入力端の値に切り替わります。',
+  inputAt: function(d){ return '入力端（負荷から d = ' + d.toFixed(3) + ' λ）。発生器側へ時計回りに回転。'; }
+};
+var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function getParams() {
-  var Z0 = parseFloat(document.getElementById('slZ0').value);
-  var ZLre = parseFloat(document.getElementById('slZLre').value);
-  var ZLim = parseFloat(document.getElementById('slZLim').value);
-  var fGHz = parseFloat(document.getElementById('slFreq').value);
-  return { Z0: Z0, ZLre: ZLre, ZLim: ZLim, fGHz: fGHz };
+function el(id){ return document.getElementById(id); }
+function num(id){ return parseFloat(el(id).value); }
+
+function getParams(){
+  return {
+    Z0: num('slZ0'),
+    ZLre: num('slZLre'),
+    ZLim: num('slZLim'),
+    fGHz: num('slFreq'),
+    line: num('slLine') // electrical length toward generator in wavelengths
+  };
 }
 
 // complex divide (a+jb)/(c+jd)
-function cdiv(a, b, c, d) {
-  var den = c * c + d * d;
-  return { re: (a * c + b * d) / den, im: (b * c - a * d) / den };
+function cdiv(a, b, c, d){
+  var den = c*c + d*d;
+  return { re:(a*c + b*d)/den, im:(b*c - a*d)/den };
 }
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(smithCanvas.parentElement.clientWidth - 40, 720));
-  var __novaW = w;
-  var __novaH = Math.round(w * 0.9);
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  smithCanvas.style.width = __novaW + 'px';
-  smithCanvas.style.height = __novaH + 'px';
-  smithCanvas.width = Math.round(__novaW * __novaDpr);
-  smithCanvas.height = Math.round(__novaH * __novaDpr);
-  smithCanvas.dataset.cssW = String(__novaW);
-  smithCanvas.dataset.cssH = String(__novaH);
-  var __novaCtx = smithCanvas.getContext && smithCanvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+/* ===== HiDPI canvas ===== */
+var cssW = 0, cssH = 0;
+function resizeCanvas(){
+  var w = Math.max(280, Math.min(smithCanvas.parentElement.clientWidth - 40, 640));
+  cssW = w; cssH = Math.round(w * 0.92);
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  smithCanvas.style.width = cssW + 'px';
+  smithCanvas.style.height = cssH + 'px';
+  smithCanvas.width = Math.round(cssW * dpr);
+  smithCanvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function drawSmithChart(gammaRe, gammaIm) {
-  var W = __novaCanvasCssW(smithCanvas), H = __novaCanvasCssH(smithCanvas);
+/* ===== Chart drawing ===== */
+// gL = load reflection coefficient {re,im}; gIn = input reflection at current line length
+function drawChart(gL, gIn){
+  var W = cssW, H = cssH;
+  ctx.clearRect(0,0,W,H);
   ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0,0,W,H);
 
-  var cx = W * 0.5, cy = H * 0.5;
-  var R = Math.min(W, H) * 0.42; // chart radius in pixels
+  var cx = W*0.5, cy = H*0.5;
+  var R = Math.min(W,H) * 0.42;
+  function ux(u){ return cx + u*R; }
+  function vy(v){ return cy - v*R; }
 
-  // map Γ-plane (u, v) in [-1, 1] to pixel (px, py)
-  function ux(u) { return cx + u * R; }
-  function vy(v) { return cy - v * R; }
-
-  // outer unit circle (|Γ| = 1)
+  // outer unit circle
   ctx.strokeStyle = '#cfe3f7';
   ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, Math.PI * 2);
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.stroke();
 
-  // real axis (horizontal diameter)
+  // real axis
   ctx.strokeStyle = 'rgba(143,184,224,0.45)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(ux(-1), vy(0)); ctx.lineTo(ux(1), vy(0)); ctx.stroke();
 
-  // helper: draw an arc of an arbitrary circle clipped to the unit disk
-  function drawClippedCircle(cu, cv, rr, color, width) {
-    // sample a polyline and only draw segments inside |Γ| ≤ 1.001
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
+  function drawClippedCircle(cu, cv, rr, color, width){
+    ctx.strokeStyle = color; ctx.lineWidth = width;
     ctx.beginPath();
-    var Np = 200;
-    var first = true;
-    for (var i = 0; i <= Np; i++) {
-      var th = i / Np * Math.PI * 2;
-      var u = cu + rr * Math.cos(th);
-      var v = cv + rr * Math.sin(th);
-      var rho2 = u * u + v * v;
-      if (rho2 <= 1.001) {
-        if (first) { ctx.moveTo(ux(u), vy(v)); first = false; }
+    var Np = 200, first = true;
+    for (var i=0;i<=Np;i++){
+      var th = i/Np*Math.PI*2;
+      var u = cu + rr*Math.cos(th);
+      var v = cv + rr*Math.sin(th);
+      if (u*u + v*v <= 1.001){
+        if (first){ ctx.moveTo(ux(u), vy(v)); first = false; }
         else ctx.lineTo(ux(u), vy(v));
-      } else {
-        first = true;
-      }
+      } else { first = true; }
     }
     ctx.stroke();
   }
 
   // constant-resistance circles (red)
   var rValues = [0, 0.2, 0.5, 1, 2, 5];
-  for (var i = 0; i < rValues.length; i++) {
+  for (var i=0;i<rValues.length;i++){
     var r = rValues[i];
-    var rc = r / (1 + r), rr = 1 / (1 + r);
+    var rc = r/(1+r), rr = 1/(1+r);
     var isMain = (r === 1);
-    drawClippedCircle(rc, 0, rr, isMain ? 'rgba(231,76,60,0.85)' : 'rgba(231,76,60,0.45)', isMain ? 1.5 : 1);
+    drawClippedCircle(rc, 0, rr, isMain ? 'rgba(231,76,60,0.85)' : 'rgba(231,76,60,0.40)', isMain ? 1.5 : 1);
   }
-
-  // constant-reactance circles (blue), both +x and -x
+  // constant-reactance circles (blue)
   var xValues = [0.2, 0.5, 1, 2, 5];
-  for (var j = 0; j < xValues.length; j++) {
+  for (var j=0;j<xValues.length;j++){
     var x = xValues[j];
     var isMain = (x === 1);
-    var col = isMain ? 'rgba(0,180,216,0.85)' : 'rgba(0,180,216,0.45)';
+    var col = isMain ? 'rgba(0,180,216,0.85)' : 'rgba(0,180,216,0.40)';
     var lw = isMain ? 1.5 : 1;
-    // +x circle: center (1, 1/x), radius 1/x
-    drawClippedCircle(1, 1 / x, 1 / x, col, lw);
-    // -x circle: center (1, -1/x), radius 1/x
-    drawClippedCircle(1, -1 / x, 1 / x, col, lw);
+    drawClippedCircle(1, 1/x, 1/x, col, lw);
+    drawClippedCircle(1, -1/x, 1/x, col, lw);
   }
 
-  // |Γ| circle (green dashed)
-  var absG = Math.sqrt(gammaRe * gammaRe + gammaIm * gammaIm);
-  if (absG > 0.001 && absG < 1.001) {
+  // |Γ| (VSWR / constant-reflection) circle — same radius for load & input
+  var absG = Math.sqrt(gIn.re*gIn.re + gIn.im*gIn.im);
+  if (absG > 0.001 && absG < 1.001){
     ctx.strokeStyle = 'rgba(0,184,148,0.85)';
     ctx.lineWidth = 1.6;
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    ctx.arc(cx, cy, absG * R, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.arc(cx, cy, absG*R, 0, Math.PI*2); ctx.stroke();
     ctx.setLineDash([]);
   }
 
-  // matched center marker (Γ = 0)
+  // matched center marker
   ctx.fillStyle = 'rgba(207,227,247,0.5)';
-  ctx.beginPath();
-  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill();
 
-  // current Γ point (yellow)
-  if (absG <= 1.001) {
-    var gpx = ux(gammaRe), gpy = vy(gammaIm);
-    // radial line from origin
+  // arc swept from load to input (shows the rotation path along the line)
+  var dLine = num('slLine');
+  if (dLine > 0.0005 && absG > 0.001 && absG < 1.001){
+    var angL = Math.atan2(gL.im, gL.re);
+    var sweep = 4*Math.PI*dLine; // total clockwise rotation = 2*beta*d = 2*(2π/λ)*d = 4π d/λ
+    ctx.strokeStyle = 'rgba(255,209,102,0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    var Na = 80;
+    for (var k=0;k<=Na;k++){
+      var ang = angL - sweep*k/Na; // clockwise (toward generator)
+      var pu = absG*Math.cos(ang), pv = absG*Math.sin(ang);
+      if (k===0) ctx.moveTo(ux(pu), vy(pv)); else ctx.lineTo(ux(pu), vy(pv));
+    }
+    ctx.stroke();
+    // load marker (faint white)
+    ctx.beginPath(); ctx.arc(ux(gL.re), vy(gL.im), 4.5, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill();
+  }
+
+  // current Γ point (yellow) + radial line
+  if (absG <= 1.001){
+    var gpx = ux(gIn.re), gpy = vy(gIn.im);
     ctx.strokeStyle = 'rgba(255,209,102,0.6)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(gpx, gpy); ctx.stroke();
-    // dot
-    ctx.beginPath();
-    ctx.arc(gpx, gpy, 6, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.arc(gpx, gpy, 6, 0, Math.PI*2);
     ctx.fillStyle = '#FFD166';
     ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.fill(); ctx.shadowBlur = 0;
   }
 
   // labels
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '11px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('Γ = 0  (z = 1, 整合)', cx, cy + R + 18);
-  ctx.textAlign = 'left';
-  ctx.fillText('r=0', ux(-1) + 4, vy(0) - 4);
-  ctx.textAlign = 'right';
-  ctx.fillText('r=∞', ux(1) - 4, vy(0) - 4);
+  ctx.fillText(TXT.matched, cx, cy + R + 18);
+  ctx.textAlign = 'left';  ctx.fillText('r=0', ux(-1)+4, vy(0)-4);
+  ctx.textAlign = 'right'; ctx.fillText('r=∞', ux(1)-4, vy(0)-4);
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(231,76,60,0.9)';
-  ctx.fillText('r=1', ux(0) + 2, vy(0) - 4);
+  ctx.fillStyle = 'rgba(231,76,60,0.9)'; ctx.fillText('r=1', ux(0)+2, vy(0)-4);
   ctx.fillStyle = 'rgba(0,180,216,0.9)';
-  ctx.fillText('+x', ux(0.4) + 8, vy(0.55));
-  ctx.fillText('-x', ux(0.4) + 8, vy(-0.55) + 12);
+  ctx.fillText('+x', ux(0.4)+8, vy(0.55));
+  ctx.fillText('-x', ux(0.4)+8, vy(-0.55)+12);
 }
 
-function fmtSigned(v, digits) {
-  var s = v >= 0 ? '+' : '-';
-  return s + Math.abs(v).toFixed(digits);
+function fmtZ(re, im){
+  return re.toFixed(1) + (im >= 0 ? ' + j' : ' - j') + Math.abs(im).toFixed(1);
 }
 
-function compute() {
+/* ===== Core compute (called on every param change & animation frame) ===== */
+function compute(){
   var p = getParams();
   if (!isFinite(p.Z0) || p.Z0 <= 0 || !isFinite(p.ZLre) || !isFinite(p.ZLim) || !isFinite(p.fGHz) || p.fGHz <= 0) return;
-  // normalized impedance z = Z_L / Z_0
-  var r = p.ZLre / p.Z0;
-  var x = p.ZLim / p.Z0;
-  // Γ = (z - 1) / (z + 1)
-  var g = cdiv(r - 1, x, r + 1, x);
-  var absG = Math.sqrt(g.re * g.re + g.im * g.im);
-  var angG = Math.atan2(g.im, g.re) * 180 / Math.PI;
-  // VSWR
-  var vswr = absG >= 1 ? Infinity : (1 + absG) / (1 - absG);
-  // wavelength in free space (mm)
-  var lambdaMm = (C_LIGHT / (p.fGHz * 1e9)) * 1000;
+  // normalized load impedance z = Z_L / Z_0
+  var r = p.ZLre/p.Z0, x = p.ZLim/p.Z0;
+  // load reflection Γ_L = (z-1)/(z+1)
+  var gL = cdiv(r-1, x, r+1, x);
+  var absG = Math.sqrt(gL.re*gL.re + gL.im*gL.im);
+  var angL = Math.atan2(gL.im, gL.re);
 
-  document.getElementById('statZNorm').textContent = r.toFixed(2) + ' ' + fmtSigned(x, 2).replace(/^([+\-])/, '$1 j').replace(' ', '');
-  // friendlier format: "1.50 + j2.00" / "1.50 - j2.00"
+  // input reflection after line length d (toward generator): rotate clockwise by 2*beta*d = 4π d/λ
+  var d = isFinite(p.line) ? p.line : 0;
+  var phi = angL - 4*Math.PI*d;
+  var gIn = { re: absG*Math.cos(phi), im: absG*Math.sin(phi) };
+
+  // VSWR & return loss (|Γ| invariant along lossless line)
+  var vswr = absG >= 1 ? Infinity : (1+absG)/(1-absG);
+  var rlDb = absG > 1e-6 ? -20*Math.log10(Math.min(absG,1)) : Infinity;
+
+  // input impedance: z_in = (1+Γ_in)/(1-Γ_in), Z_in = z_in * Z0
+  var zin = cdiv(1+gIn.re, gIn.im, 1-gIn.re, -gIn.im);
+  var Zin_re = zin.re*p.Z0, Zin_im = zin.im*p.Z0;
+
+  var lambdaMm = (C_LIGHT/(p.fGHz*1e9))*1000;
+
+  // static result cards (load impedance values)
   var zStr = r.toFixed(2) + (x >= 0 ? ' + j' : ' - j') + Math.abs(x).toFixed(2);
-  document.getElementById('statZNorm').textContent = zStr;
-  document.getElementById('statGamma').textContent = absG.toFixed(3) + ' ∠ ' + angG.toFixed(1) + '°';
-  document.getElementById('statVSWR').textContent = isFinite(vswr) ? vswr.toFixed(2) : '∞';
-  document.getElementById('statWavelength').textContent = lambdaMm >= 1000
-    ? (lambdaMm / 1000).toFixed(2) + ' m'
-    : lambdaMm.toFixed(1) + ' mm';
+  el('statZNorm').textContent = zStr;
+  el('statGamma').textContent = absG.toFixed(3) + ' ∠ ' + (angL*180/Math.PI).toFixed(1) + '°';
+  el('statVSWR').textContent = isFinite(vswr) ? vswr.toFixed(2) : '∞';
+  el('statWavelength').textContent = lambdaMm >= 1000 ? (lambdaMm/1000).toFixed(2)+' m' : lambdaMm.toFixed(1)+' mm';
 
-  drawSmithChart(g.re, g.im);
+  // live readouts (input-end values at current line length)
+  el('roGamma').textContent = absG.toFixed(3) + ' ∠ ' + (phi*180/Math.PI).toFixed(0) + '°';
+  el('roVSWR').textContent = isFinite(vswr) ? vswr.toFixed(2) : '∞';
+  el('roRL').textContent = isFinite(rlDb) ? rlDb.toFixed(1) : '∞';
+  el('roZin').textContent = fmtZ(Zin_re, Zin_im);
+  el('roNote').textContent = d > 0.0005 ? TXT.inputAt(d) : TXT.load;
+
+  drawChart(gL, gIn);
 }
 
-function resetParams() {
-  var defs = { slZ0: 50, slZLre: 75, slZLim: 100, slFreq: 2.4 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slZ0'), 'slZ0Val', 0, '');
-  updateSlider(document.getElementById('slZLre'), 'slZLreVal', 0, '');
-  updateSlider(document.getElementById('slZLim'), 'slZLimVal', 0, '');
-  updateSlider(document.getElementById('slFreq'), 'slFreqVal', 1, '');
+/* ===== Animation (rotate along the transmission line) ===== */
+var playing = false, animId = null, speedMult = 1, lastTs = 0;
+function loop(ts){
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dtReal = Math.min(0.05, (ts - lastTs)/1000);
+  lastTs = ts;
+  var d = num('slLine') + dtReal * 0.12 * speedMult; // ~one λ/2 every ~4s at 1x
+  if (d > 0.5) d -= 0.5; // wrap one full revolution (λ/2)
+  el('slLine').value = d.toFixed(3);
+  el('slLineR').value = d.toFixed(3);
+  updateSlider(el('slLineR'), null, 3, '');
   compute();
+  animId = requestAnimationFrame(loop);
 }
+function startPlay(){
+  if (prefersReduced){ return; } // honor reduced motion: no continuous animation
+  playing = true; lastTs = 0;
+  el('btnPlay').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing = false;
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+  el('btnPlay').innerHTML = '<i class="fas fa-play"></i> 線路で回転';
+}
+window.togglePlay = function(){ playing ? stopPlay() : startPlay(); };
+window.setSpeed = function(s){
+  speedMult = s;
+  document.querySelectorAll('.speed-btn').forEach(function(b){
+    b.classList.toggle('active', parseFloat(b.dataset.speed) === s);
+  });
+};
+window.resetLine = function(){
+  stopPlay();
+  el('slLine').value = '0'; el('slLineR').value = '0';
+  updateSlider(el('slLineR'), null, 3, '');
+  compute();
+};
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+/* ===== Presets ===== */
+window.setPreset = function(name){
+  stopPlay();
+  var P = {
+    matched: { Z0:50, ZLre:50,  ZLim:0,   line:0 },
+    open:    { Z0:50, ZLre:500, ZLim:0,   line:0 },
+    short:   { Z0:50, ZLre:1,   ZLim:0,   line:0 },
+    vswr2:   { Z0:50, ZLre:100, ZLim:0,   line:0 },
+    rotate:  { Z0:50, ZLre:100, ZLim:80,  line:0 }
+  }[name];
+  if (!P) return;
+  el('slZ0').value = P.Z0;   el('slZ0Val').value = P.Z0;
+  el('slZLre').value = P.ZLre; el('slZLreVal').value = P.ZLre;
+  el('slZLim').value = P.ZLim; el('slZLimVal').value = P.ZLim;
+  el('slLine').value = P.line; el('slLineR').value = P.line;
+  updateSlider(el('slZ0'),'slZ0Val',0,'');
+  updateSlider(el('slZLre'),'slZLreVal',0,'');
+  updateSlider(el('slZLim'),'slZLimVal',0,'');
+  updateSlider(el('slLineR'), null, 3, '');
+  document.querySelectorAll('.preset-btn').forEach(function(b){ b.classList.remove('active'); });
+  compute();
+  if (name === 'rotate'){ el('slZLim').value = 80; el('slZLimVal').value = 80; updateSlider(el('slZLim'),'slZLimVal',0,''); compute(); startPlay(); }
+};
+
+window.resetParams = function(){
+  stopPlay();
+  var defs = { slZ0:50, slZLre:75, slZLim:100, slFreq:2.4, slLine:0, slLineR:0 };
+  Object.keys(defs).forEach(function(id){ var e = el(id); if (e) e.value = defs[id]; });
+  el('slZ0Val').value = 50; el('slZLreVal').value = 75; el('slZLimVal').value = 100; el('slFreqVal').value = 2.4;
+  updateSlider(el('slZ0'),'slZ0Val',0,'');
+  updateSlider(el('slZLre'),'slZLreVal',0,'');
+  updateSlider(el('slZLim'),'slZLimVal',0,'');
+  updateSlider(el('slFreq'),'slFreqVal',1,'');
+  updateSlider(el('slLineR'), null, 3, '');
+  compute();
+};
+
+// expose compute so inline oninput handlers keep working
+window.compute = compute;
+
+smithCanvas.addEventListener('keydown', function(e){
+  if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); window.togglePlay(); }
+});
+
+window.addEventListener('resize', function(){ resizeCanvas(); compute(); });
 
 resizeCanvas();
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -484,6 +647,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="smith-chart.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -538,13 +704,13 @@ compute();
 <h3>使い方ガイド</h3>
 <ol>
 <li>特性インピーダンス Z₀ を設定します。同軸ケーブル RG-58 は 50Ω、RG-11 は 75Ω が標準です。</li>
-<li>負荷インピーダンス Z_L の実部（抵抗成分）と虚部（リアクタンス成分）をΩ単位で入力します。例：Z_L = 75 + j40Ω の場合、実部 75、虚部 +40 と指定します。</li>
-<li>周波数を MHz または GHz で指定すると、自由空間波長 λ = c/f が自動計算され、スミスチャート上に正規化点がプロットされます。</li>
+<li>負荷インピーダンス Z_L の実部（抵抗成分）と虚部（リアクタンス成分）をΩ単位で入力します。例：Z_L = 75 + j25Ω の場合、実部 75、虚部 +25 と指定します。</li>
+<li>周波数を GHz で指定すると、自由空間波長 λ = c/f が自動計算され、スミスチャート上に正規化点がプロットされます。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>Z₀ = 50Ω、Z_L = 75 + j25Ω、周波数 2.4 GHz の場合：正規化インピーダンス z = 1.5 + j0.5、反射係数 Γ = 0.408∠31.0°、VSWR = 2.41、波長 λ = 125mm です。このスミスチャート上の点は定抵抗円 1.5 と定リアクタンス円 +0.5 の交点にプロットされ、原点からの距離が反射係数の絶対値 |Γ| = 0.408 に対応します。</p>
+<p>Z₀ = 50Ω、Z_L = 75 + j25Ω、周波数 2.4 GHz の場合：正規化インピーダンス z = 1.5 + j0.5、反射係数 Γ = 0.277∠33.7°、VSWR = 1.77、波長 λ = 125mm です。このスミスチャート上の点は定抵抗円 1.5 と定リアクタンス円 +0.5 の交点にプロットされ、原点からの距離が反射係数の絶対値 |Γ| = 0.277 に対応します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -553,6 +719,22 @@ compute();
 <li>VSWR が 1.5 を超える場合、トランスミッションライン整合（λ/4 または λ/8 スタブ挿入）を検討してください。スミスチャート上で反射係数が中心に近づくと整合精度が向上します。</li>
 <li>負荷がリアクティブ成分を含む場合、周波数変化によってインピーダンスが大きく変動します。広帯域整合にはブロードバンド トランスフォーマや L型整合回路が有効です。</li>
 </ul>
+</div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
+<div class="howto-card">
+<h3>準拠規格・前提条件</h3>
+<p><strong>準拠/参考：</strong> 伝送線路の反射理論。反射係数 \( \Gamma=\dfrac{Z_L-Z_0}{Z_L+Z_0}=\dfrac{z-1}{z+1} \)（\( z=Z_L/Z_0 \)）、定在波比 \( \mathrm{VSWR}=\dfrac{1+|\Gamma|}{1-|\Gamma|} \)。スミスチャートは正規化インピーダンスを単位 |Γ| 円に写す双線形変換（定抵抗円・定リアクタンス円）。出典：Smith(1939)、Pozar「マイクロ波工学」。</p>
+<p><strong>モデルの前提：</strong> 無損失線路、単一周波数、正規化インピーダンス表示。整合（Z_L=Z₀）で Γ=0・VSWR=1、Z_L=100+j50・Z₀=50 で Γ=0.4+j0.2・|Γ|=0.447・VSWR=2.618、短絡（Z_L=0）で Γ=−1・VSWR=∞ を確認済み。自由空間波長 λ=c/f は参考表示。</p>
+<p><strong>適用範囲・限界：</strong> 1点の負荷整合の直感を養う教育ツール。線路損失・分散、周波数掃引、Sパラメータ網羅、スタブ整合の自動設計は対象外。実機では損失・寄生・帯域を別途評価のこと。</p>
 </div>
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">

@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "感染症SIRモデルシミュレーター — 集団免疫と感染拡大",
       "description": "SIR/SEIR/SIRSモデルで感染症の拡大をシミュレーション。基本再生産数R₀・集団免疫閾値・ワクチン効果をリアルタイム可視化。",
       "url": "https://novasolver.jp/tools/epidemic-sir.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["SIR/SEIR/SIRSモデルの切り替え","基本再生産数R₀のリアルタイム表示","ワクチン接種率による集団免疫シミュレーション","季節性変動・再流行・潜伏期間の拡張モデル","COVID-19・インフルエンザ・麻疹のプリセット"],
       "keywords": "SIRモデル,感染症,集団免疫,R0,ワクチン,COVID-19,数理生物学,流行モデル",
       "datePublished": "2026-04-08",
@@ -135,6 +135,24 @@ details.theory-box[open]>summary h3,details.theory-box[open]>summary h4{margin-b
 details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
+
+/* ===== v2 live sim ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:6px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+#simCanvas{border-radius:8px;background:#0a1628;display:block;width:100%;max-width:100%;height:340px}
+#simCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:14px;height:14px;border-radius:3px;display:inline-block}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+@media (prefers-reduced-motion: reduce){.ebar-fill{transition:none}}
+/* end v2 additions */
 
 </style>
 <meta property="og:type" content="article">
@@ -268,7 +286,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">主要指標</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right viz panel -->
@@ -282,9 +308,30 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 時系列グラフ（S/I/R vs 日数）</div><canvas class="ux-chartjs-canvas" id="sirChart"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> 流行中ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roDay">0</div><div class="rl">経過日数 t [日]</div></div>
+        <div class="live-ro"><div class="rv" id="roInf">0.0%</div><div class="rl">現在の感染者 I</div></div>
+        <div class="live-ro"><div class="rv" id="roR0">2.50</div><div class="rl">基本再生産数 R₀</div></div>
+        <div class="live-ro"><div class="rv" id="roRt">2.50</div><div class="rl">実効再生産数 Rₜ</div></div>
+        <div class="live-ro"><div class="rv" id="roRec">0.0%</div><div class="rl">回復・免疫 R</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 感染波の伝播（住民グリッド）＋ S/I/R 流行曲線</div>
+      <canvas id="simCanvas" tabindex="0" role="img" aria-label="住民グリッドを赤い感染波が伝播し、S/I/R曲線がリアルタイムで描かれるアニメーション"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#3b82f6"></i>未感染 S</span>
+        <span><i class="swatch" style="background:#e74c3c"></i>感染中 I</span>
+        <span><i class="swatch" style="background:#9aa3ad"></i>回復・免疫 R</span>
+      </div>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" id="btnReplay" onclick="replaySim()"><i class="fas fa-rotate-left"></i> 最初から</button>
+      </div>
+    </div>
     <div id="peakNote" style="font-size:0.78rem;color:var(--muted);margin-top:8px;text-align:center"></div>
-  
+
 
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
@@ -300,202 +347,337 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
+(function(){
+"use strict";
+const LBL = {
+  herd: (h,v)=>` 集団免疫閾値: ${h}（現在ワクチン接種率: ${v}%）`,
+  extinct: ' R₀ < 1 のため自然終息します。',
+  curveTitle: 'S / I / R 流行曲線',
+  gridTitle: '住民グリッド（感染の伝播）',
+  day: '日'
+};
 
-let chart = null;
+const $ = id => document.getElementById(id);
+const canvas = $('simCanvas');
+const ctx = canvas.getContext('2d');
 
 function getParams(){
   return {
-    N: parseFloat(document.getElementById('sN').value),
-    I0: parseFloat(document.getElementById('sI0').value),
-    beta: parseFloat(document.getElementById('sBeta').value),
-    gamma: parseFloat(document.getElementById('sGamma').value),
-    sigma: 1 / parseFloat(document.getElementById('sSigma').value),
-    xi: parseFloat(document.getElementById('sXi').value),
-    vax: parseFloat(document.getElementById('sVax').value) / 100,
-    days: parseInt(document.getElementById('sDays').value),
-    eps: parseFloat(document.getElementById('sEps').value),
-    model: document.getElementById('modelType').value
+    N: parseFloat($('sN').value),
+    I0: parseFloat($('sI0').value),
+    beta: parseFloat($('sBeta').value),
+    gamma: parseFloat($('sGamma').value),
+    sigma: 1 / parseFloat($('sSigma').value),
+    xi: parseFloat($('sXi').value),
+    vax: parseFloat($('sVax').value) / 100,
+    days: parseInt($('sDays').value),
+    eps: parseFloat($('sEps').value),
+    model: $('modelType').value
   };
-}function rk4Step(f, y, t, dt){
+}
+
+function rk4Step(f, y, t, dt){
   const k1 = f(t, y);
   const k2 = f(t + dt/2, y.map((yi,i) => yi + dt/2 * k1[i]));
   const k3 = f(t + dt/2, y.map((yi,i) => yi + dt/2 * k2[i]));
   const k4 = f(t + dt, y.map((yi,i) => yi + dt * k3[i]));
   return y.map((yi,i) => yi + dt/6 * (k1[i] + 2*k2[i] + 2*k3[i] + k4[i]));
-}function simulate(){
+}
+
+// ===== ODE integration: returns full time series (S,I,R fractions per day) =====
+let SIM = null;   // { p, r0, herd, series:[{t,S,I,R,E}], peakI, peakDay, finalR }
+
+function deriv(model, s, beta, gamma, sigma, xi, N){
+  if (model === 'SEIR'){
+    const inf = beta * s[0] * s[2] / N;
+    const exp = sigma * s[1];
+    const rec = gamma * s[2];
+    return [-inf, inf - exp, exp - rec, rec];
+  } else if (model === 'SIRS'){
+    const inf = beta * s[0] * s[1] / N;
+    const rec = gamma * s[1];
+    const wan = xi * s[2];
+    return [-inf + wan, inf - rec, rec - wan];
+  }
+  const inf = beta * s[0] * s[1] / N;
+  const rec = gamma * s[1];
+  return [-inf, inf - rec, rec];
+}
+
+function runODE(){
   const p = getParams();
-  const { N, I0, beta, gamma, sigma, xi, vax, days, eps, model }= p;
-
-  // Update model-specific panels
-  document.getElementById('seirGroup').style.display = model === 'SEIR' ? '' : 'none';
-  document.getElementById('sirsGroup').style.display = model === 'SIRS' ? '' : 'none';
-
-  // R0
+  const { N, I0, beta, gamma, sigma, xi, vax, days, eps, model } = p;
   const r0 = beta / gamma;
-  const r0El = document.getElementById('r0Val');
-  const r0Box = document.getElementById('r0Box');
-  r0El.textContent = r0.toFixed(2);
-  if (r0 > 1){
-    r0El.className = 'r0-value danger';
-    r0Box.className = 'r0-display danger';
-  }else{
-    r0El.className = 'r0-value safe';
-    r0Box.className = 'r0-display safe';
-  }// Initial conditions accounting for vaccination
-  const S0 = N * (1 - vax) - I0;
+  const S0 = Math.max(0, N * (1 - vax) - I0);
   const R0init = N * vax;
   const dt = 0.5;
   const steps = Math.round(days / dt);
 
-  let labels = [], sData = [], iData = [], rData = [], eData = [];
+  let y = (model === 'SEIR')
+    ? [Math.max(0, S0 - 1), 1, I0, R0init]   // S,E,I,R
+    : [S0, I0, R0init];                      // S,I,R
+
+  const series = [];
   let peakI = 0, peakDay = 0;
-
-  let y;
-  if (model === 'SEIR'){
-    y = [Math.max(0, S0 - 1), 1, I0, R0init]; // S, E, I, R
-  }else{
-    y = [Math.max(0, S0), I0, R0init]; // S, I, R
-  }for (let step = 0; step <= steps; step++){
+  for (let step = 0; step <= steps; step++){
     const t = step * dt;
-    const betaT = beta * (1 + eps * Math.cos(2 * Math.PI * t / 365));
-
-    if (step % 2 === 0) { // store every 1 day
-      labels.push(Math.round(t));
-      if (model === 'SEIR') {
-        sData.push(y[0]/N*100);
-        eData.push(y[1]/N*100);
-        iData.push(y[2]/N*100);
-        rData.push(y[3]/N*100);
-        if (y[2] > peakI) { peakI = y[2]; peakDay = Math.round(t); }
-      }else{
-        sData.push(y[0]/N*100);
-        iData.push(y[1]/N*100);
-        rData.push(y[2]/N*100);
-        if (y[1] > peakI) { peakI = y[1]; peakDay = Math.round(t); }
-      }
-    }if (model === 'SIR'){
-      y = rk4Step((t2, s) => {
-        const bT = beta * (1 + eps * Math.cos(2 * Math.PI * t2 / 365));
-        const inf = bT * s[0] * s[1] / N;
-        const rec = gamma * s[1];
-        return [-inf, inf - rec, rec];
-      }, y, t, dt);
-    }else if (model === 'SEIR'){
-      y = rk4Step((t2, s) => {
-        const bT = beta * (1 + eps * Math.cos(2 * Math.PI * t2 / 365));
-        const inf = bT * s[0] * s[2] / N;
-        const exp = sigma * s[1];
-        const rec = gamma * s[2];
-        return [-inf, inf - exp, exp - rec, rec];
-      }, y, t, dt);
-    }else{ // SIRS
-      y = rk4Step((t2, s) => {
-        const bT = beta * (1 + eps * Math.cos(2 * Math.PI * t2 / 365));
-        const inf = bT * s[0] * s[1] / N;
-        const rec = gamma * s[1];
-        const wan = xi * s[2];
-        return [-inf + wan, inf - rec, rec - wan];
-      }, y, t, dt);
+    const Iidx = (model === 'SEIR') ? 2 : 1;
+    const Ridx = (model === 'SEIR') ? 3 : 2;
+    const Eidx = (model === 'SEIR') ? 1 : -1;
+    if (step % 2 === 0){
+      const rec = {
+        t: Math.round(t),
+        S: y[0]/N, I: y[Iidx]/N, R: y[Ridx]/N,
+        E: Eidx >= 0 ? y[Eidx]/N : 0
+      };
+      series.push(rec);
+      if (y[Iidx] > peakI){ peakI = y[Iidx]; peakDay = Math.round(t); }
     }
-
-    // Clamp
+    const bT = beta * (1 + eps * Math.cos(2 * Math.PI * t / 365));
+    y = rk4Step((t2, s) => deriv(model, s, beta * (1 + eps * Math.cos(2 * Math.PI * t2 / 365)), gamma, sigma, xi, N), y, t, dt);
     y = y.map(v => Math.max(0, v));
-  }// Metrics
-  const finalR = model === 'SEIR' ? rData[rData.length-1] : rData[rData.length-1];
-  document.getElementById('mPeak').textContent = (peakI/N*100).toFixed(1) + '%';
-  document.getElementById('mAttack').textContent = finalR.toFixed(1) + '%';
-  document.getElementById('mDayPeak').textContent = peakDay + ' d';
-  const herd = r0 > 1 ? ((1 - 1/r0)*100).toFixed(0) + '%' : 'N/A';
-  document.getElementById('mHerd').textContent = herd;
+  }
+  const finalR = series[series.length-1].R;
+  SIM = { p, r0, herd: r0 > 1 ? (1 - 1/r0) : 0, series, peakI: peakI/N, peakDay, finalR };
+  return SIM;
+}
 
-  // Note
-  const vaxPct = (vax*100).toFixed(0);
-  const herdNote = r0 > 1
-    ? ` 集団免疫閾値: ${herd}（現在ワクチン接種率: ${vaxPct}%）`
-    : ' R₀ < 1 のため自然終息します。';
-  document.getElementById('peakNote').textContent = herdNote;
+// ===== Agent grid: cells with state 0=S,1=I,2=R; reseeded from the ODE I-fraction =====
+const GW = 46, GH = 22, NCELL = GW*GH;
+let grid = new Uint8Array(NCELL);
+let infAge = new Float32Array(NCELL);
 
-  // Chart datasets
-  const datasets = [];
-  datasets.push({
-    label: '未感染 S (%)',
-    data: sData,
-    borderColor: '#007BFF',
-    backgroundColor: 'rgba(0,123,255,0.08)',
-    borderWidth: 2,
-    pointRadius: 0,
-    fill: true,
-    tension: 0.3
-  });
-  if (model === 'SEIR'){
-    datasets.push({
-      label: '潜伏期 E (%)',
-      data: eData,
-      borderColor: '#f39c12',
-      backgroundColor: 'rgba(243,156,18,0.07)',
-      borderWidth: 2,
-      pointRadius: 0,
-      fill: false,
-      tension: 0.3
-    });
-  }datasets.push({
-    label: '感染中 I (%)',
-    data: iData,
-    borderColor: '#e74c3c',
-    backgroundColor: 'rgba(231,76,60,0.10)',
-    borderWidth: 2.5,
-    pointRadius: 0,
-    fill: true,
-    tension: 0.3
-  });
-  datasets.push({
-    label: '回復・免疫 R (%)',
-    data: rData,
-    borderColor: '#27ae60',
-    backgroundColor: 'rgba(39,174,96,0.07)',
-    borderWidth: 2,
-    pointRadius: 0,
-    fill: true,
-    tension: 0.3
-  });
+function seedGrid(vax){
+  grid = new Uint8Array(NCELL);
+  infAge = new Float32Array(NCELL);
+  // pre-immunise a vax fraction
+  for (let i=0;i<NCELL;i++){ if (Math.random() < vax) grid[i] = 2; }
+  // seed a small infected cluster in the centre
+  const cx = (GW>>1), cy = (GH>>1);
+  for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++){
+    const x = cx+dx, y = cy+dy;
+    if (x>=0&&x<GW&&y>=0&&y<GH){ grid[y*GW+x] = 1; infAge[y*GW+x]=0; }
+  }
+}
 
-  if (chart){
-    chart.data.labels = labels;
-    chart.data.datasets = datasets;
-    chart.update('none');
-  }else{
-    const ctx = document.getElementById('sirChart').getContext('2d');
-    chart = new Chart(ctx, {
-      type: 'line',
-      data: { labels, datasets },
-      options:{
-        responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,animation: { duration: 300 },
-        interaction:{ mode: 'index', intersect: false },
-        plugins:{
-          legend: { position: 'top', labels: { font: { size: 11 }, usePointStyle: true } },
-          tooltip:{
-            callbacks: {
-              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`
-            }
-          }
-        },
-        scales:{
-          x: { title: { display: true, text: '日数（days）', font: { size: 11 } },
-            ticks:{ maxTicksLimit: 10, font: { size: 10 } }
-          },
-          y:{
-            title: { display: true, text: '人口割合（%）', font: { size: 11 } },
-            min: 0,
-            max: 100,
-            ticks:{ callback: v => v + '%', font: { size: 10 } }
-          }
+// advance the agent grid one visual tick, tuned so its wave tracks R0
+function stepGrid(beta, gamma){
+  const pInf = Math.min(0.9, beta * 0.55);     // neighbour transmission prob
+  const pRec = Math.min(0.6, gamma * 1.2);      // recovery prob per tick
+  const next = grid.slice();
+  for (let y=0;y<GH;y++){
+    for (let x=0;x<GW;x++){
+      const i = y*GW+x;
+      if (grid[i] === 1){
+        infAge[i] += 1;
+        if (Math.random() < pRec){ next[i] = 2; continue; }
+        // infect S neighbours (4-neighbourhood)
+        const nb = [[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
+        for (const [nx,ny] of nb){
+          if (nx<0||nx>=GW||ny<0||ny>=GH) continue;
+          const j = ny*GW+nx;
+          if (grid[j] === 0 && Math.random() < pInf){ next[j] = 1; infAge[j]=0; }
         }
       }
-    });
+    }
   }
-}function applyPreset(name){
+  grid = next;
+}
+
+/* ===== HiDPI canvas ===== */
+let cssW = 0, cssH = 0, dpr = 1;
+function resizeCanvas(){
+  const rect = canvas.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width));
+  cssH = 340;
+  dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+const COL = { S:'#3b82f6', I:'#e74c3c', R:'#9aa3ad' };
+
+function drawFrame(frac){
+  // frac in [0,1] = progress through the simulation timeline
+  if (!SIM) return;
+  resizeCanvas();
+  const W = cssW, H = cssH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+  const gap = 16;
+  const gridH = Math.round(H * 0.46);
+  const curveTop = gridH + gap;
+  const curveH = H - curveTop - 28;
+
+  // ---- agent grid (top) ----
+  const padX = 10;
+  const cw = (W - padX*2) / GW;
+  const ch = gridH / GH;
+  const r = Math.max(1.4, Math.min(cw, ch)*0.42);
+  for (let y=0;y<GH;y++){
+    for (let x=0;x<GW;x++){
+      const st = grid[y*GW+x];
+      ctx.fillStyle = st===1 ? COL.I : (st===2 ? COL.R : COL.S);
+      const px = padX + x*cw + cw/2;
+      const py = y*ch + ch/2;
+      ctx.beginPath(); ctx.arc(px, py, r, 0, 6.2832); ctx.fill();
+    }
+  }
+  ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='left';
+  ctx.fillText(LBL.gridTitle, padX, gridH - 2 < 12 ? 12 : 12);
+
+  // ---- S/I/R curves (bottom) ----
+  const ser = SIM.series;
+  const n = ser.length;
+  const cutoff = Math.max(1, Math.floor(frac * (n-1)));
+  const cpadL = 34, cpadR = 10;
+  const cw2 = W - cpadL - cpadR;
+  const tx = i => cpadL + (i/(n-1)) * cw2;
+  const ty = v => curveTop + curveH - v * curveH;
+
+  // grid lines
+  ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1; ctx.font='9px Roboto Mono';
+  ctx.fillStyle='rgba(255,255,255,.4)'; ctx.textAlign='right';
+  for (let k=0;k<=4;k++){
+    const v = k/4, yy = ty(v);
+    ctx.beginPath(); ctx.moveTo(cpadL, yy); ctx.lineTo(W-cpadR, yy); ctx.stroke();
+    ctx.fillText((v*100).toFixed(0)+'%', cpadL-3, yy+3);
+  }
+  // herd immunity threshold line
+  if (SIM.herd > 0){
+    const yy = ty(SIM.herd);
+    ctx.strokeStyle='rgba(255,213,74,.55)'; ctx.setLineDash([4,4]); ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(cpadL, yy); ctx.lineTo(W-cpadR, yy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,213,74,.85)'; ctx.textAlign='left'; ctx.font='9px Noto Sans JP';
+    ctx.fillText('HIT '+(SIM.herd*100).toFixed(0)+'%', cpadL+2, yy-3);
+  }
+
+  function plot(key, color, width){
+    ctx.strokeStyle=color; ctx.lineWidth=width; ctx.beginPath();
+    for (let i=0;i<=cutoff;i++){
+      const X = tx(i), Y = ty(ser[i][key]);
+      i===0 ? ctx.moveTo(X,Y) : ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+  }
+  plot('S', COL.S, 2);
+  if (SIM.p.model === 'SEIR') plot('E', '#f39c12', 1.6);
+  plot('R', '#27ae60', 2);
+  plot('I', COL.I, 2.6);
+
+  // moving head dot on I curve
+  const hx = tx(cutoff), hy = ty(ser[cutoff].I);
+  ctx.beginPath(); ctx.arc(hx, hy, 4, 0, 6.2832); ctx.fillStyle=COL.I; ctx.fill();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+
+  // axis labels
+  ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='10px Noto Sans JP'; ctx.textAlign='center';
+  ctx.fillText(LBL.curveTitle, W/2, curveTop + curveH + 22);
+  ctx.fillStyle='rgba(255,255,255,.7)'; ctx.font='bold 11px Roboto Mono'; ctx.textAlign='right';
+  ctx.fillText('t = '+ser[cutoff].t+' '+LBL.day, W-cpadR, curveTop - 4);
+
+  updateLive(ser[cutoff]);
+}
+
+function updateLive(rec){
+  if (!SIM) return;
+  const Rt = SIM.r0 * rec.S;   // effective reproduction number
+  $('roDay').textContent = rec.t;
+  $('roInf').textContent = (rec.I*100).toFixed(1) + '%';
+  $('roR0').textContent = SIM.r0.toFixed(2);
+  $('roRt').textContent = Rt.toFixed(2);
+  $('roRec').textContent = (rec.R*100).toFixed(1) + '%';
+}
+
+/* ===== animation loop ===== */
+let playing = true, animId = null, lastTs = 0, simFrac = 0, gridAcc = 0;
+const SIM_SECONDS = 9;   // time to sweep full timeline
+
+function loop(ts){
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  const d = Math.min(0.05, (ts - lastTs)/1000);
+  lastTs = ts;
+  simFrac += d / SIM_SECONDS;
+  // advance the agent grid roughly in step with infection prevalence
+  gridAcc += d;
+  if (gridAcc > 0.12){
+    gridAcc = 0;
+    stepGrid(SIM.p.beta, SIM.p.gamma);
+  }
+  if (simFrac >= 1){
+    simFrac = 1; drawFrame(1);
+    // brief hold, then restart
+    playing = false;
+    setTimeout(()=>{ if (!document.hidden){ restartCycle(); } }, 1100);
+    return;
+  }
+  drawFrame(simFrac);
+  animId = requestAnimationFrame(loop);
+}
+
+function restartCycle(){
+  simFrac = 0; lastTs = 0; gridAcc = 0;
+  seedGrid(SIM.p.vax);
+  playing = true;
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+
+function startLoop(){
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    seedGridFull();        // fully-evolved static grid
+    drawFrame(1);
+    playing = false;
+    $('btnPlay').innerHTML = '<i class="fas fa-play"></i> 再生';
+    return;
+  }
+  restartCycle();
+}
+
+// for reduced-motion: paint the grid at its final state (matches final R)
+function seedGridFull(){
+  seedGrid(SIM.p.vax);
+  // run many ticks so the wave has fully passed
+  for (let k=0;k<120;k++) stepGrid(SIM.p.beta, SIM.p.gamma);
+}
+
+/* ===== public hooks (called from inline handlers) ===== */
+function simulate(){
+  const p = getParams();
+  $('seirGroup').style.display = p.model === 'SEIR' ? '' : 'none';
+  $('sirsGroup').style.display = p.model === 'SIRS' ? '' : 'none';
+
+  const r0El = $('r0Val'), r0Box = $('r0Box');
+  r0El.textContent = p.beta.toFixed ? (p.beta/p.gamma).toFixed(2) : '';
+  const r0 = p.beta / p.gamma;
+  r0El.textContent = r0.toFixed(2);
+  r0El.className = r0 > 1 ? 'r0-value danger' : 'r0-value safe';
+  r0Box.className = r0 > 1 ? 'r0-display danger' : 'r0-display safe';
+
+  runODE();
+
+  // metrics
+  $('mPeak').textContent = (SIM.peakI*100).toFixed(1) + '%';
+  $('mAttack').textContent = (SIM.finalR*100).toFixed(1) + '%';
+  $('mDayPeak').textContent = SIM.peakDay + ' d';
+  const herdTxt = r0 > 1 ? (SIM.herd*100).toFixed(0) + '%' : 'N/A';
+  $('mHerd').textContent = herdTxt;
+  $('peakNote').textContent = r0 > 1
+    ? LBL.herd(herdTxt, (p.vax*100).toFixed(0))
+    : LBL.extinct;
+
+  // (re)start visual cycle
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+  startLoop();
+  if (playing) $('btnPlay').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+}
+
+function applyPreset(name){
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (typeof event !== 'undefined' && event && event.target) event.target.classList.add('active');
   const presets = {
     influenza: { beta: 0.5, gamma: 0.25, vax: 0, model: 'SIR', days: 180, eps: 0 },
     covid:{ beta: 0.35, gamma: 0.10, vax: 0, model: 'SEIR', days: 365, eps: 0 },
@@ -505,27 +687,59 @@ function getParams(){
   };
   const p = presets[name];
   const set = (id, val) =>{
-    const el = document.getElementById(id);
+    const el = $(id);
     el.value = val;
     const min = parseFloat(el.min), max = parseFloat(el.max);
-    const pct = ((val - min) / (max - min) * 100).toFixed(1) + '%';
-    el.style.setProperty('--pct', pct);
+    el.style.setProperty('--pct', ((val - min) / (max - min) * 100).toFixed(1) + '%');
   };
-  set('sBeta', p.beta); document.getElementById('vBeta').value = p.beta.toFixed(2);
-  set('sGamma', p.gamma); document.getElementById('vGamma').value = p.gamma.toFixed(2);
-  set('sVax', p.vax); document.getElementById('vVax').value = p.vax;
-  set('sDays', p.days); document.getElementById('vDays').value = p.days + ' d';
-  set('sEps', p.eps); document.getElementById('vEps').value = p.eps.toFixed(2);
-  document.getElementById('modelType').value = p.model;
+  set('sBeta', p.beta); $('vBeta').value = p.beta.toFixed(2);
+  set('sGamma', p.gamma); $('vGamma').value = p.gamma.toFixed(2);
+  set('sVax', p.vax); $('vVax').value = p.vax;
+  set('sDays', p.days); $('vDays').value = p.days;
+  set('sEps', p.eps); $('vEps').value = p.eps.toFixed(2);
+  $('modelType').value = p.model;
   simulate();
-}// Initialize sliders
+}
 
+function togglePlay(){
+  if (!SIM) return;
+  if (playing){
+    playing = false;
+    if (animId){ cancelAnimationFrame(animId); animId = null; }
+    $('btnPlay').innerHTML = '<i class="fas fa-play"></i> 再生';
+  } else {
+    playing = true; lastTs = 0;
+    $('btnPlay').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    if (!animId) animId = requestAnimationFrame(loop);
+  }
+}
+
+function replaySim(){
+  if (!SIM) return;
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+  $('btnPlay').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+  restartCycle();
+}
+
+// expose to inline handlers
+window.simulate = simulate;
+window.applyPreset = applyPreset;
+window.togglePlay = togglePlay;
+window.replaySim = replaySim;
+
+// init sliders
 document.querySelectorAll('input[type=range]').forEach(el =>{
   const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
   el.style.setProperty('--pct', ((val - min)/(max - min)*100).toFixed(1) + '%');
 });
 
+canvas.addEventListener('keydown', e=>{
+  if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); togglePlay(); }
+});
+window.addEventListener('resize', ()=>{ if (SIM) drawFrame(simFrac); });
+
 simulate();
+})();
 </script>
 
 <section class="explanation">
@@ -588,6 +802,9 @@ simulate();
 </section>
 
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="epidemic-sir.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -648,7 +865,7 @@ simulate();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>人口1000万人、初期感染者100人、ワクチン接種率30%の設定でCOVID-19をモデル化した場合：R0=2.5、感染率β=0.5/日、回復率γ=0.1/日（平均10日の感染期間）と設定。シミュレーション結果はピーク感染率が約18%（180万人）、到達日が45日目、最終感染率が約60%となり、集団免疫閾値1-1/2.5=60%に達する。ワクチン効果90%を適用すると、ピーク感染率は12%に低下、到達日が55日に遅延し医療負荷が軽減される。</p>
+<p>β=0.25/日、γ=0.10/日、ワクチン接種率0%、SIRモデル、既定の人口N=10000・初期感染者I0=10・365日で計算する場合：R0=β/γ=2.5、集団免疫閾値1-1/R0=60%。ページのsimulate()と同じRK4計算では、ピーク感染率は約23.4%（49日目）、最終回復率は約89.3%です。接種率を上げると初期免疫者が増え、ピークと最終感染規模が下がります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -659,6 +876,16 @@ simulate();
 <li>時間経過による媒介変数変化：非医療行為（社会距離）や流行株変異によるR0変化を定期的に反映させる</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

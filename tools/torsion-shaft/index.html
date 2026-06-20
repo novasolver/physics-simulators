@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "軸ねじり設計ツール",
       "description": "動力・回転数からトルクを自動計算し、せん断応力・ねじれ角・必要軸径・危険速度をリアルタイムで求める軸ねじり設計計算ツール。",
       "url": "https://novasolver.jp/tools/torsion-shaft.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["中実円形・中空円形・正方形・矩形断面に対応","せん断応力・ねじれ角・必要軸径の自動計算","危険速度（ランキン法）の算出","鋼・アルミ・鋳鉄の材料データベース"],
       "keywords": "軸設計,ねじり,せん断応力,ねじれ角,極断面係数,危険速度,CAE計算ツール",
       "datePublished": "2026-04-09",
@@ -108,6 +108,23 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 torsion hero ===== */
+#tsHeroCanvas{width:100%;display:block;border-radius:8px;background:#0a1628;touch-action:none}
+#tsHeroCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.ts-live{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+@media(max-width:600px){.ts-live{grid-template-columns:repeat(2,1fr)}}
+.ts-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 8px;text-align:center}
+.ts-ro .rv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.1}
+.ts-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.ts-ro.accent .rv{color:#ffd54a}
+.ts-play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.ts-play-row .preset-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+.ts-preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.ts-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.7rem;color:var(--muted);margin-top:10px}
+.ts-legend span{display:inline-flex;align-items:center;gap:5px}
+.ts-legend i.sw{width:18px;height:10px;border-radius:3px;display:inline-block}
+@media (prefers-reduced-motion: reduce){#tsHeroCanvas{outline-offset:2px}}
+/* end v2 torsion hero */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/torsion-shaft.html">
@@ -207,9 +224,48 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <option value="cast_iron">鋳鉄 (τ=25 MPa, G=41 GPa)</option>
       </select>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-rotate"></i> 軸ねじりアニメーション（リアルタイム）</div>
+      <div class="ts-live">
+        <div class="ts-ro accent"><div class="rv" id="tsRoPhi">—</div><div class="rl">ねじれ角 φ (°)</div></div>
+        <div class="ts-ro"><div class="rv" id="tsRoTau">—</div><div class="rl">最大せん断応力 τ_max (MPa)</div></div>
+        <div class="ts-ro"><div class="rv" id="tsRoT">—</div><div class="rl">トルク T (N·m)</div></div>
+        <div class="ts-ro"><div class="rv" id="tsRoJ">—</div><div class="rl">極断面二次モーメント J (mm⁴)</div></div>
+      </div>
+      <div class="ts-preset-row">
+        <button class="preset-btn" type="button" onclick="tsPreset('solid_steel')">中実鋼軸</button>
+        <button class="preset-btn" type="button" onclick="tsPreset('hollow')">中空軸</button>
+        <button class="preset-btn" type="button" onclick="tsPreset('high_torque')">高トルク</button>
+        <button class="preset-btn" type="button" onclick="tsPreset('long_slender')">長い細軸</button>
+      </div>
+      <canvas id="tsHeroCanvas" height="360" tabindex="0" role="img" aria-label="円形軸がトルクで実際にねじれる様子と、断面のせん断応力分布（中心ゼロ・表面最大）をリアルタイムに表示します。"></canvas>
+      <div class="ts-play-row">
+        <button class="btn" type="button" id="tsBtnPlay" onclick="tsTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="tsReset()"><i class="fas fa-rotate-left"></i> リセット</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn ts-speed" type="button" data-sp="0.5" onclick="tsSetSpeed(0.5)">0.5×</button>
+          <button class="preset-btn ts-speed active" type="button" data-sp="1" onclick="tsSetSpeed(1)">1×</button>
+          <button class="preset-btn ts-speed" type="button" data-sp="2" onclick="tsSetSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="ts-legend">
+        <span><i class="sw" style="background:linear-gradient(90deg,#2c5282,#e74c3c)"></i>せん断応力（中心0→表面最大）</span>
+        <span><i class="sw" style="background:#ffd54a"></i>ねじれた基準線（らせん）</span>
+        <span id="tsHollowLeg" style="display:none"><i class="sw" style="background:#0a1628;border:1px solid #4a5568"></i>中空部</span>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:8px">左端を固定し、右端にトルク T を加えると自由端が φ=TL/(GJ) だけ回転します。直線だった軸方向の格子線がらせんに変わり、断面のせん断応力は中心でゼロ、表面で最大（τ=Tr/J）になります。スライダーや断面形状を変えるとリアルタイムに反映されます。</div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="statT">—</div><div class="sl">T (N·m)</div></div>
@@ -238,7 +294,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 
 <script>
-const MAT={steel:{tau_allow:50,G:80000,E:206000},aluminum:{tau_allow:30,G:26000,E:71000},cast_iron:{tau_allow:25,G:41000,E:120000}};
+const MAT={steel:{tau_allow:50,G:80000,E:206000,rho:7850},aluminum:{tau_allow:30,G:26000,E:71000,rho:2700},cast_iron:{tau_allow:25,G:41000,E:120000,rho:7200}};
 let chartTau,chartTheta;
 
 function setPct(id){const el=document.getElementById(id);if(!el)return;const pct=((el.value-el.min)/(el.max-el.min)*100).toFixed(1);el.style.setProperty('--pct',pct+'%');}function g(id){return parseFloat(document.getElementById(id).value);}function s(id,v){var _ve=document.getElementById(id);if(_ve){if(_ve.tagName==='INPUT')_ve.value=v;else _ve.textContent=v;}}function showSection(){
@@ -258,7 +314,7 @@ function setPct(id){const el=document.getElementById(id);if(!el)return;const pct
 
   s('vP',P.toFixed(1));s('vN',N);s('vL',L);
 
-  let tau,theta_pm,d_req,d_eff,Jp;
+  let tau,theta_pm,d_req,d_eff,Jp,area_mm2,I_bend;
 
   if(secType==='solid_circle'){
     const d=g('slD'); s('vD',d);
@@ -267,34 +323,47 @@ function setPct(id){const el=document.getElementById(id);if(!el)return;const pct
     theta_pm=T*1000/(Jp*mat.G)*(180/Math.PI);
     d_req=Math.cbrt(16*T/(Math.PI*mat.tau_allow));
     d_eff=d;
+    area_mm2=Math.PI*Math.pow(d,2)/4;
+    I_bend=Math.PI*Math.pow(d,4)/64;
   }else if(secType==='hollow_circle'){
-    const OD=g('slOD'),ID=Math.min(g('slID'),OD*0.95);
+    const OD=g('slOD');
+    const ID=Math.min(g('slID'),OD*0.95);
+    document.getElementById('slID').value=ID;
+    setPct('slID');
     s('vOD',OD);s('vID',Math.round(ID));
     Jp=Math.PI*(Math.pow(OD,4)-Math.pow(ID,4))/32;
     tau=T*(OD/2)/Jp;
     theta_pm=T*1000/(Jp*mat.G)*(180/Math.PI);
     d_req=Math.cbrt(16*T/(Math.PI*mat.tau_allow));
     d_eff=OD;
+    area_mm2=Math.PI*(Math.pow(OD,2)-Math.pow(ID,2))/4;
+    I_bend=Math.PI*(Math.pow(OD,4)-Math.pow(ID,4))/64;
   }else if(secType==='solid_square'){
     const a=g('slA'); s('vA',a);
     tau=T/(0.208*Math.pow(a,3));
-    theta_pm=T*1000/(0.1406*Math.pow(a,4)*mat.G)*(180/Math.PI);
+    Jp=0.1406*Math.pow(a,4);
+    theta_pm=T*1000/(Jp*mat.G)*(180/Math.PI);
     d_req=Math.cbrt(16*T/(Math.PI*mat.tau_allow));
     d_eff=a;
+    area_mm2=a*a;
+    I_bend=Math.pow(a,4)/12;
   }else{
     const b=g('slB'),h=g('slH'); s('vB',b);s('vH',h);
-    const ratio=Math.min(b,h)/Math.max(b,h);
-    const alpha=0.208*(1-0.63*ratio);
-    tau=T/(alpha*Math.min(b,h)*Math.pow(Math.max(b,h),2));
-    theta_pm=T*1000/(0.1406*Math.pow(Math.min(b,h),4)*mat.G)*(180/Math.PI);
+    const longSide=Math.max(b,h), shortSide=Math.min(b,h);
+    const ratio=shortSide/longSide;
+    Jp=longSide*Math.pow(shortSide,3)*(1/3-0.21*ratio*(1-Math.pow(ratio,4)/12));
+    const tauCoeff=1/(3+1.8*ratio);
+    tau=T/(tauCoeff*longSide*Math.pow(shortSide,2));
+    theta_pm=T*1000/(Jp*mat.G)*(180/Math.PI);
     d_req=Math.cbrt(16*T/(Math.PI*mat.tau_allow));
-    d_eff=Math.min(b,h);
+    d_eff=shortSide;
+    area_mm2=b*h;
+    I_bend=Math.min(b*Math.pow(h,3),h*Math.pow(b,3))/12;
   }
 
   const FS=mat.tau_allow/tau;
-  const I=Math.PI*Math.pow(d_eff,4)/64;
-  const W=7850*Math.PI*Math.pow(d_eff/1000,2)/4*(L/1000)*9.81;
-  const N_cr=W>0?(30/Math.PI)*Math.sqrt(9810*mat.E*I/(W*Math.pow(L,3)/48)):0;
+  const W=mat.rho*area_mm2*1e-6*(L/1000)*9.81;
+  const N_cr=W>0?(30/Math.PI)*Math.sqrt(9810*mat.E*I_bend/(5*W*Math.pow(L,3)/384)):0;
 
   s('statT',(T/1000).toFixed(1));
   s('statTau',tau.toFixed(1));
@@ -340,6 +409,260 @@ function setPct(id){const el=document.getElementById(id);if(!el)return;const pct
 }compute();
 </script>
 
+<script>
+"use strict";
+(function(){
+  var TXT={emptyHint:'軸はトルクでねじれます',fixed:'固定端',free:'自由端（φ回転）',section:'断面せん断応力',twist:'φ ='};
+  var canvas=document.getElementById('tsHeroCanvas');
+  if(!canvas)return;
+  var cx=canvas.getContext('2d');
+  var playing=true, animId=null, speed=1, phase=0, lastTs=0;
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function el(id){return document.getElementById(id);}
+  function num(id){var e=el(id);return e?parseFloat(e.value):NaN;}
+
+  // Material shear modulus in MPa (matches calculator MAT)
+  var GMAT={steel:80000,aluminum:26000,cast_iron:41000};
+
+  // Read live geometry+load from the existing calculator inputs
+  function model(){
+    var sec=el('sectionType')?el('sectionType').value:'solid_circle';
+    var matKey=el('material')?el('material').value:'steel';
+    var G=GMAT[matKey]||80000;             // MPa
+    var P=num('slP'), N=num('slN'), L=num('slL'); // kW, rpm, mm
+    if(!isFinite(P))P=10; if(!isFinite(N))N=1500; if(!isFinite(L))L=500;
+    var T=P*1000*60/(2*Math.PI*N)*1000;    // N·mm
+    var ro, ri=0, J;
+    if(sec==='hollow_circle'){
+      var OD=num('slOD'), ID=Math.min(num('slID'),num('slOD')*0.95);
+      if(!isFinite(OD))OD=80; if(!isFinite(ID))ID=50;
+      ro=OD/2; ri=ID/2;
+      J=Math.PI*(Math.pow(OD,4)-Math.pow(ID,4))/32;
+    }else if(sec==='solid_circle'){
+      var d=num('slD'); if(!isFinite(d))d=50; ro=d/2; J=Math.PI*Math.pow(d,4)/32;
+    }else if(sec==='solid_square'){
+      var a=num('slA'); if(!isFinite(a))a=50; ro=a/2; J=0.1406*Math.pow(a,4);
+    }else{
+      var b=num('slB'),h=num('slH'); if(!isFinite(b))b=60; if(!isFinite(h))h=40;
+      var lo=Math.max(b,h),sh=Math.min(b,h),r=sh/lo;
+      ro=Math.max(b,h)/2;
+      J=lo*Math.pow(sh,3)*(1/3-0.21*r*(1-Math.pow(r,4)/12));
+    }
+    var phiRad=T*L/(G*J);                   // rad  (T N·mm, L mm, G MPa, J mm⁴)
+    var tauMax=T*ro/J;                       // MPa
+    return {sec:sec,G:G,P:P,N:N,L:L,T:T,ro:ro,ri:ri,J:J,phiRad:phiRad,tauMax:tauMax};
+  }
+
+  function fmt(v,d){ if(!isFinite(v))return '—';
+    var a=Math.abs(v);
+    if(a!==0&&(a<0.01||a>=1e5))return v.toExponential(2);
+    return v.toFixed(d);
+  }
+
+  function updateReadouts(m){
+    el('tsRoPhi').textContent=fmt(m.phiRad*180/Math.PI,2);
+    el('tsRoTau').textContent=fmt(m.tauMax,1);
+    el('tsRoT').textContent=fmt(m.T/1000,1);
+    el('tsRoJ').textContent=fmt(m.J,0);
+    el('tsHollowLeg').style.display=(m.sec==='hollow_circle')?'':'none';
+  }
+
+  // shear-stress colour ramp: r/ro in [0,1] -> blue(centre) to red(surface)
+  function stressColor(frac){
+    frac=Math.max(0,Math.min(1,frac));
+    var r=Math.round(44+(231-44)*frac);
+    var g=Math.round(82+(76-82)*frac);
+    var b=Math.round(130+(60-130)*frac);
+    return 'rgb('+r+','+g+','+b+')';
+  }
+
+  var cssW=0,cssH=0;
+  function resize(){
+    var rect=canvas.parentElement.getBoundingClientRect();
+    cssW=Math.max(280,Math.floor(rect.width-44));
+    cssH=360;
+    var dpr=Math.min(window.devicePixelRatio||1,2.5);
+    canvas.style.width=cssW+'px'; canvas.style.height=cssH+'px';
+    canvas.width=Math.round(cssW*dpr); canvas.height=Math.round(cssH*dpr);
+    cx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function render(animPhi){
+    resize();
+    var W=cssW,H=cssH;
+    cx.clearRect(0,0,W,H);
+    cx.fillStyle='#0a1628'; cx.fillRect(0,0,W,H);
+    var m=model();
+    updateReadouts(m);
+
+    // animPhi: the currently-displayed twist (rad), eases from 0..phiRad via phase
+    var phiDisp=animPhi;
+
+    // ---- left: the twisting shaft (side view) ----
+    var shaftX0=46, shaftX1=W*0.62, shaftLen=shaftX1-shaftX0;
+    var cyMid=H*0.40;
+    var Rpx=Math.min(46, H*0.16);            // visual outer radius
+    var riFrac=(m.sec==='hollow_circle'&&m.ro>0)?(m.ri/m.ro):0;
+
+    // ground / wall (fixed end)
+    cx.fillStyle='rgba(120,140,170,0.25)';
+    cx.fillRect(shaftX0-14,cyMid-Rpx-14,14,2*Rpx+28);
+    cx.strokeStyle='rgba(200,210,230,0.5)';cx.lineWidth=2;
+    cx.beginPath();cx.moveTo(shaftX0-14,cyMid-Rpx-14);cx.lineTo(shaftX0-14,cyMid+Rpx+14);cx.stroke();
+
+    // shaft body (cylinder shading)
+    var grd=cx.createLinearGradient(0,cyMid-Rpx,0,cyMid+Rpx);
+    grd.addColorStop(0,'#5a6b85');grd.addColorStop(0.5,'#aebccf');grd.addColorStop(1,'#3a4a63');
+    cx.fillStyle=grd;
+    cx.fillRect(shaftX0,cyMid-Rpx,shaftLen,2*Rpx);
+    cx.strokeStyle='rgba(255,255,255,0.25)';cx.lineWidth=1;
+    cx.strokeRect(shaftX0,cyMid-Rpx,shaftLen,2*Rpx);
+
+    // helical reference lines: 4 lines around circumference, each starts straight,
+    // twists by phiDisp*(x/L) along the length.
+    var NL=6, steps=40;
+    for(var k=0;k<NL;k++){
+      var base=k/NL*2*Math.PI;
+      cx.beginPath();
+      for(var i=0;i<=steps;i++){
+        var f=i/steps;                       // 0..1 along length
+        var ang=base+phiDisp*f;              // twist accumulates
+        var yy=cyMid - Rpx*Math.cos(ang)*0.92; // project: y = R cos
+        // depth shading via sin
+        var xx=shaftX0+shaftLen*f;
+        if(i===0)cx.moveTo(xx,yy);else cx.lineTo(xx,yy);
+      }
+      cx.strokeStyle='rgba(255,213,74,0.85)';cx.lineWidth=1.6;cx.stroke();
+    }
+    // straight dashed datum (undeformed) for comparison along centre top
+    cx.strokeStyle='rgba(255,255,255,0.22)';cx.lineWidth=1;cx.setLineDash([4,4]);
+    cx.beginPath();cx.moveTo(shaftX0,cyMid-Rpx*0.92);cx.lineTo(shaftX1,cyMid-Rpx*0.92);cx.stroke();
+    cx.setLineDash([]);
+
+    // labels
+    cx.fillStyle='rgba(255,255,255,0.6)';cx.font='11px Noto Sans JP';cx.textAlign='center';
+    cx.fillText(TXT.fixed,shaftX0+4,cyMid+Rpx+24);
+    cx.fillText(TXT.free,shaftX1-8,cyMid+Rpx+24);
+    // torque arrow at free end (curved)
+    cx.strokeStyle='#00B4D8';cx.lineWidth=2.4;
+    cx.beginPath();cx.arc(shaftX1,cyMid,Rpx+12,-1.3,1.3);cx.stroke();
+    var ah=shaftX1+(Rpx+12)*Math.cos(1.3), av=cyMid+(Rpx+12)*Math.sin(1.3);
+    cx.fillStyle='#00B4D8';cx.beginPath();
+    cx.moveTo(ah,av);cx.lineTo(ah-9,av-2);cx.lineTo(ah-1,av+9);cx.closePath();cx.fill();
+    cx.fillText('T',shaftX1,cyMid-Rpx-20);
+
+    // ---- right: cross-section with shear-stress radial gradient ----
+    var ccx=W*0.82, ccy=cyMid, CR=Math.min(Rpx*1.25, (W-shaftX1)*0.42, 64);
+    // radial fill ring-by-ring
+    var rings=26;
+    for(var rr=rings;rr>=1;rr--){
+      var fr=rr/rings;
+      if(riFrac>0 && fr<riFrac){continue;}
+      cx.beginPath();cx.arc(ccx,ccy,CR*fr,0,2*Math.PI);
+      cx.fillStyle=stressColor(fr);cx.fill();
+    }
+    if(riFrac>0){ cx.beginPath();cx.arc(ccx,ccy,CR*riFrac,0,2*Math.PI);cx.fillStyle='#0a1628';cx.fill(); }
+    cx.strokeStyle='rgba(255,255,255,0.4)';cx.lineWidth=1.4;
+    cx.beginPath();cx.arc(ccx,ccy,CR,0,2*Math.PI);cx.stroke();
+    // a rotated radius marker showing the section's own twist
+    var mAng=phiDisp; // free-end section rotation
+    cx.strokeStyle='#ffd54a';cx.lineWidth=2;
+    cx.beginPath();cx.moveTo(ccx,ccy);
+    cx.lineTo(ccx+CR*Math.cos(mAng),ccy+CR*Math.sin(mAng));cx.stroke();
+    cx.fillStyle='rgba(255,255,255,0.7)';cx.font='11px Noto Sans JP';cx.textAlign='center';
+    cx.fillText(TXT.section,ccx,ccy+CR+20);
+    // colorbar ticks
+    cx.fillStyle='rgba(255,255,255,0.55)';cx.font='10px Roboto Mono';
+    cx.fillText('τ=0',ccx,ccy+3);
+    cx.textAlign='left';
+    cx.fillStyle=stressColor(1);cx.fillText('τmax',ccx+CR*0.55,ccy-CR*0.55);
+
+    // ---- bottom: linear τ vs r line (centre→surface) ----
+    var gx0=shaftX0, gx1=W-30, gy=H-34, gh=46;
+    cx.strokeStyle='rgba(255,255,255,0.3)';cx.lineWidth=1;
+    cx.beginPath();cx.moveTo(gx0,gy);cx.lineTo(gx1,gy);cx.stroke();
+    cx.beginPath();cx.moveTo(gx0,gy);cx.lineTo(gx0,gy-gh);cx.stroke();
+    // linear stress profile from r=0..ro
+    cx.strokeStyle=stressColor(1);cx.lineWidth=2.2;
+    cx.beginPath();
+    var x0p = riFrac>0 ? gx0+(gx1-gx0)*riFrac : gx0;
+    var y0p = gy - gh*riFrac;
+    cx.moveTo(x0p,y0p);cx.lineTo(gx1,gy-gh);cx.stroke();
+    cx.fillStyle='rgba(255,255,255,0.5)';cx.font='10px Roboto Mono';cx.textAlign='left';
+    cx.fillText('r=0',gx0,gy+12);cx.textAlign='right';cx.fillText('r=c (τmax)',gx1,gy+12);
+    cx.textAlign='left';
+
+    // twist value annotation
+    cx.fillStyle='rgba(255,255,255,0.85)';cx.font='bold 12px Roboto Mono';cx.textAlign='left';
+    cx.fillText(TXT.twist+' '+(phiDisp*180/Math.PI).toFixed(2)+'°',shaftX0,22);
+    cx.textAlign='left';
+  }
+
+  function targetPhi(){ return model().phiRad; }
+
+  function loop(ts){
+    if(!playing){animId=null;return;}
+    if(!lastTs)lastTs=ts;
+    var dt=Math.min(0.05,(ts-lastTs)/1000);lastTs=ts;
+    // phase oscillates 0..1..0 so the shaft loads and unloads (visible twisting)
+    phase+=dt*speed*0.6;
+    var tri=0.5-0.5*Math.cos(phase*Math.PI); // smooth 0..1..0
+    // clamp displayed twist for visibility (scale so it's always visible but proportional)
+    var tp=targetPhi();
+    var disp=tp*tri;
+    // visual amplification cap so tiny twists are still visible (cap at ~0.9 rad on screen)
+    var visMax=0.9;
+    var dispVis=Math.max(-visMax,Math.min(visMax, disp* (Math.abs(tp)>visMax? visMax/Math.abs(tp):1) ));
+    render(dispVis);
+    animId=requestAnimationFrame(loop);
+  }
+
+  window.tsTogglePlay=function(){
+    playing=!playing;
+    el('tsBtnPlay').innerHTML=playing?'<i class="fas fa-pause"></i> 一時停止':'<i class="fas fa-play"></i> 再生';
+    if(playing){lastTs=0;if(!animId)animId=requestAnimationFrame(loop);}
+  };
+  window.tsReset=function(){ phase=0; if(reduce){render(0);} };
+  window.tsSetSpeed=function(s){
+    speed=s;
+    var btns=document.querySelectorAll('.ts-speed');
+    for(var i=0;i<btns.length;i++){ btns[i].classList.toggle('active',parseFloat(btns[i].dataset.sp)===s); }
+  };
+  window.tsPreset=function(name){
+    var P={
+      solid_steel:{sec:'solid_circle',mat:'steel',d:50,P:10,N:1500,L:500},
+      hollow:{sec:'hollow_circle',mat:'steel',OD:80,ID:50,P:10,N:1500,L:500},
+      high_torque:{sec:'solid_circle',mat:'steel',d:60,P:200,N:600,L:800},
+      long_slender:{sec:'solid_circle',mat:'aluminum',d:30,P:5,N:1500,L:3000}
+    }[name];
+    if(!P)return;
+    function set(id,v){var e=el(id);if(e&&isFinite(v)){e.value=v;}}
+    if(el('sectionType'))el('sectionType').value=P.sec;
+    if(el('material'))el('material').value=P.mat;
+    set('slD',P.d);set('vD',P.d);
+    set('slOD',P.OD);set('vOD',P.OD);set('slID',P.ID);set('vID',P.ID);
+    set('slP',P.P);set('vP',P.P);set('slN',P.N);set('vN',P.N);set('slL',P.L);set('vL',P.L);
+    if(typeof window.compute==='function'){try{window.compute();}catch(e){}}
+    phase=0;
+    if(reduce)render(0);
+  };
+
+  // keyboard a11y
+  canvas.addEventListener('keydown',function(e){
+    if(e.key===' '||e.key==='Enter'){e.preventDefault();window.tsTogglePlay();}
+  });
+  window.addEventListener('resize',function(){ if(reduce)render(targetPhi()); });
+
+  if(reduce){
+    playing=false;
+    el('tsBtnPlay').innerHTML='<i class="fas fa-play"></i> 再生';
+    render(Math.min(0.9,targetPhi()));
+  }else{
+    animId=requestAnimationFrame(loop);
+  }
+})();
+</script>
+
 <section class="explanation">
   <h2>軸ねじり設計ツールとは</h2>
   <div class="chat">
@@ -366,7 +689,7 @@ function setPct(id){const el=document.getElementById(id);if(!el)return;const pct
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">動力と回転数を入力してもトルクが表示されません。どうすればいいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">動力の単位を確認してください。kWまたはWのいずれかに対応しています。また、回転数はrpmで入力してください。正しく入力されると自動計算され、トルクがN·mm単位で表示されます。</div>
+    <div class="faq-a">動力はkW、回転数はrpmで入力します。正しく入力されるとトルクが自動計算され、結果カードにはN·m単位で表示されます。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">中実軸と中空軸では、どちらがねじれにくいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -374,11 +697,11 @@ function setPct(id){const el=document.getElementById(id);if(!el)return;const pct
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">危険速度とは何ですか？なぜ確認する必要があるのですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">危険速度は軸が回転中に共振を起こしやすい回転数です。この速度付近で運転すると大きな振動が発生し、破損の原因になります。ツールで算出された危険速度を避けて設計してください。</div>
+    <div class="faq-a">危険速度は軸が回転中に共振を起こしやすい回転数です。この簡易計算では選択材料の密度、断面積、弱軸側の断面二次モーメントを用いた一次危険速度の目安を表示します。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">材料のせん断弾性係数（G）はどこで確認できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">一般的な鋼（S45Cなど）は約80,000 MPa、ステンレスは約75,000 MPa、アルミニウムは約26,000 MPaです。ツールの材料選択リストに代表値が設定されていますので、該当する材料を選んでください。</div>
+    <div class="faq-a">材料選択リストには鋼（G=80,000MPa）、アルミニウム（G=26,000MPa）、鋳鉄（G=41,000MPa）の代表値を設定しています。特定鋼種やステンレスなどは、この簡易版には個別入力欄がないため、近い材料を選ぶか詳細計算で確認してください。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -398,6 +721,9 @@ function setPct(id){const el=document.getElementById(id);if(!el)return;const pct
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="torsion-shaft.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -454,12 +780,12 @@ function setPct(id){const el=document.getElementById(id);if(!el)return;const pct
 <ol>
 <li>動力(kW)と回転数(rpm)を入力するとトルクが自動計算されます。例:15kW・1500rpmの場合、T=95.5N·mが算出されます</li>
 <li>軸の断面形状(中実円形・中空円形・正方形・矩形)を選択し、寸法パラメータを設定します。中空円の場合は外径100mm・内径80mmのような値を入力します</li>
-<li>材質の許容せん断応力(例:炭素鋼S45C=60MPa)を指定するとτ_max・ねじれ角θ・必要軸径d_req・危険速度N_crが自動算出されます</li>
+<li>材料プリセットを選択すると、τ_max・ねじれ角θ・必要軸径d_req・危険速度N_crが自動算出されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>動力30kW・回転数3000rpmで、中実円形軸(外径50mm)・材質SS400(τ_allow=50MPa)の場合:トルクT=95.5N·m、最大せん断応力τ_max=48.6MPa、ねじれ角θ=0.18°/m、危険速度(臨界速度)N_cr=8420rpmが得られます。安全率FS=1.03となり、軸径を55mmに増大すると安全率が1.25に改善されます</p>
+<p>動力30kW・回転数3000rpmで、中実円形軸d=50mm、軸長500mm、鋼（τ_allow=50MPa）を選ぶと、トルクT=95.5N·m、最大せん断応力τ_max≈3.89MPa、ねじれ角θ≈0.111°/m、安全率FS≈12.85です。密度と自重を考慮した一次危険速度の目安は約21435rpmです。軸径を55mmに増やすとτ_max≈2.92MPa、FS≈17.10になります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -469,6 +795,16 @@ function setPct(id){const el=document.getElementById(id);if(!el)return;const pct
 <li>危険速度N_crに接近する運転は共振を招くため、通常N_cr の60~80%以下での運用が推奨されます</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

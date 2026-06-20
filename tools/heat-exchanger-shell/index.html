@@ -37,7 +37,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "シェルアンドチューブ熱交換器設計ツール",
       "description": "熱交換量・LMTD・F補正係数・伝熱面積・NTU・有効度をリアルタイム計算。温度プロファイルをChart.jsでグラフ表示。",
       "url": "https://novasolver.jp/tools/heat-exchanger-shell.html",
@@ -47,7 +47,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["熱交換量 Q = ṁh·Cph·(Thi-Tho)", "LMTD法とF補正係数（多パス）", "NTU法と有効度ε", "温度プロファイルグラフ"],
       "keywords": "シェルアンドチューブ,熱交換器,LMTD,NTU法,有効度,伝熱面積,熱工学,プロセス工学",
       "datePublished": "2026-04-09",
@@ -128,6 +128,11 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+#hxCanvas{width:100%;display:block;border-radius:8px;background:#0a1628;}
+.hx-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.hx-legend span{display:inline-flex;align-items:center;gap:5px}
+.hx-legend i.hx-sw{width:16px;height:10px;border-radius:3px;display:inline-block}
+#hxCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/heat-exchanger-shell.html">
@@ -201,18 +206,37 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983372?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983372.09._SCMZZZZZZ_.jpg" alt="伝熱工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">伝熱工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-water"></i> シェル＆チューブ断面 — バッフルによるクロスフロー</div>
+      <canvas id="hxCanvas" role="img" aria-label="シェルアンドチューブ熱交換器の断面アニメーション。バッフルが殻側流体を管束の上下にジグザグに導き、管内を流れる流体と熱交換する様子を温度で色分けして表示します。"></canvas>
+      <div class="hx-legend">
+        <span><i class="hx-sw" style="background:#ff5a3c"></i>高温（シェル側）</span>
+        <span><i class="hx-sw" style="background:#1f8fff"></i>低温（チューブ側）</span>
+        <span><i class="hx-sw" style="background:#9aa7b4"></i>バッフル板</span>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> ライブ計算結果</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="r-q">—</div><div class="sl">Q (kW)</div></div>
       <div class="stat-card"><div class="sv" id="r-lmtd">—</div><div class="sl">LMTD (K)</div></div>
+      <div class="stat-card"><div class="sv" id="r-f">—</div><div class="sl">F 補正係数</div></div>
       <div class="stat-card"><div class="sv" id="r-area">—</div><div class="sl">面積 A (m²)</div></div>
       <div class="stat-card"><div class="sv" id="r-ntu">—</div><div class="sl">NTU</div></div>
       <div class="stat-card"><div class="sv" id="r-eps">—</div><div class="sl">有効度 ε</div></div>
       <div class="stat-card"><div class="sv" id="r-tco">—</div><div class="sl">Tco (°C)</div></div>
+      <div class="stat-card"><div class="sv" id="r-tubes">—</div><div class="sl">必要本数 N (φ19,L2m)</div></div>
     </div>
     </div>
 
@@ -232,99 +256,265 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
-
-let chartInstance = null;
-const Cph = 4200, Cpc = 4200; // J/(kg·K) water approx
+(function(){
+"use strict";
+var chartInstance = null;
+var Cph = 4200, Cpc = 4200; // J/(kg·K) water approx
+// live state shared with the hero animation
+var sim = { Thi:120, Tho:80, Tci:20, Tco:46.7, F:0.96, passes:2, valid:true };
 
 function initSliders(){
-  document.querySelectorAll('input[type=range]').forEach(el => {
-    const pct = (el.value - el.min) / (el.max - el.min) * 100;
+  document.querySelectorAll('input[type=range]').forEach(function(el){
+    var pct = (el.value - el.min) / (el.max - el.min) * 100;
     el.style.setProperty('--pct', pct + '%');
   });
-}function calcF(R, P, passes){
+}
+
+function calcF(R, P, passes){
   if (passes === 1) return 1.0;
-  // Approximate F for 1-2 shell-and-tube (analytical formula)
-  if (Math.abs(R - 1) < 0.001) {
-    const sqrtS = Math.sqrt(2) * P / (1 - P);
-    if (sqrtS >= 1) return 0.75;
-    return Math.sqrt(2) * P / ((1 - P) * Math.log((2/P - 1 - R + Math.sqrt(2)/P) / (2/P - 1 - R - Math.sqrt(2)/P)));
+  // Analytical F for 1 shell-pass / 2 tube-pass (TEMA E, Bowman)
+  if (Math.abs(R - 1) < 1e-4){
+    var sx = Math.sqrt(2) * P / (1 - P);
+    if (sx >= 1) return 0.6;
+    return sx / Math.log((2/P - 1 - R + Math.sqrt(2)/P) / (2/P - 1 - R - Math.sqrt(2)/P));
   }
-  const S = Math.sqrt(R*R + 1);
-  const num = S * Math.log((1 - P) / (1 - R*P));
-  const den = (R - 1) * Math.log((2 - P*(R + 1 - S)) / (2 - P*(R + 1 + S)));
-  const F = num / den;
+  var S = Math.sqrt(R*R + 1);
+  var num = S * Math.log((1 - P) / (1 - R*P));
+  var den = (R - 1) * Math.log((2 - P*(R + 1 - S)) / (2 - P*(R + 1 + S)));
+  var F = num / den;
+  if (!isFinite(F)) return 0.6;
   return Math.max(0.60, Math.min(1.0, F));
-}function calc(){
-  const mh = parseFloat(document.getElementById('s-mh').value);
-  const mc = parseFloat(document.getElementById('s-mc').value);
-  const Thi = parseFloat(document.getElementById('s-thi').value);
-  const Tho = parseFloat(document.getElementById('s-tho').value);
-  const Tci = parseFloat(document.getElementById('s-tci').value);
-  const U = parseFloat(document.getElementById('s-u').value);
-  const passes = parseInt(document.getElementById('s-pass').value);
+}
 
-  if (Tho >= Thi) {
-    ['r-q','r-lmtd','r-area','r-ntu','r-eps','r-tco'].forEach(id => { var el=document.getElementById(id); if(el) el.textContent='N/A'; })
-    return;
-  }const Ch = mh * Cph;  // W/K
-  const Cc = mc * Cpc;  // W/K
-  const Q = Ch * (Thi - Tho); // W
-  const Tco = Tci + Q / Cc;
+function setNA(){
+  ['r-q','r-lmtd','r-f','r-area','r-ntu','r-eps','r-tco','r-tubes'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.textContent='N/A';
+  });
+  sim.valid = false;
+}
 
-  if (Tco > Thi){
-    document.getElementById('r-tco').textContent = '制限超';
-    return;
-  }// LMTD counter-flow basis
-  const dT1 = Thi - Tco;  // hot in - cold out
-  const dT2 = Tho - Tci;  // hot out - cold in
-  let lmtd;
-  if (Math.abs(dT1 - dT2) < 0.001){ lmtd = dT1; }else{ lmtd = (dT1 - dT2) / Math.log(dT1 / dT2); }// F factor
-  const R = (Thi - Tho) / (Tco - Tci);
-  const P = (Tco - Tci) / (Thi - Tci);
-  const F = calcF(R, P, passes);
+function calc(){
+  var mh = parseFloat(document.getElementById('s-mh').value);
+  var mc = parseFloat(document.getElementById('s-mc').value);
+  var Thi = parseFloat(document.getElementById('s-thi').value);
+  var Tho = parseFloat(document.getElementById('s-tho').value);
+  var Tci = parseFloat(document.getElementById('s-tci').value);
+  var U = parseFloat(document.getElementById('s-u').value);
+  var passes = parseInt(document.getElementById('s-pass').value, 10);
 
-  const A = Q / (U * F * lmtd);
-  const Cmin = Math.min(Ch, Cc);
-  const NTU = U * A / Cmin;
-  const Qmax = Cmin * (Thi - Tci);
-  const eps = Q / Qmax;
+  if (Tho >= Thi || Tho <= Tci){ setNA(); return; }
+  var Ch = mh * Cph, Cc = mc * Cpc;      // W/K
+  var Q = Ch * (Thi - Tho);              // W
+  var Tco = Tci + Q / Cc;                // cold outlet from energy balance
+  if (Tco > Thi){ setNA(); document.getElementById('r-tco').textContent='制限超'; return; }
 
-  document.getElementById('r-q').textContent = (Q / 1000).toFixed(2);
+  // LMTD on counter-flow basis
+  var dT1 = Thi - Tco, dT2 = Tho - Tci, lmtd;
+  lmtd = (Math.abs(dT1 - dT2) < 1e-4) ? dT1 : (dT1 - dT2) / Math.log(dT1 / dT2);
+
+  var R = (Thi - Tho) / (Tco - Tci);
+  var P = (Tco - Tci) / (Thi - Tci);
+  var F = calcF(R, P, passes);
+
+  var A = Q / (U * F * lmtd);
+  var Cmin = Math.min(Ch, Cc);
+  var NTU = U * A / Cmin;
+  var eps = Q / (Cmin * (Thi - Tci));
+  // tube count for φ19mm OD, 2 m effective length
+  var aPerTube = Math.PI * 0.019 * 2.0;
+  var nTubes = Math.max(1, Math.ceil(A / aPerTube));
+
+  document.getElementById('r-q').textContent = (Q/1000).toFixed(2);
   document.getElementById('r-lmtd').textContent = lmtd.toFixed(2);
+  document.getElementById('r-f').textContent = F.toFixed(3);
   document.getElementById('r-area').textContent = A.toFixed(2);
   document.getElementById('r-ntu').textContent = NTU.toFixed(3);
   document.getElementById('r-eps').textContent = eps.toFixed(3);
   document.getElementById('r-tco').textContent = Tco.toFixed(1);
+  document.getElementById('r-tubes').textContent = nTubes;
 
-  // Temperature profile along length (counter-flow, linearized)
-  const N = 20;
-  const xs = [], Th_prof = [], Tc_prof = [];
-  for (let i = 0; i <= N; i++){
-    const x = i / N;
-    xs.push((x * 100).toFixed(0) + '%');
-    // Linear profile approximation
-    Th_prof.push(+(Thi - (Thi - Tho) * x).toFixed(2));
-    Tc_prof.push(+(Tco - (Tco - Tci) * x).toFixed(2));
-  }document.getElementById('chart-title').textContent =
+  sim.Thi=Thi; sim.Tho=Tho; sim.Tci=Tci; sim.Tco=Tco; sim.F=F; sim.passes=passes; sim.valid=true;
+
+  // Temperature profile (counter-flow, linearised)
+  var Npr = 20, xs=[], Th_prof=[], Tc_prof=[];
+  for (var i=0;i<=Npr;i++){
+    var x=i/Npr; xs.push((x*100).toFixed(0)+'%');
+    Th_prof.push(+(Thi - (Thi - Tho)*x).toFixed(2));
+    Tc_prof.push(+(Tco - (Tco - Tci)*x).toFixed(2));
+  }
+  document.getElementById('chart-title').textContent =
     '温度プロファイル — Q=' + (Q/1000).toFixed(1) + ' kW, F=' + F.toFixed(3) + ' (' + passes + 'パス)';
-  if (chartInstance){ chartInstance.destroy(); chartInstance = null; }chartInstance = new Chart(document.getElementById('mainChart').getContext('2d'),{
-    type: 'line',
-    data: {
-      labels: xs,
-      datasets: [
-        { label: '高温流体 Th (°C)', data: Th_prof, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.07)', fill: true, tension: 0.2, pointRadius: 0 },{ label: '低温流体 Tc (°C)', data: Tc_prof, borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.07)', fill: true, tension: 0.2, pointRadius: 0 }
-      ]
-    },
-    options:{ responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
-      plugins: { legend: { display: true, labels: { font: { size: 11 } } }, tooltip:{ mode: 'index', intersect: false } },
-      scales:{
-        x: { title: { display: true, text: '熱交換器長さ方向 (%)' } },
-        y:{ title: { display: true, text: '温度 (°C)' } }
-      }
-    }
+  if (chartInstance){ chartInstance.destroy(); chartInstance=null; }
+  chartInstance = new Chart(document.getElementById('mainChart').getContext('2d'),{
+    type:'line',
+    data:{ labels:xs, datasets:[
+      { label:'高温流体 Th (°C)', data:Th_prof, borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,0.07)', fill:true, tension:0.2, pointRadius:0 },
+      { label:'低温流体 Tc (°C)', data:Tc_prof, borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,0.07)', fill:true, tension:0.2, pointRadius:0 }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, resizeDelay:100, animation:false,
+      plugins:{ legend:{ display:true, labels:{ font:{size:11} } }, tooltip:{ mode:'index', intersect:false } },
+      scales:{ x:{ title:{ display:true, text:'熱交換器長さ方向 (%)' } }, y:{ title:{ display:true, text:'温度 (°C)' } } } }
   });
-}initSliders();
+}
+window.calc = calc;
+
+/* ===================== V2 HERO: shell-and-tube cutaway ===================== */
+var cv = document.getElementById('hxCanvas');
+var cx = cv ? cv.getContext('2d') : null;
+var cssW=0, cssH=0;
+var NBAFFLE = 5;        // baffles -> zig-zag segments
+var NTUBE = 6;          // drawn tubes in bundle
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// shell-side particles weaving over the baffles; tube-side particles in the tubes
+var shellP=[], tubeP=[];
+function seedParticles(){
+  shellP=[]; tubeP=[];
+  for (var i=0;i<46;i++) shellP.push({ s: Math.random() });          // s in [0,1] = path progress
+  for (var j=0;j<NTUBE;j++){
+    for (var k=0;k<5;k++) tubeP.push({ tube:j, u: Math.random() });   // u in [0,1] along tube
+  }
+}
+seedParticles();
+
+function resizeCv(){
+  if(!cv) return;
+  var rect = cv.parentElement.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width - 44));
+  cssH = Math.round(Math.min(360, Math.max(240, cssW*0.52)));
+  var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  cv.style.width=cssW+'px'; cv.style.height=cssH+'px';
+  cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
+  cx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+// colour by temperature: hot=red, cold=blue, lerp
+function tColor(temp, lo, hi, a){
+  var f = (hi>lo) ? (temp-lo)/(hi-lo) : 0.5;
+  f = Math.max(0, Math.min(1, f));
+  var r = Math.round(40 + f*215);
+  var g = Math.round(120 - f*70 + (1-f)*40);
+  var b = Math.round(255 - f*215);
+  return 'rgba('+r+','+g+','+b+','+(a==null?1:a)+')';
+}
+
+// geometry of the shell cutaway
+function geo(){
+  var padL=22, padR=22, padT=30, padB=30;
+  var x0=padL, x1=cssW-padR, y0=padT, y1=cssH-padB;
+  return { x0:x0, x1:x1, y0:y0, y1:y1, w:x1-x0, h:y1-y0 };
+}
+
+// shell-side zig-zag path point at progress s in [0,1]
+// the flow enters top-left nozzle, then weaves up/down between baffles, exits bottom-right.
+function shellPath(s, g){
+  var seg = NBAFFLE+1;            // number of cross passes
+  var ss = s*seg;
+  var k = Math.floor(ss); if(k>=seg) k=seg-1;
+  var local = ss-k;              // 0..1 within this cross pass
+  var colW = g.w/seg;
+  var xc = g.x0 + colW*(k+0.5);
+  var topY = g.y0+8, botY = g.y1-8;
+  // alternate sweep direction each pass (down, up, down, ...)
+  var y = (k%2===0) ? (topY + (botY-topY)*local) : (botY - (botY-topY)*local);
+  // small horizontal drift so the particle advances across the column
+  var x = g.x0 + colW*k + colW*(0.18 + 0.64*local);
+  return { x:x, y:y };
+}
+
+function drawShell(){
+  if(!cx) return;
+  resizeCv();
+  var g = geo();
+  cx.clearRect(0,0,cssW,cssH);
+  cx.fillStyle='#0a1628'; cx.fillRect(0,0,cssW,cssH);
+
+  if(!sim.valid){
+    cx.fillStyle='rgba(255,255,255,.4)'; cx.font='13px Noto Sans JP'; cx.textAlign='center';
+    cx.fillText('入力が物理的に不整合です（Tho と Thi/Tci を確認）', cssW/2, cssH/2);
+    cx.textAlign='left'; return;
+  }
+
+  // shell wall
+  cx.strokeStyle='rgba(180,200,220,.55)'; cx.lineWidth=2;
+  if(cx.roundRect){ cx.beginPath(); cx.roundRect(g.x0,g.y0,g.w,g.h,14); cx.stroke(); }
+  else { cx.strokeRect(g.x0,g.y0,g.w,g.h); }
+
+  // baffles: alternate plates anchored top / bottom with a cut gap
+  var seg=NBAFFLE+1, colW=g.w/seg;
+  cx.fillStyle='rgba(154,167,180,.85)';
+  for (var b=0;b<NBAFFLE;b++){
+    var bx = g.x0 + colW*(b+1) - 3;
+    var anchorTop = (b%2===0);
+    var plateH = g.h*0.72;
+    var py = anchorTop ? g.y0+2 : (g.y1-2-plateH);
+    cx.fillRect(bx, py, 6, plateH);
+  }
+
+  // tube bundle (horizontal tubes through the shell) — tube-side cold fluid warming
+  var tubeTop = g.y0 + g.h*0.16, tubeBot = g.y1 - g.h*0.16;
+  var dyT = (tubeBot-tubeTop)/(NTUBE-1);
+  for (var t=0;t<NTUBE;t++){
+    var ty = tubeTop + dyT*t;
+    cx.strokeStyle='rgba(120,140,160,.45)'; cx.lineWidth=7;
+    cx.beginPath(); cx.moveTo(g.x0-12, ty); cx.lineTo(g.x1+12, ty); cx.stroke();
+    cx.strokeStyle='rgba(10,22,40,.9)'; cx.lineWidth=3.2;
+    cx.beginPath(); cx.moveTo(g.x0-12, ty); cx.lineTo(g.x1+12, ty); cx.stroke();
+  }
+
+  // tube-side fluid: cold in (left) warms toward right (Tci -> Tco)
+  var loC = sim.Tci, hiC = sim.Tco;
+  for (var i=0;i<tubeP.length;i++){
+    var p=tubeP[i];
+    var ty2 = tubeTop + dyT*p.tube;
+    var px = (g.x0-12) + (g.w+24)*p.u;
+    var temp = sim.Tci + (sim.Tco-sim.Tci)*p.u;
+    cx.beginPath(); cx.arc(px, ty2, 2.6, 0, 7);
+    cx.fillStyle = tColor(temp, loC, hiC, 0.95); cx.fill();
+  }
+
+  // shell-side fluid: hot in (Thi) cools toward exit (Tho) as it crosses the bundle
+  for (var j=0;j<shellP.length;j++){
+    var q=shellP[j];
+    var pt=shellPath(q.s, g);
+    var temp2 = sim.Thi + (sim.Tho-sim.Thi)*q.s;   // hot -> cooler along the path
+    cx.beginPath(); cx.arc(pt.x, pt.y, 3.0, 0, 7);
+    cx.fillStyle = tColor(temp2, sim.Tho, sim.Thi, 0.92); cx.fill();
+  }
+
+  // nozzles + labels
+  cx.fillStyle='rgba(255,255,255,.85)'; cx.font='11px Noto Sans JP'; cx.textAlign='left';
+  cx.fillText('シェル側 入口 '+sim.Thi.toFixed(0)+'°C', g.x0, g.y0-10);
+  cx.textAlign='right';
+  cx.fillText('シェル側 出口 '+sim.Tho.toFixed(0)+'°C', g.x1, g.y1+18);
+  cx.textAlign='left';
+  cx.fillStyle='rgba(120,180,255,.9)';
+  cx.fillText('チューブ側 '+sim.Tci.toFixed(0)+'°C → '+sim.Tco.toFixed(0)+'°C', g.x0, g.y1+18);
+  cx.textAlign='right';
+  cx.fillStyle='rgba(255,213,74,.95)';
+  cx.fillText('F = '+sim.F.toFixed(3)+'  ('+sim.passes+'パス)', g.x1, g.y0-10);
+  cx.textAlign='left';
+}
+
+function animate(){
+  // advance particles
+  var spd = sim.valid ? 0.0042 : 0;
+  for (var i=0;i<shellP.length;i++){ shellP[i].s += spd; if(shellP[i].s>1) shellP[i].s -= 1; }
+  for (var j=0;j<tubeP.length;j++){ tubeP[j].u += spd*1.7; if(tubeP[j].u>1) tubeP[j].u -= 1; }
+  drawShell();
+  if(!reduce) requestAnimationFrame(animate);
+}
+
+window.addEventListener('resize', function(){ if(reduce) drawShell(); });
+
+// boot
+initSliders();
 calc();
+if(cv){
+  if(reduce) drawShell();
+  else requestAnimationFrame(animate);
+}
+})();
 </script>
 
 <section class="explanation">
@@ -386,6 +576,9 @@ calc();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-exchanger-shell.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -440,13 +633,13 @@ calc();
 <h3>使い方ガイド</h3>
 <ol>
 <li>ホットサイド（シェル側）の入口温度Thi、出口温度Tho、流量Mhを入力します。例：Thi=80°C、Tho=50°C、Mh=5000kg/h</li>
-<li>コールドサイド（チューブ側）の入口温度Tci、流量Mcを入力し、伝熱係数UおよびLMTD補正係数Fを設定します。例：U=1500W/m²K、F=0.85（1シェル・2チューブパス）</li>
+<li>コールドサイド（チューブ側）の入口温度Tci、流量Mc、伝熱係数Uを入力し、パス数（1パス対向流／2パス1-2型）を選びます。F補正係数はパス数と温度効率P・熱容量比Rから自動算出されます。例：U=1500W/m²K、2パス</li>
 <li>シミュレータが自動計算する出口温度Tco、伝熱量Q、必要伝熱面積A、NTU、有効度εを確認し、設計条件の妥当性を検証します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>冷却水を用いた蒸気凝縮器の場合：ホット側（蒸気）Thi=100°C、Tho=60°C、Mh=2000kg/h、Cp=2.1kJ/kg·K、コールド側（冷却水）Tci=25°C、Mc=8000kg/h、Cp=4.18kJ/kg·K、U=2000W/m²K、F=0.90と設定すると、伝熱量Q≈116.7kW、LMTD≈54.8K、必要面積A≈1.20m²、NTU≈0.65、有効度ε≈0.72、Tco≈41.3°Cが算出されます</p>
+<p>本ツールは流体を水(Cp=4200 J/kg·K)・流量をkg/sで扱います。ホット側 ṁh=2.0kg/s、Thi=120°C、Tho=80°C、コールド側 ṁc=3.0kg/s、Tci=20°C、U=500W/m²K、2パス(1-2型)と設定すると、伝熱量Q≈336kW、LMTD≈66.4K、F補正係数≈0.958、必要面積A≈10.6m²、NTU≈0.628、有効度ε≈0.400、Tco≈46.7°Cが自動算出されます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -456,6 +649,16 @@ calc();
 <li>フーリエ数が大きい場合（NTU>3）、有効度ε計算の精度が低下するため、段数型熱交換器の採用を検討してください</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983372?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983372.09._SCMZZZZZZ_.jpg" alt="伝熱工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">伝熱工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "橋梁トラス有限要素法解析",
       "description": "プラット・ワーレン・ハウ型トラス橋の有限要素法（FEM）解析シミュレーター。各部材の軸力・応力をリアルタイム可視化。",
       "url": "https://novasolver.jp/tools/bridge-truss.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["プラット・ワーレン・ハウのトラス形式選択","FEM剛性マトリクス組立・境界条件・連立方程式求解","部材力の引張/圧縮カラーマップ","変形図のアニメーション表示","部材力棒グラフ"],
       "keywords": "トラス,FEM,有限要素法,橋梁,構造解析,軸力,引張,圧縮,変位",
       "datePublished": "2026-04-08",
@@ -159,8 +159,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <div class="hero">
   <div class="hero-inner">
     <div class="hero-badge"><i class="fas fa-drafting-compass"></i> 構造解析</div>
-    <h1>橋梁トラス有限要素法解析</h1>
-    <p class="hero-sub">プラット・ワーレン・ハウ型トラス橋をFEMで解析。荷重をかけると各部材が赤（引張）・青（圧縮）で表示され、変形図がアニメーションされる。</p>
+    <h1>橋梁トラス 移動荷重シミュレーター</h1>
+    <p class="hero-sub">プラット・ワーレン・ハウ型トラス橋を車両が渡る。節点法（ΣFx=ΣFy=0）で各部材の軸力をリアルタイム計算し、赤（引張）・青（圧縮）で色分け、最も応力の高い部材をハイライトする。</p>
   </div>
 </div>
 
@@ -173,93 +173,123 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="preset-btn" id="btn-howe" onclick="setPreset('howe')">Howe</button>
     </div>
     <div class="divider"></div>
+    <div class="panel-title">シナリオ</div>
+    <div class="btn-group">
+      <button class="preset-btn active" id="btn-moving" onclick="setScenario('moving')">移動荷重</button>
+      <button class="preset-btn" id="btn-point" onclick="setScenario('point')">中央点荷重</button>
+    </div>
+    <div class="btn-group">
+      <button class="btn" id="btn-play" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+      <button class="btn secondary" onclick="resetSim()"><i class="fas fa-rotate-left"></i> 最初から</button>
+    </div>
+    <div class="divider"></div>
     <div class="panel-title">荷重・材料パラメータ</div>
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">集中荷重 F</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="val-load" value="100" min="10" max="500" step="10" oninput="syncFromNum('sl-load','val-load')"><span class="num-unit">kN</span></div>
+        <span class="param-name">車両荷重 P</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="val-load" value="200" min="10" max="500" step="10" oninput="syncFromNum('sl-load','val-load')"><span class="num-unit">kN</span></div>
       </div>
-      <input type="range" id="sl-load" min="10" max="500" value="100" step="10" oninput="syncToNum('sl-load','val-load');updateSlider(this,'val-load',v=>v+' kN');solve();updateChart()">
+      <input type="range" id="sl-load" min="10" max="500" value="200" step="10" oninput="syncToNum('sl-load','val-load');updateSlider(this,'val-load',v=>v+' kN')">
     </div>
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">荷重位置</span>
-        <span class="param-value" id="val-loadpos">中央</span>
+        <span class="param-name">荷重位置 x/L</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="val-pos" value="50" min="0" max="100" step="1" oninput="syncFromNum('sl-pos','val-pos')"><span class="num-unit">%</span></div>
       </div>
-      <div class="select-wrap">
-        <select id="sel-loadpos" onchange="solve()">
-          <option value="mid">中央スパン</option>
-          <option value="quarter">1/4スパン</option>
-          <option value="distributed">等分布</option>
-        </select>
+      <input type="range" id="sl-pos" min="0" max="100" value="50" step="1" oninput="syncToNum('sl-pos','val-pos');updateSlider(this,'val-pos',v=>v+' %');onManualPos()">
+    </div>
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">走行速度</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="val-speed" value="40" min="5" max="120" step="5" oninput="syncFromNum('sl-speed','val-speed')"><span class="num-unit">%/s</span></div>
       </div>
+      <input type="range" id="sl-speed" min="5" max="120" value="40" step="5" oninput="syncToNum('sl-speed','val-speed');updateSlider(this,'val-speed',v=>v+' %/s')">
     </div>
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">弾性係数 E</span>
         <div class="num-wrap"><input type="number" class="num-input" id="val-E" value="200" min="70" max="210" step="10" oninput="syncFromNum('sl-E','val-E')"><span class="num-unit">GPa</span></div>
       </div>
-      <input type="range" id="sl-E" min="70" max="210" value="200" step="10" oninput="syncToNum('sl-E','val-E');updateSlider(this,'val-E',v=>v+' GPa');solve();updateChart()">
+      <input type="range" id="sl-E" min="70" max="210" value="200" step="10" oninput="syncToNum('sl-E','val-E');updateSlider(this,'val-E',v=>v+' GPa')">
     </div>
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">断面積 A</span>
         <div class="num-wrap"><input type="number" class="num-input" id="val-A" value="50" min="5" max="200" step="5" oninput="syncFromNum('sl-A','val-A')"><span class="num-unit">cm²</span></div>
       </div>
-      <input type="range" id="sl-A" min="5" max="200" value="50" step="5" oninput="syncToNum('sl-A','val-A');updateSlider(this,'val-A',v=>v+' cm²');solve();updateChart()">
+      <input type="range" id="sl-A" min="5" max="200" value="50" step="5" oninput="syncToNum('sl-A','val-A');updateSlider(this,'val-A',v=>v+' cm²')">
     </div>
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">変形拡大率</span>
         <div class="num-wrap"><input type="number" class="num-input" id="val-scale" value="200" min="10" max="1000" step="10" oninput="syncFromNum('sl-scale','val-scale')"><span class="num-unit">×</span></div>
       </div>
-      <input type="range" id="sl-scale" min="10" max="1000" value="200" step="10" oninput="syncToNum('sl-scale','val-scale');updateSlider(this,'val-scale',v=>v+'×');drawTruss();updateChart()">
+      <input type="range" id="sl-scale" min="10" max="1000" value="200" step="10" oninput="syncToNum('sl-scale','val-scale');updateSlider(this,'val-scale',v=>v+'×')">
     </div>
     <div class="divider"></div>
-    <div class="panel-title">解析結果</div>
+    <div class="panel-title">凡例</div>
 <div class="legend-row">
       <span><span class="legend-dot" style="background:#e74c3c"></span>引張</span>
       <span><span class="legend-dot" style="background:#3498db"></span>圧縮</span>
-      <span><span class="legend-dot" style="background:#95a5a6"></span>ゼロ</span>
+      <span><span class="legend-dot" style="background:#95a5a6"></span>ゼロ部材</span>
+      <span><span class="legend-dot" style="background:#f1c40f"></span>最大応力部材</span>
     </div>
-    
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（ライブ）</div>
     <div class="stat-cards">
-      <div class="stat-card"><div class="sv" id="stat-disp">—</div><div class="sl">最大変位 (mm)</div></div>
-      <div class="stat-card"><div class="sv" id="stat-maxF">—</div><div class="sl">最大部材力 (kN)</div></div>
+      <div class="stat-card"><div class="sv" id="stat-maxT">—</div><div class="sl">最大引張 (kN) / 部材</div></div>
+      <div class="stat-card"><div class="sv" id="stat-maxC">—</div><div class="sl">最大圧縮 (kN) / 部材</div></div>
+      <div class="stat-card"><div class="sv" id="stat-RA">—</div><div class="sl">左支点反力 R<sub>A</sub> (kN)</div></div>
+      <div class="stat-card"><div class="sv" id="stat-RB">—</div><div class="sl">右支点反力 R<sub>B</sub> (kN)</div></div>
+      <div class="stat-card"><div class="sv" id="stat-load">—</div><div class="sl">荷重位置 (x/L)</div></div>
       <div class="stat-card"><div class="sv" id="stat-stress">—</div><div class="sl">最大応力 (MPa)</div></div>
-      <div class="stat-card"><div class="sv" id="stat-member">—</div><div class="sl">最大荷重部材</div></div>
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> トラス</div><canvas id="trussCanvas" height="340"></canvas></div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 力</div><canvas class="ux-chartjs-canvas" id="forceChart" height="140"></canvas></div>
-  
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-truck-moving"></i> トラス橋（移動荷重・色分け軸力）</div><canvas id="trussCanvas" height="360"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-column"></i> 各部材の軸力</div><canvas class="ux-chartjs-canvas" id="forceChart" height="150"></canvas></div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      局所座標系での剛性マトリクス：<br>
-      $k = \frac{EA}{L}\begin{bmatrix}1 & -1 \\ -1 & 1\end{bmatrix}$<br>
-      部材力：$F_{bar}= \frac{EA}{L}(u_2 - u_1)$<br>
-      応力：$\sigma = F_{bar}/A$
-    
+      <p>全体のつり合いから支点反力（スパン $L$、左端から荷重位置 $a$、荷重 $P$）：</p>
+      $$R_B = \frac{Pa}{L},\qquad R_A = P - R_B$$
+      <p>各節点で節点法を適用（未知の部材力 $F_m$ を解く）：</p>
+      $$\sum F_x = 0,\qquad \sum F_y = 0$$
+      <p>部材応力：$\sigma = F_m / A$。正符号＝引張（赤）、負符号＝圧縮（青）。</p>
+
 </div>
 </div>
 </div>
 
 <script>
 
-// init sliders
-['sl-load','sl-E','sl-A','sl-scale'].forEach(id =>{
+// ---- slider visual init ----
+['sl-load','sl-pos','sl-speed','sl-E','sl-A','sl-scale'].forEach(id =>{
   const el = document.getElementById(id);
+  if(!el) return;
   const v = parseFloat(el.value), min = parseFloat(el.min), max = parseFloat(el.max);
   el.style.setProperty('--pct', ((v - min)/(max - min)*100)+'%');
 });
 
 let currentPreset = 'pratt';
+let scenario = 'moving';
 let nodes = [], elements = [], supports = [];
 let displacements = [], forces = [];
+let reactionA = 0, reactionB = 0;
+let loadFrac = 0.5;          // x/L position of the moving load (0..1)
+let playing = true;
+let lastT = 0;
+const SPAN_NODES = 5;        // bottom chord has nodes 0..5 (5 panels)
 
 function setPreset(type){
   currentPreset = type;
@@ -267,54 +297,84 @@ function setPreset(type){
     document.getElementById('btn-'+t).classList.toggle('active', t===type);
   });
   buildTruss();
-  solve();
-}function buildTruss(){
-  // 5-panel truss: nodes along bottom chord + top chord
-  // Bottom: 0-5 (6 nodes), Top: 6-10 (5 nodes, offset by half panel)
+  solveAndDraw();
+}
+
+function setScenario(s){
+  scenario = s;
+  document.getElementById('btn-moving').classList.toggle('active', s==='moving');
+  document.getElementById('btn-point').classList.toggle('active', s==='point');
+  if(s==='point'){ loadFrac = 0.5; syncPosUI(); }
+  solveAndDraw();
+}
+
+function togglePlay(){
+  playing = !playing;
+  const b = document.getElementById('btn-play');
+  b.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+  if(playing){ lastT = 0; requestAnimationFrame(loop); }
+}
+
+function resetSim(){
+  loadFrac = 0; syncPosUI();
+  if(!playing) solveAndDraw();
+}
+
+function onManualPos(){
+  loadFrac = parseFloat(document.getElementById('sl-pos').value)/100;
+  playing = false;
+  const b = document.getElementById('btn-play');
+  if(b) b.innerHTML = '<i class="fas fa-play"></i> 再生';
+  solveAndDraw();
+}
+
+function syncPosUI(){
+  const sl = document.getElementById('sl-pos');
+  const nu = document.getElementById('val-pos');
+  const pct = Math.round(loadFrac*100);
+  if(sl){ sl.value = pct; sl.style.setProperty('--pct', pct + '%'); }
+  if(nu) nu.value = pct;
+}
+
+function buildTruss(){
+  // 5-panel parallel-chord truss (statically determinate: m = 2n - r = 17).
+  // Bottom chord: nodes 0..5 (6 nodes). Top chord: nodes 6..9 (4 nodes),
+  // placed DIRECTLY ABOVE interior bottom nodes 1..4 so that vertical posts
+  // and a single sloped diagonal per bay are well defined.
   const panels = 5;
   const L = 1.0; // panel length normalized
   const H = 1.0; // height
   nodes = [];
   elements = [];
 
-  // Bottom chord nodes
   for (let i = 0; i <= panels; i++) nodes.push([i * L, 0]);
-  // Top chord nodes
-  for (let i = 0; i < panels; i++) nodes.push([(i + 0.5) * L, H]);
+  for (let i = 1; i < panels; i++) nodes.push([i * L, H]);
 
-  const nb = panels + 1; // number of bottom nodes
-  // Bottom chord
+  const nb = panels + 1;
+  const top = i => nb + (i - 1);
+
   for (let i = 0; i < panels; i++) elements.push([i, i + 1]);
-  // Top chord
-  for (let i = 0; i < panels - 1; i++) elements.push([nb + i, nb + i + 1]);
+  for (let i = 1; i < panels - 1; i++) elements.push([top(i), top(i + 1)]);
+  elements.push([0, top(1)]);
+  elements.push([panels, top(panels - 1)]);
+  for (let i = 1; i < panels; i++) elements.push([i, top(i)]);
 
-  if (currentPreset === 'pratt') {
-    // Verticals: bottom to top
-    for (let i = 0; i < panels; i++) {
-      // Left vertical of each panel (from bottom node i to top node i)
-      elements.push([i, nb + i]);
-      elements.push([i + 1, nb + i]);
-    }// Remove duplicate: last vertical already covered
-    // Diagonals: in pratt, diagonals go from bottom-inner toward top-outer
-    // For panels i=0..4: diagonal from bottom[i+1] to top[i]
-    for (let i = 0; i < panels; i++){
-      elements.push([i + 1, nb + i]);
+  const bays = [[1, 2], [2, 3], [3, 4]];
+  const midX = panels / 2;
+  bays.forEach(([a, b], bi) => {
+    const cx = (a + b) / 2;
+    if (currentPreset === 'pratt') {
+      if (cx < midX) elements.push([top(a), b]);
+      else           elements.push([top(b), a]);
+    } else if (currentPreset === 'howe') {
+      if (cx < midX) elements.push([top(b), a]);
+      else           elements.push([top(a), b]);
+    } else {
+      if (bi % 2 === 0) elements.push([top(a), b]);
+      else              elements.push([top(b), a]);
     }
-  }else if (currentPreset === 'warren'){
-    // No verticals, just diagonals alternating
-    for (let i = 0; i < panels; i++) {
-      elements.push([i, nb + i]);
-      elements.push([i + 1, nb + i]);
-    }
-  }else{ // howe
-    // Verticals + diagonals opposite to pratt
-    for (let i = 0; i < panels; i++) {
-      elements.push([i, nb + i]);
-      elements.push([i + 1, nb + i]);
-    }for (let i = 0; i < panels; i++){
-      elements.push([i, nb + i]);
-    }
-  }// Remove duplicate elements
+  });
+
   const seen = new Set();
   elements = elements.filter(e =>{
     const key = Math.min(e[0],e[1])+','+Math.max(e[0],e[1]);
@@ -323,29 +383,38 @@ function setPreset(type){
     return true;
   });
 
-  // Supports: pin at node 0 (fix x,y), roller at node panels (fix y only)
   supports = [];
-  supports.push({node: 0, dof: [0, 1]}); // pin: fix DOF 0,1
-  supports.push({node: panels, dof: [1]}); // roller: fix DOF 1
-}function solve(){
-  const F_kN = parseFloat(document.getElementById('sl-load').value);
+  supports.push({node: 0, dof: [0, 1]}); // pin
+  supports.push({node: panels, dof: [1]}); // roller
+}
+
+// Distribute the moving load to the two nearest bottom-chord panel points.
+// Returns nodal vertical loads (object node->force, downward positive magnitude).
+function loadDistribution(frac){
+  const x = frac * SPAN_NODES;     // position in panel-length units along bottom chord
+  let i0 = Math.floor(x);
+  if (i0 < 0) i0 = 0;
+  if (i0 >= SPAN_NODES) i0 = SPAN_NODES - 1;
+  const i1 = i0 + 1;
+  const r = x - i0;                // 0..1 between node i0 and i1
+  return [[i0, 1 - r], [i1, r]];
+}
+
+function solve(){
+  const P_kN = parseFloat(document.getElementById('sl-load').value);
   const E_GPa = parseFloat(document.getElementById('sl-E').value);
   const A_cm2 = parseFloat(document.getElementById('sl-A').value);
-  const loadPos = document.getElementById('sel-loadpos').value;
-
-  document.getElementById('val-loadpos').textContent =
-    loadPos === 'mid' ? '中央' : loadPos === 'quarter' ? '1/4点' : '等分布';
 
   const E = E_GPa * 1e9;
   const A = A_cm2 * 1e-4;
-  const F = F_kN * 1e3;
+  const P = P_kN * 1e3;
 
   const n = nodes.length;
   const ndof = 2 * n;
   const K = Array.from({length: ndof}, () => new Array(ndof).fill(0));
   const Fvec = new Array(ndof).fill(0);
 
-  // Assemble stiffness
+  // Assemble stiffness (bar elements -> equivalent to method of joints for determinate truss)
   for (const [i, j] of elements){
     const dx = nodes[j][0] - nodes[i][0];
     const dy = nodes[j][1] - nodes[i][1];
@@ -360,31 +429,22 @@ function setPreset(type){
     for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) {
       K[dofs[a]][dofs[b]] += k * T[a*4+b];
     }
-  }// Apply loads
-  const panels = 5;
-  const nb = panels + 1;
-  if (loadPos === 'mid'){
-    const midNode = Math.floor(panels / 2);
-    Fvec[2 * midNode + 1] = -F;
-  }else if (loadPos === 'quarter'){
-    const qNode = Math.floor(panels / 4);
-    Fvec[2 * qNode + 1] = -F;
-  }else{
-    // Distributed over bottom chord nodes (excluding supports)
-    const load = F / (nb - 2);
-    for (let i = 1; i < nb - 1; i++) Fvec[2*i+1] = -load;
-  }// Apply boundary conditions (penalty method)
+  }
+
+  // Apply the moving wheel load split between adjacent panel points
+  const dist = loadDistribution(loadFrac);
+  for (const [node, w] of dist) Fvec[2*node+1] = -P * w;
+
+  // Boundary conditions (penalty)
   const BIG = 1e20;
-  for (const s of supports){
-    for (const d of s.dof) {
-      const gdof = 2 * s.node + d;
-      K[gdof][gdof] += BIG;
-    }
-  }// Solve K*u = F (Gaussian elimination)
+  for (const sp of supports){
+    for (const d of sp.dof) K[2*sp.node + d][2*sp.node + d] += BIG;
+  }
+
   const U = gaussSolve(K, Fvec);
   displacements = U;
 
-  // Compute member forces
+  // Member axial forces (kN)
   forces = [];
   for (const [i, j] of elements){
     const dx = nodes[j][0] - nodes[i][0];
@@ -392,31 +452,43 @@ function setPreset(type){
     const L = Math.sqrt(dx*dx + dy*dy);
     const c = dx/L, s = dy/L;
     const du = (U[2*j]-U[2*i])*c + (U[2*j+1]-U[2*i+1])*s;
-    const f = E * A / L * du;
-    forces.push(f / 1e3); // kN
-  }// Stats
-  let maxDisp = 0;
-  for (let i = 0; i < n; i++){
-    const d = Math.sqrt(U[2*i]*U[2*i] + U[2*i+1]*U[2*i+1]);
-    if (d > maxDisp) maxDisp = d;
+    forces.push((E * A / L * du) / 1e3);
   }
-  const maxF = Math.max(...forces.map(Math.abs));
-  const maxStress = maxF * 1e3 / A / 1e6;
-  const maxIdx = forces.findIndex(f => Math.abs(f) === maxF);
 
-  document.getElementById('stat-disp').textContent = (maxDisp * 1000).toFixed(2);
-  document.getElementById('stat-maxF').textContent = maxF.toFixed(1);
-  document.getElementById('stat-stress').textContent = maxStress.toFixed(1);
-  document.getElementById('stat-member').textContent = '#' + (maxIdx + 1);
+  // Support reactions by global statics: R_B = P*a/L, R_A = P - R_B
+  const a = loadFrac * SPAN_NODES;        // distance from left support (panel units)
+  reactionB = P_kN * a / SPAN_NODES;
+  reactionA = P_kN - reactionB;
 
-  drawTruss();
-  updateChart();
-}function gaussSolve(A, b){
+  updateStats(A);
+}
+
+function updateStats(A){
+  let maxT = 0, maxTidx = -1, maxC = 0, maxCidx = -1;
+  for (let i = 0; i < forces.length; i++){
+    const f = forces[i];
+    if (f > maxT){ maxT = f; maxTidx = i; }
+    if (f < maxC){ maxC = f; maxCidx = i; }
+  }
+  const maxAbs = Math.max(maxT, Math.abs(maxC), 1e-9);
+  const maxStress = maxAbs * 1e3 / A / 1e6; // MPa
+
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('stat-maxT', (maxTidx>=0 ? '+'+maxT.toFixed(0)+' / #'+(maxTidx+1) : '—'));
+  set('stat-maxC', (maxCidx>=0 ? maxC.toFixed(0)+' / #'+(maxCidx+1) : '—'));
+  set('stat-RA', reactionA.toFixed(1));
+  set('stat-RB', reactionB.toFixed(1));
+  set('stat-load', loadFrac.toFixed(2));
+  set('stat-stress', maxStress.toFixed(1));
+}
+
+function gaussSolve(A, b){
   const n = b.length;
   const M = A.map((r, i) => [...r, b[i]]);
   for (let col = 0; col < n; col++) {
     let max = Math.abs(M[col][col]), row = col;
-    for (let r = col+1; r < n; r++) if (Math.abs(M[r][col]) > max) { max = Math.abs(M[r][col]); row = r; }[M[col], M[row]] = [M[row], M[col]];
+    for (let r = col+1; r < n; r++) if (Math.abs(M[r][col]) > max) { max = Math.abs(M[r][col]); row = r; }
+    [M[col], M[row]] = [M[row], M[col]];
     const piv = M[col][col];
     if (Math.abs(piv) < 1e-14) continue;
     for (let j = col; j <= n; j++) M[col][j] /= piv;
@@ -427,109 +499,142 @@ function setPreset(type){
     }
   }
   return M.map(r => r[n]);
-}function drawTruss(){
-  const canvas = document.getElementById('trussCanvas');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth || 600;
-  var __novaW = W;
-  var __novaH = 340;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  ctx.clearRect(0, 0, W, 340);
+}
 
-  const scale = parseFloat(document.getElementById('sl-scale').value);
+let _geom = null;
+function computeGeom(W, Hc){
+  const scale = parseFloat(document.getElementById('sl-scale').value) || 1;
   const pad = 50;
   const xs = nodes.map(n => n[0]), ys = nodes.map(n => n[1]);
   const xmin = Math.min(...xs), xmax = Math.max(...xs);
   const ymin = Math.min(...ys), ymax = Math.max(...ys);
-  const W2 = W - 2*pad, H2 = 340 - 2*pad - 60;
+  const W2 = W - 2*pad, H2 = Hc - 2*pad - 60;
   const scx = W2 / (xmax - xmin || 1);
   const scy = H2 / (ymax - ymin || 1);
   const sc = Math.min(scx, scy) * 0.8;
   const offX = pad + (W2 - (xmax-xmin)*sc)/2;
   const offY = pad + 30 + H2 - (ymax-ymin)*sc;
+  return {scale, sc, offX, offY};
+}
 
-  function px(n, i) { return offX + (nodes[n][0] + displacements[2*n]*scale)*sc; }function py(n, i){ return offY - (nodes[n][1] + displacements[2*n+1]*scale)*sc; }function pxO(n){ return offX + nodes[n][0]*sc; }function pyO(n){ return offY - nodes[n][1]*sc; }// Draw original (ghost)
+function fin(v){ return Number.isFinite(v) ? v : 0; }
+
+function drawTruss(){
+  const canvas = document.getElementById('trussCanvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 600;
+  const Hc = 360;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const needW = Math.round(W * dpr), needH = Math.round(Hc * dpr);
+  if (canvas.width !== needW || canvas.height !== needH){
+    canvas.style.width = W + 'px';
+    canvas.style.height = Hc + 'px';
+    canvas.width = needW; canvas.height = needH;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, Hc);
+
+  const g = computeGeom(W, Hc);
+  _geom = g;
+  const {scale, sc, offX, offY} = g;
+  const px = n => offX + (fin(nodes[n][0]) + fin(displacements[2*n])*scale)*sc;
+  const py = n => offY - (fin(nodes[n][1]) + fin(displacements[2*n+1])*scale)*sc;
+  const pxO = n => offX + nodes[n][0]*sc;
+  const pyO = n => offY - nodes[n][1]*sc;
+
+  // critical (max |force|) member index
+  let critIdx = -1, critAbs = 0;
+  for (let i=0;i<forces.length;i++){ const a=Math.abs(forces[i]); if(a>critAbs){critAbs=a;critIdx=i;} }
+
+  // ghost (undeformed)
   ctx.lineWidth = 1;
   ctx.strokeStyle = 'rgba(150,150,180,0.2)';
   for (const [i, j] of elements){
     ctx.beginPath(); ctx.moveTo(pxO(i), pyO(i)); ctx.lineTo(pxO(j), pyO(j)); ctx.stroke();
-  }// Draw deformed with force colors
+  }
+
+  // deformed members, color-coded by force
   const maxF = Math.max(...forces.map(Math.abs), 0.001);
   elements.forEach(([i, j], idx) =>{
     const f = forces[idx];
     const t = Math.min(Math.abs(f) / maxF, 1);
-    const lw = 1.5 + t * 4;
-    let color;
-    if (Math.abs(f) < 0.01) color = '#95a5a6';
-    else if (f > 0) color = `rgba(231,${Math.round(76 + (1-t)*130)},60,${0.6+t*0.4})`;
-    else color = `rgba(52,${Math.round(152 + (1-t)*50)},219,${0.6+t*0.4})`;
+    let color, lw = 1.5 + t * 4.5;
+    if (Math.abs(f) < 0.05) color = '#95a5a6';
+    else if (f > 0) color = `rgba(231,${Math.round(76 + (1-t)*120)},60,${0.55+t*0.45})`;
+    else color = `rgba(52,${Math.round(152 + (1-t)*60)},219,${0.55+t*0.45})`;
+    if (idx === critIdx){ color = '#f1c40f'; lw = 4 + t*4; }
     ctx.lineWidth = lw;
     ctx.strokeStyle = color;
     ctx.beginPath(); ctx.moveTo(px(i), py(i)); ctx.lineTo(px(j), py(j)); ctx.stroke();
-    // Force label
-    if (Math.abs(f) > 0.1 && t > 0.3){
+    if (Math.abs(f) > 0.1 && (t > 0.32 || idx === critIdx)){
       const mx = (px(i)+px(j))/2, my = (py(i)+py(j))/2;
-      ctx.fillStyle = color;
+      ctx.fillStyle = idx===critIdx ? '#f1c40f' : color;
       ctx.font = '9px Roboto Mono, monospace';
       ctx.textAlign = 'center';
       ctx.fillText((f > 0 ? '+' : '') + f.toFixed(0)+'kN', mx, my-5);
     }
   });
 
-  // Draw nodes
+  // nodes
   nodes.forEach((nd, i) =>{
-    const x = px(i), y = py(i);
     ctx.beginPath();
-    ctx.arc(x, y, 5, 0, Math.PI*2);
-    ctx.fillStyle = '#00B4D8';
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.arc(fin(px(i)), fin(py(i)), 4, 0, Math.PI*2);
+    ctx.fillStyle = '#00B4D8'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.stroke();
   });
 
-  // Draw supports
-  const panels = 5;
-  drawPin(ctx, pxO(0), pyO(0), sc);
-  drawRoller(ctx, pxO(panels), pyO(panels), sc);
+  drawPin(ctx, pxO(0), pyO(0));
+  drawRoller(ctx, pxO(SPAN_NODES), pyO(SPAN_NODES));
 
-  // Load arrows
-  const F_kN = parseFloat(document.getElementById('sl-load').value);
-  const loadPos = document.getElementById('sel-loadpos').value;
-  const nb = panels + 1;
-  ctx.fillStyle = '#f39c12';
-  ctx.strokeStyle = '#f39c12';
-  ctx.lineWidth = 2;
-  const drawArrow = (nx) =>{
-    const ax = pxO(nx), ay = pyO(nx) - 5;
-    ctx.beginPath(); ctx.moveTo(ax, ay - 22); ctx.lineTo(ax, ay);
-    ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(ax-6, ay-10); ctx.lineTo(ax, ay); ctx.lineTo(ax+6, ay-10); ctx.fill();
-  };
-  if (loadPos === 'mid') drawArrow(Math.floor(panels/2));
-  else if (loadPos === 'quarter') drawArrow(Math.floor(panels/4));
-  else for (let i = 1; i < nb-1; i++) drawArrow(i);
+  // support reaction arrows (upward) with magnitude
+  drawReaction(ctx, pxO(0), pyO(0), reactionA, 'R_A');
+  drawReaction(ctx, pxO(SPAN_NODES), pyO(SPAN_NODES), reactionB, 'R_B');
 
-  // Title
+  // moving load (vehicle) + downward arrow at current x position on bottom chord
+  const lx = offX + (loadFrac * SPAN_NODES) * sc;
+  const ly = offY; // bottom chord y
+  ctx.fillStyle = '#f39c12'; ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(lx, ly - 40); ctx.lineTo(lx, ly - 8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lx-6, ly-18); ctx.lineTo(lx, ly-8); ctx.lineTo(lx+6, ly-18); ctx.fill();
+  // simple truck glyph
+  ctx.fillStyle = 'rgba(243,156,18,0.92)';
+  ctx.fillRect(lx-14, ly-58, 28, 14);
+  ctx.fillStyle = '#222';
+  ctx.beginPath(); ctx.arc(lx-8, ly-44, 3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(lx+8, ly-44, 3, 0, Math.PI*2); ctx.fill();
+  const P_kN = parseFloat(document.getElementById('sl-load').value);
+  ctx.fillStyle = '#f39c12'; ctx.font = '10px Roboto Mono, monospace'; ctx.textAlign='center';
+  ctx.fillText(P_kN.toFixed(0)+' kN', lx, ly-62);
+
+  // title
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.font = '11px Noto Sans JP, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(currentPreset.charAt(0).toUpperCase()+currentPreset.slice(1)+' トラス — 変形図（'+parseFloat(document.getElementById('sl-scale').value)+'×拡大）', 10, 15);
-}function drawPin(ctx, x, y, sc){
+  ctx.fillText(currentPreset.charAt(0).toUpperCase()+currentPreset.slice(1)+' トラス — 移動荷重 x/L='+loadFrac.toFixed(2)+'（変形'+scale+'×）', 10, 15);
+}
+
+function drawReaction(ctx, x, y, mag, label){
+  if(!Number.isFinite(x) || !Number.isFinite(y)) return;
+  ctx.save();
+  ctx.strokeStyle = '#2ecc71'; ctx.fillStyle = '#2ecc71'; ctx.lineWidth = 2;
+  const yb = y + 26;
+  ctx.beginPath(); ctx.moveTo(x, yb); ctx.lineTo(x, yb-18); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x-5, yb-9); ctx.lineTo(x, yb-18); ctx.lineTo(x+5, yb-9); ctx.fill();
+  ctx.font = '9px Roboto Mono, monospace'; ctx.textAlign='center';
+  ctx.fillText((Number.isFinite(mag)?mag.toFixed(0):'0')+'kN', x, yb+10);
+  ctx.restore();
+}
+
+function drawPin(ctx, x, y){
   ctx.save();
   ctx.strokeStyle = '#2ecc71'; ctx.fillStyle = 'rgba(46,204,113,0.3)'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x-8, y+14); ctx.lineTo(x+8, y+14); ctx.closePath();
   ctx.fill(); ctx.stroke();
   ctx.restore();
-}function drawRoller(ctx, x, y, sc){
+}
+
+function drawRoller(ctx, x, y){
   ctx.save();
   ctx.strokeStyle = '#2ecc71'; ctx.fillStyle = 'rgba(46,204,113,0.3)'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x-8, y+14); ctx.lineTo(x+8, y+14); ctx.closePath();
@@ -538,29 +643,71 @@ function setPreset(type){
   ctx.arc(x+5, y+18, 3, 0, Math.PI*2);
   ctx.fillStyle = '#2ecc71'; ctx.fill();
   ctx.restore();
-}let forceChartInst = null;
+}
+
+let forceChartInst = null;
 function updateChart(){
   const labels = elements.map((_, i) => '#'+(i+1));
   const data = forces.map(f => parseFloat(f.toFixed(2)));
   const colors = data.map(f => f >= 0 ? 'rgba(231,76,60,0.8)' : 'rgba(52,152,219,0.8)');
-  if (forceChartInst) forceChartInst.destroy();
-  const ctx2 = document.getElementById('forceChart').getContext('2d');
-  forceChartInst = new Chart(ctx2, {
-    type: 'bar',
-    data: { labels, datasets: [{ label: '部材力 (kN)', data, backgroundColor: colors, borderWidth: 0 }] },
-    options:{
-      responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
-      plugins: { legend: { display: false }, title:{ display: true, text: '各部材の軸力 (kN) — 正=引張 負=圧縮', font: { size: 11 } } },
-      scales:{
-        x: { ticks: { font: { size: 9 } } },
-        y:{ title: { display: true, text: '軸力 (kN)', font: { size: 10 } } }
+  const ctx2 = document.getElementById('forceChart');
+  if(!ctx2) return;
+  if (!forceChartInst){
+    forceChartInst = new Chart(ctx2.getContext('2d'), {
+      type: 'bar',
+      data: { labels, datasets: [{ label: '部材力 (kN)', data, backgroundColor: colors, borderWidth: 0 }] },
+      options:{
+        responsive: true, maintainAspectRatio:false, resizeDelay:100, animation: false,
+        plugins: { legend: { display: false }, title:{ display: true, text: '各部材の軸力 (kN) — 正=引張 負=圧縮', font: { size: 11 } } },
+        scales:{
+          x: { ticks: { font: { size: 9 } } },
+          y:{ title: { display: true, text: '軸力 (kN)', font: { size: 10 } } }
+        }
       }
-    }
-  });
-}// Initialize
+    });
+  } else {
+    forceChartInst.data.labels = labels;
+    forceChartInst.data.datasets[0].data = data;
+    forceChartInst.data.datasets[0].backgroundColor = colors;
+    forceChartInst.update('none');
+  }
+}
+
+function solveAndDraw(){
+  solve();
+  drawTruss();
+  updateChart();
+}
+
+// ---- animation loop ----
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function loop(ts){
+  if(!playing) return;
+  if(!lastT) lastT = ts;
+  const dt = Math.min((ts - lastT)/1000, 0.05);
+  lastT = ts;
+  if(scenario === 'moving'){
+    const sp = parseFloat(document.getElementById('sl-speed').value)/100; // fraction per second
+    loadFrac += sp * dt;
+    if(loadFrac > 1) loadFrac = 0;
+    syncPosUI();
+  }
+  solveAndDraw();
+  requestAnimationFrame(loop);
+}
+
+// Initialize
 buildTruss();
-solve();
-window.addEventListener('resize', () =>{ drawTruss(); });
+syncPosUI();
+solveAndDraw();
+if(reduceMotion){
+  playing = false;
+  const b = document.getElementById('btn-play');
+  if(b) b.innerHTML = '<i class="fas fa-play"></i> 再生';
+} else {
+  requestAnimationFrame(loop);
+}
+window.addEventListener('resize', () =>{ if(forceChartInst) forceChartInst.resize(); drawTruss(); });
 </script>
 
 <section class="explanation">
@@ -593,15 +740,15 @@ window.addEventListener('resize', () =>{ drawTruss(); });
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">荷重の大きさや位置はどのように設定できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">画面上の節点（部材の接合点）をクリックして選択し、表示される入力欄に荷重の大きさ（NまたはkN）と方向（上下・左右）を数値で指定します。複数の節点に同時に荷重をかけることも可能です。</div>
+    <div class="faq-a">左パネルの「集中荷重F」スライダーで荷重の大きさ(kN)を設定し、「荷重位置」セレクトで中央スパン・1/4スパン・等分布から作用位置を選びます。荷重は鉛直下向きに自動で与えられます。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">変形図のアニメーションが大きすぎる／小さすぎる場合、調整できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">はい、画面下部のスライダーで変形の倍率を0.1倍から10倍まで調整できます。実際の変形量は微小なため、初期設定では見やすい倍率に自動設定されますが、自由に変更して挙動を確認してください。</div>
+    <div class="faq-a">はい、「変形拡大率」スライダーで倍率を10倍から1000倍まで調整できます。実際の変形量は微小なため初期値は200倍に設定されていますが、自由に変更して挙動を確認してください。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">解析に使用している材料（ヤング率や断面積）は変更できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">可能です。画面左側の「材料設定」パネルで、ヤング率E（例：鋼材なら200GPa）、断面積A、部材長さLを数値入力で変更できます。変更後は「再解析」ボタンを押すと、新しい物性値で計算が実行されます。</div>
+    <div class="faq-a">可能です。左パネルのヤング率E（例：鋼材なら200GPa）と断面積Aのスライダー／数値入力で変更でき、操作するたびに自動で再解析されます（部材長は正規化モデルで固定です）。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -621,6 +768,9 @@ window.addEventListener('resize', () =>{ drawTruss(); });
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="bridge-truss.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -682,7 +832,7 @@ window.addEventListener('resize', () =>{ drawTruss(); });
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>スチール製プラットトラス橋（支間12m）で、中央に300kNの点荷重を加える場合：E=200GPa、部材断面積=85cm²と設定すると、最大変位は約8.2mm、上弦材の最大圧縮応力は約142MPa、下弦材の最大引張部材力は約385kNと算出されます。この値が許容応力度180MPa以下であることを確認し、設計の妥当性を検証できます</p>
+<p>本ツールは正規化した5パネル（パネル長L=1・高さH=1）のプラットトラスを解析します。中央に300kNの集中荷重、E=200GPa、断面積A=85cm²と設定すると、最大変位は約1.59mm、最大部材力は約360kN（圧縮・部材#6）、最大応力は約42.4MPaと算出されます。実橋の設計ではこの応力に許容応力度・座屈耐力の安全率を併せて評価します</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -692,6 +842,16 @@ window.addEventListener('resize', () =>{ drawTruss(); });
 <li>部材の実際の接合部は完全ピン接合を仮定していますが、現場では剛接合の二次曲げモーメントが発生するため、結果に20～30%の安全係数を見込んでください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

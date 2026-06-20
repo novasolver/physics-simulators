@@ -37,7 +37,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "カム機構シミュレーター",
       "description": "円板カムのフォロワー変位・速度・加速度をリアルタイム可視化。SHM・サイクロイダル・多項式カムプロファイルの比較と圧力角チェック。",
       "url": "https://novasolver.jp/tools/cam-mechanism.html",
@@ -47,7 +47,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["SHM・サイクロイダル・多項式3-4-5プロファイル","変位・速度・加速度曲線のリアルタイム描画","圧力角30°超の警告表示","アニメーション付きカム回転表示"],
       "keywords": "カム機構,カムシミュレーター,フォロワー変位,圧力角,サイクロイダルカム,多項式カム,機構設計",
       "datePublished": "2026-04-08",
@@ -90,6 +90,28 @@
   --bg: #F8F9FA; --card: #ffffff; --text: #1a1a2e;
   --muted: #6c757d; --border: #dee2e6;
 }*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* v2 live readouts + controls */
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.62);margin-top:3px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+.live-ro.seg .rv{font-size:0.92rem;color:#00e0c0}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0 4px}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.84rem;font-family:inherit;font-weight:600;transition:background .2s}
+.btn:hover{background:#0056b3}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+.speed-btn{padding:4px 10px;font-size:.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit}
+.speed-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.preset-btn{padding:5px 11px;font-size:.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.chart-host{position:relative;height:300px}
+.chart-host canvas{height:300px!important}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.ebar-fill,input[type=range]::-webkit-slider-thumb{transition:none}}
 body { font-family: 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 /* Header */
 header { background: var(--navy); color: #fff; padding: 0 24px; }
@@ -153,14 +175,29 @@ canvas#camCanvas { width: 100%; border-radius: 10px; background: #0a1628; displa
 
 <div class="main">
   <div class="panel">
-    <div class="section-title">カムプロファイル</div>
+    <div class="section-title">プリセット</div>
+    <div class="preset-row">
+      <button class="preset-btn" type="button" onclick="setPreset('const')">定速→加速度スパイク</button>
+      <button class="preset-btn" type="button" onclick="setPreset('shm')">SHM</button>
+      <button class="preset-btn" type="button" onclick="setPreset('cycloidal')">サイクロイダル→滑らか</button>
+      <button class="preset-btn" type="button" onclick="setPreset('highspeed')">高速カム</button>
+    </div>
+    <div class="section-title" style="margin-top:4px">カムプロファイル</div>
     <div class="ctrl-group">
-      <label>プロファイル種類</label>
+      <label>運動法則（プロファイル）</label>
       <select id="profileType">
         <option value="shm">SHM（単純調和運動）</option>
         <option value="cycloidal" selected>サイクロイダル</option>
-        <option value="poly345">多項式 3-4-5</option>
-        <option value="const">定速（比較用）</option>
+        <option value="poly345">多項式 3-4-5（修正台形）</option>
+        <option value="const">定速（加速度スパイク）</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>フォロワー種類</label>
+      <select id="followerType">
+        <option value="flat" selected>平面フォロワー</option>
+        <option value="roller">ローラーフォロワー</option>
+        <option value="knife">ナイフエッジ</option>
       </select>
     </div>
     <div class="section-title" style="margin-top:4px">カム寸法</div>
@@ -174,12 +211,12 @@ canvas#camCanvas { width: 100%; border-radius: 10px; background: #0a1628; displa
     </div>
     <div class="section-title" style="margin-top:4px">ドウェル角度</div>
     <div class="ctrl-group">
-      <label>上昇区間 β₁ <div class="num-wrap"><input type="number" class="num-input" id="beta1Val" value="120" min="30" max="180" step="5" oninput="syncFromNum('beta1','beta1Val')"><span class="num-unit">°</span></div></label>
-      <input type="range" id="beta1" oninput="syncToNum('beta1','beta1Val')" min="30" max="180" value="120" step="5">
+      <label>上昇区間 β₁ <div class="num-wrap"><input type="number" class="num-input" id="beta1Val" value="120" min="30" max="180" step="5" oninput="syncFromNum('beta1','beta1Val');clampCamAngles('beta1')"><span class="num-unit">°</span></div></label>
+      <input type="range" id="beta1" oninput="syncToNum('beta1','beta1Val');clampCamAngles('beta1')" min="30" max="180" value="120" step="5">
     </div>
     <div class="ctrl-group">
-      <label>上側ドウェル β₂ <div class="num-wrap"><input type="number" class="num-input" id="beta2Val" value="60" min="0" max="90" step="5" oninput="syncFromNum('beta2','beta2Val')"><span class="num-unit">°</span></div></label>
-      <input type="range" id="beta2" oninput="syncToNum('beta2','beta2Val')" min="0" max="90" value="60" step="5">
+      <label>上側ドウェル β₂ <div class="num-wrap"><input type="number" class="num-input" id="beta2Val" value="60" min="0" max="90" step="5" oninput="syncFromNum('beta2','beta2Val');clampCamAngles('beta2')"><span class="num-unit">°</span></div></label>
+      <input type="range" id="beta2" oninput="syncToNum('beta2','beta2Val');clampCamAngles('beta2')" min="0" max="90" value="60" step="5">
     </div>
     <div class="section-title" style="margin-top:4px">動作</div>
     <div class="ctrl-group">
@@ -187,17 +224,35 @@ canvas#camCanvas { width: 100%; border-radius: 10px; background: #0a1628; displa
       <input type="range" id="rpm" oninput="syncToNum('rpm','rpmVal')" min="10" max="600" value="120" step="10">
     </div>
 <div class="warn-badge" id="pressureWarn">⚠️ 圧力角が30°を超えています。ベース円半径を大きくしてください。</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="機械力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">機械力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（現在のカム角）</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roTheta">0°</div><div class="rl">カム角 θ</div></div>
+        <div class="live-ro"><div class="rv" id="roS">0.0</div><div class="rl">変位 S [mm]</div></div>
+        <div class="live-ro"><div class="rv" id="roV">0.0</div><div class="rl">速度 V [mm/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roA">0.0</div><div class="rl">加速度 A [m/s²]</div></div>
+        <div class="live-ro seg"><div class="rv" id="roSeg">—</div><div class="rl">区間</div></div>
+      </div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">最大速度</div>
+        <div class="stat-label">最大速度 V<sub>max</sub></div>
         <div class="stat-value" id="maxVel">—</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">最大加速度</div>
+        <div class="stat-label">最大加速度 A<sub>max</sub></div>
         <div class="stat-value" id="maxAcc">—</div>
       </div>
       <div class="stat-card">
@@ -213,21 +268,34 @@ canvas#camCanvas { width: 100%; border-radius: 10px; background: #0a1628; displa
 
     <div class="chart-tabs">
       <button class="tab-btn active" data-tab="anim">アニメーション</button>
-      <button class="tab-btn" data-tab="disp">変位</button>
-      <button class="tab-btn" data-tab="vel">速度</button>
-      <button class="tab-btn" data-tab="acc">加速度</button>
+      <button class="tab-btn" data-tab="disp">変位 S</button>
+      <button class="tab-btn" data-tab="vel">速度 V</button>
+      <button class="tab-btn" data-tab="acc">加速度 A</button>
+      <button class="tab-btn" data-tab="jerk">躍度 J</button>
     </div>
     <div id="animTab">
-      <canvas id="camCanvas" width="800" height="540" style="border-radius:8px;background:#0a1628;display:block;width:100%"></canvas>
+      <canvas id="camCanvas" width="800" height="540" tabindex="0" role="img" aria-label="回転するカムとフォロワーのアニメーション。ベース円・プライム円・接触点・各区間（上昇/ドウェル/下降）を表示します。" style="border-radius:8px;background:#0a1628;display:block;width:100%"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="resetSim()"><i class="fas fa-rotate-left"></i> リセット</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="speed-btn" type="button" data-speed="0.25" onclick="setSpeed(0.25)">0.25×</button>
+          <button class="speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+          <button class="speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+        </div>
+      </div>
     </div>
     <div id="dispTab" style="display:none">
-      <canvas id="dispChart"></canvas>
+      <div class="chart-host"><canvas id="dispChart"></canvas></div>
     </div>
     <div id="velTab" style="display:none">
-      <canvas id="velChart"></canvas>
+      <div class="chart-host"><canvas id="velChart"></canvas></div>
     </div>
     <div id="accTab" style="display:none">
-      <canvas id="accChart"></canvas>
+      <div class="chart-host"><canvas id="accChart"></canvas></div>
+    </div>
+    <div id="jerkTab" style="display:none">
+      <div class="chart-host"><canvas id="jerkChart"></canvas></div>
     </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 <p>$$h(\theta) = H\!\left[\frac{\theta}{\beta} - \frac{1}{2\pi}\sin\!\left(\frac{2\pi\theta}{\beta}\right)\right] \quad (\text{サイクロイダル})$$</p>
@@ -236,6 +304,10 @@ canvas#camCanvas { width: 100%; border-radius: 10px; background: #0a1628; displa
 <p style="margin-top:6px;">フォロワー速度 [m/s]。ω：カム角速度 [rad/s]。サイクロイダルは加速度が連続で衝撃が少ない</p>
 <p style="margin-top:10px;">$$\tan\alpha = \frac{dh/d\theta}{r_0 + h(\theta)}$$</p>
 <p style="margin-top:6px;">圧力角 α。r_0：基礎円半径 [m]。α &gt; 30° で側方力が大きくなりスティック・スリップ発生</p>
+<p style="margin-top:10px;font-size:.78rem;color:var(--muted)">既知解照合（H=30mm, β=120°, 120rpm → ω=12.57 rad/s）：<br>
+SHM $V_{max}=\pi L\omega/(2\beta)=282.7$ mm/s, $A_{max}=\pi^2 L\omega^2/(2\beta^2)=5.33$ m/s²。<br>
+サイクロイダル $V_{max}=2L\omega/\beta=360.0$ mm/s, $A_{max}=2\pi L\omega^2/\beta^2=6.79$ m/s²。<br>
+本ツールの「最大速度／最大加速度」表示と一致。サイクロイダルは加速度が連続、定速は区間端で加速度が無限大（スパイク）。</p>
 </div>
   </div>
 </div>
@@ -272,11 +344,44 @@ window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$'],['\\[','\\]
 const mjScript=document.createElement('script');mjScript.src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js';mjScript.async=true;
 document.head.appendChild(mjScript);
 
+const L10N = {
+  follower:'フォロワー', cam:'カム', base:'ベース円', prime:'プライム円',
+  rise:'上昇', dwellU:'上ドウェル', fall:'下降', dwellD:'下ドウェル',
+  contact:'接触点', amax:'Amax（最大応力点）', lawNames:{shm:'SHM',cycloidal:'サイクロイダル',poly345:'多項式3-4-5',const:'定速'},
+  paused:'再生', playing:'一時停止', axisAngle:'カム角 (°)',
+  dispLbl:'変位 S(θ)', velLbl:'速度 V', accLbl:'加速度 A', jerkLbl:'躍度 J',
+  dispY:'変位 (mm)', velY:'速度 (mm/s)', accY:'加速度 (m/s²)', jerkY:'躍度 (m/s³)'
+};
 const canvas = document.getElementById('camCanvas');
 const ctx = canvas.getContext('2d');
 let animId = null;
 let angle = 0;
 let charts = {};
+let playing = true;
+let speedMult = 1;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function clampCamAngles(changed){
+  const b1 = document.getElementById('beta1');
+  const b2 = document.getElementById('beta2');
+  const b1Val = document.getElementById('beta1Val');
+  const b2Val = document.getElementById('beta2Val');
+  let beta1 = parseFloat(b1.value);
+  let beta2 = parseFloat(b2.value);
+  const min1 = parseFloat(b1.min), max1 = parseFloat(b1.max);
+  const min2 = parseFloat(b2.min), max2 = parseFloat(b2.max);
+  if (2*beta1 + beta2 > 360) {
+    if (changed === 'beta2') beta2 = Math.max(min2, 360 - 2*beta1);
+    else beta1 = Math.max(min1, (360 - beta2)/2);
+  }
+  beta1 = Math.min(max1, Math.max(min1, beta1));
+  beta2 = Math.min(max2, Math.max(min2, beta2));
+  if (2*beta1 + beta2 > 360) beta2 = Math.max(min2, 360 - 2*beta1);
+  b1.value = beta1; b2.value = beta2;
+  if (b1Val) b1Val.value = beta1;
+  if (b2Val) b2Val.value = beta2;
+  if (typeof updateStats === 'function') updateStats();
+}
+
 
 function getParams(){
   return {
@@ -285,9 +390,20 @@ function getParams(){
     beta1: +document.getElementById('beta1').value * Math.PI / 180,
     beta2: +document.getElementById('beta2').value * Math.PI / 180,
     rpm: +document.getElementById('rpm').value,
-    profile: document.getElementById('profileType').value
+    profile: document.getElementById('profileType').value,
+    follower: (document.getElementById('followerType')||{}).value || 'flat'
   };
-}function computeProfile(theta, H, beta1, beta2, profile){
+}
+// Which kinematic segment a wrapped cam angle is in: 0 rise,1 dwellU,2 fall,3 dwellD
+function segmentOf(theta, beta1, beta2){
+  const total = 2*Math.PI, dwell2Start = beta1+beta2, returnEnd = dwell2Start+beta1;
+  let t = theta % total; if (t < 0) t += total;
+  if (t <= beta1) return 0;
+  if (t <= dwell2Start) return 1;
+  if (t <= returnEnd) return 2;
+  return 3;
+}
+function computeProfile(theta, H, beta1, beta2, profile){
   // Angles: [0, beta1] rise, [beta1, beta1+beta2] dwell-up
   // [beta1+beta2, beta1+beta2+beta1] return, [rest] dwell-down
   const beta3 = beta1; // return same as rise
@@ -298,285 +414,344 @@ function getParams(){
   let t = theta % total;
   if (t < 0) t += total;
 
-  let h = 0, dh = 0, d2h = 0;
+  let h = 0, dh = 0, d2h = 0, d3h = 0;
 
   if (t <= beta1) {
     const tau = t / beta1;
-    [h, dh, d2h] = profileFunc(tau, H, beta1, profile, 1);
+    [h, dh, d2h, d3h] = profileFunc(tau, H, beta1, profile, 1);
   }else if (t <= dwell2Start){
-    h = H; dh = 0; d2h = 0;
+    h = H; dh = 0; d2h = 0; d3h = 0;
   }else if (t <= returnEnd){
     const tau = (t - dwell2Start) / beta3;
-    [h, dh, d2h] = profileFunc(tau, H, beta3, profile, -1);
+    [h, dh, d2h, d3h] = profileFunc(tau, H, beta3, profile, -1);
     h = H - h;
     dh = -dh;
     d2h = -d2h;
+    d3h = -d3h;
   }else{
-    h = 0; dh = 0; d2h = 0;
+    h = 0; dh = 0; d2h = 0; d3h = 0;
   }
-  return [h, dh, d2h];
+  return [h, dh, d2h, d3h];
 }function profileFunc(tau, H, beta, profile, dir){
-  let h, dh, d2h;
+  let h, dh, d2h, d3h;
   switch(profile) {
     case 'shm':
       h = H / 2 * (1 - Math.cos(Math.PI * tau));
       dh = H * Math.PI / (2 * beta) * Math.sin(Math.PI * tau);
       d2h = H * Math.PI * Math.PI / (2 * beta * beta) * Math.cos(Math.PI * tau);
+      d3h = -H * Math.PI**3 / (2 * beta**3) * Math.sin(Math.PI * tau);
       break;
     case 'cycloidal':
       h = H * (tau - Math.sin(2 * Math.PI * tau) / (2 * Math.PI));
       dh = H / beta * (1 - Math.cos(2 * Math.PI * tau));
       d2h = H * 2 * Math.PI / (beta * beta) * Math.sin(2 * Math.PI * tau);
+      d3h = H * 4 * Math.PI * Math.PI / (beta**3) * Math.cos(2 * Math.PI * tau);
       break;
     case 'poly345':
       // 3-4-5 polynomial: h = H(10tau^3 - 15tau^4 + 6tau^5)
       h = H * (10 * tau**3 - 15 * tau**4 + 6 * tau**5);
       dh = H / beta * (30 * tau**2 - 60 * tau**3 + 30 * tau**4);
       d2h = H / (beta * beta) * (60 * tau - 180 * tau**2 + 120 * tau**3);
+      d3h = H / (beta**3) * (60 - 360 * tau + 360 * tau**2);
       break;
-    default: // const
+    default: // const velocity — finite spikes injected near the segment ends
       h = H * tau;
       dh = H / beta;
       d2h = 0;
+      // emulate the (theoretically infinite) acceleration impulses at tau=0 and tau=1
+      const edge = 0.04;
+      if (tau < edge)      d2h =  H / (beta * beta) * 90 * (1 - tau/edge);
+      else if (tau > 1-edge) d2h = -H / (beta * beta) * 90 * (1 - (1-tau)/edge);
+      d3h = 0;
   }
-  return [h, dh, d2h];
+  return [h, dh, d2h, d3h];
 }function computePressureAngle(theta, p){
   const [h, dh] = computeProfile(theta, p.lift, p.beta1, p.beta2, p.profile);
   return Math.abs(Math.atan2(dh, p.r0 + h)) * 180 / Math.PI;
-}function updateStats(){
+}let maxStats = {maxV:0,maxA:0,maxPA:0,maxAngle:0};
+function updateStats(){
   const p = getParams();
-  const N = 720;
-  let maxV = 0, maxA = 0, maxPA = 0;
+  const N = 1440;
+  let maxV = 0, maxA = 0, maxPA = 0, maxAngle = 0;
+  const omega = p.rpm * 2 * Math.PI / 60;
   for (let i = 0; i < N; i++) {
     const theta = i / N * 2 * Math.PI;
     const [h, dh, d2h] = computeProfile(theta, p.lift, p.beta1, p.beta2, p.profile);
-    const omega = p.rpm * 2 * Math.PI / 60;
     const v = Math.abs(dh * omega);
     const a = Math.abs(d2h * omega * omega);
     const pa = Math.abs(Math.atan2(dh, p.r0 + h)) * 180 / Math.PI;
     if (v > maxV) maxV = v;
-    if (a > maxA) maxA = a;
+    if (a > maxA){ maxA = a; maxAngle = theta; }
     if (pa > maxPA) maxPA = pa;
-  }const omega = p.rpm * 2 * Math.PI / 60;
+  }
+  maxStats = {maxV, maxA, maxPA, maxAngle};
   document.getElementById('maxVel').textContent = maxV.toFixed(1) + ' mm/s';
   document.getElementById('maxAcc').textContent = (maxA / 1000).toFixed(2) + ' m/s²';
   const paEl = document.getElementById('maxPressure');
   paEl.textContent = maxPA.toFixed(1) + '°';
   if (maxPA > 30){ paEl.classList.add('warn'); document.getElementById('pressureWarn').classList.add('show'); }else{ paEl.classList.remove('warn'); document.getElementById('pressureWarn').classList.remove('show'); }
   document.getElementById('period').textContent = (60 / p.rpm * 1000).toFixed(0) + ' ms';
-}function buildChartData(p, N=360){
-  const labels = [], dispData = [], velData = [], accData = [];
+  // refresh any visible chart so it reflects new params (keeps cursor logic simple)
+  ['dispChart','velChart','accChart','jerkChart'].forEach(id=>{ if(charts[id]) rebuildChart(id); });
+}
+function buildChartData(p, N=360){
+  const labels = [], dispData = [], velData = [], accData = [], jerkData = [];
   const omega = p.rpm * 2 * Math.PI / 60;
   for (let i = 0; i <= N; i++) {
     const theta = i / N * 2 * Math.PI;
     labels.push((i / N * 360).toFixed(0));
-    const [h, dh, d2h] = computeProfile(theta, p.lift, p.beta1, p.beta2, p.profile);
-    dispData.push(h.toFixed(3));
-    velData.push((dh * omega).toFixed(2));
-    accData.push((d2h * omega * omega / 1000).toFixed(4));
-  }return{ labels, dispData, velData, accData };
-}function makeChart(id, label, data, color, yLabel){
-  const existing = charts[id];
-  if (existing) existing.destroy();
+    const [h, dh, d2h, d3h] = computeProfile(theta, p.lift, p.beta1, p.beta2, p.profile);
+    dispData.push(+h.toFixed(3));
+    velData.push(+(dh * omega).toFixed(2));
+    accData.push(+(d2h * omega * omega / 1000).toFixed(4));
+    jerkData.push(+(d3h * omega * omega * omega / 1e6).toFixed(5));
+  }
+  return { labels, dispData, velData, accData, jerkData };
+}
+// Live vertical cursor (current cam angle) + Amax marker
+const cursorPlugin = {
+  id:'camCursor',
+  afterDatasetsDraw(chart){
+    const cur = chart.$curAngleDeg;
+    if (cur==null) return;
+    const x = chart.scales.x, y = chart.scales.y, c = chart.ctx;
+    const px = x.getPixelForValue(Math.round(cur));
+    if (px==null || isNaN(px)) return;
+    c.save();
+    c.strokeStyle = '#ffd54a'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(px, y.top); c.lineTo(px, y.bottom); c.stroke();
+    c.fillStyle = '#ffd54a'; c.font = 'bold 11px Roboto Mono, monospace'; c.textAlign='center';
+    c.fillText('θ='+Math.round(cur)+'°', px, y.top + 12);
+    // Amax marker for acceleration chart of poor profiles
+    if (chart.$amaxDeg!=null){
+      const ax = x.getPixelForValue(Math.round(chart.$amaxDeg));
+      if (!isNaN(ax)){ c.strokeStyle='#ff5252'; c.setLineDash([4,4]); c.beginPath(); c.moveTo(ax,y.top); c.lineTo(ax,y.bottom); c.stroke(); c.setLineDash([]);
+        c.fillStyle='#ff5252'; c.fillText(L10N.amax, ax, y.bottom - 4); }
+    }
+    c.restore();
+  }
+};
+const CHART_DEF = {
+  dispChart:{key:'dispData', color:'#007BFF', label:()=>L10N.dispLbl, y:()=>L10N.dispY},
+  velChart:{key:'velData', color:'#00B4D8', label:()=>L10N.velLbl, y:()=>L10N.velY},
+  accChart:{key:'accData', color:'#ff6b6b', label:()=>L10N.accLbl, y:()=>L10N.accY},
+  jerkChart:{key:'jerkData', color:'#b388ff', label:()=>L10N.jerkLbl, y:()=>L10N.jerkY}
+};
+function rebuildChart(id){
+  const def = CHART_DEF[id];
   const p = getParams();
-  const { labels, dispData, velData, accData }= buildChartData(p);
-  const map ={ dispChart: dispData, velChart: velData, accChart: accData };
+  const data = buildChartData(p);
+  if (charts[id]){ charts[id].destroy(); }
   const ctx2 = document.getElementById(id).getContext('2d');
   charts[id] = new Chart(ctx2,{
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label,
-        data: map[id],
-        borderColor: color,
-        backgroundColor: color + '20',
-        borderWidth: 2,
-        fill: true,
-        pointRadius: 0,
-        tension: 0.3
-      }]
-    },
-    options:{
-      responsive: true, animation: false,
-      maintainAspectRatio: false,resizeDelay:100,
-      plugins: { legend: { display: true } },
-      scales:{
-        x: { title: { display: true, text: 'カム角度 (°)' } },
-        y:{ title: { display: true, text: yLabel } }
-      }
-    }
+    type:'line',
+    data:{ labels:data.labels, datasets:[{ label:def.label(), data:data[def.key],
+      borderColor:def.color, backgroundColor:def.color+'20', borderWidth:2, fill:true, pointRadius:0, tension:0.25 }]},
+    options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:100,
+      plugins:{ legend:{display:true} },
+      scales:{ x:{ title:{display:true,text:L10N.axisAngle}, ticks:{maxTicksLimit:13} },
+               y:{ title:{display:true,text:def.y()} } } },
+    plugins:[cursorPlugin]
   });
-}function drawCam(theta, p){
+  // mark Amax line only on acceleration chart for spiky/poor profiles
+  charts[id].$amaxDeg = (id==='accChart' && (p.profile==='const' || p.profile==='shm')) ? (maxStats.maxAngle*180/Math.PI) : null;
+}
+function makeChart(id){ rebuildChart(id); }
+
+// follower current lift S(θ) for cam angle theta (cam rotates by +theta;
+// the follower sits at the fixed contact ray pointing up, so it reads the
+// profile point currently under that ray = computeProfile(theta).
+function liftAt(theta, p){ return computeProfile(theta, p.lift, p.beta1, p.beta2, p.profile); }
+
+function drawCam(theta, p){
   const __novaDims = __novaHiDpiCanvas(canvas, canvas.clientWidth || parseFloat(canvas.getAttribute('width')) || 800, canvas.clientHeight || parseFloat(canvas.getAttribute('height')) || 540, ctx);
   const W = __novaDims.w, H = __novaDims.h;
   ctx.clearRect(0, 0, W, H);
-  // Background
-  ctx.fillStyle = '#0a1628';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, W, H);
 
-  const cx = W * 0.38, cy = H * 0.55;
+  const cx = W * 0.40, cy = H * 0.56;
   const scale = Math.min(W, H) / 320;
-  const R = (p.r0 + p.lift) * scale;
-  const r = p.r0 * scale;
+  const R = (p.r0 + p.lift) * scale, r0 = p.r0 * scale;
+  const primeR = (p.r0 + p.lift) * scale;
 
-  // Draw grid lines
-  ctx.strokeStyle = 'rgba(0,123,255,0.1)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < W; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke(); }for (let i = 0; i < H; i += 40){ ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(W, i); ctx.stroke(); }// Draw cam profile shape
+  // grid
+  ctx.strokeStyle = 'rgba(0,123,255,0.08)'; ctx.lineWidth = 1;
+  for (let i=0;i<W;i+=40){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,H);ctx.stroke();}
+  for (let i=0;i<H;i+=40){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(W,i);ctx.stroke();}
+
+  const tw = ((theta % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI);
+  // The follower contact ray points straight up from the cam center (-Y).
+  // Cam shape is drawn rotated by +theta; the profile radius along the up-ray
+  // corresponds to profile angle (a_ray - theta). Up-ray angle = -PI/2.
+  const [curH, curDh, curD2h, curD3h] = liftAt(tw, p);
+  const omega = p.rpm * 2*Math.PI/60;
+  const curV = curDh * omega;            // mm/s
+  const curA = curD2h * omega * omega;   // mm/s^2
+  const seg = segmentOf(tw, p.beta1, p.beta2);
+  const segNames = [L10N.rise, L10N.dwellU, L10N.fall, L10N.dwellD];
+  const segColors = ['#00e0c0', '#7aa2ff', '#ffb74d', '#9aa6b2'];
+
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(theta);
+
+  // base circle (dashed) + prime circle
+  ctx.setLineDash([4,4]);
+  ctx.strokeStyle = 'rgba(0,180,216,0.55)'; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.arc(0,0,r0,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.arc(0,0,primeR,0,Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // cam polygon: at screen angle a, profile angle = (a - theta)
   ctx.beginPath();
-  for (let i = 0; i <= 360; i++){
-    const a = i / 360 * 2 * Math.PI;
-    const [hh] = computeProfile(a, p.lift, p.beta1, p.beta2, p.profile);
+  for (let i=0;i<=360;i++){
+    const a = i*Math.PI/180;
+    const [hh] = computeProfile(a - tw, p.lift, p.beta1, p.beta2, p.profile);
     const rr = (p.r0 + hh) * scale;
-    if (i === 0) ctx.moveTo(rr, 0);
-    else ctx.lineTo(rr * Math.cos(a - theta * 0), rr * Math.sin(a - theta * 0));
-  }// Simpler: draw cam as offset circle approach visually
+    const x = rr*Math.cos(a), y = rr*Math.sin(a);
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  const grad = ctx.createRadialGradient(0,0,r0*0.3,0,0,R);
+  grad.addColorStop(0,'#1a3a6e'); grad.addColorStop(1,'#0a2348');
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.strokeStyle = '#007BFF'; ctx.lineWidth = 2; ctx.stroke();
+
+  // colored arc on cam rim showing current segment under the contact ray
+  // hub
+  ctx.beginPath(); ctx.arc(0,0,r0*0.35,0,Math.PI*2); ctx.fillStyle='#001F3F'; ctx.fill();
+  ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2; ctx.stroke();
+  // rotation reference spoke (rotates with cam)
+  ctx.save(); ctx.rotate(tw);
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(r0*0.78,0);
+  ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(r0*0.78,0,3,0,Math.PI*2); ctx.fillStyle='#00B4D8'; ctx.fill();
+  ctx.restore();
   ctx.restore();
 
-  // Draw cam as polygon
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.beginPath();
-  for (let i = 0; i <= 360; i++){
-    const a = i * Math.PI / 180;
-    const [hh] = computeProfile(a - theta + Math.PI * 2, p.lift, p.beta1, p.beta2, p.profile);
-    const rr = (p.r0 + hh) * scale;
-    const x = rr * Math.cos(a);
-    const y = rr * Math.sin(a);
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  }ctx.closePath();
-  const grad = ctx.createRadialGradient(0, 0, r * 0.3, 0, 0, R);
-  grad.addColorStop(0, '#1a3a6e');
-  grad.addColorStop(1, '#0a2348');
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.strokeStyle = '#007BFF';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Hub circle
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
-  ctx.fillStyle = '#001F3F';
-  ctx.fill();
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Rotation marker
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(r * 0.3, 0);
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.restore();
-
-  // Follower
-  const [curH] = computeProfile(-theta + Math.PI * 2, p.lift, p.beta1, p.beta2, p.profile);
+  // contact point (on the up-ray, at cam center minus profile radius)
+  const contactY = cy - (p.r0 + curH) * scale;
+  // follower geometry
   const followerX = cx;
-  const followerBaseY = cy - (p.r0 + p.lift + 15) * scale;
-  const followerY = cy - (p.r0 + curH) * scale;
+  const followerY = contactY;
+  // follower guide
+  ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=16;
+  ctx.beginPath(); ctx.moveTo(followerX, cy-(p.r0+p.lift+40)*scale); ctx.lineTo(followerX, cy-p.r0*scale); ctx.stroke();
+  // stem
+  ctx.strokeStyle='#aad4f5'; ctx.lineWidth=6;
+  ctx.beginPath(); ctx.moveTo(followerX, cy-(p.r0+p.lift+40)*scale); ctx.lineTo(followerX, followerY); ctx.stroke();
+  // follower face by type
+  ctx.fillStyle='#ccddff'; ctx.strokeStyle='#007BFF'; ctx.lineWidth=2;
+  if (p.follower==='roller'){
+    ctx.beginPath(); ctx.arc(followerX, followerY-10*scale, 12*scale, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(followerX, followerY-10*scale, 3, 0, Math.PI*2); ctx.fillStyle='#001F3F'; ctx.fill();
+  } else if (p.follower==='knife'){
+    ctx.beginPath(); ctx.moveTo(followerX, followerY); ctx.lineTo(followerX-9*scale, followerY-16*scale); ctx.lineTo(followerX+9*scale, followerY-16*scale); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else { // flat
+    ctx.fillRect(followerX-16*scale, followerY-6*scale, 32*scale, 6*scale);
+    ctx.strokeRect(followerX-16*scale, followerY-6*scale, 32*scale, 6*scale);
+  }
+  // contact marker
+  ctx.beginPath(); ctx.arc(followerX, followerY, 4, 0, Math.PI*2); ctx.fillStyle='#ffd54a'; ctx.fill();
 
-  // Follower guide
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 14;
-  ctx.beginPath();
-  ctx.moveTo(followerX, cy - (p.r0 + p.lift + 30) * scale);
-  ctx.lineTo(followerX, cy - p.r0 * scale);
-  ctx.stroke();
+  // labels
+  ctx.fillStyle='#aac4dd'; ctx.font="12px 'Noto Sans JP', sans-serif";
+  ctx.fillText(L10N.follower, followerX + 22*scale, followerY-4);
+  ctx.fillText(L10N.cam, cx + r0*0.8, cy - r0*0.2);
+  ctx.fillStyle='rgba(0,180,216,0.8)'; ctx.font="10px 'Noto Sans JP', sans-serif";
+  ctx.fillText(L10N.base, cx - r0*0.7, cy + r0 + 12);
+  ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.fillText(L10N.prime, cx - primeR*0.7, cy - primeR - 6);
 
-  // Follower stem
-  ctx.strokeStyle = '#aad4f5';
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(followerX, followerBaseY - 20 * scale);
-  ctx.lineTo(followerX, followerY);
-  ctx.stroke();
+  // displacement bar (right)
+  const barX = W*0.84, barTop = cy-(p.r0+p.lift+10)*scale, barBot = cy-p.r0*scale+10;
+  ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=8;
+  ctx.beginPath(); ctx.moveTo(barX,barTop); ctx.lineTo(barX,barBot); ctx.stroke();
+  ctx.strokeStyle='#007BFF'; ctx.lineWidth=8;
+  ctx.beginPath(); ctx.moveTo(barX,barBot); ctx.lineTo(barX, barBot-(curH/p.lift)*(barBot-barTop)); ctx.stroke();
+  ctx.fillStyle='#aac4dd'; ctx.font='11px Roboto Mono, monospace';
+  ctx.fillText('S='+curH.toFixed(1)+'mm', barX-40, barTop-8);
 
-  // Follower flat face
-  ctx.fillStyle = '#ccddff';
-  ctx.beginPath();
-  ctx.arc(followerX, followerY, 10 * scale, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#007BFF';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  // segment badge (top-left) + angle
+  ctx.fillStyle=segColors[seg]; ctx.font="bold 13px 'Noto Sans JP', sans-serif";
+  ctx.fillText(segNames[seg], 14, 22);
+  ctx.fillStyle='#aac4dd'; ctx.font='12px Roboto Mono, monospace';
+  ctx.fillText('θ='+(tw*180/Math.PI).toFixed(0)+'°  '+L10N.lawNames[p.profile], 14, H-14);
 
-  // Labels
-  ctx.fillStyle = '#aac4dd';
-  ctx.font = `${12 * scale}px 'Noto Sans JP'`;
-  ctx.fillText('フォロワー', followerX + 15, followerY);
-  ctx.fillText('カム', cx + r * 0.7, cy - r * 0.1);
+  // live readouts
+  document.getElementById('roTheta').textContent = (tw*180/Math.PI).toFixed(0)+'°';
+  document.getElementById('roS').textContent = curH.toFixed(1);
+  document.getElementById('roV').textContent = curV.toFixed(0);
+  document.getElementById('roA').textContent = (curA/1000).toFixed(2);
+  const segEl = document.getElementById('roSeg');
+  segEl.textContent = segNames[seg]; segEl.parentElement.querySelector('.rv').style.color = segColors[seg];
 
-  // Displacement bar
-  const barX = W * 0.82;
-  const barTop = cy - (p.r0 + p.lift + 10) * scale;
-  const barBot = cy - p.r0 * scale + 10;
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.moveTo(barX, barTop);
-  ctx.lineTo(barX, barBot);
-  ctx.stroke();
-  const ratio = curH / p.lift;
-  ctx.strokeStyle = '#007BFF';
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.moveTo(barX, barBot);
-  ctx.lineTo(barX, barBot - ratio * (barBot - barTop));
-  ctx.stroke();
-  ctx.fillStyle = '#aac4dd';
-  ctx.font = '11px Roboto Mono';
-  ctx.fillText('h=' + curH.toFixed(1) + 'mm', barX - 35, barTop - 8);
+  // push cursor angle into any live chart
+  ['dispChart','velChart','accChart','jerkChart'].forEach(id=>{ if(charts[id]){ charts[id].$curAngleDeg = tw*180/Math.PI; charts[id].update('none'); } });
+}
 
-  // Angle indicator
-  ctx.fillStyle = '#aac4dd';
-  ctx.font = '12px Roboto Mono';
-  ctx.fillText('θ=' + (((theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) * 180 / Math.PI).toFixed(0) + '°', 14, H - 14);
-}let lastTime = null;
+let lastTime = null;
 function animate(ts){
   if (!lastTime) lastTime = ts;
-  const dt = (ts - lastTime) / 1000;
+  const dt = Math.min((ts - lastTime)/1000, 0.05);
   lastTime = ts;
   const p = getParams();
-  angle += p.rpm / 60 * 2 * Math.PI * dt;
+  if (playing && !reduceMotion) angle += p.rpm/60 * 2*Math.PI * dt * speedMult;
   drawCam(angle, p);
   animId = requestAnimationFrame(animate);
-}// Tab switching
+}
+
+// playback controls
+function togglePlay(){
+  playing = !playing;
+  const b = document.getElementById('btnPlay');
+  b.innerHTML = playing ? '<i class="fas fa-pause"></i> '+L10N.playing : '<i class="fas fa-play"></i> '+L10N.paused;
+}
+function resetSim(){ angle = 0; lastTime = null; const p=getParams(); drawCam(0,p); }
+function setSpeed(s){
+  speedMult = s;
+  document.querySelectorAll('.speed-btn').forEach(b=>b.classList.toggle('active', +b.dataset.speed===s));
+}
+function setVal(id,v){ const el=document.getElementById(id); if(el){ el.value=v; const ve=document.getElementById(id+'Val'); if(ve){ if(ve.tagName==='INPUT')ve.value=v; else ve.textContent=v; } } }
+function setPreset(kind){
+  if (kind==='highspeed'){
+    document.getElementById('profileType').value='cycloidal';
+    setVal('r0',55); setVal('lift',20); setVal('beta1',90); setVal('beta2',40); setVal('rpm',600);
+  } else {
+    document.getElementById('profileType').value=kind;
+    setVal('r0',40); setVal('lift',30); setVal('beta1',120); setVal('beta2',60); setVal('rpm',120);
+  }
+  clampCamAngles('beta1');
+  updateStats();
+}
+
+// Tab switching
+const TAB_CHART = {disp:'dispChart', vel:'velChart', acc:'accChart', jerk:'jerkChart'};
 document.querySelectorAll('.tab-btn').forEach(btn =>{
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const tab = btn.dataset.tab;
-    document.getElementById('animTab').style.display = tab === 'anim' ? '' : 'none';
-    document.getElementById('dispTab').style.display = tab === 'disp' ? '' : 'none';
-    document.getElementById('velTab').style.display = tab === 'vel' ? '' : 'none';
-    document.getElementById('accTab').style.display = tab === 'acc' ? '' : 'none';
-    if (tab === 'disp') makeChart('dispChart', '変位 h(θ)', null, '#007BFF', '変位 (mm)');
-    if (tab === 'vel') makeChart('velChart', '速度 (mm/s)', null, '#00B4D8', '速度 (mm/s)');
-    if (tab === 'acc') makeChart('accChart', '加速度 (m/s²)', null, '#ff6b6b', '加速度 (m/s²)');
+    document.getElementById('animTab').style.display = tab==='anim' ? '' : 'none';
+    ['disp','vel','acc','jerk'].forEach(t=>{ document.getElementById(t+'Tab').style.display = tab===t ? '' : 'none'; });
+    if (TAB_CHART[tab]) makeChart(TAB_CHART[tab]);
   });
 });
 
 // Slider updates
 ['r0','lift','beta1','beta2','rpm'].forEach(id =>{
   const el = document.getElementById(id);
-  const valId = id + 'Val';
   el.addEventListener('input', () => {
-    const _cme=document.getElementById(valId);if(_cme){if(_cme.tagName==='INPUT')_cme.value=el.value;else _cme.textContent=el.value;}
+    const _cme=document.getElementById(id+'Val'); if(_cme){if(_cme.tagName==='INPUT')_cme.value=el.value;else _cme.textContent=el.value;}
     updateStats();
   });
 });
 document.getElementById('profileType').addEventListener('change', updateStats);
+const ftEl = document.getElementById('followerType'); if(ftEl) ftEl.addEventListener('change', ()=>{ const p=getParams(); drawCam(angle,p); });
 
 // Init
 updateStats();
+if (reduceMotion){ playing=false; const b=document.getElementById('btnPlay'); if(b) b.innerHTML='<i class="fas fa-play"></i> '+L10N.paused; drawCam(1.0, getParams()); }
 requestAnimationFrame(animate);
 </script>
 
@@ -639,6 +814,9 @@ requestAnimationFrame(animate);
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="cam-mechanism.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -692,23 +870,34 @@ requestAnimationFrame(animate);
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>カムの基本寸法を設定：基礎円半径r0（mm単位、例：20mm）とフォロワーの最大上昇量lift（例：8mm）を入力</li>
-<li>カムプロファイルの設計区間を指定：上昇区間beta1（カム回転角度、例：120°）と下降区間beta2（例：120°）を度数法で入力</li>
-<li>プロファイルタイプ（SHM・サイクロイダル・多項式）を選択すると、フォロワーの変位y、速度v、加速度aがリアルタイム表示され、圧力角αも同時計算される</li>
+<li>カムの基本寸法としてベース円半径r0とリフト量liftを入力する</li>
+<li>上昇区間beta1と上側ドウェルbeta2を度数法で入力する。下降区間はbeta1と同じ角度で、2×beta1+beta2≤360°に自動制限される</li>
+<li>プロファイル種類（SHM・サイクロイダル・多項式3-4-5）を選ぶと、変位・速度・加速度と圧力角がリアルタイム表示される</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>自動機械のパッキング装置用カム設計：r0=25mm、lift=12mm、beta1=100°、beta2=140°、残り120°は静止区間の場合、SHMプロファイルでは上昇中点（50°位置）で速度vmax≈0.85mm/°、加速度amax≈0.018mm/°²が得られます。同じ条件でサイクロイダル選択時は加速度が約40%低減され、機械的衝撃が軽減されます。圧力角αは上昇区間で最大25°程度に達し、フォロワーガイドの横力設計に影響します。</p>
+<p>自動機械のパッキング装置用カム設計：r0=25mm、lift=12mm、beta1=100°、上側ドウェルbeta2=60°、残り100°は下側ドウェルとします。SHMプロファイルでは上昇中点（50°位置）で速度vmax≈0.1885mm/°、加速度amax≈0.00592mm/°²です。サイクロイダルではピーク加速度はSHMより約27%高くなりますが、区間端で速度・加速度が連続になり、衝撃や有限ジャークの扱いが改善されます。beta2は下降区間ではなく上側ドウェルです。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>SHMプロファイルは上下昇終点で加速度が無限大に近づくため、高速運転（500rpm以上）ではサイクロイダルまたは多項式を推奨。加速度ピークは衝撃音やフォロワー磨耗と直結</li>
-<li>圧力角αが30°を超える場合、フォロワーロッドの座屈検討が必須。特にliftが大きい場合（10mm以上）は多項式で段階的な加速を設計し、α≤20°に抑える</li>
-<li>beta1とbeta2の比率が1:1に近いほど対称性が高くカム製造精度への依存度が低い。金型寿命を考慮し、非対称設計（例：100°/140°）にする場合は離型角度マージンを確認</li>
+<li>SHMプロファイルは端部で加速度が不連続です。高速回転ではサイクロイダルまたは3-4-5多項式を検討し、ピーク加速度だけでなく連続性も確認してください。</li>
+<li>サイクロイダルはSHMよりピーク加速度が約27%高い一方、端部の速度・加速度が連続で、衝撃と振動の抑制に向きます。</li>
+<li>圧力角が30°を超える場合はフォロワーガイドの横力と接触応力を再検討し、lift/r0やbeta1を調整します。</li>
+<li>beta2は上側ドウェルです。非対称な動作時間を設計する場合も、2×beta1+beta2≤360°を満たす必要があります。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="機械力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">機械力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

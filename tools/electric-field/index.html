@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "電場・電位シミュレーター",
       "description": "最大3個の点電荷を自由に配置し、クーロン力の重ね合わせによる電場ベクトルと電位分布をリアルタイム可視化するツール。等電位線と断面電位グラフも同時表示。",
       "url": "https://novasolver.jp/tools/electric-field.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["最大3点電荷の自由配置（±10 μC）","電場ベクトル（矢印）と電位分布（カラーマップ）の同時表示","等電位線の描画","カーソル位置での電位・電場強度表示","y=0断面の電位グラフ"],
       "keywords": "電場,電位,クーロンの法則,点電荷,等電位線,重ね合わせ,電磁気学,CAEシミュレーター",
       "datePublished": "2026-04-09",
@@ -233,19 +233,29 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">カーソル位置</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> プローブ点のライブ数値</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="sv_v">— kV</div><div class="sl">電位 V</div></div>
       <div class="stat-card"><div class="sv" id="sv_e">— kV/m</div><div class="sl">電場強度 |E|</div></div>
+      <div class="stat-card"><div class="sv" id="sv_f">— pN</div><div class="sl">+1 nC への力 F</div></div>
+      <div class="stat-card"><div class="sv" id="sv_r">— m</div><div class="sl">最近接電荷までの距離</div></div>
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 場の分布</div><canvas id="fieldCanvas" width="600" height="600"></canvas></div>
-    <p class="hint">マウスをキャンバス上に移動すると、その位置の電位・電場強度を左パネルに表示します。</p>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 電気力線＋場の流れ（アニメーション）</div><canvas id="fieldCanvas" width="600" height="600"></canvas></div>
+    <p class="hint">流れる粒子が電気力線に沿って正電荷から湧き出し負電荷へ流れ込みます。キャンバス上にマウスを移動すると、その位置をプローブ点として電位・電場強度を表示します。</p>
     <div class="canvas-wrap">
       <div class="chart-card">
       <div class="chart-title">水平断面（y = 0）の電位分布</div>
@@ -265,243 +275,368 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 <script>
 function syncFromNum(slId,numId){var sl=document.getElementById(slId);var e=document.getElementById(numId);if(!sl||!e)return;var v=parseFloat(e.value);if(!isNaN(v))sl.value=Math.max(+sl.min,Math.min(+sl.max,v));sl.dispatchEvent(new Event('input'));}
-const k_e = 8.99e9;
-const signs = {1:1, 2:-1, 3:1};
-const WORLD = 10, W = 600, H = 600;
+function setSign(i,s){window.__ef&&window.__ef.setSign(i,s);}
+function updateCharge(i){window.__ef&&window.__ef.updateCharge(i);}
+function updateField(){window.__ef&&window.__ef.updateField();}
+(function(){
+"use strict";
+/* ===== Electric Field v2 — animated field lines + flowing field particles =====
+   Physics: E = sum_i k q_i / r_i^2 * r_hat_i  (k=8.99e9), V = sum_i k q_i / r_i.
+   Field points away from + charges and toward - charges; particles advect along E. */
+var LBL='電荷', PROBE_LABEL_DEFAULT=true;
+var k_e=8.99e9;
+var signs={1:1,2:-1,3:1};
+var WORLD=10, W=600, H=600;
 
-function fmt(v, sign){ return (v>=0?(sign?'+':'')+v.toFixed(1):v.toFixed(1)); }function setSign(i, s){
-  signs[i] = s;
-  const q = parseFloat(document.getElementById('q'+i).value);
-  const lbl = document.getElementById('lbl'+i);
+function el(id){return document.getElementById(id);}
+
+function setSign(i,s){
+  signs[i]=s;
+  var q=parseFloat(el('q'+i).value);
+  var lbl=el('lbl'+i);
   if(s>0){
-    lbl.className='charge-label pos'; lbl.textContent='電荷 '+i+' (+)';
-    document.getElementById('sign'+i+'p').className='ctbtn active-pos';
-    document.getElementById('sign'+i+'n').className='ctbtn';
-    var qvEl=document.getElementById('q'+i+'v');if(qvEl)qvEl.textContent='+'+q.toFixed(1)+' μC';
+    lbl.className='charge-label pos'; lbl.textContent=LBL+' '+i+' (+)';
+    el('sign'+i+'p').className='ctbtn active-pos';
+    el('sign'+i+'n').className='ctbtn';
+    var qvEl=el('q'+i+'v'); if(qvEl)qvEl.textContent='+'+q.toFixed(1)+' μC';
   }else{
-    lbl.className='charge-label neg'; lbl.textContent='電荷 '+i+' (−)';
-    document.getElementById('sign'+i+'p').className='ctbtn';
-    document.getElementById('sign'+i+'n').className='ctbtn active-neg';
-    var qvEl2=document.getElementById('q'+i+'v');if(qvEl2)qvEl2.textContent='−'+q.toFixed(1)+' μC';
+    lbl.className='charge-label neg'; lbl.textContent=LBL+' '+i+' (−)';
+    el('sign'+i+'p').className='ctbtn';
+    el('sign'+i+'n').className='ctbtn active-neg';
+    var qvEl2=el('q'+i+'v'); if(qvEl2)qvEl2.textContent='−'+q.toFixed(1)+' μC';
   }
   updateField();
-}function updateCharge(i){
-  const q = parseFloat(document.getElementById('q'+i).value);
-  const s = signs[i];
-  var qvE=document.getElementById('q'+i+'v');if(qvE)qvE.textContent=(s>0?'+':'−')+q.toFixed(1)+' μC';
+}
+function updateCharge(i){
+  var q=parseFloat(el('q'+i).value);
+  var s=signs[i];
+  var qvE=el('q'+i+'v'); if(qvE)qvE.textContent=(s>0?'+':'−')+q.toFixed(1)+' μC';
   updateField();
-}function setChargeControlState(){
-  for(let i=1;i<=3;i++){
-    const enabled=document.getElementById('en'+i).checked;
-    ['q','x','y'].forEach(prefix=>{
-      const sl=document.getElementById(prefix+i);
-      const num=document.getElementById(prefix+i+'num');
+}
+function setChargeControlState(){
+  for(var i=1;i<=3;i++){
+    var enabled=el('en'+i).checked;
+    ['q','x','y'].forEach(function(prefix){
+      var sl=el(prefix+i), num=el(prefix+i+'num');
       if(sl)sl.disabled=!enabled;
       if(num)num.disabled=!enabled;
     });
   }
-}function getCharges(){
-  const cs=[];
-  for(let i=1;i<=3;i++){
-    if(!document.getElementById('en'+i).checked) continue;
-    const xv=parseFloat(document.getElementById('x'+i).value);
-    const yv=parseFloat(document.getElementById('y'+i).value);
-    var xvE=document.getElementById('x'+i+'v');if(xvE)xvE.textContent=(xv>=0?'+':'')+xv.toFixed(1)+' m';
-    var yvE=document.getElementById('y'+i+'v');if(yvE)yvE.textContent=(yv>=0?'+':'')+yv.toFixed(1)+' m';
-    cs.push({q:signs[i]*parseFloat(document.getElementById('q'+i).value)*1e-6, x:xv, y:yv});
+}
+function getCharges(){
+  var cs=[];
+  for(var i=1;i<=3;i++){
+    if(!el('en'+i).checked) continue;
+    var xv=parseFloat(el('x'+i).value);
+    var yv=parseFloat(el('y'+i).value);
+    var xvE=el('x'+i+'v'); if(xvE)xvE.textContent=(xv>=0?'+':'')+xv.toFixed(1)+' m';
+    var yvE=el('y'+i+'v'); if(yvE)yvE.textContent=(yv>=0?'+':'')+yv.toFixed(1)+' m';
+    cs.push({q:signs[i]*parseFloat(el('q'+i).value)*1e-6, x:xv, y:yv, s:signs[i]});
   }
   return cs;
-}function computeVE(wx,wy,charges){
-  let V=0,Ex=0,Ey=0;
-  for(const c of charges){
-    const dx=wx-c.x, dy=wy-c.y;
-    const r2=dx*dx+dy*dy;
+}
+// Total potential V and field (Ex,Ey) at a world point. Returns V:null inside a charge core.
+function computeVE(wx,wy,charges){
+  var V=0,Ex=0,Ey=0;
+  for(var ci=0;ci<charges.length;ci++){
+    var c=charges[ci];
+    var dx=wx-c.x, dy=wy-c.y;
+    var r2=dx*dx+dy*dy;
     if(r2<0.04) return {V:null,Ex:0,Ey:0};
-    const r=Math.sqrt(r2);
+    var r=Math.sqrt(r2);
     V+=k_e*c.q/r;
-    const E=k_e*c.q/r2;
+    var E=k_e*c.q/r2;
     Ex+=E*dx/r; Ey+=E*dy/r;
-  }return{V,Ex,Ey};
-}function w2c(wx,wy){ return [(wx+WORLD)/(2*WORLD)*W, (WORLD-wy)/(2*WORLD)*H]; }function c2w(cx,cy){ return [cx/W*2*WORLD-WORLD, WORLD-cy/H*2*WORLD]; }
-
-const canvas=document.getElementById('fieldCanvas');
-const ctx=canvas.getContext('2d');
-
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
+  }
+  return {V:V,Ex:Ex,Ey:Ey};
 }
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / dpr || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / dpr || 320));
-  canvas.style.setProperty('width', w + 'px', 'important');
-  canvas.style.setProperty('height', h + 'px', 'important');
-  var bw = Math.round(w * dpr);
-  var bh = Math.round(h * dpr);
-  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
-}
-const fieldBuffer=document.createElement('canvas');
-fieldBuffer.width=W;
-fieldBuffer.height=H;
-const fieldBufferCtx=fieldBuffer.getContext('2d');
-let vChart=null;
+function w2c(wx,wy){ return [(wx+WORLD)/(2*WORLD)*W, (WORLD-wy)/(2*WORLD)*H]; }
+function c2w(cx,cy){ return [cx/W*2*WORLD-WORLD, WORLD-cy/H*2*WORLD]; }
 
-function updateField(){
-  __novaHiDpiCanvas(canvas,W,H,ctx);
+var canvas=el('fieldCanvas');
+var ctx=canvas.getContext('2d');
+var dpr=1;
+function hidpi(){
+  dpr=Math.min(window.devicePixelRatio||1,2.5);
+  canvas.setAttribute('data-ux-no-scale','1');
+  canvas.style.setProperty('width',W+'px','important');
+  canvas.style.setProperty('height',H+'px','important');
+  var bw=Math.round(W*dpr), bh=Math.round(H*dpr);
+  if(canvas.width!==bw||canvas.height!==bh){canvas.width=bw;canvas.height=bh;}
+  canvas.dataset.cssW=String(W); canvas.dataset.cssH=String(H);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+// ---- field heat buffer (|E| magnitude tint) ----
+var fieldBuffer=document.createElement('canvas');
+fieldBuffer.width=W; fieldBuffer.height=H;
+var fieldBufferCtx=fieldBuffer.getContext('2d');
+
+var charges=[];          // current charge list
+var vMin=0,vMax=1,vRange=1;
+var fieldLines=[];       // precomputed polylines in canvas coords (one per seed)
+var particles=[];        // {line, t, speed}
+var vChart=null;
+var probe={x:5,y:0,active:false}; // world-space probe point (default + cursor)
+
+// Trace a field line by integrating the unit E direction (RK2). dir=+1 outward from +, -1 toward -.
+function traceLine(x0,y0,dir,maxLen){
+  var pts=[]; var x=x0,y=y0; var hStep=0.12; var steps=Math.round(maxLen/hStep);
+  for(var n=0;n<steps;n++){
+    pts.push(w2c(x,y));
+    var f=computeVE(x,y,charges);
+    if(f.V===null) break;
+    var m=Math.hypot(f.Ex,f.Ey); if(m<1e-30) break;
+    var ux=dir*f.Ex/m, uy=dir*f.Ey/m;
+    var xm=x+ux*hStep*0.5, ym=y+uy*hStep*0.5;
+    var f2=computeVE(xm,ym,charges);
+    if(f2.V===null){ pts.push(w2c(xm,ym)); break; }
+    var m2=Math.hypot(f2.Ex,f2.Ey)||1;
+    x+=dir*f2.Ex/m2*hStep; y+=dir*f2.Ey/m2*hStep;
+    if(x<-WORLD*1.2||x>WORLD*1.2||y<-WORLD*1.2||y>WORLD*1.2) break;
+    // stop if we reached a charge (any sign)
+    var hit=false;
+    for(var ci=0;ci<charges.length;ci++){ if((x-charges[ci].x)*(x-charges[ci].x)+(y-charges[ci].y)*(y-charges[ci].y)<0.05){ pts.push(w2c(x,y)); hit=true; break; } }
+    if(hit) break;
+  }
+  return pts;
+}
+
+// Build field lines: seed rings around + charges (outward) and - charges (inward, reversed).
+function buildFieldLines(){
+  fieldLines=[]; particles=[];
+  var hasPos=false,hasNeg=false;
+  for(var ci=0;ci<charges.length;ci++){ if(charges[ci].q>0)hasPos=true; else hasNeg=true; }
+  for(var c=0;c<charges.length;c++){
+    var ch=charges[c];
+    var qmag=Math.abs(ch.q)*1e6;             // in μC
+    var nLines=Math.max(8,Math.round(qmag*2.2)); // density ∝ |q|
+    var dir=ch.q>0?1:-1;                      // +: trace outward, -: trace "outward" against E (i.e. lines coming in)
+    for(var s=0;s<nLines;s++){
+      var ang=(s/nLines)*Math.PI*2 + (ch.q>0?0:0.15);
+      var sx=ch.x+Math.cos(ang)*0.28, sy=ch.y+Math.sin(ang)*0.28;
+      var pts=traceLine(sx,sy,dir,60);
+      if(pts.length>4){
+        var line={pts:pts, fromPos:ch.q>0};
+        fieldLines.push(line);
+        // seed 2-3 flowing particles per line at staggered phase
+        var np=2+(s%2);
+        for(var p=0;p<np;p++){ particles.push({line:fieldLines.length-1, t:(p/np+Math.random()*0.3)%1, sp:0.0045+Math.random()*0.003}); }
+      }
+    }
+  }
+}
+
+function recompute(){
   setChargeControlState();
-  getCharges(); // triggers display update for x/y labels
-  const charges=getCharges();
-  const GRID=80;
-  const step=2*WORLD/GRID;
-  const Vg=[];
-  const allV=[];
-  for(let j=0;j<=GRID;j++){
-    Vg[j]=[];
-    for(let i=0;i<=GRID;i++){
-      const wx=-WORLD+i*step, wy=WORLD-j*step;
-      const res=computeVE(wx,wy,charges);
-      Vg[j][i]=res.V;
-      if(res.V!==null) allV.push(res.V);
-    }
-  }if(allV.length===0){ctx.clearRect(0,0,W,H);return;}allV.sort((a,b)=>a-b);
-  const vMin=allV[Math.floor(allV.length*0.02)];
-  const vMax=allV[Math.floor(allV.length*0.98)];
-  const vRange=vMax-vMin||1;
+  charges=getCharges();
+  // potential range for color reference (cheap grid)
+  var allV=[]; var G=42, st=2*WORLD/G;
+  for(var j=0;j<=G;j++) for(var i=0;i<=G;i++){
+    var r=computeVE(-WORLD+i*st,WORLD-j*st,charges);
+    if(r.V!==null) allV.push(r.V);
+  }
+  if(allV.length){
+    allV.sort(function(a,b){return a-b;});
+    vMin=allV[Math.floor(allV.length*0.02)];
+    vMax=allV[Math.floor(allV.length*0.98)];
+    vRange=(vMax-vMin)||1;
+  }
+  buildHeat();
+  buildFieldLines();
+  updateVChart();
+}
 
-  // heatmap
-  const cW=W/GRID, cH=H/GRID;
-  const img=fieldBufferCtx.createImageData(W,H);
-  for(let py=0;py<H;py++){
-    for(let px=0;px<W;px++){
-      const gi=Math.min(GRID-1,Math.floor(px/cW));
-      const gj=Math.min(GRID-1,Math.floor(py/cH));
-      const v=Vg[gj][gi];
-      let r=20,g=20,b=40;
-      if(v!==null){
-        const t=Math.max(0,Math.min(1,(v-vMin)/vRange));
-        if(t<0.5){const s=t*2;r=Math.round(15+s*30);g=Math.round(40+s*60);b=Math.round(180+s*50);}else{const s=(t-0.5)*2;r=Math.round(45+s*210);g=Math.round(100+s*60);b=Math.round(230-s*200);}
-      }
-      const idx=(py*W+px)*4;
-      img.data[idx]=r;img.data[idx+1]=g;img.data[idx+2]=b;img.data[idx+3]=255;
+// |E| magnitude heat (faint background) so strength is visible as a color map
+function buildHeat(){
+  var GRID=70, cW=W/GRID, cH=H/GRID, st=2*WORLD/GRID;
+  var mags=[]; var Eg=[];
+  for(var j=0;j<GRID;j++){ Eg[j]=[];
+    for(var i=0;i<GRID;i++){
+      var r=computeVE(-WORLD+(i+0.5)*st,WORLD-(j+0.5)*st,charges);
+      var m=r.V===null?null:Math.log10(Math.hypot(r.Ex,r.Ey)+1);
+      Eg[j][i]=m; if(m!==null)mags.push(m);
     }
-  }fieldBufferCtx.putImageData(img,0,0);
-  ctx.imageSmoothingEnabled=false;
-  ctx.clearRect(0,0,W,H);
-  ctx.drawImage(fieldBuffer,0,0,W,H);
+  }
+  mags.sort(function(a,b){return a-b;});
+  var lo=mags.length?mags[Math.floor(mags.length*0.05)]:0;
+  var hi=mags.length?mags[Math.floor(mags.length*0.95)]:1; var rng=(hi-lo)||1;
+  var img=fieldBufferCtx.createImageData(W,H);
+  for(var py=0;py<H;py++){ var gj=Math.min(GRID-1,Math.floor(py/cH));
+    for(var px=0;px<W;px++){ var gi=Math.min(GRID-1,Math.floor(px/cW));
+      var m=Eg[gj][gi]; var R=8,Gc=12,B=26;
+      if(m!==null){ var t=Math.max(0,Math.min(1,(m-lo)/rng));
+        // dark navy -> teal -> warm where field is strong
+        R=Math.round(8+t*t*150); Gc=Math.round(14+t*70); B=Math.round(30+t*90);
+      }
+      var idx=(py*W+px)*4; img.data[idx]=R;img.data[idx+1]=Gc;img.data[idx+2]=B;img.data[idx+3]=255;
+    }
+  }
+  fieldBufferCtx.putImageData(img,0,0);
+}
 
-  // equipotential lines
-  const lvls=[-0.5,-0.25,0,0.25,0.5].map(f=>vMin+f*vRange+vRange*0.5);
-  ctx.lineWidth=1.2;
-  for(const lv of lvls){
-    ctx.strokeStyle='rgba(255,255,255,0.5)';
-    ctx.beginPath();
-    for(let j=0;j<GRID;j++){
-      for(let i=0;i<GRID;i++){
-        const v00=Vg[j][i],v10=Vg[j][i+1],v01=Vg[j+1]?Vg[j+1][i]:null,v11=Vg[j+1]?Vg[j+1][i+1]:null;
-        if(v00===null||v10===null||v01===null||v11===null) continue;
-        const pts=[];
-        if((v00-lv)*(v10-lv)<0){const t=(lv-v00)/(v10-v00);pts.push([i+t,j]);}if((v10-lv)*(v11-lv)<0){const t=(lv-v10)/(v11-v10);pts.push([i+1,j+t]);}if((v01-lv)*(v11-lv)<0){const t=(lv-v01)/(v11-v01);pts.push([i+t,j+1]);}if((v00-lv)*(v01-lv)<0){const t=(lv-v00)/(v01-v00);pts.push([i,j+t]);}if(pts.length>=2){
-          const [cx0,cy0]=w2c(-WORLD+pts[0][0]*step,WORLD-pts[0][1]*step);
-          const [cx1,cy1]=w2c(-WORLD+pts[1][0]*step,WORLD-pts[1][1]*step);
-          ctx.moveTo(cx0,cy0);ctx.lineTo(cx1,cy1);
-        }
-      }
-    }
-    ctx.stroke();
-  }// E-field arrows
-  const AG=20, as2=2*WORLD/AG;
-  for(let j=0;j<AG;j++){
-    for(let i=0;i<AG;i++){
-      const wx=-WORLD+(i+0.5)*as2, wy=WORLD-(j+0.5)*as2;
-      const res=computeVE(wx,wy,charges);
-      if(res.V===null) continue;
-      const em=Math.sqrt(res.Ex*res.Ex+res.Ey*res.Ey);
-      if(em===0) continue;
-      const nx=res.Ex/em, ny=res.Ey/em;
-      const [px2,py2]=w2c(wx,wy);
-      const len=9;
-      const tx=nx*len, ty=-ny*len;
-      ctx.strokeStyle='rgba(255,255,180,0.7)';
-      ctx.fillStyle='rgba(255,255,180,0.7)';
-      ctx.lineWidth=1;
-      ctx.beginPath();
-      ctx.moveTo(px2-tx*0.4,py2-ty*0.4);
-      ctx.lineTo(px2+tx*0.5,py2+ty*0.5);
-      ctx.stroke();
-      ctx.beginPath();
-      const hw=2.5;
-      ctx.moveTo(px2+tx*0.5,py2+ty*0.5);
-      ctx.lineTo(px2+tx*0.5-ty/len*hw-tx/len*hw*1.4,py2+ty*0.5+tx/len*hw-ty/len*hw*1.4);
-      ctx.lineTo(px2+tx*0.5+ty/len*hw-tx/len*hw*1.4,py2+ty*0.5-tx/len*hw-ty/len*hw*1.4);
-      ctx.closePath();ctx.fill();
-    }
-  }// charge circles
-  for(let i=1;i<=3;i++){
-    if(!document.getElementById('en'+i).checked) continue;
-    const cx2=parseFloat(document.getElementById('x'+i).value);
-    const cy2=parseFloat(document.getElementById('y'+i).value);
-    const s=signs[i];
-    const q=parseFloat(document.getElementById('q'+i).value);
-    const [px2,py2]=w2c(cx2,cy2);
-    const rr=6+q*0.7;
-    ctx.beginPath();ctx.arc(px2,py2,rr,0,Math.PI*2);
-    ctx.fillStyle=s>0?'#ff4757':'#1e90ff';ctx.fill();
-    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
-    ctx.fillStyle='#fff';ctx.font='bold 12px Roboto Mono';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(s>0?'+':'−',px2,py2);
-  }// V-line chart
-  const NP=200, xs=[], vs=[];
-  for(let i=0;i<NP;i++){
-    const wx=-WORLD+i/(NP-1)*2*WORLD;
-    xs.push(wx.toFixed(1));
-    const res=computeVE(wx,0,charges);
-    vs.push(res.V===null?null:parseFloat((res.V/1e3).toFixed(3)));
-  }if(vChart){
-    vChart.data.labels=xs;vChart.data.datasets[0].data=vs;vChart.update('none');
-  }else{
-    vChart=new Chart(document.getElementById('vLineChart').getContext('2d'),{
+function updateVChart(){
+  if(typeof Chart==='undefined') return;
+  var NP=200, xs=[], vs=[];
+  for(var i=0;i<NP;i++){
+    var wx=-WORLD+i/(NP-1)*2*WORLD; xs.push(wx.toFixed(1));
+    var r=computeVE(wx,0,charges);
+    vs.push(r.V===null?null:parseFloat((r.V/1e3).toFixed(3)));
+  }
+  if(vChart){ vChart.data.labels=xs; vChart.data.datasets[0].data=vs; vChart.update('none'); }
+  else{
+    var cEl=el('vLineChart'); if(!cEl) return;
+    vChart=new Chart(cEl.getContext('2d'),{
       type:'line',
       data:{labels:xs,datasets:[{label:'V(x,y=0) [kV]',data:vs,borderColor:'#007BFF',borderWidth:1.5,pointRadius:0,spanGaps:false,tension:0.2}]},
       options:{animation:false,plugins:{legend:{display:false}},scales:{
-        x:{ ticks:{maxTicksLimit:9,font:{size:10}},title:{display:true,text:'x (m)',font:{size:10}}},
+        x:{ticks:{maxTicksLimit:9,font:{size:10}},title:{display:true,text:'x (m)',font:{size:10}}},
         y:{title:{display:true,text:'V (kV)',font:{size:10}},ticks:{font:{size:10}}}
       }}
     });
   }
 }
 
-canvas.addEventListener('mousemove',function(e){
-  const rect=canvas.getBoundingClientRect();
-  const px=(e.clientX-rect.left)*(W/rect.width);
-  const py=(e.clientY-rect.top)*(H/rect.height);
-  const [wx,wy]=c2w(px,py);
-  const charges=getCharges();
-  const res=computeVE(wx,wy,charges);
-  if(res.V===null){
-    document.getElementById('sv_v').textContent='∞';
-    document.getElementById('sv_e').textContent='∞';
-  }else{
-    const em=Math.sqrt(res.Ex*res.Ex+res.Ey*res.Ey);
-    document.getElementById('sv_v').textContent=(res.V/1e3).toFixed(2)+' kV';
-    document.getElementById('sv_e').textContent=em>1e6?(em/1e6).toFixed(2)+' MV/m':(em/1e3).toFixed(1)+' kV/m';
+function drawCharges(){
+  for(var i=1;i<=3;i++){
+    if(!el('en'+i).checked) continue;
+    var cx=parseFloat(el('x'+i).value), cy=parseFloat(el('y'+i).value);
+    var s=signs[i], q=parseFloat(el('q'+i).value);
+    var pc=w2c(cx,cy); var rr=6+q*0.7;
+    ctx.beginPath(); ctx.arc(pc[0],pc[1],rr,0,Math.PI*2);
+    ctx.fillStyle=s>0?'#ff4757':'#1e90ff'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 12px Roboto Mono';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(s>0?'+':'−',pc[0],pc[1]);
   }
+}
+
+function drawStaticLines(alpha){
+  ctx.lineWidth=1; ctx.strokeStyle='rgba(180,210,255,'+alpha+')';
+  for(var l=0;l<fieldLines.length;l++){
+    var pts=fieldLines[l].pts; if(pts.length<2) continue;
+    ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
+    for(var p=1;p<pts.length;p++) ctx.lineTo(pts[p][0],pts[p][1]);
+    ctx.stroke();
+  }
+}
+
+// advect a particle index along its line; param t in [0,1]
+function ptAt(line,t){
+  var pts=fieldLines[line].pts; if(!pts||pts.length<2) return null;
+  var f=t*(pts.length-1); var i=Math.floor(f); if(i>=pts.length-1)i=pts.length-2;
+  var fr=f-i;
+  return [pts[i][0]+(pts[i+1][0]-pts[i][0])*fr, pts[i][1]+(pts[i+1][1]-pts[i][1])*fr];
+}
+
+var reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function drawScene(animate){
+  ctx.imageSmoothingEnabled=false;
+  ctx.clearRect(0,0,W,H);
+  ctx.drawImage(fieldBuffer,0,0,W,H);
+  drawStaticLines(animate?0.18:0.5);
+  // flowing particles along the lines (head + short fading tail)
+  if(animate){
+    for(var p=0;p<particles.length;p++){
+      var pa=particles[p];
+      var head=ptAt(pa.line,pa.t); if(!head) continue;
+      var tail=ptAt(pa.line,Math.max(0,pa.t-0.05));
+      if(tail){
+        var grad=ctx.createLinearGradient(tail[0],tail[1],head[0],head[1]);
+        grad.addColorStop(0,'rgba(120,200,255,0)');
+        grad.addColorStop(1,'rgba(180,230,255,0.95)');
+        ctx.strokeStyle=grad; ctx.lineWidth=2.1; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(tail[0],tail[1]); ctx.lineTo(head[0],head[1]); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(head[0],head[1],1.8,0,Math.PI*2);
+      ctx.fillStyle='#dff3ff'; ctx.fill();
+    }
+  }
+  drawCharges();
+  drawProbe();
+}
+
+function drawProbe(){
+  var pc=w2c(probe.x,probe.y);
+  var r=computeVE(probe.x,probe.y,charges);
+  ctx.save();
+  ctx.setLineDash([3,3]); ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(pc[0],pc[1],7,0,Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+  if(r.V!==null){
+    var m=Math.hypot(r.Ex,r.Ey);
+    if(m>1e-9){ var ux=r.Ex/m, uy=-r.Ey/m, L=22;
+      ctx.strokeStyle='#ffd54a'; ctx.fillStyle='#ffd54a'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(pc[0],pc[1]); ctx.lineTo(pc[0]+ux*L,pc[1]+uy*L); ctx.stroke();
+      var ang=Math.atan2(uy,ux);
+      ctx.beginPath(); ctx.moveTo(pc[0]+ux*L,pc[1]+uy*L);
+      ctx.lineTo(pc[0]+ux*L-7*Math.cos(ang-0.4),pc[1]+uy*L-7*Math.sin(ang-0.4));
+      ctx.lineTo(pc[0]+ux*L-7*Math.cos(ang+0.4),pc[1]+uy*L-7*Math.sin(ang+0.4));
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function fmtE(m){ return m>1e6?(m/1e6).toFixed(2)+' MV/m':(m/1e3).toFixed(1)+' kV/m'; }
+function updateReadouts(){
+  var r=computeVE(probe.x,probe.y,charges);
+  var svV=el('sv_v'), svE=el('sv_e'), svF=el('sv_f'), svR=el('sv_r');
+  // nearest charge distance
+  var dmin=Infinity;
+  for(var ci=0;ci<charges.length;ci++){ var d=Math.hypot(probe.x-charges[ci].x,probe.y-charges[ci].y); if(d<dmin)dmin=d; }
+  if(svR) svR.textContent=(isFinite(dmin)?dmin.toFixed(2):'—')+' m';
+  if(r.V===null){
+    if(svV)svV.textContent='∞'; if(svE)svE.textContent='∞'; if(svF)svF.textContent='∞';
+  }else{
+    var m=Math.hypot(r.Ex,r.Ey);
+    if(svV)svV.textContent=(r.V/1e3).toFixed(2)+' kV';
+    if(svE)svE.textContent=fmtE(m);
+    // force on a +1 nC test charge: F = qE, in piconewtons
+    var F=1e-9*m; // N
+    if(svF)svF.textContent=(F*1e12).toFixed(1)+' pN';
+  }
+}
+
+// ---- animation loop ----
+var lastBuilt=0;
+function frame(){
+  for(var p=0;p<particles.length;p++){
+    var pa=particles[p]; pa.t+=pa.sp;
+    if(pa.t>=1){ pa.t=0.001+Math.random()*0.04; } // respawn at the line start (source)
+  }
+  drawScene(true);
+  updateReadouts();
+  requestAnimationFrame(frame);
+}
+
+function updateField(){
+  hidpi();
+  recompute();
+  if(reduceMotion){ drawScene(false); updateReadouts(); }
+}
+
+// cursor -> probe point
+canvas.addEventListener('mousemove',function(e){
+  var rect=canvas.getBoundingClientRect();
+  var px=(e.clientX-rect.left)*(W/rect.width);
+  var py=(e.clientY-rect.top)*(H/rect.height);
+  var w=c2w(px,py); probe.x=w[0]; probe.y=w[1]; probe.active=true;
+  if(reduceMotion){ drawScene(false); updateReadouts(); }
 });
 
-document.querySelectorAll('input[type=range]').forEach(s=>{
-  const u=()=>{const p=(s.value-s.min)/(s.max-s.min)*100;s.style.setProperty('--pct',p+'%');};
-  s.addEventListener('input',u);u();
+// slider track fill
+document.querySelectorAll('input[type=range]').forEach(function(s){
+  var u=function(){var p=(s.value-s.min)/(s.max-s.min)*100;s.style.setProperty('--pct',p+'%');};
+  s.addEventListener('input',u); u();
 });
 
+window.__ef={setSign:setSign,updateCharge:updateCharge,updateField:updateField};
 updateField();
+if(!reduceMotion) requestAnimationFrame(frame);
+})();
 </script>
 
 <section class="explanation">
@@ -563,6 +698,9 @@ updateField();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="electric-field.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -623,7 +761,7 @@ updateField();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>+1μCの点電荷を原点に、-1μCを(0.1m, 0)に配置した場合、中点(0.05m, 0)での電位はほぼ0Vですが、電場強度は約3.6×10⁵V/mに達します。0.2m離れた点では電場強度は約2.25×10⁴V/mに減衰し、距離の二乗則に従う減衰が確認できます。</p>
+<p>+1μCを(-0.5m, 0)、-1μCを(+0.5m, 0)に配置すると、格子上の中点(0, 0)では電位V=0V、電場強度は|E|=7.19×10⁴V/mで、向きは正電荷から負電荷へ（+x方向）です。外側の点(1.5m, 0)では負電荷まで1.0m、正電荷まで2.0mとなり、重ね合わせによりV≈-4.50×10³V、|E|≈6.74×10³V/m、向きは左向き（負電荷側）になります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -633,6 +771,16 @@ updateField();
 <li>複数電荷系では重ね合わせ原理により各電荷の寄与を独立に計算・検証でき、対称性を利用して計算負荷を削減できます</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

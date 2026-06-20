@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "完全非弾性衝突 シミュレーター",
       "description": "2 物体の質量 m_1, m_2 と速度 v_1, v_2 から、運動量保存則による合体後の共通速度 v_f と、初期/最終運動エネルギー・エネルギー損失率を実時間に計算する衝突力学教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/inelastic-collision.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["運動量保存則 v_f = (m_1 v_1 + m_2 v_2)/(m_1+m_2) のリアルタイム計算","エネルギー損失式 ΔKE = (1/2)·(m_1 m_2)/(m_1+m_2)·(v_1-v_2)² の自動評価","衝突前後の物体配置と質量比に応じた円サイズのキャンバス可視化","KE_i, KE_f, ΔKE_loss の比較棒グラフ表示"],
       "keywords": "完全非弾性衝突,運動量保存,エネルギー損失,衝突力学,合体衝突,塑性衝突,自動車衝突,粘着衝突,弾道振り子,衝突エネルギー",
       "datePublished": "2026-05-15",
@@ -102,6 +102,26 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #collisionCanvas,#energyCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+/* ===== v2 live readouts / controls ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:4px 10px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:10px;border-radius:3px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{transition:none}
+}
+/* end v2 additions */
 </style>
 </head>
 <body>
@@ -131,68 +151,116 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" data-preset="stick" onclick="setPreset('stick')">完全非弾性 e=0（合体）</button>
+        <button type="button" class="preset-btn" data-preset="elastic" onclick="setPreset('elastic')">完全弾性 e=1</button>
+        <button type="button" class="preset-btn" data-preset="equal" onclick="setPreset('equal')">等質量・正面衝突</button>
+        <button type="button" class="preset-btn" data-preset="heavy" onclick="setPreset('heavy')">重い物体が軽い物体に衝突</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">質量 m_1</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slM1Val" value="2.0" min="0.1" max="100" step="0.1" oninput="syncFromNum('slM1','slM1Val')"><span class="num-unit">kg</span></div>
+        <span class="param-name">質量 m₁</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slM1Val" value="2.0" min="0.1" max="20" step="0.1" oninput="syncFromNum('slM1','slM1Val')"><span class="num-unit">kg</span></div>
       </div>
-      <input type="range" id="slM1" min="0.1" max="100" step="0.1" value="2.0" oninput="syncToNum('slM1','slM1Val');updateSlider(this,'slM1Val',1,'');compute()">
+      <input type="range" id="slM1" min="0.1" max="20" step="0.1" value="2.0" aria-label="質量 m1" oninput="syncToNum('slM1','slM1Val');updateSlider(this,'slM1Val',1,'');onParam()">
     </div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">速度 v_1</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slV1Val" value="10.0" min="-50" max="50" step="0.1" oninput="syncFromNum('slV1','slV1Val')"><span class="num-unit">m/s</span></div>
+        <span class="param-name">初速度 u₁</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slV1Val" value="3.0" min="-20" max="20" step="0.1" oninput="syncFromNum('slV1','slV1Val')"><span class="num-unit">m/s</span></div>
       </div>
-      <input type="range" id="slV1" min="-50" max="50" step="0.1" value="10.0" oninput="syncToNum('slV1','slV1Val');updateSlider(this,'slV1Val',1,'');compute()">
+      <input type="range" id="slV1" min="-20" max="20" step="0.1" value="3.0" aria-label="物体1の初速度 u1" oninput="syncToNum('slV1','slV1Val');updateSlider(this,'slV1Val',1,'');onParam()">
     </div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">質量 m_2</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slM2Val" value="3.0" min="0.1" max="100" step="0.1" oninput="syncFromNum('slM2','slM2Val')"><span class="num-unit">kg</span></div>
+        <span class="param-name">質量 m₂</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slM2Val" value="1.0" min="0.1" max="20" step="0.1" oninput="syncFromNum('slM2','slM2Val')"><span class="num-unit">kg</span></div>
       </div>
-      <input type="range" id="slM2" min="0.1" max="100" step="0.1" value="3.0" oninput="syncToNum('slM2','slM2Val');updateSlider(this,'slM2Val',1,'');compute()">
+      <input type="range" id="slM2" min="0.1" max="20" step="0.1" value="1.0" aria-label="質量 m2" oninput="syncToNum('slM2','slM2Val');updateSlider(this,'slM2Val',1,'');onParam()">
     </div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">速度 v_2</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slV2Val" value="0.0" min="-50" max="50" step="0.1" oninput="syncFromNum('slV2','slV2Val')"><span class="num-unit">m/s</span></div>
+        <span class="param-name">初速度 u₂</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slV2Val" value="0.0" min="-20" max="20" step="0.1" oninput="syncFromNum('slV2','slV2Val')"><span class="num-unit">m/s</span></div>
       </div>
-      <input type="range" id="slV2" min="-50" max="50" step="0.1" value="0.0" oninput="syncToNum('slV2','slV2Val');updateSlider(this,'slV2Val',1,'');compute()">
+      <input type="range" id="slV2" min="-20" max="20" step="0.1" value="0.0" aria-label="物体2の初速度 u2" oninput="syncToNum('slV2','slV2Val');updateSlider(this,'slV2Val',1,'');onParam()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">反発係数 e</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slEVal" value="0.0" min="0" max="1" step="0.01" oninput="syncFromNum('slE','slEVal')"><span class="num-unit"></span></div>
+      </div>
+      <input type="range" id="slE" min="0" max="1" step="0.01" value="0.0" aria-label="反発係数 e" oninput="syncToNum('slE','slEVal');updateSlider(this,'slEVal',2,'');onParam()">
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:3px;">e=0：完全非弾性（合体）／e=1：完全弾性（エネルギー保存）</div>
     </div>
 
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> v_1 をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+      <button type="button" class="btn secondary" onclick="replaySim()"><i class="fas fa-rotate-left"></i> 最初から</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は m_1 = 2.0 kg、v_1 = 10.0 m/s、m_2 = 3.0 kg、v_2 = 0.0 m/s。合体後速度 v_f = 4.0 m/s、損失率 60.0% — 静止物体への正面衝突は典型例です。v_2 を負値にすると正面衝突、同符号にすると追突を模擬できます。</p>
+    <div class="play-row">
+      <span style="font-size:.72rem;color:var(--muted)">速度</span>
+      <button type="button" class="preset-btn speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+      <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="setSpeed(1)">1×</button>
+      <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:8px;">既定値は m₁=2.0 kg、u₁=3.0 m/s、m₂=1.0 kg、u₂=0.0 m/s、e=0。合体後速度 V=2.0 m/s、KE_before=9 J、KE_after=6 J、損失率 33.3%。運動量は衝突前後で 6 kg·m/s に保存され、重心速度は終始 2.0 m/s で一定です。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-      <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statVf">—</div><div class="sl">合体後速度 v_f</div></div>
-        <div class="stat-card"><div class="sv" id="statKEi">—</div><div class="sl">初期運動エネルギー</div></div>
-        <div class="stat-card"><div class="sv" id="statKEf">—</div><div class="sl">最終運動エネルギー</div></div>
-        <div class="stat-card"><div class="sv" id="statLoss">—</div><div class="sl">エネルギー損失率</div></div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（衝突前→後）</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roPhase">—</div><div class="rl">フェーズ</div></div>
+        <div class="live-ro"><div class="rv" id="roV1">—</div><div class="rl">v₁ [m/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roV2">—</div><div class="rl">v₂ [m/s]</div></div>
+        <div class="live-ro accent"><div class="rv" id="roVcm">—</div><div class="rl">重心速度 v_cm [m/s]（一定）</div></div>
+        <div class="live-ro"><div class="rv" id="roP">—</div><div class="rl">総運動量 p [kg·m/s]（保存）</div></div>
+        <div class="live-ro"><div class="rv" id="roKE">—</div><div class="rl">総運動エネルギー [J]</div></div>
+        <div class="live-ro"><div class="rv" id="roMu">—</div><div class="rl">換算質量 μ [kg]</div></div>
+        <div class="live-ro accent"><div class="rv" id="roLoss">—</div><div class="rl">KE 損失率</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-arrows-to-circle"></i> 衝突前後の物体配置</div>
-      <canvas id="collisionCanvas"></canvas>
-      <p class="canvas-hint">上段＝衝突前（青円＝m_1、橙円＝m_2、矢印＝速度 v_1, v_2）／下段＝衝突後（紫円＝合体物体 m_1+m_2、矢印＝共通速度 v_f）／円の半径は質量の立方根に比例（質量比を視覚化）／矢印の長さは速度の絶対値に比例</p>
+      <div class="chart-title"><i class="fas fa-arrows-to-circle"></i> 衝突アニメーション</div>
+      <canvas id="collisionCanvas" tabindex="0" role="img" aria-label="2 物体が接近・衝突し、衝突後に運動する様子のリアルタイムアニメーション。速度ベクトルと重心マーカーを重ねて表示します。"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#4ac6ff"></i>m₁</span>
+        <span><i class="swatch" style="background:#ffb347"></i>m₂</span>
+        <span><i class="swatch" style="background:#b388ff"></i>合体（e&lt;1）</span>
+        <span><i class="swatch" style="background:#7fdcff"></i>速度ベクトル</span>
+        <span><i class="swatch" style="background:#2ecc71;height:10px;border-radius:50%"></i>重心 CoM（等速で移動）</span>
+      </div>
+      <p class="canvas-hint">2 物体が実時間で接近・衝突します。緑の縦線＝重心（外力なしで終始等速）／矢印＝各物体の速度／e=0 では合体（紫）、e=1 では弾性的に跳ね返り、0&lt;e&lt;1 は中間。衝突の瞬間に「運動量保存」「KE 損失 = …%」を注釈表示します。</p>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-bar"></i> 運動エネルギーの比較</div>
+      <div class="chart-title"><i class="fas fa-chart-bar"></i> 運動エネルギー・運動量の収支</div>
       <canvas id="energyCanvas"></canvas>
-      <p class="canvas-hint">青棒＝初期運動エネルギー KE_i／緑棒＝最終運動エネルギー KE_f（合体後）／赤棒＝損失エネルギー ΔKE = KE_i − KE_f／各棒の上に数値ラベル [J] を表示／KE_f / KE_i 比は損失率 100% − (ΔKE/KE_i × 100%) と一致</p>
+      <p class="canvas-hint">青棒＝衝突前 KE／緑棒＝衝突後 KE／赤棒＝損失 ΔKE = KE_before − KE_after／灰棒＝総運動量（衝突前後で不変）／各棒の上に数値ラベルを表示。e=1 では赤棒が消え KE が保存されます。</p>
     </div>
 
     <div class="chart-card">
@@ -210,360 +278,380 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Perfectly Inelastic Collision Simulator ==========
+(function(){
+"use strict";
+// ========== Inelastic Collision Simulator (v2, real-time) ==========
+var I18N = {
+  before: '衝突前', impact: '衝突', after: '衝突後',
+  momCons: '運動量保存',
+  keLost: 'KE 損失 = ',
+  keCons: 'KE 保存（弾性）',
+  cm: '重心',
+  play: '<i class="fas fa-play"></i> 再生',
+  pause: '<i class="fas fa-pause"></i> 一時停止',
+  keBefore: '衝突前 KE', keAfter: '衝突後 KE', dke: '損失 ΔKE', pTot: '運動量 p'
+};
+
 var collisionCanvas = document.getElementById('collisionCanvas');
 var collisionCtx = collisionCanvas.getContext('2d');
 var energyCanvas = document.getElementById('energyCanvas');
 var energyCtx = energyCanvas.getContext('2d');
-var playing = false;
-var animId = null;
-var sweepDir = 1;
-var rafId = null;
-var animTime = 0;
 
-function getParams() {
-  var m1 = parseFloat(document.getElementById('slM1').value);
-  var v1 = parseFloat(document.getElementById('slV1').value);
-  var m2 = parseFloat(document.getElementById('slM2').value);
-  var v2 = parseFloat(document.getElementById('slV2').value);
-  return { m1: m1, v1: v1, m2: m2, v2: v2 };
+var playing = false, animId = null, rafActive = false;
+var speedMult = 1, simT = 0, lastTs = 0, phase = 'before';
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function el(id){ return document.getElementById(id); }
+function gn(id){ return parseFloat(el(id).value); }
+
+function getParams(){
+  return { m1: gn('slM1'), u1: gn('slV1'), m2: gn('slM2'), u2: gn('slV2'), e: gn('slE') };
 }
 
-function vFinal(p) {
-  var mTot = p.m1 + p.m2;
-  if (mTot <= 0) return 0;
-  return (p.m1 * p.v1 + p.m2 * p.v2) / mTot;
+// Physics: general coefficient-of-restitution collision (1D)
+function solve(p){
+  var M = p.m1 + p.m2;
+  var vcm = M > 0 ? (p.m1*p.u1 + p.m2*p.u2)/M : 0;
+  var e = p.e;
+  // v1 = ((m1 - e m2)u1 + (1+e)m2 u2)/M ; v2 = ((1+e)m1 u1 + (m2 - e m1)u2)/M
+  var v1 = M>0 ? ((p.m1 - e*p.m2)*p.u1 + (1+e)*p.m2*p.u2)/M : 0;
+  var v2 = M>0 ? ((1+e)*p.m1*p.u1 + (p.m2 - e*p.m1)*p.u2)/M : 0;
+  var mu = M>0 ? p.m1*p.m2/M : 0;
+  var keB = 0.5*p.m1*p.u1*p.u1 + 0.5*p.m2*p.u2*p.u2;
+  var keA = 0.5*p.m1*v1*v1 + 0.5*p.m2*v2*v2;
+  var pB = p.m1*p.u1 + p.m2*p.u2;
+  var pA = p.m1*v1 + p.m2*v2;
+  var loss = Math.max(0, keB - keA);
+  var lossPct = keB > 1e-12 ? loss/keB*100 : 0;
+  return { M:M, vcm:vcm, v1:v1, v2:v2, mu:mu, keB:keB, keA:keA, pB:pB, pA:pA, loss:loss, lossPct:lossPct, stuck: e < 0.02 };
 }
 
-function kineticInitial(p) {
-  return 0.5 * p.m1 * p.v1 * p.v1 + 0.5 * p.m2 * p.v2 * p.v2;
-}
-
-function kineticFinal(p) {
-  var vf = vFinal(p);
-  return 0.5 * (p.m1 + p.m2) * vf * vf;
-}
-
-function energyLoss(p) {
-  return kineticInitial(p) - kineticFinal(p);
-}
-
-function lossPercent(p) {
-  var ki = kineticInitial(p);
-  if (ki <= 1e-12) return 0;
-  return (energyLoss(p) / ki) * 100;
-}
-
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-
-function resizeCanvases() {
+/* ===== HiDPI ===== */
+function cssW(cv){ return parseFloat(cv.dataset.cssW) || cv.clientWidth || 600; }
+function cssH(cv){ return parseFloat(cv.dataset.cssH) || 300; }
+function resizeCanvases(){
   [collisionCanvas, energyCanvas].forEach(function(cv){
     var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+    var h = Math.round(w * 0.5);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    cv.dataset.cssW = String(w);
+    cv.dataset.cssH = String(h);
+    var c = cv.getContext('2d');
+    if (c) c.setTransform(dpr, 0, 0, dpr, 0, 0);
   });
 }
 
-function drawArrow(ctx, x0, y0, x1, y1, color, lw) {
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = lw || 2;
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x1, y1);
-  ctx.stroke();
-  // arrowhead
-  var ang = Math.atan2(y1 - y0, x1 - x0);
-  var ah = 8;
+function drawArrow(ctx, x0, y0, x1, y1, color, lw){
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw || 2;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  var ang = Math.atan2(y1 - y0, x1 - x0), ah = 8;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
-  ctx.lineTo(x1 - ah * Math.cos(ang - Math.PI / 6), y1 - ah * Math.sin(ang - Math.PI / 6));
-  ctx.lineTo(x1 - ah * Math.cos(ang + Math.PI / 6), y1 - ah * Math.sin(ang + Math.PI / 6));
-  ctx.closePath();
-  ctx.fill();
+  ctx.lineTo(x1 - ah*Math.cos(ang - Math.PI/6), y1 - ah*Math.sin(ang - Math.PI/6));
+  ctx.lineTo(x1 - ah*Math.cos(ang + Math.PI/6), y1 - ah*Math.sin(ang + Math.PI/6));
+  ctx.closePath(); ctx.fill();
 }
 
-function drawCollision(p) {
-  var ctx = collisionCtx, W = __novaCanvasCssW(collisionCanvas), H = __novaCanvasCssH(collisionCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = 'rgba(143,184,224,0.4)';
-  ctx.lineWidth = 1.2;
-  ctx.strokeRect(8, 8, W - 16, H - 16);
+function radiusOf(m, mMax){
+  var rMax = 26;
+  return Math.max(8, rMax * Math.pow(m / Math.max(mMax, 1e-3), 1/3));
+}
 
-  var rowY1 = Math.round(H * 0.30);
-  var rowY2 = Math.round(H * 0.72);
-  var vf = vFinal(p);
+// world->canvas scale: meters mapped so the action fits
+var TPRE = 1.4;   // seconds of pre-collision approach shown
+var TPOST = 1.6;  // seconds of post-collision shown
+var TIMPACT = 0.18; // duration of the impact flash
 
-  // Radius: proportional to mass^(1/3), normalized so max mass -> r=28
-  var rMax = Math.min(28, H * 0.12);
-  var mMax = Math.max(p.m1, p.m2, p.m1 + p.m2, 1e-3);
-  function radius(m) {
-    var r = rMax * Math.pow(m / mMax, 1 / 3);
-    return Math.max(6, r);
-  }
+function totalDur(){ return TPRE + TIMPACT + TPOST; }
 
-  // Speed scale for arrows
-  var vMaxAbs = Math.max(Math.abs(p.v1), Math.abs(p.v2), Math.abs(vf), 0.5);
-  var arrowMaxPx = W * 0.18;
-  function arrowLen(v) { return (Math.abs(v) / vMaxAbs) * arrowMaxPx; }
+// Positions are chosen so the two bodies just touch at t = TPRE (collision instant).
+function drawCollision(p, s, t){
+  var ctx = collisionCtx, W = cssW(collisionCanvas), H = cssH(collisionCanvas);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = 'rgba(143,184,224,0.35)'; ctx.lineWidth = 1.2;
+  ctx.strokeRect(8,8,W-16,H-16);
 
-  // --- Row 1: before collision ---
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = 'bold 12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('衝突前', 16, 22);
+  var yLine = Math.round(H*0.56);
+  var mMax = Math.max(p.m1, p.m2, p.m1+p.m2);
+  var r1 = radiusOf(p.m1, mMax), r2 = radiusOf(p.m2, mMax), rM = radiusOf(p.m1+p.m2, mMax);
 
-  var x1 = Math.round(W * 0.30);
-  var x2 = Math.round(W * 0.70);
+  // meters-per-pixel: scale so collision happens near center and motion is visible
+  var vMax = Math.max(Math.abs(p.u1), Math.abs(p.u2), Math.abs(s.v1), Math.abs(s.v2), Math.abs(s.vcm), 1);
+  var mpp = (W*0.34) / (vMax * Math.max(TPRE, TPOST)); // px per (m/s * s)
+  var xc = W*0.5; // collision contact x (in px)
 
-  // m1 (blue), m2 (orange)
-  ctx.fillStyle = '#4ac6ff';
-  ctx.shadowColor = '#4ac6ff'; ctx.shadowBlur = 12;
-  ctx.beginPath(); ctx.arc(x1, rowY1, radius(p.m1), 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = '#ffb347';
-  ctx.shadowColor = '#ffb347'; ctx.shadowBlur = 12;
-  ctx.beginPath(); ctx.arc(x2, rowY1, radius(p.m2), 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 0;
-
-  // labels inside
-  ctx.fillStyle = '#0a1929';
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 11px "Roboto Mono",monospace';
-  ctx.fillText('m₁', x1, rowY1 + 3);
-  ctx.fillText('m₂', x2, rowY1 + 3);
-
-  // velocity arrows
-  if (Math.abs(p.v1) > 1e-6) {
-    var dir1 = p.v1 >= 0 ? 1 : -1;
-    var aStart = x1 + dir1 * (radius(p.m1) + 4);
-    var aEnd = aStart + dir1 * arrowLen(p.v1);
-    drawArrow(ctx, aStart, rowY1, aEnd, rowY1, '#7fdcff', 2.4);
-  }
-  if (Math.abs(p.v2) > 1e-6) {
-    var dir2 = p.v2 >= 0 ? 1 : -1;
-    var bStart = x2 + dir2 * (radius(p.m2) + 4);
-    var bEnd = bStart + dir2 * arrowLen(p.v2);
-    drawArrow(ctx, bStart, rowY1, bEnd, rowY1, '#ffd166', 2.4);
-  }
-
-  // velocity text labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('v₁ = ' + p.v1.toFixed(1) + ' m/s', x1, rowY1 - radius(p.m1) - 10);
-  ctx.fillText('v₂ = ' + p.v2.toFixed(1) + ' m/s', x2, rowY1 - radius(p.m2) - 10);
-  ctx.fillText(p.m1.toFixed(1) + ' kg', x1, rowY1 + radius(p.m1) + 14);
-  ctx.fillText(p.m2.toFixed(1) + ' kg', x2, rowY1 + radius(p.m2) + 14);
-
-  // --- divider line between rows ---
+  // ground line
   ctx.strokeStyle = 'rgba(143,184,224,0.25)';
-  ctx.setLineDash([5, 4]);
-  ctx.beginPath();
-  ctx.moveTo(16, (rowY1 + rowY2) / 2);
-  ctx.lineTo(W - 16, (rowY1 + rowY2) / 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(12, yLine + Math.max(r1,r2,rM) + 6); ctx.lineTo(W-12, yLine + Math.max(r1,r2,rM) + 6); ctx.stroke();
 
-  // --- Row 2: after collision ---
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = 'bold 12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('衝突後（融合）', 16, rowY2 - Math.round(H * 0.20));
+  // phase + time relative to impact (impact at TPRE)
+  var tau = t - TPRE; // negative=before, positive=after
+  var inImpact = (t >= TPRE && t <= TPRE + TIMPACT);
 
-  var xMid = Math.round(W * 0.5);
-  var rFinal = radius(p.m1 + p.m2);
-
-  // purple merged body
-  ctx.fillStyle = '#b388ff';
-  ctx.shadowColor = '#b388ff'; ctx.shadowBlur = 14;
-  ctx.beginPath(); ctx.arc(xMid, rowY2, rFinal, 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = '#0a1929';
-  ctx.font = 'bold 11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('m₁+m₂', xMid, rowY2 + 3);
-
-  if (Math.abs(vf) > 1e-6) {
-    var dirf = vf >= 0 ? 1 : -1;
-    var fStart = xMid + dirf * (rFinal + 4);
-    var fEnd = fStart + dirf * arrowLen(vf);
-    drawArrow(ctx, fStart, rowY2, fEnd, rowY2, '#d4baff', 2.6);
+  // body centers
+  var x1, x2, drawMerged = false, xm = xc;
+  if (t < TPRE){
+    // approach: at t=TPRE they touch (centers at xc-r1, xc+r2 ... but contact means x1+r1 = x2-r2 = xc)
+    var dt = TPRE - t;
+    x1 = (xc - r1) - p.u1*dt*mpp;
+    x2 = (xc + r2) - p.u2*dt*mpp;
+  } else {
+    var ta = Math.max(0, t - TPRE - TIMPACT);
+    if (s.stuck){
+      drawMerged = true;
+      xm = xc + s.vcm*ta*mpp;
+    } else {
+      // bodies separate from contact point
+      x1 = (xc - r1) + s.v1*ta*mpp;
+      x2 = (xc + r2) + s.v2*ta*mpp;
+    }
   }
 
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('v_f = ' + vf.toFixed(2) + ' m/s', xMid, rowY2 - rFinal - 10);
-  ctx.fillText((p.m1 + p.m2).toFixed(1) + ' kg', xMid, rowY2 + rFinal + 14);
+  // CoM marker (constant velocity throughout) — vertical green line
+  // CoM position: it travels at vcm and coincides with contact region at impact.
+  var comX;
+  if (t < TPRE) comX = xc - s.vcm*(TPRE - t)*mpp;
+  else comX = xc + s.vcm*(t - TPRE)*mpp;
+  // clamp to view
+  comX = Math.max(14, Math.min(W-14, comX));
+  ctx.strokeStyle = 'rgba(46,204,113,0.85)';
+  ctx.setLineDash([4,4]); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(comX, 14); ctx.lineTo(comX, H-14); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#2ecc71'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(I18N.cm, comX, 24);
+  ctx.beginPath(); ctx.arc(comX, yLine, 4, 0, Math.PI*2); ctx.fill();
 
-  // --- Top-right readout ---
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText('p_tot = (m₁v₁ + m₂v₂) = ' + (p.m1 * p.v1 + p.m2 * p.v2).toFixed(2) + ' kg·m/s', W - 16, 22);
+  function body(x, r, fill, label){
+    ctx.fillStyle = fill;
+    ctx.shadowColor = fill; ctx.shadowBlur = inImpact ? 22 : 12;
+    ctx.beginPath(); ctx.arc(x, yLine, r, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#0a1929'; ctx.font = 'bold 11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillText(label, x, yLine + 3);
+  }
+  function velArrow(x, r, v, color){
+    if (Math.abs(v) < 1e-6) return;
+    var dir = v >= 0 ? 1 : -1;
+    var a0 = x + dir*(r+3);
+    var a1 = a0 + dir*Math.min(W*0.16, Math.abs(v)/vMax * W*0.16);
+    drawArrow(ctx, a0, yLine, a1, yLine, color, 2.4);
+  }
+
+  if (drawMerged){
+    body(xm, rM, '#b388ff', 'm₁+m₂');
+    velArrow(xm, rM, s.vcm, '#d4baff');
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace';
+    ctx.fillText('V = ' + s.vcm.toFixed(2) + ' m/s', xm, yLine - rM - 8);
+  } else {
+    var v1c = (t < TPRE) ? p.u1 : s.v1;
+    var v2c = (t < TPRE) ? p.u2 : s.v2;
+    body(x1, r1, '#4ac6ff', 'm₁');
+    body(x2, r2, '#ffb347', 'm₂');
+    velArrow(x1, r1, v1c, '#7fdcff');
+    velArrow(x2, r2, v2c, '#ffd166');
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillText('v₁=' + v1c.toFixed(2), x1, yLine - r1 - 8);
+    ctx.fillText('v₂=' + v2c.toFixed(2), x2, yLine - r2 - 8);
+  }
+
+  // impact flash + annotations
+  if (inImpact){
+    ctx.fillStyle = 'rgba(255,213,74,0.18)'; ctx.fillRect(0,0,W,H);
+  }
+
+  // top-left phase label
+  ctx.fillStyle = '#cfe3f7'; ctx.font = 'bold 12px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  var phaseLabel = t < TPRE ? I18N.before : (inImpact ? I18N.impact : I18N.after);
+  ctx.fillText(phaseLabel, 16, 40);
+
+  // momentum-conserved annotation (always) + KE loss annotation (after impact)
+  ctx.textAlign = 'right'; ctx.font = '11px "Roboto Mono",monospace';
+  ctx.fillStyle = '#7ee787';
+  ctx.fillText(I18N.momCons + ': p = ' + s.pA.toFixed(2) + ' kg·m/s', W-16, 40);
+  if (t >= TPRE){
+    ctx.fillStyle = s.lossPct < 0.05 ? '#7ee787' : '#ff9b9b';
+    var txt = s.lossPct < 0.05 ? I18N.keCons : (I18N.keLost + s.lossPct.toFixed(1) + '%');
+    ctx.fillText(txt, W-16, 58);
+  }
 }
 
-function drawEnergy(p) {
-  var ctx = energyCtx, W = __novaCanvasCssW(energyCanvas), H = __novaCanvasCssH(energyCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 56, my = 36;
-  var x0 = mx, x1 = W - 14, y0 = H - my, y1 = my + 6;
+function drawEnergy(s){
+  var ctx = energyCtx, W = cssW(energyCanvas), H = cssH(energyCanvas);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
+  var x0 = 48, x1 = W - 14, y0 = H - 34, y1 = 30;
   var gw = x1 - x0, gh = y0 - y1;
 
-  var ki = kineticInitial(p);
-  var kf = kineticFinal(p);
-  var dk = Math.max(0, ki - kf);
-  var maxVal = Math.max(ki, kf, dk, 1e-3);
-  // Make Y axis slightly above maxVal
-  var yMax = maxVal * 1.15;
+  var keMax = Math.max(s.keB, s.keA, s.loss, 1e-3);
+  var pAbs = Math.abs(s.pB);
+  function pyKE(v){ return y0 - (v/(keMax*1.15))*gh; }
 
-  function py(v) { return y0 - (v / yMax) * gh; }
-
-  // Grid + Y labels
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.lineWidth = 1;
-  var yticks = 5;
-  ctx.textAlign = 'right';
-  for (var k = 0; k <= yticks; k++) {
-    var vv = (yMax * k) / yticks;
-    var yy = py(vv);
+  ctx.strokeStyle = 'rgba(143,184,224,0.18)'; ctx.fillStyle = '#8fb8e0';
+  ctx.font = '10px "Roboto Mono",monospace'; ctx.lineWidth = 1; ctx.textAlign = 'right';
+  for (var k=0;k<=5;k++){
+    var vv = keMax*1.15*k/5, yy = pyKE(vv);
     ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    ctx.fillText(vv.toFixed(1), x0 - 4, yy + 3);
+    ctx.fillText(vv.toFixed(0), x0-4, yy+3);
   }
-  // Axes
   ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y1); ctx.stroke();
 
-  // 3 bars: KE_i, KE_f, ΔKE_loss
   var bars = [
-    { label: 'KE_i (初期)', value: ki, color: '#4ac6ff' },
-    { label: 'KE_f (最終)', value: kf, color: '#7ee787' },
-    { label: 'ΔKE (損失)', value: dk, color: '#ff7b7b' }
+    { label: I18N.keBefore, value: s.keB, color: '#4ac6ff', unit:' J', py: pyKE },
+    { label: I18N.keAfter,  value: s.keA, color: '#7ee787', unit:' J', py: pyKE },
+    { label: I18N.dke,      value: s.loss, color: '#ff7b7b', unit:' J', py: pyKE },
+    { label: I18N.pTot,     value: pAbs, color: '#9aa7b5', unit:'', py: function(v){ return y0 - (v/(Math.max(pAbs,1e-3)*1.15))*gh; } }
   ];
-  var nBars = bars.length;
-  var slot = gw / nBars;
-  var bw = slot * 0.5;
-
-  ctx.textAlign = 'center';
-  ctx.font = '11px "Roboto Mono",monospace';
-  for (var i = 0; i < nBars; i++) {
-    var b = bars[i];
-    var cx = x0 + slot * (i + 0.5);
-    var bx = cx - bw / 2;
-    var by = py(b.value);
-    var hb = y0 - by;
-    if (hb < 0) hb = 0;
-    // bar
-    ctx.fillStyle = b.color;
-    ctx.shadowColor = b.color; ctx.shadowBlur = 8;
-    ctx.fillRect(bx, by, bw, hb);
-    ctx.shadowBlur = 0;
-    // label below axis
-    ctx.fillStyle = '#cfe3f7';
-    ctx.fillText(b.label, cx, y0 + 14);
-    // value label above bar
+  var slot = gw / bars.length, bw = slot*0.46;
+  ctx.textAlign = 'center'; ctx.font = '10px "Roboto Mono",monospace';
+  for (var i=0;i<bars.length;i++){
+    var b = bars[i], cx = x0 + slot*(i+0.5), bx = cx - bw/2, by = b.py(b.value);
+    var hb = Math.max(0, y0 - by);
+    ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 8;
+    ctx.fillRect(bx, by, bw, hb); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#cfe3f7'; ctx.fillText(b.label, cx, y0 + 14);
     ctx.fillStyle = '#fff';
-    ctx.fillText(b.value.toFixed(1) + ' J', cx, by - 6);
+    var lab = (i===3) ? b.value.toFixed(2) : b.value.toFixed(1) + b.unit;
+    ctx.fillText(lab, cx, by - 6);
   }
-
-  // Title / units
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('運動エネルギー [J]', 16, 22);
-  ctx.textAlign = 'right';
-  var pct = ki > 1e-12 ? (dk / ki) * 100 : 0;
-  ctx.fillText('損失率 = ' + pct.toFixed(1) + ' %', W - 16, 22);
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText(I18N.keLost.replace('=','').trim() + ' ' + s.lossPct.toFixed(1) + ' %', 16, 20);
 }
 
-function compute() {
+function updateReadouts(p, s, t){
+  var v1c = (t < TPRE) ? p.u1 : s.v1;
+  var v2c = (t < TPRE) ? p.u2 : s.v2;
+  if (s.stuck && t >= TPRE){ v1c = s.vcm; v2c = s.vcm; }
+  el('roPhase').textContent = t < TPRE ? I18N.before : (t <= TPRE+TIMPACT ? I18N.impact : I18N.after);
+  el('roV1').textContent = v1c.toFixed(2);
+  el('roV2').textContent = v2c.toFixed(2);
+  el('roVcm').textContent = s.vcm.toFixed(2);
+  el('roP').textContent = s.pA.toFixed(2);
+  var keNow = (t < TPRE) ? s.keB : s.keA;
+  el('roKE').textContent = keNow.toFixed(1);
+  el('roMu').textContent = s.mu.toFixed(2);
+  el('roLoss').textContent = s.lossPct.toFixed(1) + ' %';
+}
+
+function render(){
   var p = getParams();
-  if (!isFinite(p.m1) || !isFinite(p.v1) || !isFinite(p.m2) || !isFinite(p.v2)) return;
-  var vf = vFinal(p);
-  var ki = kineticInitial(p);
-  var kf = kineticFinal(p);
-  var pct = lossPercent(p);
-  document.getElementById('statVf').textContent = vf.toFixed(2) + ' m/s';
-  document.getElementById('statKEi').textContent = ki.toFixed(1) + ' J';
-  document.getElementById('statKEf').textContent = kf.toFixed(1) + ' J';
-  document.getElementById('statLoss').textContent = pct.toFixed(1) + ' %';
-  drawCollision(p);
-  drawEnergy(p);
+  if (!isFinite(p.m1)||!isFinite(p.u1)||!isFinite(p.m2)||!isFinite(p.u2)||!isFinite(p.e)) return;
+  var s = solve(p);
+  var t = Math.min(simT, totalDur());
+  drawCollision(p, s, t);
+  drawEnergy(s);
+  updateReadouts(p, s, t);
 }
 
-function animationStep() {
-  if (!playing) return;
-  // sweep slV1 from -50 to 50
-  var sl = document.getElementById('slV1');
-  var cur = parseFloat(sl.value);
-  if (!isFinite(cur)) cur = 10.0;
-  cur += sweepDir * 1.0;
-  if (cur > 50) { cur = 50; sweepDir = -1; }
-  if (cur < -50) { cur = -50; sweepDir = 1; }
-  sl.value = cur.toFixed(1);
-  updateSlider(sl, 'slV1Val', 1, '');
-  compute();
-  setTimeout(function(){ animId = requestAnimationFrame(animationStep); }, 110);
+/* ===== animation loop ===== */
+function loop(ts){
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dt = Math.min(0.05, (ts - lastTs)/1000);
+  lastTs = ts;
+  simT += dt * speedMult;
+  if (simT >= totalDur()){ simT = totalDur(); render(); stopPlay(); return; }
+  render();
+  animId = requestAnimationFrame(loop);
 }
+function startPlay(){
+  if (reduceMotion){ simT = totalDur(); render(); return; }
+  if (simT >= totalDur()) simT = 0;
+  playing = true; lastTs = 0;
+  el('playBtn').innerHTML = I18N.pause;
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing = false;
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+  el('playBtn').innerHTML = I18N.play;
+}
+function togglePlay(){ playing ? stopPlay() : startPlay(); }
+function replaySim(){ simT = 0; if (reduceMotion){ render(); return; } stopPlay(); startPlay(); }
 
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> v_1 をスイープ';
-    if (animId) cancelAnimationFrame(animId);
+function setSpeed(v){
+  speedMult = v;
+  var btns = document.querySelectorAll('.speed-btn');
+  for (var i=0;i<btns.length;i++){
+    btns[i].classList.toggle('active', parseFloat(btns[i].dataset.speed) === v);
   }
 }
 
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> v_1 をスイープ';
-  var defs = { slM1: 2.0, slV1: 10.0, slM2: 3.0, slV2: 0.0 };
-  Object.keys(defs).forEach(function(id){
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slM1'), 'slM1Val', 1, '');
-  updateSlider(document.getElementById('slV1'), 'slV1Val', 1, '');
-  updateSlider(document.getElementById('slM2'), 'slM2Val', 1, '');
-  updateSlider(document.getElementById('slV2'), 'slV2Val', 1, '');
-  compute();
+function onParam(){
+  // restart the run so the new params animate from the start
+  simT = 0;
+  if (playing){ lastTs = 0; render(); }
+  else { render(); }
+  highlightPreset();
 }
 
-window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
-
-function animLoop(ts) {
-  animTime = (ts || 0) / 1000;
-  rafId = requestAnimationFrame(animLoop);
+var PRESETS = {
+  stick:   { m1:2, u1:3,  m2:1, u2:0,   e:0 },
+  elastic: { m1:2, u1:3,  m2:1, u2:0,   e:1 },
+  equal:   { m1:2, u1:10, m2:2, u2:-10, e:0 },
+  heavy:   { m1:8, u1:5,  m2:1, u2:0,   e:0 }
+};
+function setPreset(name){
+  var P = PRESETS[name]; if (!P) return;
+  el('slM1').value = P.m1; el('slV1').value = P.u1;
+  el('slM2').value = P.m2; el('slV2').value = P.u2; el('slE').value = P.e;
+  syncAll();
+  simT = 0; stopPlay(); startPlay();
+  highlightPreset();
+}
+function highlightPreset(){
+  var p = getParams();
+  var btns = document.querySelectorAll('.preset-btn[data-preset]');
+  for (var i=0;i<btns.length;i++){
+    var P = PRESETS[btns[i].dataset.preset];
+    var on = P && P.m1===p.m1 && P.u1===p.u1 && P.m2===p.m2 && P.u2===p.u2 && Math.abs(P.e-p.e)<1e-9;
+    btns[i].classList.toggle('active', !!on);
+  }
 }
 
+function syncAll(){
+  updateSlider(el('slM1'),'slM1Val',1,'');
+  updateSlider(el('slV1'),'slV1Val',1,'');
+  updateSlider(el('slM2'),'slM2Val',1,'');
+  updateSlider(el('slV2'),'slV2Val',1,'');
+  updateSlider(el('slE'),'slEVal',2,'');
+}
+
+function resetParams(){
+  stopPlay();
+  el('slM1').value = 2.0; el('slV1').value = 3.0;
+  el('slM2').value = 1.0; el('slV2').value = 0.0; el('slE').value = 0.0;
+  syncAll();
+  simT = 0; startPlay();
+  highlightPreset();
+}
+
+collisionCanvas.addEventListener('keydown', function(e){
+  if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); togglePlay(); }
+});
+window.addEventListener('resize', function(){ resizeCanvases(); render(); });
+
+// expose handlers for inline on* attributes
+window.togglePlay = togglePlay;
+window.replaySim = replaySim;
+window.resetParams = resetParams;
+window.setPreset = setPreset;
+window.setSpeed = setSpeed;
+window.onParam = onParam;
+
+// init
 resizeCanvases();
-compute();
-rafId = requestAnimationFrame(animLoop);
+syncAll();
+highlightPreset();
+if (reduceMotion){ simT = totalDur(); render(); }
+else { startPlay(); }
+})();
 </script>
 
 <section class="explanation">
@@ -637,6 +725,9 @@ rafId = requestAnimationFrame(animLoop);
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="inelastic-collision.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -684,13 +775,13 @@ rafId = requestAnimationFrame(animLoop);
 <h3>使い方ガイド</h3>
 <ol>
 <li>左側のスライダーで物体1の質量(kg)と衝突前速度(m/s)を設定します。例：鋼球質量2kg、速度8m/s</li>
-<li>右側のスライダーで物体2の質量(kg)と衝突前速度(m/s)を入力します。例：鋼球質量3kg、速度2m/s</li>
-<li>シミュレーション開始ボタンを押すと、運動量保存則から合体後速度が自動計算され、衝突前後のエネルギーと損失率が表示されます</li>
+<li>スライダーで物体2の質量(kg)と衝突前速度(m/s)を入力します。例：鉄製ブロック質量4kg、速度0m/s</li>
+<li>値を変えるたびに、運動量保存則から合体後速度が自動計算され、衝突前後のエネルギーと損失率がリアルタイムで表示されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>アルミ合金製の小型部品(m₁=2.5kg)が時速36km/h(10m/s)で、静止した鉄製ブロック(m₂=4.0kg)に衝突する場合を想定します。運動量保存則により、合体後速度は(2.5×10+4.0×0)/(2.5+4.0)=3.57m/sとなります。初期運動エネルギーは125J、最終運動エネルギーは31.9Jで、エネルギー損失率は74.5%に達します。完全非弾性衝突では高い率のエネルギーが熱や音、変形に消費されます。</p>
+<p>アルミ合金製の小型部品(m₁=2.5kg)が時速36km/h(10m/s)で、静止した鉄製ブロック(m₂=4.0kg)に衝突する場合を想定します。運動量保存則により、合体後速度は(2.5×10+4.0×0)/(2.5+4.0)=3.85m/sとなります。初期運動エネルギーは125J、最終運動エネルギーは48.1Jで、エネルギー損失率は61.5%に達します。完全非弾性衝突では高い率のエネルギーが熱や音、変形に消費されます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -700,6 +791,16 @@ rafId = requestAnimationFrame(animLoop);
 <li>空気抵抗や接触時間の影響は本シミュレーションに含まれていないため、現実条件では測定値との乖離が生じる可能性があります</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

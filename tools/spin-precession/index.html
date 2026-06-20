@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "スピン歳差シミュレーター",
       "description": "スピン歳差シミュレーター。静磁場 B_0 中の磁気モーメントの Larmor 歳差と T_1/T_2 緩和を可視化し、MRI 1.5T で陽子 Larmor 周波数 63.85 MHz をリアルタイム計算・解析できます。",
       "url": "https://novasolver.jp/tools/spin-precession.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["静磁場 B_0 と磁気回転比 γ からの Larmor 周波数の計算","横緩和 T_2 を伴う自由歳差信号 (FID) の可視化","縦緩和 T_1 による飽和回復曲線の表示","xy 平面投影による歳差運動の表現"],
       "keywords": "スピン歳差,Larmor 歳差,NMR,MRI,磁気共鳴,磁気回転比,T1緩和,T2緩和,Bloch方程式",
       "datePublished": "2026-05-16",
@@ -100,8 +100,26 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#cv,#fid{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.preset-btn{padding:4px 10px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.toggle-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.82rem;font-family:inherit;cursor:pointer;transition:all .2s}
+.toggle-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.speed-btn.active{border-color:var(--accent);color:var(--accent)}
+#cv:focus-visible,#fid:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){input[type=range]::-webkit-slider-thumb{transition:none}}
 </style>
 </head>
 <body>
@@ -131,12 +149,34 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div style="margin-bottom:6px;font-size:0.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+    <div class="preset-row">
+      <button type="button" class="preset-btn" onclick="setPreset('larmor')">自由 Larmor 歳差</button>
+      <button type="button" class="preset-btn" onclick="setPreset('p90')">90°パルス→FID</button>
+      <button type="button" class="preset-btn" onclick="setPreset('rabi')">共鳴 Rabi 章動</button>
+      <button type="button" class="preset-btn" onclick="setPreset('offres')">オフ共鳴</button>
+    </div>
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">核種プリセット</span>
+        <div class="num-wrap"><select class="num-input" id="nucleus" style="width:auto;min-width:110px" onchange="setNucleus(this.value)" aria-label="核種プリセット">
+          <option value="26.75">¹H 陽子</option>
+          <option value="6.728">¹³C 炭素</option>
+          <option value="10.84">³¹P リン</option>
+          <option value="-2.713">¹⁵N 窒素</option>
+          <option value="25.18">¹⁹F フッ素</option>
+        </select></div>
+      </div>
+    </div>
+
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">静磁場 B_0</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slB0Val" value="1.5" min="0.1" max="10" step="0.1" oninput="syncFromNum('slB0','slB0Val')"><span class="num-unit">T</span></div>
       </div>
-      <input type="range" id="slB0" min="0.1" max="10" step="0.1" value="1.5" oninput="syncToNum('slB0','slB0Val');updateSlider(this,'slB0Val',1,'');compute()">
+      <input type="range" id="slB0" min="0.1" max="10" step="0.1" value="1.5" oninput="syncToNum('slB0','slB0Val');updateSlider(this,'slB0Val',1,'');compute()" aria-label="静磁場 B0 テスラ">
     </div>
 
     <div class="param-group">
@@ -144,7 +184,23 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">磁気回転比 γ (×10⁷ rad/s/T)</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slGammaVal" value="26.75" min="1" max="30" step="0.05" oninput="syncFromNum('slGamma','slGammaVal')"><span class="num-unit">×10⁷</span></div>
       </div>
-      <input type="range" id="slGamma" min="1" max="30" step="0.05" value="26.75" oninput="syncToNum('slGamma','slGammaVal');updateSlider(this,'slGammaVal',2,'');compute()">
+      <input type="range" id="slGamma" min="1" max="30" step="0.05" value="26.75" oninput="syncToNum('slGamma','slGammaVal');updateSlider(this,'slGammaVal',2,'');compute()" aria-label="磁気回転比 ガンマ">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">RF 振幅 B_1 (µT)</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slB1Val" value="20" min="1" max="200" step="1" oninput="syncFromNum('slB1','slB1Val')"><span class="num-unit">µT</span></div>
+      </div>
+      <input type="range" id="slB1" min="1" max="200" step="1" value="20" oninput="syncToNum('slB1','slB1Val');updateSlider(this,'slB1Val',0,'');compute()" aria-label="RF 振幅 B1 マイクロテスラ">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">初期チップ角 θ₀</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slTipVal" value="30" min="0" max="180" step="1" oninput="syncFromNum('slTip','slTipVal')"><span class="num-unit">°</span></div>
+      </div>
+      <input type="range" id="slTip" min="0" max="180" step="1" value="30" oninput="syncToNum('slTip','slTipVal');updateSlider(this,'slTipVal',0,'');compute()" aria-label="初期チップ角 度">
     </div>
 
     <div class="param-group">
@@ -152,7 +208,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">縦緩和時間 T_1</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slT1Val" value="1.00" min="0.01" max="5.00" step="0.01" oninput="syncFromNum('slT1','slT1Val')"><span class="num-unit">s</span></div>
       </div>
-      <input type="range" id="slT1" min="0.01" max="5.00" step="0.01" value="1.00" oninput="syncToNum('slT1','slT1Val');updateSlider(this,'slT1Val',2,'');compute()">
+      <input type="range" id="slT1" min="0.01" max="5.00" step="0.01" value="1.00" oninput="syncToNum('slT1','slT1Val');updateSlider(this,'slT1Val',2,'');compute()" aria-label="縦緩和時間 T1 秒">
     </div>
 
     <div class="param-group">
@@ -160,7 +216,24 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">横緩和時間 T_2</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slT2Val" value="0.100" min="0.001" max="2.000" step="0.001" oninput="syncFromNum('slT2','slT2Val')"><span class="num-unit">s</span></div>
       </div>
-      <input type="range" id="slT2" min="0.001" max="2.000" step="0.001" value="0.100" oninput="syncToNum('slT2','slT2Val');updateSlider(this,'slT2Val',3,'');compute()">
+      <input type="range" id="slT2" min="0.001" max="2.000" step="0.001" value="0.100" oninput="syncToNum('slT2','slT2Val');updateSlider(this,'slT2Val',3,'');compute()" aria-label="横緩和時間 T2 秒">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">RF パルス (B_1)</span>
+        <button class="toggle-btn" type="button" id="rfToggle" onclick="toggleRF()"><i class="fas fa-broadcast-tower"></i> OFF</button>
+      </div>
+      <div class="param-label" style="margin-top:8px;">
+        <span class="param-name">回転座標系</span>
+        <button class="toggle-btn" type="button" id="frameToggle" onclick="toggleFrame()"><i class="fas fa-sync-alt"></i> 実験室系</button>
+      </div>
+      <div class="param-label" style="margin-top:8px;">
+        <span class="param-name">緩和 (T_1/T_2)</span>
+        <button class="toggle-btn active" type="button" id="relaxToggle" onclick="toggleRelax()"><i class="fas fa-hourglass-half"></i> ON</button>
+      </div>
     </div>
 
     <div class="divider"></div>
@@ -170,9 +243,65 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値 γ = 26.75×10⁷ rad/s/T は陽子（¹H）の値。物理的制約 T_2 ≤ T_1 を自動でクランプします。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130626345?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130626345.09._SCMZZZZZZ_.jpg" alt="量子力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">量子力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roFL">—</div><div class="rl">Larmor f_L</div></div>
+        <div class="live-ro"><div class="rv" id="roTheta">—</div><div class="rl">極角 θ</div></div>
+        <div class="live-ro"><div class="rv" id="roMx">—</div><div class="rl">Mx</div></div>
+        <div class="live-ro"><div class="rv" id="roMy">—</div><div class="rl">My</div></div>
+        <div class="live-ro"><div class="rv" id="roMz">—</div><div class="rl">Mz</div></div>
+      </div>
+      <div class="live-readouts" style="grid-template-columns:repeat(4,1fr);margin-bottom:0">
+        <div class="live-ro"><div class="rv" id="roMxy">—</div><div class="rl">M_xy（横）</div></div>
+        <div class="live-ro"><div class="rv" id="roMag">—</div><div class="rl">|M|</div></div>
+        <div class="live-ro"><div class="rv" id="roRabi">—</div><div class="rl">Rabi ω₁/2π</div></div>
+        <div class="live-ro"><div class="rv" id="roTime">0.0</div><div class="rl">時刻 t [ms]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-atom"></i> Bloch 球：磁化ベクトル M の歳差</div>
+      <canvas id="cv" width="600" height="420" tabindex="0" role="img" aria-label="Bloch 球上で磁化ベクトル M が B0 の周りを歳差する 3D 表示。RF を入れると横平面へ章動します。"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="playBtn2" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+        <button class="btn secondary" type="button" onclick="replay()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+          <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+          <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#8fb8e0"></i>B₀ 軸 (z)</span>
+        <span><i class="swatch" style="background:#FFD166"></i>磁化 M</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>歳差軌跡</span>
+        <span><i class="swatch" style="background:#ff5252"></i>RF B₁</span>
+      </div>
+      <p class="canvas-hint">M が B₀ の周りを円錐状に歳差。RF ON で横平面へ章動（Rabi）。回転座標系では歳差が止まって見えます。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-wave-square"></i> M_z(t) 回復 と M_xy(t) 自由誘導減衰 (FID)</div>
+      <canvas id="fid" width="600" height="220" role="img" aria-label="Mz の縦緩和回復曲線と Mxy の自由誘導減衰 (FID) の時間プロット。"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#00B4D8"></i>M_z(t) 縦緩和（T₁）</span>
+        <span><i class="swatch" style="background:#FFD166"></i>M_xy(t) FID 包絡線（T₂）</span>
+      </div>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -184,17 +313,13 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-atom"></i> スピン歳差と緩和カーブ</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">上＝磁化ベクトル M の xy 平面投影（歳差円が T_2 で減衰）／下＝縦緩和 M_z(t) と横緩和包絡線 M_xy(t)</p>
-    </div>
-
-    <div class="chart-card">
       <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
       <div class="theory-box">
         <p>静磁場 B_0 中の磁気モーメント μ は、トルク dμ/dt = γ μ × B_0 によって磁場軸の周りを一定角速度で歳差します。</p>
         <p style="margin-top:8px;">Larmor 角周波数 ω_L と Larmor 周波数 f_L。γ は磁気回転比：</p>
         $$\omega_L = \gamma B_0, \qquad f_L = \frac{\omega_L}{2\pi}$$
+        <p style="margin-top:6px;">共鳴 RF (B_1) による Rabi 章動。90° パルス時間：</p>
+        $$\omega_1 = \gamma B_1, \qquad t_{90} = \frac{\pi}{2\,\omega_1}$$
         <p style="margin-top:6px;">90 度パルス後の自由歳差（横緩和は T_2 で指数減衰）：</p>
         $$M_x(t) = M_0\cos(\omega_L t)\,e^{-t/T_2}$$
         <p style="margin-top:6px;">縦磁化の飽和回復（縦緩和は時定数 T_1）：</p>
@@ -206,304 +331,401 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Spin Precession (Larmor + T1/T2) Simulator ==========
+// ========== Spin Precession (Larmor + RF Rabi + T1/T2) v2 Simulator ==========
+"use strict";
+var T = {
+  pause:'一時停止', play:'再生', playPrec:'歳差を再生',
+  labB0:'B₀ 軸', labLab:'実験室系', labRot:'回転座標系', labOn:'ON', labOff:'OFF',
+  annFree:'自由 Larmor 歳差', annRabi:'RF ON：横平面へ章動 (Rabi)', annFID:'90° 後：FID（T₂ 減衰）',
+  mzL:'M_z(t) 縦緩和（T₁）', mxyL:'M_xy(t) FID（T₂）', tlbl:'t [緩和の単位]'
+};
+
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
-var playing = false;
-var animId = null;
-var animTime = 0; // simulation time in seconds (animated)
+var fid = document.getElementById('fid');
+var fctx = fid.getContext('2d');
 
+var playing = false, animId = null;
+var animTime = 0;            // animation clock (relaxation time units, s)
+var speedMult = 1;
+var lastTs = 0;
+var rfOn = false, rotFrame = false, relaxOn = true;
+// magnetization state vector (unit M0=1)
+var M = { x:0, y:0, z:1 };
+var phase = 0;              // accumulated Larmor phase for lab-frame display
+var fidHist = [];          // {t, mz, mxy}
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function $(id){ return document.getElementById(id); }
 function getParams() {
-  var B0 = parseFloat(document.getElementById('slB0').value);
-  var gamma = parseFloat(document.getElementById('slGamma').value) * 1e7; // ×10^7 rad/s/T
-  var T1 = parseFloat(document.getElementById('slT1').value);
-  var T2 = parseFloat(document.getElementById('slT2').value);
-  // physical constraint T2 <= T1: clamp display
-  if (T2 > T1) T2 = T1;
-  return { B0: B0, gamma: gamma, T1: T1, T2: T2 };
+  var B0 = parseFloat($('slB0').value);
+  var gamma = parseFloat($('slGamma').value) * 1e7;       // rad/s/T
+  var B1 = parseFloat($('slB1').value) * 1e-6;            // µT -> T
+  var tip0 = parseFloat($('slTip').value) * Math.PI / 180;
+  var T1 = parseFloat($('slT1').value);
+  var T2 = parseFloat($('slT2').value);
+  if (T2 > T1) T2 = T1;                                   // physical constraint
+  return { B0:B0, gamma:gamma, B1:B1, tip0:tip0, T1:T1, T2:T2 };
 }
 
 function fmtFreq(hz) {
   if (!isFinite(hz)) return '—';
   var a = Math.abs(hz);
-  if (a >= 1e9) return (hz / 1e9).toFixed(2) + ' GHz';
-  if (a >= 1e6) return (hz / 1e6).toFixed(2) + ' MHz';
-  if (a >= 1e3) return (hz / 1e3).toFixed(2) + ' kHz';
-  return hz.toFixed(0) + ' Hz';
+  if (a >= 1e9) return (hz/1e9).toFixed(2)+' GHz';
+  if (a >= 1e6) return (hz/1e6).toFixed(2)+' MHz';
+  if (a >= 1e3) return (hz/1e3).toFixed(2)+' kHz';
+  return hz.toFixed(0)+' Hz';
 }
-function fmtOmega(w) {
-  if (!isFinite(w)) return '—';
-  return w.toExponential(2);
-}
+function fmtOmega(w){ return isFinite(w) ? w.toExponential(2) : '—'; }
 
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var h = Math.round(w * 0.66);
+/* ===== HiDPI sizing ===== */
+function sizeOne(c, cx2, h) {
+  var w = Math.max(280, Math.min(c.parentElement.clientWidth - 32, 920));
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
-  cv.width = Math.round(w * dpr);
-  cv.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cv.dataset.cssW = String(w);
-  cv.dataset.cssH = String(h);
+  c.style.width = w+'px'; c.style.height = h+'px';
+  c.width = Math.round(w*dpr); c.height = Math.round(h*dpr);
+  cx2.setTransform(dpr,0,0,dpr,0,0);
+  c.dataset.cssW = String(w); c.dataset.cssH = String(h);
+}
+function resizeCanvas(){
+  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 32, 920));
+  sizeOne(cv, ctx, Math.round(w*0.7));
+  sizeOne(fid, fctx, 220);
 }
 
-function drawScene(p, omegaL) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-
-  // ===== Top panel: xy plane projection of M vector (precessing circle) =====
-  var topH = H * 0.5;
-  var cx = W * 0.5, cy = topH * 0.5;
-  var R = Math.min(W * 0.5, topH) * 0.36;
-
-  // bounding circle (xy plane outline)
-  ctx.strokeStyle = 'rgba(143,184,224,0.3)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // axes labels (perspective xy plane)
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('x', cx + R + 12, cy + 3);
-  ctx.fillText('y', cx, cy - R - 8);
-  ctx.fillText('B₀ (z)', cx, 14);
-
-  // animated precession trail (last ~one cycle worth, scaled to visible animation speed)
-  // We map real-time omegaL to a visual rotation speed (slow it dramatically for display)
-  var visualSpeedFactor = Math.max(omegaL * 1e-9, 0.5); // make at least visible
-  var visualOmega = 2.0 * visualSpeedFactor; // rad per simulated unit
-  var Ntrail = 80;
-  ctx.lineWidth = 1.5;
-  for (var k = Ntrail; k >= 1; k--) {
-    var dt = k * 0.02;
-    var tk = animTime - dt;
-    // amplitude decays with T2
-    var amp = Math.exp(-Math.max(tk, 0) / Math.max(p.T2, 1e-6));
-    if (amp < 0.02) continue;
-    var ang = visualOmega * tk;
-    var x = cx + R * amp * Math.cos(ang);
-    var y = cy + R * amp * Math.sin(ang);
-    var x2 = cx + R * amp * Math.cos(visualOmega * (tk + 0.02));
-    var y2 = cy + R * amp * Math.sin(visualOmega * (tk + 0.02));
-    var alpha = 0.6 * (1 - k / Ntrail);
-    ctx.strokeStyle = 'rgba(0,180,216,' + alpha.toFixed(3) + ')';
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-  }
-
-  // current M vector tip
-  var ampNow = Math.exp(-animTime / Math.max(p.T2, 1e-6));
-  var angNow = visualOmega * animTime;
-  var mx = cx + R * ampNow * Math.cos(angNow);
-  var my = cy + R * ampNow * Math.sin(angNow);
-  // vector line
-  ctx.strokeStyle = '#FFD166';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(mx, my);
-  ctx.stroke();
-  // arrowhead
-  var ang2 = Math.atan2(my - cy, mx - cx);
-  ctx.fillStyle = '#FFD166';
-  ctx.beginPath();
-  ctx.moveTo(mx, my);
-  ctx.lineTo(mx - 9 * Math.cos(ang2 - 0.4), my - 9 * Math.sin(ang2 - 0.4));
-  ctx.lineTo(mx - 9 * Math.cos(ang2 + 0.4), my - 9 * Math.sin(ang2 + 0.4));
-  ctx.closePath();
-  ctx.fill();
-  // tip dot
-  ctx.beginPath();
-  ctx.arc(mx, my, 4, 0, Math.PI * 2);
-  ctx.fill();
-
-  // top panel label
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('M (xy 投影) — 歳差 + T₂ 減衰', 8, topH - 6);
-
-  // separator line
-  ctx.strokeStyle = 'rgba(143,184,224,0.25)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, topH);
-  ctx.lineTo(W, topH);
-  ctx.stroke();
-
-  // ===== Bottom panel: relaxation curves M_z(t) and M_xy envelope =====
-  var mx2 = 50, my2 = 22;
-  var bx0 = mx2, bx1 = W - 16, by0 = H - my2, by1 = topH + my2;
-  var gw = bx1 - bx0, gh = by0 - by1;
-
-  // Time axis: choose a max time that shows both T1 and T2 reasonably
-  var tMax = Math.max(p.T1 * 3, p.T2 * 5);
-  if (!isFinite(tMax) || tMax <= 0) tMax = 1;
-
-  function tx(t) { return bx0 + (t / tMax) * gw; }
-  function ty(v) { return by0 - v * gh; } // v in [0,1]
-
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(bx0, by0); ctx.lineTo(bx1, by0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(bx0, by0); ctx.lineTo(bx0, by1); ctx.stroke();
-
-  // 1/e horizontal line
-  ctx.strokeStyle = 'rgba(143,184,224,0.2)';
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath(); ctx.moveTo(bx0, ty(0.632)); ctx.lineTo(bx1, ty(0.632)); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // M_z(t) = 1 - exp(-t/T1) (longitudinal recovery)
-  var N = 240;
-  ctx.beginPath();
-  for (var i = 0; i <= N; i++) {
-    var t = (i / N) * tMax;
-    var Mz = 1 - Math.exp(-t / Math.max(p.T1, 1e-9));
-    if (i === 0) ctx.moveTo(tx(t), ty(Mz)); else ctx.lineTo(tx(t), ty(Mz));
-  }
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // M_xy envelope: exp(-t/T2)
-  ctx.beginPath();
-  for (var i = 0; i <= N; i++) {
-    var t = (i / N) * tMax;
-    var Mxy = Math.exp(-t / Math.max(p.T2, 1e-9));
-    if (i === 0) ctx.moveTo(tx(t), ty(Mxy)); else ctx.lineTo(tx(t), ty(Mxy));
-  }
-  ctx.strokeStyle = '#FFD166';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // Mark T1 and T2 on time axis if within range
-  if (p.T1 <= tMax) {
-    ctx.strokeStyle = 'rgba(0,180,216,0.6)';
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(tx(p.T1), by0);
-    ctx.lineTo(tx(p.T1), ty(0.632));
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#00B4D8';
-    ctx.textAlign = 'center';
-    ctx.fillText('T₁', tx(p.T1), by0 + 13);
-  }
-  if (p.T2 <= tMax) {
-    ctx.strokeStyle = 'rgba(255,209,102,0.6)';
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(tx(p.T2), by0);
-    ctx.lineTo(tx(p.T2), ty(Math.exp(-1)));
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#FFD166';
-    ctx.textAlign = 'center';
-    ctx.fillText('T₂', tx(p.T2), by0 + 13);
-  }
-
-  // axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('t = 0', bx0, by0 + 14);
-  ctx.textAlign = 'right';
-  ctx.fillText('t = ' + tMax.toFixed(2) + ' s', bx1, by0 + 14);
-  ctx.textAlign = 'left';
-  ctx.fillText('M / M₀', bx0 + 4, by1 + 10);
-
-  // legend (top-right)
-  var lgX = W - 158, lgY = by1 + 6;
-  ctx.fillStyle = 'rgba(20,40,70,0.6)';
-  ctx.fillRect(lgX, lgY, 150, 42);
-  ctx.strokeStyle = 'rgba(143,184,224,0.4)';
-  ctx.strokeRect(lgX, lgY, 150, 42);
-  ctx.fillStyle = '#00B4D8';
-  ctx.fillRect(lgX + 6, lgY + 10, 16, 3);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.textAlign = 'left';
-  ctx.fillText('M_z(t)  T₁ 縦緩和', lgX + 28, lgY + 14);
-  ctx.fillStyle = '#FFD166';
-  ctx.fillRect(lgX + 6, lgY + 28, 16, 3);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.fillText('M_xy(t) T₂ 横緩和', lgX + 28, lgY + 32);
-}
-
-function compute() {
+/* ===== Physics: Bloch evolution in rotating frame =====
+   In the rotating frame at resonance, B0 effect cancels; M rotates about B1 (x') at
+   Rabi rate w1 = gamma*B1 when RF is on. Relaxation: dMz/dt=(M0-Mz)/T1, dMxy/dt=-Mxy/T2. */
+function stepPhysics(dt){
   var p = getParams();
-  // Reflect T2 clamp back to UI if needed
-  var T2raw = parseFloat(document.getElementById('slT2').value);
-  if (T2raw > p.T1) {
-    document.getElementById('slT2').value = p.T1.toFixed(3);
-    document.getElementById('slT2Val').value = p.T1.toFixed(3);
-    updateSlider(document.getElementById('slT2'), 'slT2Val', 3, '');
+  var w1 = p.gamma * p.B1;                 // Rabi angular frequency (rad/s)
+  // Rabi nutation about x' axis (rotating frame) when RF on
+  if (rfOn) {
+    var ang = w1 * dt;
+    var ca = Math.cos(ang), sa = Math.sin(ang);
+    var ny = M.y*ca - M.z*sa;
+    var nz = M.y*sa + M.z*ca;
+    M.y = ny; M.z = nz;
   }
-  if (!isFinite(p.B0) || !isFinite(p.gamma)) return;
+  if (relaxOn) {
+    var e1 = Math.exp(-dt/Math.max(p.T1,1e-6));
+    var e2 = Math.exp(-dt/Math.max(p.T2,1e-6));
+    M.x *= e2; M.y *= e2;
+    M.z = 1 + (M.z - 1)*e1;
+  }
+  // Larmor phase accumulates for lab-frame display (visually slowed)
   var omegaL = p.gamma * p.B0;
-  var fL = omegaL / (2 * Math.PI);
-  document.getElementById('statFL').textContent = fmtFreq(fL);
-  document.getElementById('statOmegaL').textContent = fmtOmega(omegaL) + ' rad/s';
-  document.getElementById('statT1').textContent = p.T1.toFixed(2) + ' s';
-  document.getElementById('statT2').textContent = p.T2.toFixed(3) + ' s';
-  drawScene(p, omegaL);
+  var visOmega = Math.max(omegaL*1.0e-8, 1.2);   // slow to a visible rate
+  phase += (rotFrame ? (w1>0&&rfOn?0:0) : visOmega) * dt * 6;
+  return p;
 }
 
-function animationStep() {
-  if (!playing) return;
-  animTime += 0.02; // 20 ms per frame in simulation time
-  // Reset animation periodically to keep trail/curves alive
+/* ===== 3D projection for Bloch sphere ===== */
+function project(x, y, z, cx, cy, R){
+  // isometric-ish: tilt so z up, slight perspective on y(depth)
+  var tilt = 0.5; // cos of view elevation
+  var sx = cx + R*x + R*y*0.32;
+  var sy = cy - R*z*tilt + R*y*0.5;
+  return [sx, sy, y];   // return depth for ordering
+}
+
+function arrowHead(x0,y0,x1,y1,color){
+  var a = Math.atan2(y1-y0, x1-x0);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x1,y1);
+  ctx.lineTo(x1-10*Math.cos(a-0.4), y1-10*Math.sin(a-0.4));
+  ctx.lineTo(x1-10*Math.cos(a+0.4), y1-10*Math.sin(a+0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+function drawBloch(p){
+  var W = parseFloat(cv.dataset.cssW)||600, H = parseFloat(cv.dataset.cssH)||420;
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0,0,W,H);
+  var cx = W*0.5, cy = H*0.54, R = Math.min(W,H)*0.34;
+
+  // sphere outline + equator
+  ctx.strokeStyle = 'rgba(143,184,224,0.28)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath();
+  for (var a=0;a<=Math.PI*2+0.01;a+=0.1){
+    var pe = project(Math.cos(a),Math.sin(a),0,cx,cy,R);
+    if(a===0) ctx.moveTo(pe[0],pe[1]); else ctx.lineTo(pe[0],pe[1]);
+  }
+  ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+
+  // z axis (B0)
+  var zT = project(0,0,1.18,cx,cy,R), zB = project(0,0,-1.05,cx,cy,R);
+  ctx.strokeStyle = '#8fb8e0'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(zB[0],zB[1]); ctx.lineTo(zT[0],zT[1]); ctx.stroke();
+  arrowHeadCtx(zB[0],zB[1],zT[0],zT[1],'#8fb8e0');
+  ctx.fillStyle='#8fb8e0'; ctx.font='12px "Roboto Mono",monospace'; ctx.textAlign='center';
+  ctx.fillText('B₀ (z)', zT[0], zT[1]-6);
+  // x,y small axes
+  var xA=project(1.15,0,0,cx,cy,R), yA=project(0,1.15,0,cx,cy,R);
+  ctx.strokeStyle='rgba(143,184,224,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(xA[0],xA[1]); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(yA[0],yA[1]); ctx.stroke();
+  ctx.fillStyle='rgba(207,227,247,0.7)';
+  ctx.fillText("x'", xA[0]+8, xA[1]+4); ctx.fillText("y'", yA[0]+8, yA[1]+4);
+
+  // precession cone trail: trace the path the M tip swept (lab frame visual)
+  var theta = Math.acos(Math.max(-1,Math.min(1,M.z/Math.max(magM(),1e-9))));
+  var st = Math.sin(theta);
+  ctx.strokeStyle='rgba(0,180,216,0.55)'; ctx.lineWidth=1.6;
+  ctx.beginPath();
+  var first=true;
+  for (var k=0;k<=60;k++){
+    var ph = phase - k*0.10;
+    var tx3 = st*Math.cos(ph), ty3 = st*Math.sin(ph), tz3 = Math.cos(theta);
+    var pp = project(tx3,ty3,tz3,cx,cy,R);
+    if(first){ctx.moveTo(pp[0],pp[1]);first=false;} else ctx.lineTo(pp[0],pp[1]);
+  }
+  ctx.stroke();
+
+  // current M tip (lab-frame azimuth = phase)
+  var mxv = st*Math.cos(phase), myv = st*Math.sin(phase), mzv = Math.cos(theta);
+  var mp = project(mxv,myv,mzv,cx,cy,R);
+  ctx.strokeStyle='#FFD166'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(mp[0],mp[1]); ctx.stroke();
+  arrowHeadCtx(cx,cy,mp[0],mp[1],'#FFD166');
+  ctx.fillStyle='#FFD166'; ctx.beginPath(); ctx.arc(mp[0],mp[1],4,0,Math.PI*2); ctx.fill();
+  ctx.font='bold 12px "Roboto Mono",monospace'; ctx.fillText('M', mp[0]+10, mp[1]-4);
+
+  // RF B1 arrow along x' when on
+  if (rfOn){
+    var b1=project(0.85,0,0,cx,cy,R);
+    ctx.strokeStyle='#ff5252'; ctx.lineWidth=2.4;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(b1[0],b1[1]); ctx.stroke();
+    arrowHeadCtx(cx,cy,b1[0],b1[1],'#ff5252');
+    ctx.fillStyle='#ff5252'; ctx.fillText('B₁', b1[0]+8, b1[1]+12);
+  }
+
+  // annotation
+  var ann = rfOn ? T.annRabi : (theta>1.2 ? T.annFID : T.annFree);
+  ctx.fillStyle='rgba(207,227,247,0.85)'; ctx.font='12px "Noto Sans JP",sans-serif'; ctx.textAlign='left';
+  ctx.fillText(ann, 12, 20);
+  ctx.fillText((rotFrame?T.labRot:T.labLab), 12, H-12);
+}
+function magM(){ return Math.sqrt(M.x*M.x+M.y*M.y+M.z*M.z); }
+function arrowHeadCtx(x0,y0,x1,y1,color){
+  var a=Math.atan2(y1-y0,x1-x0); ctx.fillStyle=color;
+  ctx.beginPath(); ctx.moveTo(x1,y1);
+  ctx.lineTo(x1-10*Math.cos(a-0.4),y1-10*Math.sin(a-0.4));
+  ctx.lineTo(x1-10*Math.cos(a+0.4),y1-10*Math.sin(a+0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+/* ===== FID / relaxation plot ===== */
+function drawFID(p){
+  var W = parseFloat(fid.dataset.cssW)||600, H = parseFloat(fid.dataset.cssH)||220;
+  fctx.fillStyle='#0a1929'; fctx.fillRect(0,0,W,H);
+  var bx0=46,bx1=W-14,by0=H-26,by1=14, gw=bx1-bx0, gh=by0-by1;
+  var tMax=Math.max(p.T1*3,p.T2*5); if(!isFinite(tMax)||tMax<=0)tMax=1;
+  function tx(t){return bx0+(t/tMax)*gw;}
+  function ty(v){return by0-v*gh;}
+  fctx.strokeStyle='rgba(143,184,224,0.5)'; fctx.lineWidth=1;
+  fctx.beginPath(); fctx.moveTo(bx0,by0); fctx.lineTo(bx1,by0); fctx.stroke();
+  fctx.beginPath(); fctx.moveTo(bx0,by0); fctx.lineTo(bx0,by1); fctx.stroke();
+  // 1/e and 0.632 guides
+  fctx.strokeStyle='rgba(143,184,224,0.18)'; fctx.setLineDash([3,3]);
+  fctx.beginPath(); fctx.moveTo(bx0,ty(0.632)); fctx.lineTo(bx1,ty(0.632)); fctx.stroke();
+  fctx.setLineDash([]);
+  // Mz recovery
+  var N=240,i,t;
+  fctx.strokeStyle='#00B4D8'; fctx.lineWidth=2.4; fctx.beginPath();
+  for(i=0;i<=N;i++){ t=(i/N)*tMax; var mz=1-Math.exp(-t/Math.max(p.T1,1e-9));
+    if(i===0)fctx.moveTo(tx(t),ty(mz)); else fctx.lineTo(tx(t),ty(mz)); }
+  fctx.stroke();
+  // Mxy FID: cos(wt)*exp(-t/T2) envelope + oscillation
+  fctx.strokeStyle='rgba(255,209,102,0.45)'; fctx.lineWidth=1; fctx.beginPath();
+  for(i=0;i<=N;i++){ t=(i/N)*tMax; var env=Math.exp(-t/Math.max(p.T2,1e-9));
+    var osc=env*Math.cos(2*Math.PI*6*t/tMax);
+    if(i===0)fctx.moveTo(tx(t),ty(osc*0.5+0.0)+0); else fctx.lineTo(tx(t),ty(osc)); }
+  fctx.stroke();
+  fctx.strokeStyle='#FFD166'; fctx.lineWidth=2.4; fctx.beginPath();
+  for(i=0;i<=N;i++){ t=(i/N)*tMax; var e2=Math.exp(-t/Math.max(p.T2,1e-9));
+    if(i===0)fctx.moveTo(tx(t),ty(e2)); else fctx.lineTo(tx(t),ty(e2)); }
+  fctx.stroke();
+  // T1,T2 markers
+  fctx.fillStyle='#cfe3f7'; fctx.font='10px "Roboto Mono",monospace'; fctx.textAlign='center';
+  if(p.T1<=tMax){ fctx.strokeStyle='rgba(0,180,216,0.6)'; fctx.setLineDash([4,4]);
+    fctx.beginPath(); fctx.moveTo(tx(p.T1),by0); fctx.lineTo(tx(p.T1),ty(0.632)); fctx.stroke(); fctx.setLineDash([]);
+    fctx.fillStyle='#00B4D8'; fctx.fillText('T₁',tx(p.T1),by0+12); }
+  if(p.T2<=tMax){ fctx.strokeStyle='rgba(255,209,102,0.6)'; fctx.setLineDash([4,4]);
+    fctx.beginPath(); fctx.moveTo(tx(p.T2),by0); fctx.lineTo(tx(p.T2),ty(Math.exp(-1))); fctx.stroke(); fctx.setLineDash([]);
+    fctx.fillStyle='#FFD166'; fctx.fillText('T₂',tx(p.T2),by0+12); }
+  // playhead at current animTime
+  if(animTime>0 && animTime<=tMax){
+    fctx.strokeStyle='rgba(255,255,255,0.5)'; fctx.beginPath();
+    fctx.moveTo(tx(animTime),by1); fctx.lineTo(tx(animTime),by0); fctx.stroke();
+  }
+  fctx.fillStyle='#cfe3f7'; fctx.textAlign='left';
+  fctx.fillText('M/M₀', bx0+2, by1+8);
+  fctx.textAlign='right'; fctx.fillText('t='+tMax.toFixed(2)+'s', bx1, by0+12);
+}
+
+function updateReadouts(p){
+  var omegaL = p.gamma*p.B0, fL = omegaL/(2*Math.PI);
+  var w1 = p.gamma*p.B1, fRabi = w1/(2*Math.PI);
+  var Mxy = Math.sqrt(M.x*M.x+M.y*M.y);
+  var mag = magM();
+  var theta = Math.acos(Math.max(-1,Math.min(1,M.z/Math.max(mag,1e-9))))*180/Math.PI;
+  $('roFL').textContent = fmtFreq(fL);
+  $('roTheta').textContent = theta.toFixed(0)+'°';
+  $('roMx').textContent = M.x.toFixed(2);
+  $('roMy').textContent = M.y.toFixed(2);
+  $('roMz').textContent = M.z.toFixed(2);
+  $('roMxy').textContent = Mxy.toFixed(2);
+  $('roMag').textContent = mag.toFixed(2);
+  $('roRabi').textContent = fmtFreq(fRabi);
+  $('roTime').textContent = (animTime*1000).toFixed(0);
+  $('statFL').textContent = fmtFreq(fL);
+  $('statOmegaL').textContent = fmtOmega(omegaL)+' rad/s';
+  $('statT1').textContent = p.T1.toFixed(2)+' s';
+  $('statT2').textContent = p.T2.toFixed(3)+' s';
+}
+
+function compute(){
   var p = getParams();
-  var tReset = Math.max(p.T1 * 3, p.T2 * 5);
-  if (animTime > tReset) animTime = 0;
-  var omegaL = p.gamma * p.B0;
-  drawScene(p, omegaL);
-  animId = requestAnimationFrame(animationStep);
-}
-
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> 歳差を再生';
-    if (animId) cancelAnimationFrame(animId);
+  var T2raw = parseFloat($('slT2').value);
+  if (T2raw > p.T1){
+    $('slT2').value = p.T1.toFixed(3); $('slT2Val').value = p.T1.toFixed(3);
+    updateSlider($('slT2'),'slT2Val',3,'');
   }
+  if(!isFinite(p.B0)||!isFinite(p.gamma)) return;
+  drawBloch(p); drawFID(p); updateReadouts(p);
 }
 
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> 歳差を再生';
-  animTime = 0;
-  var defs = { slB0: 1.5, slGamma: 26.75, slT1: 1.00, slT2: 0.100 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
+/* initialize M to the initial tip angle */
+function initM(){
+  var p = getParams();
+  M.x = Math.sin(p.tip0); M.y = 0; M.z = Math.cos(p.tip0);
+  phase = 0; animTime = 0;
+}
+
+function loop(ts){
+  if(!playing){ animId=null; return; }
+  if(!lastTs) lastTs=ts;
+  var dtReal = Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+  var dt = dtReal*speedMult*0.5;        // map real seconds to relaxation-time seconds
+  animTime += dt;
+  stepPhysics(dt);
+  var p = getParams();
+  var tMax = Math.max(p.T1*3,p.T2*5);
+  if(animTime>tMax){ initM(); }          // loop the demo
+  drawBloch(p); drawFID(p); updateReadouts(p);
+  animId = requestAnimationFrame(loop);
+}
+
+function startPlay(){
+  playing=true; lastTs=0;
+  setPlayLabel(true);
+  if(!animId) animId=requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing=false; if(animId){cancelAnimationFrame(animId);animId=null;}
+  setPlayLabel(false);
+}
+function setPlayLabel(on){
+  var html = on ? '<i class="fas fa-pause"></i> '+T.pause : '<i class="fas fa-play"></i> '+T.playPrec;
+  if($('playBtn')) $('playBtn').innerHTML = html;
+  if($('playBtn2')) $('playBtn2').innerHTML = on ? '<i class="fas fa-pause"></i> '+T.pause : '<i class="fas fa-play"></i> '+T.play;
+}
+function togglePlay(){ playing ? stopPlay() : startPlay(); }
+function replay(){ initM(); compute(); startPlay(); }
+
+function setSpeed(s){
+  speedMult=s;
+  document.querySelectorAll('.speed-btn').forEach(function(b){
+    b.classList.toggle('active', parseFloat(b.dataset.speed)===s);
   });
-  updateSlider(document.getElementById('slB0'), 'slB0Val', 1, '');
-  updateSlider(document.getElementById('slGamma'), 'slGammaVal', 2, '');
-  updateSlider(document.getElementById('slT1'), 'slT1Val', 2, '');
-  updateSlider(document.getElementById('slT2'), 'slT2Val', 3, '');
+}
+
+function toggleRF(){
+  rfOn=!rfOn; var b=$('rfToggle');
+  b.classList.toggle('active',rfOn);
+  b.innerHTML='<i class="fas fa-broadcast-tower"></i> '+(rfOn?T.labOn:T.labOff);
+  compute();
+}
+function toggleFrame(){
+  rotFrame=!rotFrame; var b=$('frameToggle');
+  b.classList.toggle('active',rotFrame);
+  b.innerHTML='<i class="fas fa-sync-alt"></i> '+(rotFrame?T.labRot:T.labLab);
+  compute();
+}
+function toggleRelax(){
+  relaxOn=!relaxOn; var b=$('relaxToggle');
+  b.classList.toggle('active',relaxOn);
+  b.innerHTML='<i class="fas fa-hourglass-half"></i> '+(relaxOn?T.labOn:T.labOff);
   compute();
 }
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+function setNucleus(g){
+  $('slGamma').value = g; $('slGammaVal').value = g;
+  updateSlider($('slGamma'),'slGammaVal',2,'');
+  compute();
+}
+
+function applyPreset(o){
+  $('slB0').value=o.B0; $('slB0Val').value=o.B0;
+  if(o.gamma!==undefined){ $('slGamma').value=o.gamma; $('slGammaVal').value=o.gamma; if($('nucleus'))$('nucleus').value=String(o.gamma);}
+  $('slB1').value=o.B1; $('slB1Val').value=o.B1;
+  $('slTip').value=o.tip; $('slTipVal').value=o.tip;
+  $('slT1').value=o.T1.toFixed(2); $('slT1Val').value=o.T1.toFixed(2);
+  $('slT2').value=o.T2.toFixed(3); $('slT2Val').value=o.T2.toFixed(3);
+  ['slB0','slGamma','slB1','slTip','slT1','slT2'].forEach(function(id){
+    var d = (id==='slGamma')?2:(id==='slB0'?1:(id==='slT1'?2:(id==='slT2'?3:0)));
+    updateSlider($(id), id+'Val', d, '');
+  });
+  rfOn=o.rf; relaxOn=o.relax!==false; rotFrame=o.rot||false;
+  $('rfToggle').classList.toggle('active',rfOn);
+  $('rfToggle').innerHTML='<i class="fas fa-broadcast-tower"></i> '+(rfOn?T.labOn:T.labOff);
+  $('relaxToggle').classList.toggle('active',relaxOn);
+  $('relaxToggle').innerHTML='<i class="fas fa-hourglass-half"></i> '+(relaxOn?T.labOn:T.labOff);
+  $('frameToggle').classList.toggle('active',rotFrame);
+  $('frameToggle').innerHTML='<i class="fas fa-sync-alt"></i> '+(rotFrame?T.labRot:T.labLab);
+  initM(); compute();
+  if(!reduceMotion) startPlay();
+}
+
+function setPreset(name){
+  var P = {
+    larmor: { B0:1.5, gamma:26.75, B1:20, tip:30, T1:1.0, T2:0.1, rf:false, relax:false, rot:false },
+    p90:    { B0:1.5, gamma:26.75, B1:20, tip:90, T1:1.0, T2:0.1, rf:false, relax:true,  rot:true },
+    rabi:   { B0:1.5, gamma:26.75, B1:120, tip:0,  T1:2.0, T2:0.5, rf:true,  relax:true,  rot:true },
+    offres: { B0:3.0, gamma:26.75, B1:40, tip:20, T1:1.0, T2:0.2, rf:true,  relax:true,  rot:false }
+  }[name];
+  if(P) applyPreset(P);
+}
+
+function resetParams(){
+  stopPlay();
+  var defs = { slB0:1.5, slGamma:26.75, slB1:20, slTip:30, slT1:1.00, slT2:0.100 };
+  Object.keys(defs).forEach(function(id){ $(id).value=defs[id]; $(id+'Val').value=defs[id]; });
+  if($('nucleus')) $('nucleus').value='26.75';
+  updateSlider($('slB0'),'slB0Val',1,'');
+  updateSlider($('slGamma'),'slGammaVal',2,'');
+  updateSlider($('slB1'),'slB1Val',0,'');
+  updateSlider($('slTip'),'slTipVal',0,'');
+  updateSlider($('slT1'),'slT1Val',2,'');
+  updateSlider($('slT2'),'slT2Val',3,'');
+  rfOn=false; rotFrame=false; relaxOn=true;
+  $('rfToggle').classList.remove('active'); $('rfToggle').innerHTML='<i class="fas fa-broadcast-tower"></i> '+T.labOff;
+  $('frameToggle').classList.remove('active'); $('frameToggle').innerHTML='<i class="fas fa-sync-alt"></i> '+T.labLab;
+  $('relaxToggle').classList.add('active'); $('relaxToggle').innerHTML='<i class="fas fa-hourglass-half"></i> '+T.labOn;
+  initM(); compute();
+}
+
+cv.addEventListener('keydown', function(e){
+  if(e.key===' '||e.key==='Enter'){ e.preventDefault(); togglePlay(); }
+});
+window.addEventListener('resize', function(){ resizeCanvas(); compute(); });
 
 resizeCanvas();
+initM();
 compute();
+if(!reduceMotion) startPlay();
 </script>
 
 <section class="explanation">
@@ -571,6 +793,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="spin-precession.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -623,16 +848,26 @@ compute();
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>静磁場 B₀ をスライダーで 0.5～3.0 T 範囲で設定します。臨床 MRI は通常 1.5 T または 3.0 T です。</li><li>核種のジラオ比 γ を選択します。¹H は 42.58 MHz/T、¹³C は 10.71 MHz/T が標準値です。</li><li>T₁（縦緩和時間）と T₂（横緩和時間）をミリ秒単位で入力し、磁化回復と減衰を観察します。脳白質の T₁ は約 600 ms、T₂ は約 80 ms です。</li><li>Larmor 周波数 f_L = γB₀ / 2π と角周波数 ω_L = γB₀ が自動計算され、NMR パルス周波数の設計に用います。</li></ol>
+<ol><li>静磁場 B₀ をスライダーで 0.1～10 T 範囲で設定します。臨床 MRI は通常 1.5 T または 3.0 T です。</li><li>核種の磁気回転比（ジャイロ磁気比）γ を設定します。f=γB₀/2π 換算で ¹H は 42.58 MHz/T、¹³C は 10.71 MHz/T が標準値です。</li><li>T₁（縦緩和時間）と T₂（横緩和時間）をミリ秒単位で入力し、磁化回復と減衰を観察します。脳白質の T₁ は約 600 ms、T₂ は約 80 ms です。</li><li>Larmor 周波数 f_L = γB₀ / 2π と角周波数 ω_L = γB₀ が自動計算され、NMR パルス周波数の設計に用います。</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>1.5 T MRI 装置で ¹H イメージング時：B₀ = 1.5 T、γ = 2.675 × 10⁸ rad/(T·s) を入力すると、Larmor 周波数は f_L = 63.86 MHz、角周波数 ω_L = 4.008 × 10⁸ rad/s が得られます。灰白質の T₁ = 800 ms、T₂ = 100 ms を設定した場合、90° パルス後 T₁ 時間で磁化は約 63% 回復し、T₂ 時間で横磁化は 37% に減衰します。3.0 T では周波数が倍となり 127.7 MHz に上昇するため、RF コイル設計と周波数チューニングが変わります。</p>
+<p>1.5 T MRI 装置で ¹H イメージング時：B₀ = 1.5 T、γ = 2.675 × 10⁸ rad/(T·s) を入力すると、Larmor 周波数は f_L = 63.86 MHz、角周波数 ω_L = 4.013 × 10⁸ rad/s が得られます。灰白質の T₁ = 800 ms、T₂ = 100 ms を設定した場合、90° パルス後 T₁ 時間で磁化は約 63% 回復し、T₂ 時間で横磁化は 37% に減衰します。3.0 T では周波数が倍となり 127.7 MHz に上昇するため、RF コイル設計と周波数チューニングが変わります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul><li>T₁ と T₂ は組織・磁場強度・温度に強く依存します。同じ脳組織でも 1.5 T と 3.0 T では異なり、3.0 T では T₁ が約 15～20% 増加します。</li><li>T₁/T₂ 比が小さい脂肪組織（T₁ ≈ 200 ms、T₂ ≈ 80 ms）は T₁ 強調像で高信号を示し、診断コントラストに影響します。</li><li>水（T₁ ≈ 2500 ms、T₂ ≈ 2000 ms）と脂肪の信号差を利用した抑制パルスには正確な Larmor 周波数が不可欠です。周波数ずれ 1% でも脂肪抑制効率が 10% 低下します。</li><li>臨床パルスシーケンス（FLAIR、STIR）は特定の T₁/T₂ 組み合わせを前提に設計されるため、シミュレーション値と実装パラメータの整合性を確認してください。</li></ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130626345?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130626345.09._SCMZZZZZZ_.jpg" alt="量子力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">量子力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -37,7 +37,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "フーリエ円（エピサイクル）シミュレーター",
       "description": "マウスで描いた任意の閉曲線を離散フーリエ変換で分解し、回転する円（エピサイクル）で再現するインタラクティブシミュレーター。",
       "url": "https://novasolver.jp/tools/fourier-epicycles.html",
@@ -130,6 +130,29 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+
+/* ===== Fourier Epicycles v2 additions ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;padding:0 12px}
+.scrub-row{display:flex;align-items:center;gap:10px;margin-top:10px;padding:0 12px}
+.scrub-row input[type=range]{flex:1}
+.scrub-time{font-family:'Roboto Mono',monospace;font-size:0.78rem;color:var(--accent);min-width:42px;text-align:right}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:12px;padding:0 12px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.epi-note{margin:10px 12px 4px;padding:10px 12px;background:rgba(0,123,255,.05);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;font-size:0.78rem;line-height:1.6;color:var(--text)}
+.speed-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+#mainCanvas{border-radius:8px;background:#0a1628}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{transition:none}
+}
+/* end v2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/fourier-epicycles.html">
@@ -163,14 +186,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   <div class="panel">
     <div>
       <div class="tool-title"><i class="fa-solid fa-circle-nodes" style="color:#007BFF;margin-right:6px"></i>フーリエ円シミュレーター</div>
-      <p class="tool-sub">描いた曲線をDFTで回転円に分解します</p>
+      <p class="tool-sub">描いた曲線をDFTで回転円に分解し、エピサイクルで再描画します</p>
     </div>
 
     <div>
       <div class="panel-title">モード</div>
       <div class="mode-btns">
-        <button class="mode-btn active" id="btnDraw" onclick="setMode('draw')"><i class="fa-solid fa-pen"></i> 描画</button>
-        <button class="mode-btn" id="btnPlay" onclick="setMode('play')"><i class="fa-solid fa-play"></i> 再生</button>
+        <button class="mode-btn active" id="btnDraw" type="button" onclick="setMode('draw')"><i class="fa-solid fa-pen"></i> 描画</button>
+        <button class="mode-btn" id="btnPlay" type="button" onclick="setMode('play')"><i class="fa-solid fa-play"></i> 再生</button>
       </div>
     </div>
 
@@ -178,27 +201,39 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="panel-title">エピサイクル数</div>
       <div class="param-label">
         <span class="param-name">円の数 N</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="numCirclesNum" value="20" min="1" max="200" step="1" oninput="syncFromNum('numCircles','numCirclesNum')"><span class="num-unit"></span></div>
+        <div class="num-wrap"><input type="number" class="num-input" id="numCirclesNum" value="20" min="1" max="200" step="1" oninput="syncFromNum('numCircles','numCirclesNum')" aria-label="円の数 N"><span class="num-unit"></span></div>
       </div>
-      <input type="range" id="numCircles" min="1" max="200" value="20" oninput="syncToNum('numCircles','numCirclesNum');updateNumCircles(this)">
-      <p class="hint">値を変えて近似精度の変化を観察</p>
+      <input type="range" id="numCircles" min="1" max="200" value="20" oninput="syncToNum('numCircles','numCirclesNum');updateNumCircles(this)" aria-label="円の数 N">
+      <p class="hint">円を増やすほど再現が元の曲線に近づきます</p>
     </div>
 
     <div class="param-group">
       <div class="panel-title">アニメーション速度</div>
       <div class="param-label">
         <span class="param-name">速度</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="speedValNum" value="10" min="1" max="50" step="0.1" oninput="syncFromNum('speedSlider','speedValNum')"><span class="num-unit">×</span></div>
+        <div class="num-wrap"><input type="number" class="num-input" id="speedValNum" value="1.0" min="0.1" max="5" step="0.1" oninput="syncFromNum('speedSlider','speedValNum')" aria-label="速度"><span class="num-unit">×</span></div>
       </div>
-      <input type="range" id="speedSlider" min="1" max="50" value="10" oninput="syncToNum('speedSlider','speedValNum');updateSpeed(this)">
+      <input type="range" id="speedSlider" min="1" max="50" value="10" oninput="syncToNum('speedSlider','speedValNum');updateSpeed(this)" aria-label="速度">
     </div>
 
     <div>
-      <div class="panel-title">プリセット</div>
+      <div class="panel-title">ターゲット形状</div>
       <div class="btn-group">
-        <button class="btn secondary" style="font-size:12px" onclick="loadPreset('star')"><i class="fa-solid fa-star"></i> 星形</button>
-        <button class="btn secondary" style="font-size:12px" onclick="loadPreset('heart')"><i class="fa-solid fa-heart" style="color:#f87171"></i> ハート</button>
-        <button class="btn secondary" style="font-size:12px" onclick="loadPreset('wave')"><i class="fa-solid fa-wave-square"></i> 矩形波</button>
+        <button class="btn secondary" style="font-size:12px" type="button" onclick="loadPreset('square')"><i class="fa-regular fa-square"></i> 四角</button>
+        <button class="btn secondary" style="font-size:12px" type="button" onclick="loadPreset('star')"><i class="fa-solid fa-star"></i> 星形</button>
+        <button class="btn secondary" style="font-size:12px" type="button" onclick="loadPreset('heart')"><i class="fa-solid fa-heart" style="color:#f87171"></i> ハート</button>
+        <button class="btn secondary" style="font-size:12px" type="button" onclick="loadPreset('wave')"><i class="fa-solid fa-wave-square"></i> 矩形波</button>
+        <button class="btn secondary" style="font-size:12px" type="button" onclick="loadPreset('letter')"><i class="fa-solid fa-font"></i> 文字 N</button>
+        <button class="btn" style="font-size:12px;background:#dc2626" type="button" onclick="clearAll()"><i class="fa-solid fa-trash"></i> 消去</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-title">ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roCircles">0</div><div class="rl">エピサイクル数</div></div>
+        <div class="live-ro"><div class="rv" id="roPeriod">—</div><div class="rl">基本周期 N</div></div>
+        <div class="live-ro"><div class="rv" id="roFreqMax">—</div><div class="rl">最大周波数</div></div>
       </div>
     </div>
 
@@ -209,334 +244,616 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="statPoints">0</div><div class="sl">サンプル数</div></div>
       <div class="stat-card"><div class="sv" id="statCircles">0</div><div class="sl">使用円数</div></div>
-      <div class="stat-card"><div class="sv" id="statProgress">0%</div><div class="sl">描画進捗</div></div>
+      <div class="stat-card"><div class="sv" id="statProgress">0%</div><div class="sl">進捗</div></div>
       <div class="stat-card"><div class="sv" id="statSpeed">1.0×</div><div class="sl">再生速度</div></div>
-      <div class="stat-card"><div class="sv" id="statError">—</div><div class="sl">近似誤差</div></div>
+      <div class="stat-card"><div class="sv" id="statError">—</div><div class="sl">再現誤差(RMS)</div></div>
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> メイン</div><canvas id="mainCanvas" data-ux-no-scale="1"></canvas></div>
-    <div class="canvas-overlay" id="canvasOverlay">
-      <h2>✏️ 曲線を描いてください</h2>
-      <p>マウスドラッグまたはタッチで<br>任意の形を描くと自動でDFT分解します</p>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> リアルタイム・エピサイクル</div>
+      <canvas id="mainCanvas" data-ux-no-scale="1" tabindex="0" role="img" aria-label="リアルタイム・エピサイクル"></canvas>
+      <div class="canvas-overlay" id="canvasOverlay">
+        <h2>✏️ 曲線を描いてください</h2>
+        <p>マウスドラッグまたはタッチで<br>任意の閉曲線を描くと自動でDFT分解します</p>
+      </div>
+
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlayPause" onclick="togglePlay()" aria-label="再生/一時停止"><i class="fas fa-play"></i></button>
+        <button class="btn secondary" type="button" onclick="replay()" aria-label="最初から"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn speed-btn" type="button" data-speed="0.25" onclick="setSpeed(0.25)">0.25×</button>
+          <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+          <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+        </div>
+      </div>
+
+      <div class="scrub-row">
+        <span style="font-size:.72rem;color:var(--muted)"><i class="fas fa-clock"></i></span>
+        <input type="range" id="scrub" min="0" max="1000" step="1" value="0" oninput="onScrub()" aria-label="進捗">
+        <span class="scrub-time" id="scrubTime">0%</span>
+      </div>
+
+      <div class="legend">
+        <span><i class="swatch" style="background:rgba(125,211,252,0.8)"></i>アーム（合成ベクトル）</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>完成輪郭</span>
+        <span><i class="swatch" style="background:#f59e0b"></i>ペン先の軌跡</span>
+      </div>
+
+      <div class="epi-note">各円 = 1つの周波数成分。半径 = 振幅 |c_n|、開始角 = 位相 arg(c_n)、回転速度 = 周波数。完成した輪郭は背後に薄く描かれ、ペン先が実時間でなぞります。</div>
     </div>
-  
-<div class="chart-card">
-  <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
-  <p>$$f(t) = \sum_{n=-\infty}^{\infty} c_n e^{i 2\pi n t/T}$$</p>
-  <p style="margin-top:6px;">フーリエ級数：周期 $T$ の関数を複素指数関数（回転するベクトル）の重ね合わせで表す。</p>
-  <p>$$c_n = \frac{1}{T}\int_0^T f(t) e^{-i 2\pi n t/T} dt$$</p>
-  <p style="margin-top:6px;">フーリエ係数：$n$ 次調和成分の複素振幅。本ツールでは描画経路から DFT で算出。</p>
-  <p>$$|c_n| = A_n, \quad \arg(c_n) = \phi_n$$</p>
-  <p style="margin-top:6px;">振幅 $A_n$ と位相 $\phi_n$：各エピサイクル（周転円）の半径と初期角度に対応する。</p>
-</div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$$z(t) = \sum_{k} c_k\, e^{\,i\,2\pi k t/T}$$</p><p style="margin-top:6px;">閉曲線を複素数 $z=x+iy$ とみなし、各成分 $c_k$ が1つのエピサイクル（回転ベクトル）に対応します。</p><p>$$c_k = \frac{1}{N}\sum_{n=0}^{N-1} z[n]\, e^{-i\,2\pi k n/N}$$</p><p style="margin-top:6px;">DFTで係数を算出。周波数は正負両方（$k$ と $k\!-\!N$）を保持し、$|c_k|$＝半径、$\arg(c_k)$＝開始角。</p><p style="margin-top:6px;">エピサイクルは $|k|$ 順（0, +1, −1, +2, −2, …）に連結。1周期 $t\!=\!T$ でペン先は始点に戻り、入力曲線と一致します。</p>
+    </div>
   </div>
 </div>
 
 <script>
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || 420));
-  canvas.style.setProperty('width', w + 'px', 'important');
-  canvas.style.setProperty('height', h + 'px', 'important');
-  var bw = Math.round(w * dpr);
-  var bh = Math.round(h * dpr);
-  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
+/* ===== Fourier Epicycles v2 engine =====
+   Placeholders __KEY__ are replaced per-language by the Python builder. */
+"use strict";
+function __novaCanvasCssW(c){return parseFloat(c.dataset.cssW)||c.clientWidth||parseFloat(c.getAttribute("width"))||c.width/Math.min(window.devicePixelRatio||1,2.5);}
+function __novaCanvasCssH(c){return parseFloat(c.dataset.cssH)||c.clientHeight||parseFloat(c.getAttribute("height"))||c.height/Math.min(window.devicePixelRatio||1,2.5);}
+function __novaHiDpiCanvas(canvas,cssW,cssH,ctx){
+  var dpr=Math.min(window.devicePixelRatio||1,2.5);
+  canvas.setAttribute('data-ux-no-scale','1');
+  var w=Math.max(1,Math.round(cssW||canvas.clientWidth||parseFloat(canvas.getAttribute("width"))||600));
+  var h=Math.max(1,Math.round(cssH||canvas.clientHeight||parseFloat(canvas.getAttribute("height"))||420));
+  canvas.style.setProperty('width',w+'px','important');
+  canvas.style.setProperty('height',h+'px','important');
+  var bw=Math.round(w*dpr),bh=Math.round(h*dpr);
+  if(canvas.width!==bw||canvas.height!==bh){canvas.width=bw;canvas.height=bh;}
+  canvas.dataset.cssW=String(w);canvas.dataset.cssH=String(h);
+  if(ctx&&ctx.setTransform)ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {w:w,h:h,dpr:dpr};
 }
 
+/* i18n strings (injected) */
+const T = {
+  drawFirst: "曲線を描いてください",
+  guide: "ここに図形を描いてください",
+  rising: "",
+  high: "",
+  done: "",
+  annCircle: "エピサイクル {n} 個 ＝ {n} 個の周波数成分"
+};
 
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 const overlay = document.getElementById('canvasOverlay');
 const wrap = document.getElementById('canvasWrap');
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let mode = 'draw';
 let isDrawing = false;
-let rawPoints = [];
-let dftData = [];
-let animTime = 0;
+let rawPoints = [];      // resampled input path (CSS px, canvas coords)
+let dftData = [];        // epicycle list: {freq, amp, phase, re, im}
+let animPhase = 0;       // 0..1 fraction of one period
 let animId = null;
 let tracePath = [];
 let numCircles = 20;
 let speed = 1.0;
+let playing = false;
+let centroid = {x:0, y:0};
+let N = 0;               // number of samples / DFT length
 
-function resizeCanvas() {
+function $(id){ return document.getElementById(id); }
+
+/* ===== Discrete Fourier Transform =====
+   Input: complex samples z[n] = (x[n]-cx) + i(y[n]-cy), n=0..N-1
+   X[k] = (1/N) Σ_n z[n] e^{-2πi k n / N}     (k = 0..N-1)
+   Each k yields one epicycle. Frequency mapping uses signed frequencies:
+   for k > N/2 the true frequency is k-N (NEGATIVE). We DO NOT fold negative
+   frequencies onto positive ones — k and N-k are independent coefficients.
+   Reconstruction: z(t) = Σ_k X[k] e^{ i 2π freq_k t },  t in [0,1).
+   At t=0 the sum returns Σ X[k] = z[0] (the start point); after one full
+   period (t=1) every term returns to its t=0 value, so the tip closes the loop. */
+function computeDFT(){
+  N = rawPoints.length;
+  let mx=0, my=0;
+  for (let n=0;n<N;n++){ mx+=rawPoints[n].x; my+=rawPoints[n].y; }
+  mx/=N; my/=N;
+  centroid = {x:mx, y:my};
+  const re = new Array(N), im = new Array(N);
+  for (let n=0;n<N;n++){ re[n]=rawPoints[n].x-mx; im[n]=rawPoints[n].y-my; }
+
+  const list = [];
+  for (let k=0;k<N;k++){
+    let sr=0, si=0;
+    for (let n=0;n<N;n++){
+      const a = -2*Math.PI*k*n/N;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      // (re+ i im)(ca + i sa)
+      sr += re[n]*ca - im[n]*sa;
+      si += re[n]*sa + im[n]*ca;
+    }
+    sr/=N; si/=N;
+    // signed frequency: do not alias k>N/2 onto positive freqs
+    const freq = (k <= N/2) ? k : k - N;
+    list.push({ freq:freq, amp:Math.hypot(sr,si), phase:Math.atan2(si,sr), re:sr, im:si });
+  }
+
+  // Classic epicycle ordering by |frequency|: 0, +1, -1, +2, -2, ...
+  // (tie-break: positive before negative). This preserves BOTH signs.
+  list.sort((a,b)=>{
+    const fa=Math.abs(a.freq), fb=Math.abs(b.freq);
+    if (fa!==fb) return fa-fb;
+    return b.freq - a.freq; // +k before -k
+  });
+  dftData = list;
+
+  const slider = $('numCircles');
+  slider.max = Math.min(N, 200);
+  if (numCircles > slider.max){ numCircles = slider.max; slider.value = numCircles; $('numCirclesNum').value = numCircles; }
+  sliderPct(slider);
+  updateReadouts();
+  computeError();
+}
+
+/* RMS reconstruction error between input path and the inverse-DFT using
+   the first `used` epicycles (in the current |freq| ordering). Verifies the
+   reconstruction matches the input path and closes after one period. */
+function reconstructError(used){
+  if (!dftData.length) return 0;
+  let sumErr=0, sumSig=0;
+  for (let n=0;n<N;n++){
+    let xr=0, xi=0;
+    for (let i=0;i<used;i++){
+      const d = dftData[i];
+      const ang = 2*Math.PI*d.freq*n/N + d.phase;
+      xr += d.amp*Math.cos(ang);
+      xi += d.amp*Math.sin(ang);
+    }
+    const tx = rawPoints[n].x - centroid.x, ty = rawPoints[n].y - centroid.y;
+    const dx = xr - tx, dy = xi - ty;
+    sumErr += dx*dx + dy*dy;
+    sumSig += tx*tx + ty*ty;
+  }
+  return sumSig>0 ? Math.sqrt(sumErr/sumSig) : 0;
+}
+
+function computeError(){
+  if (!dftData.length){ $('statError').textContent='—'; return; }
+  const used = Math.min(numCircles, dftData.length);
+  const e = reconstructError(used)*100;
+  $('statError').textContent = e.toFixed(1)+'%';
+}
+
+function updateReadouts(){
+  const used = dftData.length ? Math.min(numCircles, dftData.length) : numCircles;
+  $('statCircles').textContent = used;
+  if ($('roCircles')) $('roCircles').textContent = used;
+  if ($('roPeriod')) $('roPeriod').textContent = N ? N : '—';
+  if ($('roFreqMax')) {
+    let fmax = 0;
+    for (let i=0;i<used;i++){ const f=Math.abs(dftData[i] ? dftData[i].freq : 0); if (f>fmax) fmax=f; }
+    $('roFreqMax').textContent = dftData.length ? ('±'+fmax) : '—';
+  }
+}
+
+/* ===== HiDPI canvas ===== */
+function resizeCanvas(){
   const w = wrap.clientWidth;
-  const h = window.innerWidth <= 820 ? Math.max(w * 0.65, 280) : window.innerHeight - 56;
+  const h = window.innerWidth <= 820 ? Math.max(w*0.65,280) : Math.max(window.innerHeight - 120, 360);
   __novaHiDpiCanvas(canvas, w, h, ctx);
-  if (mode === 'play' && dftData.length > 0) { tracePath = []; }
+  if (mode==='play' && dftData.length>0){ tracePath=[]; }
   refreshCanvasAfterResize();
-}window.addEventListener('resize', () =>{ resizeCanvas(); });
-resizeCanvas();
-// 初期状態でキャンバスにガイドテキストを描画
+}
+window.addEventListener('resize', ()=>{ resizeCanvas(); });
+
 function drawInitGuide(){
-  ctx.clearRect(0,0,__novaCanvasCssW(canvas),__novaCanvasCssH(canvas));
-  const cx=__novaCanvasCssW(canvas)/2, cy=Math.min(__novaCanvasCssH(canvas)/2, 180);
+  const W=__novaCanvasCssW(canvas), H=__novaCanvasCssH(canvas);
+  ctx.clearRect(0,0,W,H);
+  const cx=W/2, cy=Math.min(H/2,180);
   ctx.fillStyle='rgba(0,123,255,0.10)';
   ctx.beginPath(); ctx.arc(cx,cy,80,0,2*Math.PI); ctx.fill();
   ctx.fillStyle='rgba(0,31,63,0.68)';
   ctx.font='600 14px "Noto Sans JP",sans-serif';
   ctx.textAlign='center';
-  ctx.fillText('左のキャンバスに図形を描いてください',cx,cy);
+  ctx.fillText(T.guide, cx, cy);
+  ctx.textAlign='left';
 }
 function refreshCanvasAfterResize(){
-  if (mode === 'play' && dftData.length > 0) drawFrame();
-  else if (rawPoints.length > 1) drawRaw();
+  if (mode==='play' && dftData.length>0) drawFrame();
+  else if (rawPoints.length>1) drawRaw();
   else drawInitGuide();
 }
-drawInitGuide();
 
-function sliderPct(el) {
-  const pct = (el.value - el.min) / (el.max - el.min) * 100;
-  el.style.setProperty('--pct', pct + '%');
-}document.querySelectorAll('input[type=range]').forEach(sliderPct);
+function sliderPct(el){
+  const pct=(el.value-el.min)/(el.max-el.min)*100;
+  el.style.setProperty('--pct', pct+'%');
+}
 
+/* ===== UI sync ===== */
+function syncToNum(rangeId, numId){ const r=$(rangeId), n=$(numId); if(n) n.value=r.value; }
+function syncFromNum(rangeId, numId){
+  const r=$(rangeId), n=$(numId);
+  if(!r||!n) return;
+  let v=parseFloat(n.value); if(isNaN(v)) return;
+  v=Math.max(parseFloat(r.min),Math.min(parseFloat(r.max),v));
+  r.value=v;
+  if(rangeId==='numCircles') updateNumCircles(r); else updateSpeed(r);
+}
 function updateNumCircles(el){
   sliderPct(el);
-  numCircles = parseInt(el.value);
-  document.getElementById('statCircles').textContent = dftData.length ? Math.min(numCircles, dftData.length) : numCircles;
-  tracePath = [];
+  numCircles=parseInt(el.value);
+  $('numCirclesNum').value=numCircles;
+  tracePath=[];
+  updateReadouts();
   computeError();
-}function updateSpeed(el){
+  if (mode!=='play') refreshCanvasAfterResize();
+}
+function updateSpeed(el){
   sliderPct(el);
-  speed = el.value / 10;
-  (function(){var _e=document.getElementById('speedValNum');if(_e){if(_e.tagName==='INPUT')_e.value=speed.toFixed(1);else _e.textContent=speed.toFixed(1)+'×';}})();
-  var _statSpeed=document.getElementById('statSpeed');if(_statSpeed)_statSpeed.textContent=speed.toFixed(1)+'×';
-}function setMode(m){
-  if (m === 'play' && rawPoints.length < 4) {
-    var _statError=document.getElementById('statError');if(_statError)_statError.textContent='曲線を描いてください';
-    overlay.style.opacity = '1';
+  speed=el.value/10;
+  const e=$('speedValNum'); if(e){ if(e.tagName==='INPUT') e.value=speed.toFixed(1); else e.textContent=speed.toFixed(1)+'×'; }
+  const ss=$('statSpeed'); if(ss) ss.textContent=speed.toFixed(1)+'×';
+}
+
+function setMode(m){
+  if (m==='play' && rawPoints.length<4){
+    const se=$('statError'); if(se) se.textContent=T.drawFirst;
+    overlay.style.opacity='1';
     return;
-  }mode = m;
-  document.getElementById('btnDraw').classList.toggle('active', m === 'draw');
-  document.getElementById('btnPlay').classList.toggle('active', m === 'play');
-  if (m === 'play'){
-    overlay.style.opacity = '0';
-    tracePath = [];
-    animTime = 0;
-    cancelAnimationFrame(animId);
-    animLoop();
-  }else{
-    cancelAnimationFrame(animId);
+  }
+  mode=m;
+  $('btnDraw').classList.toggle('active', m==='draw');
+  $('btnPlay').classList.toggle('active', m==='play');
+  if (m==='play'){
+    overlay.style.opacity='0';
+    tracePath=[]; animPhase=0;
+    startPlay();
+  } else {
+    stopPlay();
+    drawRaw();
   }
 }
 
-// Mouse
-canvas.addEventListener('mousedown', e => {
-  if (mode !== 'draw') return;
-  isDrawing = true; rawPoints = []; tracePath = [];
-  overlay.style.opacity = '0';
-  addPt(e.clientX, e.clientY);
+/* ===== Drawing input ===== */
+canvas.addEventListener('mousedown', e=>{
+  if (mode!=='draw') return;
+  isDrawing=true; rawPoints=[]; tracePath=[];
+  overlay.style.opacity='0';
+  addPt(e.clientX,e.clientY);
 });
-canvas.addEventListener('mousemove', e => { if (!isDrawing) return; addPt(e.clientX, e.clientY); drawRaw(); });
-canvas.addEventListener('mouseup', () => { if (!isDrawing) return; isDrawing = false; finishDraw(); });
-canvas.addEventListener('mouseleave', () => { if (isDrawing) { isDrawing = false; finishDraw(); } });
-
-// Touch
-canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  if (mode !== 'draw') return;
-  isDrawing = true; rawPoints = []; tracePath = [];
-  overlay.style.opacity = '0';
-  const t = e.touches[0]; addPt(t.clientX, t.clientY);
+canvas.addEventListener('mousemove', e=>{ if(!isDrawing) return; addPt(e.clientX,e.clientY); drawRaw(); });
+canvas.addEventListener('mouseup', ()=>{ if(!isDrawing) return; isDrawing=false; finishDraw(); });
+canvas.addEventListener('mouseleave', ()=>{ if(isDrawing){ isDrawing=false; finishDraw(); } });
+canvas.addEventListener('touchstart', e=>{
+  e.preventDefault(); if(mode!=='draw') return;
+  isDrawing=true; rawPoints=[]; tracePath=[];
+  overlay.style.opacity='0';
+  const t=e.touches[0]; addPt(t.clientX,t.clientY);
 },{passive:false});
-canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  if (!isDrawing) return;
-  const t = e.touches[0]; addPt(t.clientX, t.clientY); drawRaw();
+canvas.addEventListener('touchmove', e=>{
+  e.preventDefault(); if(!isDrawing) return;
+  const t=e.touches[0]; addPt(t.clientX,t.clientY); drawRaw();
 },{passive:false});
-canvas.addEventListener('touchend', () => { if (!isDrawing) return; isDrawing = false; finishDraw(); });
+canvas.addEventListener('touchend', ()=>{ if(!isDrawing) return; isDrawing=false; finishDraw(); });
 
-function addPt(cx, cy){
-  const r = canvas.getBoundingClientRect();
-  const sx = __novaCanvasCssW(canvas) / r.width, sy = __novaCanvasCssH(canvas) / r.height;
-  rawPoints.push({ x: (cx - r.left) * sx, y: (cy - r.top) * sy });
-}function drawRaw(){
-  ctx.clearRect(0, 0, __novaCanvasCssW(canvas), __novaCanvasCssH(canvas));
-  if (rawPoints.length < 2) {
-    drawInitGuide();
-    return;
-  }
+function addPt(cx,cy){
+  const r=canvas.getBoundingClientRect();
+  const sx=__novaCanvasCssW(canvas)/r.width, sy=__novaCanvasCssH(canvas)/r.height;
+  rawPoints.push({ x:(cx-r.left)*sx, y:(cy-r.top)*sy });
+}
+function drawRaw(){
+  const W=__novaCanvasCssW(canvas), H=__novaCanvasCssH(canvas);
+  ctx.clearRect(0,0,W,H);
+  if (rawPoints.length<2){ drawInitGuide(); return; }
   ctx.beginPath();
-  ctx.strokeStyle = '#7dd3fc';
-  ctx.lineWidth = 2.5;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  rawPoints.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle='#7dd3fc'; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.lineCap='round';
+  rawPoints.forEach((p,i)=> i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
   ctx.stroke();
-}function resample(pts, n){
-  const dist = [0];
-  for (let i = 1; i < pts.length; i++) {
-    const dx = pts[i].x - pts[i-1].x, dy = pts[i].y - pts[i-1].y;
-    dist.push(dist[i-1] + Math.hypot(dx, dy));
-  }const total = dist[dist.length - 1];
-  if (total < 1) return pts;
-  const result = [];
-  for (let k = 0; k < n; k++){
-    const target = (k / n) * total;
-    let i = 0;
-    while (i < dist.length - 2 && dist[i+1] < target) i++;
-    const d = dist[i+1] - dist[i];
-    const t = d < 1e-10 ? 0 : (target - dist[i]) / d;
-    result.push({ x: pts[i].x + t * (pts[i+1].x - pts[i].x), y: pts[i].y + t * (pts[i+1].y - pts[i].y) });
+}
+function resample(pts,n){
+  const dist=[0];
+  for (let i=1;i<pts.length;i++){
+    const dx=pts[i].x-pts[i-1].x, dy=pts[i].y-pts[i-1].y;
+    dist.push(dist[i-1]+Math.hypot(dx,dy));
+  }
+  const total=dist[dist.length-1];
+  if (total<1) return pts;
+  const result=[];
+  for (let k=0;k<n;k++){
+    const target=(k/n)*total;
+    let i=0;
+    while (i<dist.length-2 && dist[i+1]<target) i++;
+    const d=dist[i+1]-dist[i];
+    const t=d<1e-10?0:(target-dist[i])/d;
+    result.push({ x:pts[i].x+t*(pts[i+1].x-pts[i].x), y:pts[i].y+t*(pts[i+1].y-pts[i].y) });
   }
   return result;
-}function finishDraw(){
-  if (rawPoints.length < 4) return;
-  rawPoints = resample(rawPoints, 256);
-  document.getElementById('statPoints').textContent = rawPoints.length;
+}
+function finishDraw(){
+  if (rawPoints.length<4){ drawInitGuide(); return; }
+  rawPoints=resample(rawPoints,256);
+  $('statPoints').textContent=rawPoints.length;
   computeDFT();
   setMode('play');
-}function computeDFT(){
-  const N = rawPoints.length;
-  let mx = 0, my = 0;
-  rawPoints.forEach(p => { mx += p.x; my += p.y; });
-  mx /= N; my /= N;
-  const re = rawPoints.map(p => p.x - mx);
-  const im = rawPoints.map(p => p.y - my);
+}
 
-  dftData = [];
-  for (let k = 0; k < N; k++){
-    let sr = 0, si = 0;
-    for (let n = 0; n < N; n++) {
-      const a = -2 * Math.PI * k * n / N;
-      sr += re[n] * Math.cos(a) - im[n] * Math.sin(a);
-      si += re[n] * Math.sin(a) + im[n] * Math.cos(a);
-    }sr /= N; si /= N;
-    dftData.push({ freq: k, amp: Math.hypot(sr, si), phase: Math.atan2(si, sr) });
-  }
-  dftData.sort((a, b) => b.amp - a.amp);
-
-  const slider = document.getElementById('numCircles');
-  slider.max = Math.min(N, 200);
-  sliderPct(slider);
-  document.getElementById('statCircles').textContent = dftData.length ? Math.min(numCircles, dftData.length) : numCircles;
-  computeError();
-}function computeError(){
+/* ===== Animation ===== */
+function startPlay(){
   if (!dftData.length) return;
-  const total = dftData.reduce((s, d) => s + d.amp, 0);
-  const used = dftData.slice(0, Math.min(numCircles, dftData.length)).reduce((s, d) => s + d.amp, 0);
-  document.getElementById('statError').textContent = total > 0 ? ((1 - used/total)*100).toFixed(1)+'%' : '0%';
-}function animLoop(){
-  animTime += speed * 0.013;
-  if (animTime >= 2 * Math.PI) { animTime -= 2 * Math.PI; tracePath = []; }
+  playing=true;
+  $('btnPlay').classList.add('active');
+  $('btnDraw').classList.remove('active');
+  setPlayBtn(true);
+  cancelAnimationFrame(animId);
+  if (reduceMotion){
+    // draw a single completed frame at phase 0 without continuous motion
+    animPhase=0; tracePath=[]; buildFullTrace(); drawFrame(); return;
+  }
+  animId=requestAnimationFrame(animLoop);
+}
+function stopPlay(){
+  playing=false;
+  setPlayBtn(false);
+  cancelAnimationFrame(animId);
+}
+function togglePlay(){
+  if (!dftData.length){ return; }
+  if (mode!=='play'){ setMode('play'); return; }
+  playing ? stopPlay() : startPlay();
+}
+function setPlayBtn(isPlaying){
+  const b=$('btnPlayPause');
+  if (!b) return;
+  b.innerHTML = isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+}
+function buildFullTrace(){
+  tracePath=[];
+  const used=Math.min(numCircles,dftData.length);
+  const cx=__novaCanvasCssW(canvas)/2, cy=__novaCanvasCssH(canvas)/2;
+  for (let n=0;n<=N;n++){
+    let x=cx,y=cy;
+    const ph=n/N;
+    for (let i=0;i<used;i++){
+      const d=dftData[i];
+      const a=2*Math.PI*d.freq*ph+d.phase;
+      x+=d.amp*Math.cos(a); y+=d.amp*Math.sin(a);
+    }
+    tracePath.push({x,y});
+  }
+}
+function animLoop(){
+  if (!playing){ animId=null; return; }
+  animPhase += speed*0.0016;
+  if (animPhase>=1){ animPhase-=1; tracePath=[]; }
   drawFrame();
-  animId = requestAnimationFrame(animLoop);
-  document.getElementById('statProgress').textContent = Math.round(animTime / (2*Math.PI) * 100) + '%';
-}function drawFrame(){
-  ctx.clearRect(0, 0, __novaCanvasCssW(canvas), __novaCanvasCssH(canvas));
-  const cx = __novaCanvasCssW(canvas) / 2, cy = __novaCanvasCssH(canvas) / 2;
-  const used = Math.min(numCircles, dftData.length);
-  let x = cx, y = cy;
+  $('statProgress').textContent=Math.round(animPhase*100)+'%';
+  animId=requestAnimationFrame(animLoop);
+}
 
-  for (let i = 0; i < used; i++) {
-    const { freq, amp, phase } = dftData[i];
-    const px = x, py = y;
-    const a = freq * animTime + phase;
-    x += amp * Math.cos(a);
-    y += amp * Math.sin(a);
+function drawFrame(){
+  const W=__novaCanvasCssW(canvas), H=__novaCanvasCssH(canvas);
+  ctx.clearRect(0,0,W,H);
+  const cx=W/2, cy=H/2;
+  const used=Math.min(numCircles,dftData.length);
 
-    // Circle
-    ctx.beginPath();
-    ctx.arc(px, py, amp, 0, 2*Math.PI);
-    ctx.strokeStyle = 'rgba(125,211,252,0.10)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+  // faint completed outline behind (full reconstruction with `used` terms)
+  drawOutline(cx,cy,used);
 
-    // Arm
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.lineTo(x, y);
-    ctx.strokeStyle = 'rgba(125,211,252,0.50)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }tracePath.push({ x, y });
-  if (tracePath.length > rawPoints.length * 1.1 + 10) tracePath.shift();
-
-  // Trace
-  if (tracePath.length > 1){
-    ctx.beginPath();
-    tracePath.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 2.2;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
+  // epicycle chain at current phase
+  let x=cx,y=cy;
+  for (let i=0;i<used;i++){
+    const d=dftData[i];
+    const px=x,py=y;
+    const a=2*Math.PI*d.freq*animPhase+d.phase;
+    x+=d.amp*Math.cos(a); y+=d.amp*Math.sin(a);
+    // circle (radius = magnitude)
+    ctx.beginPath(); ctx.arc(px,py,d.amp,0,2*Math.PI);
+    ctx.strokeStyle='rgba(125,211,252,0.12)'; ctx.lineWidth=1; ctx.stroke();
+    // arm
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(x,y);
+    ctx.strokeStyle='rgba(125,211,252,0.55)'; ctx.lineWidth=1.4; ctx.stroke();
   }
 
-  // Tip
-  ctx.beginPath();
-  ctx.arc(x, y, 4, 0, 2*Math.PI);
-  ctx.fillStyle = '#f59e0b';
-  ctx.fill();
-}function loadPreset(type){
-  clearAll();
-  const cx = __novaCanvasCssW(canvas) / 2, cy = __novaCanvasCssH(canvas) / 2;
-  const r = Math.min(__novaCanvasCssW(canvas), __novaCanvasCssH(canvas)) * 0.30;
-  rawPoints = [];
+  // live trace of the tip
+  if (!reduceMotion){
+    tracePath.push({x,y});
+    if (tracePath.length>N+4) tracePath.shift();
+  }
+  if (tracePath.length>1){
+    ctx.beginPath();
+    tracePath.forEach((p,i)=> i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2.4; ctx.lineJoin='round'; ctx.stroke();
+  }
 
-  if (type === 'star') {
-    for (let i = 0; i < 360; i++) {
-      const a = (i / 360) * 2 * Math.PI - Math.PI/2;
-      const arm = i % (360/5);
-      const t = arm / (360/5);
-      const rad = t < 0.5 ? r*(0.38 + 0.62*(t*2)) : r*(0.38 + 0.62*(2 - t*2));
-      rawPoints.push({ x: cx + rad*Math.cos(a), y: cy + rad*Math.sin(a) });
+  // tip
+  ctx.beginPath(); ctx.arc(x,y,4,0,2*Math.PI); ctx.fillStyle='#f59e0b'; ctx.fill();
+
+  // integrated annotation: each circle = one frequency component
+  drawAnnotation(W,H,used);
+
+  // sync scrubber
+  const sc=$('scrub'); if(sc && document.activeElement!==sc){ sc.value=String(Math.round(animPhase*1000)); }
+  const st=$('scrubTime'); if(st) st.textContent=Math.round(animPhase*100)+'%';
+}
+
+function drawOutline(cx,cy,used){
+  // full one-period reconstruction with `used` terms, drawn faintly behind
+  ctx.beginPath();
+  for (let n=0;n<=N;n++){
+    let x=cx,y=cy; const ph=n/N;
+    for (let i=0;i<used;i++){
+      const d=dftData[i];
+      const a=2*Math.PI*d.freq*ph+d.phase;
+      x+=d.amp*Math.cos(a); y+=d.amp*Math.sin(a);
     }
-  }else if (type === 'heart'){
-    for (let i = 0; i < 256; i++) {
-      const t = (i/256)*2*Math.PI;
-      const hx = 16 * Math.pow(Math.sin(t), 3);
-      const hy = -(13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t));
-      rawPoints.push({ x: cx + hx*(r/17), y: cy + hy*(r/17) });
+    n===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle='rgba(0,180,216,0.35)'; ctx.lineWidth=1.6; ctx.stroke();
+}
+
+function drawAnnotation(W,H,used){
+  const txt = T.annCircle.replace('{n}', used);
+  ctx.font='bold 11.5px "Noto Sans JP",sans-serif';
+  const w=ctx.measureText(txt).width;
+  const bx=12, by=12, pad=7;
+  ctx.fillStyle='rgba(10,22,40,0.78)';
+  if (ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx,by,w+pad*2,22,5); ctx.fill(); }
+  else { ctx.fillRect(bx,by,w+pad*2,22); }
+  ctx.fillStyle='#7dd3fc'; ctx.textAlign='left';
+  ctx.fillText(txt, bx+pad, by+15);
+}
+
+/* ===== Presets ===== */
+function shapePoints(type,cx,cy,r){
+  const out=[];
+  if (type==='star'){
+    for (let i=0;i<360;i++){
+      const a=(i/360)*2*Math.PI-Math.PI/2;
+      const arm=i%(360/5), t=arm/(360/5);
+      const rad=t<0.5? r*(0.40+0.60*(t*2)) : r*(0.40+0.60*(2-t*2));
+      out.push({x:cx+rad*Math.cos(a), y:cy+rad*Math.sin(a)});
     }
-  }else if (type === 'wave'){
-    // Square wave approx via circle path
-    const sides = 4, pts = 64;
-    for (let i = 0; i < sides; i++) {
-      const a0 = (i/sides)*2*Math.PI, a1 = ((i+1)/sides)*2*Math.PI;
-      for (let j = 0; j < pts; j++) {
-        const f = j/pts;
-        // alternate radius for square wave shape
-        const rad = (i % 2 === 0) ? r : r * 0.5;
-        const ang = a0 + f*(a1-a0);
-        rawPoints.push({ x: cx + rad*Math.cos(ang), y: cy + rad*Math.sin(ang) });
+  } else if (type==='square'){
+    const side=r*1.5, x0=cx-side/2, y0=cy-side/2, per=90;
+    for (let e=0;e<4;e++){
+      for (let j=0;j<per;j++){
+        const f=j/per;
+        let px,py;
+        if (e===0){ px=x0+side*f; py=y0; }
+        else if (e===1){ px=x0+side; py=y0+side*f; }
+        else if (e===2){ px=x0+side*(1-f); py=y0+side; }
+        else { px=x0; py=y0+side*(1-f); }
+        out.push({x:px,y:py});
       }
     }
+  } else if (type==='heart'){
+    for (let i=0;i<256;i++){
+      const t=(i/256)*2*Math.PI;
+      const hx=16*Math.pow(Math.sin(t),3);
+      const hy=-(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t));
+      out.push({x:cx+hx*(r/17), y:cy+hy*(r/17)});
+    }
+  } else if (type==='wave'){
+    // square wave drawn as a closed rectangular waveform loop
+    const A=r*0.85, L=r*1.7, half=4, segPts=24, base=cy;
+    const xs=cx-L; let lvl=1;
+    // top edge: a square wave going right
+    for (let s=0;s<half;s++){
+      const x=xs + (s/half)*2*L;
+      out.push({x:x, y:base-lvl*A});
+      out.push({x:x+(L/half)*0, y:base-lvl*A});
+      const xn=xs+((s+1)/half)*2*L;
+      // horizontal run
+      for (let j=1;j<segPts;j++){ out.push({x:x+(xn-x)*(j/segPts), y:base-lvl*A}); }
+      // vertical transition
+      out.push({x:xn, y:base-lvl*A});
+      lvl=-lvl;
+      out.push({x:xn, y:base-lvl*A});
+    }
+    // close back along the bottom
+    out.push({x:xs+2*L, y:base+A});
+    out.push({x:xs, y:base+A});
+    out.push({x:xs, y:base-A});
+  } else if (type==='letter'){
+    // letter "N" (NovaSolver) as a closed outline
+    const w=r*1.3, h=r*1.7, t=r*0.34;
+    const x0=cx-w/2, y0=cy-h/2, x1=cx+w/2, y1=cy+h/2;
+    const poly=[
+      {x:x0,y:y1},{x:x0,y:y0},{x:x0+t,y:y0},
+      {x:x1-t,y:y1-t*1.0},{x:x1-t,y:y0},{x:x1,y:y0},
+      {x:x1,y:y1},{x:x1-t,y:y1},
+      {x:x0+t,y:y0+t*1.0},{x:x0+t,y:y1},{x:x0,y:y1}
+    ];
+    // densify polygon
+    for (let i=0;i<poly.length-1;i++){
+      const a=poly[i], b=poly[i+1];
+      const seg=30;
+      for (let j=0;j<seg;j++){ out.push({x:a.x+(b.x-a.x)*j/seg, y:a.y+(b.y-a.y)*j/seg}); }
+    }
   }
-
-  overlay.style.opacity = '0';
-  rawPoints = resample(rawPoints, 256);
-  document.getElementById('statPoints').textContent = rawPoints.length;
+  return out;
+}
+function loadPreset(type){
+  clearAll();
+  const cx=__novaCanvasCssW(canvas)/2, cy=__novaCanvasCssH(canvas)/2;
+  const r=Math.min(__novaCanvasCssW(canvas),__novaCanvasCssH(canvas))*0.30;
+  rawPoints=shapePoints(type,cx,cy,r);
+  if (!rawPoints.length){ drawInitGuide(); return; }
+  overlay.style.opacity='0';
+  rawPoints=resample(rawPoints,256);
+  $('statPoints').textContent=rawPoints.length;
   computeDFT();
   drawRaw();
   setMode('play');
-}function clearAll(){
-  cancelAnimationFrame(animId);
-  mode = 'draw';
-  rawPoints = []; dftData = []; tracePath = []; animTime = 0;
-  ctx.clearRect(0, 0, __novaCanvasCssW(canvas), __novaCanvasCssH(canvas));
+}
+
+/* ===== Controls ===== */
+function setSpeed(s){
+  speed=s;
+  const sl=$('speedSlider'); if(sl){ sl.value=Math.round(s*10); sliderPct(sl); }
+  const e=$('speedValNum'); if(e){ if(e.tagName==='INPUT') e.value=speed.toFixed(1); else e.textContent=speed.toFixed(1); }
+  const ss=$('statSpeed'); if(ss) ss.textContent=speed.toFixed(1)+'×';
+  document.querySelectorAll('.speed-btn').forEach(b=>{
+    const on=parseFloat(b.dataset.speed)===s;
+    b.classList.toggle('active',on);
+  });
+}
+function onScrub(){
+  if (!dftData.length) return;
+  stopPlay();
+  animPhase=parseFloat($('scrub').value)/1000;
+  tracePath=[]; buildPartialTrace();
+  drawFrame();
+}
+function buildPartialTrace(){
+  tracePath=[];
+  const used=Math.min(numCircles,dftData.length);
+  const cx=__novaCanvasCssW(canvas)/2, cy=__novaCanvasCssH(canvas)/2;
+  const steps=Math.max(2,Math.round(animPhase*N));
+  for (let s=0;s<=steps;s++){
+    let x=cx,y=cy; const ph=(s/N);
+    for (let i=0;i<used;i++){
+      const d=dftData[i];
+      const a=2*Math.PI*d.freq*ph+d.phase;
+      x+=d.amp*Math.cos(a); y+=d.amp*Math.sin(a);
+    }
+    tracePath.push({x,y});
+  }
+}
+function replay(){
+  if (!dftData.length) return;
+  animPhase=0; tracePath=[];
+  setMode('play');
+  startPlay();
+}
+function clearAll(){
+  stopPlay();
+  mode='draw';
+  rawPoints=[]; dftData=[]; tracePath=[]; animPhase=0; N=0;
+  ctx.clearRect(0,0,__novaCanvasCssW(canvas),__novaCanvasCssH(canvas));
   drawInitGuide();
-  overlay.style.opacity = '1';
-  document.getElementById('statPoints').textContent = '0';
-  document.getElementById('statCircles').textContent = '0';
-  document.getElementById('statProgress').textContent = '0%';
-  var _statSpeed=document.getElementById('statSpeed');if(_statSpeed)_statSpeed.textContent=speed.toFixed(1)+'×';
-  document.getElementById('statError').textContent = '—';
-  document.getElementById('btnDraw').classList.add('active');
-  document.getElementById('btnPlay').classList.remove('active');
-}</script>
+  overlay.style.opacity='1';
+  $('statPoints').textContent='0';
+  $('statCircles').textContent='0';
+  $('statProgress').textContent='0%';
+  const ss=$('statSpeed'); if(ss) ss.textContent=speed.toFixed(1)+'×';
+  $('statError').textContent='—';
+  if ($('roCircles')) $('roCircles').textContent='0';
+  if ($('roPeriod')) $('roPeriod').textContent='—';
+  if ($('roFreqMax')) $('roFreqMax').textContent='—';
+  const sc=$('scrub'); if(sc) sc.value='0';
+  const st=$('scrubTime'); if(st) st.textContent='0%';
+  $('btnDraw').classList.add('active');
+  $('btnPlay').classList.remove('active');
+}
+
+/* keyboard a11y on canvas */
+canvas.addEventListener('keydown', e=>{
+  if (e.key===' '||e.key==='Enter'){ e.preventDefault(); togglePlay(); }
+});
+
+/* init */
+document.querySelectorAll('input[type=range]').forEach(sliderPct);
+resizeCanvas();
+drawInitGuide();
+
+</script>
 
 <section class="explanation">
   <h2>フーリエ円（エピサイクル）とは</h2>
@@ -589,7 +906,7 @@ function addPt(cx, cy){
 </div>
 <h2>よくある誤解と注意点</h2>
 <div class="fblock">
-<p>このシミュレーターを使い始めるときに、多くの人が同じような疑問や間違いにぶつかるよ。まず押さえておきたいポイントを3つ説明するね。<br><br><strong>1. 「円の数Nを最大にすれば必ず完璧？」</strong><br>確かに理論上は、元の点の数と同じだけ円を使えば完全に再現できる。でも、シミュレーター上で「点の数」自体が有限だから、そもそもマウスで描いた滑らかな曲線も離散的な点の集まりとして取り込まれている。だから、Nを最大にしても「離散点を通る」再現に過ぎないんだ。実務では、完全再現よりも「必要な精度を達成する最小のN」を見つけることが重要だよ。例えば、人の耳に聞こえない20kHz以上の高音をカットするMP3圧縮みたいにね。<br><br><strong>2. 「円の回転速度は自由に選べる？」</strong><br>スライダーで「速度」を変えているから誤解しがちだけど、各円の<strong>相対的な回転速度の比は固定</strong>だ。k番目の円の角速度は $\omega_k = \frac{2\pi k}{T}$ で決まっていて、基本速度の整数倍になる。ツールで変えているのは、この基本速度全体を一括で速くしたり遅くしたりする「再生速度」だと思ってくれ。実設計で周波数を変えるには、サンプリング点の数や間隔そのものを変える必要がある。<br><br><strong>3. 「位相（初期向き）は飾り？」</strong><br>半径や速度に比べて地味だけど、位相は形を決める特に重要パラメータだ。例えば、半径が同じ2つの円でも、位相が90度ずれているかどうかで、ペン先の軌跡は全く異なる楕円軌道を描く。実務でフーリエ係数から信号を復元するとき、位相情報を間違えると波形が非常にになってしまう。シミュレーターで「位相」の表示をONにして、各円のスタート位置がバラバラなことを確認してみよう。</p>
+<p>このシミュレーターを使い始めるときに、多くの人が同じような疑問や間違いにぶつかるよ。まず押さえておきたいポイントを3つ説明するね。<br><br><strong>1. 「円の数Nを最大にすれば必ず完璧？」</strong><br>確かに理論上は、元の点の数と同じだけ円を使えば完全に再現できる。でも、シミュレーター上で「点の数」自体が有限だから、そもそもマウスで描いた滑らかな曲線も離散的な点の集まりとして取り込まれている。だから、Nを最大にしても「離散点を通る」再現に過ぎないんだ。実務では、完全再現よりも「必要な精度を達成する最小のN」を見つけることが重要だよ。例えば、人の耳に聞こえない20kHz以上の高音をカットするMP3圧縮みたいにね。<br><br><strong>2. 「円の回転速度は自由に選べる？」</strong><br>スライダーで「速度」を変えているから誤解しがちだけど、各円の<strong>相対的な回転速度の比は固定</strong>だ。k番目の円の角速度は $\omega_k = \frac{2\pi k}{T}$ で決まっていて、基本速度の整数倍になる。ツールで変えているのは、この基本速度全体を一括で速くしたり遅くしたりする「再生速度」だと思ってくれ。実設計で周波数を変えるには、サンプリング点の数や間隔そのものを変える必要がある。<br><br><strong>3. 「位相（初期向き）は飾り？」</strong><br>半径や速度に比べて地味だけど、位相は形を決める特に重要パラメータだ。例えば、半径が同じ2つの円でも、位相が90度ずれているかどうかで、ペン先の軌跡は全く異なる楕円軌道を描く。実務でフーリエ係数から信号を復元するとき、位相情報を間違えると波形が大きく崩れてしまう。このシミュレーターでも、各円の腕（アーム）が最初からバラバラの向きで伸びているのが見えるはずだ。</p>
 
 </div>
 
@@ -648,23 +965,23 @@ function addPt(cx, cy){
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>入力フィールド「サンプル数」に256～2048の値を設定し、対象曲線をDFT（離散フーリエ変換）で分解するデータ点数を決定します</li>
-<li>「使用円数」スライダーで1～128の範囲から回転円の個数を調整し、リアルタイムで近似曲線の再現精度を確認します</li>
-<li>「再生速度」パラメータで0.5～2.0倍の範囲内でエピサイクル描画の進行速度を制御し、円群の動作メカニズムを観察します</li>
-<li>「描画進捗」バーでアニメーション進行状況を監視し、「近似誤差」表示で目標曲線との偏差（平均二乗誤差）を数値確認します</li>
+<li>「描画」モードでキャンバスに一筆書きの閉じた曲線をマウス／タッチで描きます（またはプリセットの「星形」「ハート」「矩形波」を選びます）。描いた曲線は自動的に256点へリサンプルされ、DFT（離散フーリエ変換）で回転円に分解されます</li>
+<li>「円の数 N」スライダー（1〜200、既定20）で再現に使う回転円の個数を調整し、近似精度の変化をリアルタイムに確認します</li>
+<li>「速度」スライダー（1〜50×）でエピサイクルの回転速度を変え、複数の円が合成されてペン先の軌跡を描く様子を観察します</li>
+<li>「再生」モードでアニメーションを動かし、「描画進捗」と「近似誤差」（全振幅に対する未使用成分の割合）を数値で確認します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>サンプル数512、使用円数32のパラメータでリサージュ曲線（X=sin(3t)、Y=sin(2t)）を解析する場合、DFTにより振幅約0.45、0.38、0.22、0.15の4つの主要周波数成分が抽出されます。使用円数を8に削減するとRMS誤差は約0.08上昇し、64に増加させると誤差は0.012以下に低下します。医療用超音波プローブの走査パターンやロボット腕の経路最適化では、此のフーリエ分解により400個の制御点を12～16個の円運動に圧縮できます。</p>
+<p>プリセット「ハート」を読み込むと、256点の輪郭がDFTで分解され、振幅の大きい順に回転円が並びます。「円の数 N」を5にすると大まかな輪郭だけ、20で滑らかなハート形、50以上でほぼ完全に元の曲線に一致します。「近似誤差」は <em>1 − (使用した円の振幅の和) ÷ (全円の振幅の和)</em> で計算され、円を増やすほど単調に小さくなります。星形のように角のある形は高周波成分（小さい円）を多く含むため、滑らかな形より多くの円が必要です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>サンプル数は対象曲線の複雑度に応じて選定：単純な円・楕円は256で充分、スパイラルや多重折り返し曲線は1024以上が必要です</li>
-<li>近似誤差が0.05を超える場合は使用円数不足の可能性があるため、段階的に16→32→64へ増加させて検証してください</li>
-<li>再生速度は2倍以上に加速するとアニメーション描画フレームスキップが発生し、誤差表示が更新されないため、実測値は0.5～1.5倍範囲推奨です</li>
-<li>CAM設計やパターン認識では円数16で約85％の精度が得られるため、計算コストと精度のバランスをこの値から調整開始してください</li>
+<li>「サンプル数」は256で固定です（描いた曲線を256点へ自動リサンプル）。表示専用のため変更はできません</li>
+<li>「近似誤差」はRMS（平均二乗誤差）ではなく振幅比 1 − Σ使用 ÷ Σ全 です。小さい円（高周波成分）を省くほど値が大きくなります</li>
+<li>曲線が閉じている（始点と終点が一致する）ほどDFTの不連続が減り、再現がきれいになります。開いた曲線では継ぎ目に振動が出ます</li>
+<li>円の数を最大にしても、元データが256点の離散点であるため「256点を通る」再現が上限です。完全再現よりも必要な精度を満たす最小の円数を探すのが実用的です</li>
 </ul>
 </div>
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">

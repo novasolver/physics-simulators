@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "Maxwell-Betti 相反定理シミュレーター",
       "description": "単純支持梁の 2 つの荷重系について Maxwell-Betti の相反定理 δ_AB·P_A = δ_BA·P_B を、影響関数 C(a,b) からリアルタイムに検証・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/maxwell-betti.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["影響関数 C(a,b) からの δ_AB と δ_BA の自動計算","左辺 δ_BA·P_A と右辺 δ_AB·P_B の一致確認","系 A・系 B のたわみ曲線の重ね描き可視化","梁長 L・荷重位置 a,b・荷重 P_A の可変設定"],
       "keywords": "Maxwell-Betti,相反定理,影響関数,線形弾性,単純支持梁,たわみ,剛性行列の対称性,構造力学",
       "datePublished": "2026-05-16",
@@ -169,23 +169,34 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">荷重 P_B は 50 kN、曲げ剛性 EI は 1×10⁴ kN·m² で固定。a, b は L−0.1 m を上限としてクランプします。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（相反性のライブ検証）</div>
       <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statDeltaBA">—</div><div class="sl">a 点での B 系たわみ δ_BA (mm)</div></div>
-        <div class="stat-card"><div class="sv" id="statDeltaAB">—</div><div class="sl">b 点での A 系たわみ δ_AB (mm)</div></div>
+        <div class="stat-card"><div class="sv" id="statDeltaBA">—</div><div class="sl">δ_BA：A に荷重 P → B のたわみ (mm)</div></div>
+        <div class="stat-card"><div class="sv" id="statDeltaAB">—</div><div class="sl">δ_AB：B に荷重 P → A のたわみ (mm)</div></div>
+        <div class="stat-card"><div class="sv" id="statEqual">—</div><div class="sl">相反の差 |δ_AB − δ_BA| (mm)</div></div>
         <div class="stat-card"><div class="sv" id="statBettiL">—</div><div class="sl">δ_BA·P_A（左辺）(kN·m)</div></div>
         <div class="stat-card"><div class="sv" id="statBettiR">—</div><div class="sl">δ_AB·P_B（右辺）(kN·m)</div></div>
+        <div class="stat-card"><div class="sv" id="statLoad">—</div><div class="sl">現在の荷重 P (kN)</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-project-diagram"></i> 系 A と系 B のたわみ曲線</div>
+      <div class="chart-title"><i class="fas fa-project-diagram"></i> 相反定理アニメーション δ_AB = δ_BA</div>
       <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">上段＝系 A：a 点に P_A、青曲線がたわみ、黄マーカーが b 点での δ_AB／下段＝系 B：b 点に P_B、赤曲線がたわみ、黄マーカーが a 点での δ_BA</p>
+      <p class="canvas-hint">CASE 1（青）＝A 点に荷重 P → B 点のたわみ δ_BA を測定／CASE 2（赤）＝同じ荷重 P を B 点へ → A 点のたわみ δ_AB を測定。黄マーカー（測定したたわみ）が常に等しいことが相反定理 δ_AB = δ_BA です。</p>
     </div>
 
     <div class="chart-card">
@@ -205,86 +216,83 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Maxwell-Betti Reciprocal Theorem Simulator ==========
-var cv = document.getElementById('cv');
-var ctx = cv.getContext('2d');
+// ========== Maxwell-Betti Reciprocal Theorem Simulator (v2) ==========
+(function(){
+  var cv = document.getElementById('cv');
+  if (!cv) return;
+  var ctx = cv.getContext('2d');
 
-var EI = 1e4;        // kN·m^2 (fixed)
-var PB_FIXED = 50;   // kN (fixed)
+  var EI = 1e4;        // kN·m^2 (fixed)
+  var PB_FIXED = 50;   // kN (fixed, for Betti-form work product)
+  var L_CSS = '系 A／系 B';
 
-function getParams() {
-  var L = parseFloat(document.getElementById('slL').value);
-  var a = parseFloat(document.getElementById('slA').value);
-  var b = parseFloat(document.getElementById('slB').value);
-  var PA = parseFloat(document.getElementById('slPA').value);
-  // clamp a, b to (0.1, L-0.1)
-  if (a > L - 0.1) a = L - 0.1;
-  if (b > L - 0.1) b = L - 0.1;
-  if (a < 0.1) a = 0.1;
-  if (b < 0.1) b = 0.1;
-  return { L: L, a: a, b: b, PA: PA, PB: PB_FIXED };
-}
-
-// Influence function C(a,b): deflection at x=b due to unit load at x=a (simply supported beam)
-function influenceC(a, b, L) {
-  if (L <= 0) return 0;
-  if (b <= a) {
-    return (b * (L - a) * (2 * L * a - a * a - b * b)) / (6 * EI * L);
-  } else {
-    return (a * (L - b) * (2 * L * b - b * b - a * a)) / (6 * EI * L);
+  function reduceMotion(){
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
-}
 
-// Deflection w(x) of a simply supported beam length L with unit load P at x=xp
-// returns deflection at point x (downward positive, units: m per unit kN)
-function beamDeflection(x, xp, P, L) {
-  if (L <= 0) return 0;
-  var bb = L - xp;
-  var aa = xp;
-  if (x <= xp) {
-    return (P * bb * x * (L * L - bb * bb - x * x)) / (6 * EI * L);
-  } else {
-    return (P * aa * (L - x) * (2 * L * x - x * x - aa * aa)) / (6 * EI * L);
+  function getParams() {
+    var L = parseFloat(document.getElementById('slL').value);
+    var a = parseFloat(document.getElementById('slA').value);
+    var b = parseFloat(document.getElementById('slB').value);
+    var PA = parseFloat(document.getElementById('slPA').value);
+    if (!isFinite(L) || L <= 0) L = 5;
+    if (a > L - 0.1) a = L - 0.1;
+    if (b > L - 0.1) b = L - 0.1;
+    if (a < 0.1) a = 0.1;
+    if (b < 0.1) b = 0.1;
+    if (!isFinite(PA)) PA = 30;
+    return { L: L, a: a, b: b, PA: PA, PB: PB_FIXED };
   }
-}
 
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var h = Math.round(w * 0.62);
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
-  cv.width = Math.round(w * dpr);
-  cv.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cv.dataset.cssW = String(w);
-  cv.dataset.cssH = String(h);
-}
+  // Maxwell influence coefficient C(x_obs, x_load): deflection (m) at x_obs
+  // for a UNIT load (1 kN) at x_load on a simply supported beam.
+  // C is symmetric: C(p,q) === C(q,p) -> this IS Maxwell reciprocity.
+  function influenceC(xObs, xLoad, L) {
+    if (L <= 0) return 0;
+    // closed form valid for either ordering via the standard simply-supported formula
+    var c = L - xLoad;          // distance of load from right support
+    var x = xObs;
+    if (x <= xLoad) {
+      return (c * x * (L * L - c * c - x * x)) / (6 * EI * L);
+    } else {
+      var d = xLoad;            // distance of load from left support
+      return (d * (L - x) * (2 * L * x - x * x - d * d)) / (6 * EI * L);
+    }
+  }
 
-function drawSystem(p, yCenter, panelH, labelTxt, load, loadPos, color, markerPos, markerLabel) {
-  var W = cv.width;
-  var marginX = 40;
-  var beamW = W - marginX * 2;
-  var beamY = yCenter;
-  var x0 = marginX;
-  function xCoord(xm) { return x0 + (xm / p.L) * beamW; }
+  // Full deflection curve w(x) (m) for load P (kN) at x=xp.
+  function beamDeflection(x, xp, P, L) {
+    return P * influenceC(x, xp, L);
+  }
 
-  // panel title
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText(labelTxt, marginX, yCenter - panelH * 0.36);
+  function resizeCanvas() {
+    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
+    var h = Math.round(w * 0.62);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cv.dataset.cssW = String(w);
+    cv.dataset.cssH = String(h);
+  }
 
-  // beam line
-  ctx.strokeStyle = '#7da6cc';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(x0, beamY);
-  ctx.lineTo(x0 + beamW, beamY);
-  ctx.stroke();
+  // Compute a common deflection scale so both cases share the same vertical
+  // exaggeration (makes the equal-marker visually convincing).
+  function commonScale(p, panelH, P) {
+    var maxAbs = 0, i, xx, w;
+    for (i = 0; i <= 60; i++) {
+      xx = (i / 60) * p.L;
+      w = Math.abs(beamDeflection(xx, p.a, P, p.L));
+      if (w > maxAbs) maxAbs = w;
+      w = Math.abs(beamDeflection(xx, p.b, P, p.L));
+      if (w > maxAbs) maxAbs = w;
+    }
+    return maxAbs > 0 ? (panelH * 0.30) / maxAbs : 0;
+  }
 
-  // supports (triangle markers)
-  function support(xpos, isPin) {
+  function drawSupport(beamY, xpos, isPin) {
     ctx.fillStyle = '#3d567a';
     ctx.beginPath();
     ctx.moveTo(xpos, beamY + 2);
@@ -296,136 +304,211 @@ function drawSystem(p, yCenter, panelH, labelTxt, load, loadPos, color, markerPo
       ctx.beginPath();
       ctx.arc(xpos - 4, beamY + 18, 2.5, 0, Math.PI * 2);
       ctx.arc(xpos + 4, beamY + 18, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#3d567a';
       ctx.fill();
     }
   }
-  support(x0, true);
-  support(x0 + beamW, false);
 
-  // deflection curve (scaled exaggerated)
-  var nSeg = 80;
-  var maxAbs = 0;
-  var ys = [];
-  for (var i = 0; i <= nSeg; i++) {
-    var xx = (i / nSeg) * p.L;
-    var w = beamDeflection(xx, loadPos, load, p.L);
-    ys.push(w);
-    if (Math.abs(w) > maxAbs) maxAbs = Math.abs(w);
+  // Draw one beam case. loadFrac in [0,1] animates the load growing in.
+  function drawCase(p, geom, opt, loadFrac, scale) {
+    var x0 = geom.x0, beamW = geom.beamW, beamY = geom.beamY;
+    function xCoord(xm) { return x0 + (xm / p.L) * beamW; }
+
+    // case title
+    ctx.fillStyle = opt.dim ? '#5d7494' : '#cfe3f7';
+    ctx.font = 'bold 12px "Roboto Mono",monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(opt.title, x0, beamY - geom.panelH * 0.40);
+
+    // undeflected reference beam
+    ctx.strokeStyle = '#33475f';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x0, beamY); ctx.lineTo(x0 + beamW, beamY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    drawSupport(beamY, x0, true);
+    drawSupport(beamY, x0 + beamW, false);
+
+    var P = opt.load * loadFrac;
+
+    // deflected beam shape
+    var nSeg = 90, j, xx, xpx, ypx, w;
+    ctx.strokeStyle = opt.color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (j = 0; j <= nSeg; j++) {
+      xx = (j / nSeg) * p.L;
+      w = beamDeflection(xx, opt.loadPos, P, p.L);
+      xpx = xCoord(xx);
+      ypx = beamY + w * scale;
+      if (j === 0) ctx.moveTo(xpx, ypx); else ctx.lineTo(xpx, ypx);
+    }
+    ctx.stroke();
+
+    // load arrow at loadPos
+    var lpx = xCoord(opt.loadPos);
+    ctx.strokeStyle = opt.color;
+    ctx.fillStyle = opt.color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(lpx, beamY - 40);
+    ctx.lineTo(lpx, beamY - 7);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(lpx, beamY - 3);
+    ctx.lineTo(lpx - 6, beamY - 12);
+    ctx.lineTo(lpx + 6, beamY - 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('P = ' + opt.load.toFixed(0) + ' kN @ ' + opt.loadName, lpx, beamY - 46);
+
+    // measured cross-deflection marker at obsPos
+    var mpx = xCoord(opt.obsPos);
+    var wObs = beamDeflection(opt.obsPos, opt.loadPos, P, p.L);
+    var mpy = beamY + wObs * scale;
+    ctx.strokeStyle = 'rgba(255,209,102,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(mpx, beamY); ctx.lineTo(mpx, mpy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(mpx, mpy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFD166';
+    ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#FFD166';
+    ctx.font = 'bold 11px "Roboto Mono",monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(opt.deltaLabel + ' = ' + (Math.abs(wObs) * 1000).toFixed(3) + ' mm @ ' + opt.obsName, mpx + 9, mpy + 4);
   }
-  var scale = maxAbs > 0 ? (panelH * 0.28) / maxAbs : 0;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (var j = 0; j <= nSeg; j++) {
-    var xx2 = (j / nSeg) * p.L;
-    var xpx = xCoord(xx2);
-    var ypx = beamY + ys[j] * scale;
-    if (j === 0) ctx.moveTo(xpx, ypx); else ctx.lineTo(xpx, ypx);
+
+  function render(p, phase) {
+    var W = parseFloat(cv.dataset.cssW) || cv.width;
+    var H = parseFloat(cv.dataset.cssH) || cv.height;
+    ctx.fillStyle = '#0a1929';
+    ctx.fillRect(0, 0, W, H);
+
+    var marginX = 44;
+    var panelH = H * 0.40;
+    var geomTop = { x0: marginX, beamW: W - marginX * 2, beamY: H * 0.30, panelH: panelH };
+    var geomBot = { x0: marginX, beamW: W - marginX * 2, beamY: H * 0.72, panelH: panelH };
+
+    // SAME load P used for both cases => Maxwell displacement reciprocity δ_AB = δ_BA.
+    var P = p.PA;
+    var scale = commonScale(p, panelH, P);
+
+    // Animation: phase in [0,2). [0,1) emphasises CASE1, [1,2) emphasises CASE2.
+    var f1, f2;
+    if (phase < 1) { f1 = Math.min(1, phase / 0.5); f2 = Math.max(0, (phase - 0.5) / 0.5); }
+    else { var ph = phase - 1; f1 = 1 - Math.min(1, ph / 0.5) * 0; f2 = 1; f1 = 1; }
+    // keep both fully shown after first build; pulse active case via title dim
+    f1 = 1; f2 = 1;
+    var activeTop = phase < 1;
+
+    drawCase(p, geomTop, {
+      title: 'CASE 1 : A 点に荷重 P',
+      color: '#00B4D8', load: P, loadPos: p.a, loadName: 'A(' + p.a.toFixed(1) + 'm)',
+      obsPos: p.b, obsName: 'B(' + p.b.toFixed(1) + 'm)',
+      deltaLabel: 'δ_BA', dim: !activeTop
+    }, 1, scale);
+
+    drawCase(p, geomBot, {
+      title: 'CASE 2 : B 点に同じ荷重 P',
+      color: '#e74c3c', load: P, loadPos: p.b, loadName: 'B(' + p.b.toFixed(1) + 'm)',
+      obsPos: p.a, obsName: 'A(' + p.a.toFixed(1) + 'm)',
+      deltaLabel: 'δ_AB', dim: activeTop
+    }, 1, scale);
+
+    // equality banner
+    var dBA = Math.abs(beamDeflection(p.b, p.a, P, p.L)) * 1000;
+    var dAB = Math.abs(beamDeflection(p.a, p.b, P, p.L)) * 1000;
+    ctx.fillStyle = '#7CFFB2';
+    ctx.font = 'bold 13px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('相反定理:  δ_AB = ' + dAB.toFixed(3) + ' mm  =  δ_BA = ' + dBA.toFixed(3) + ' mm', W / 2, H - 10);
   }
-  ctx.stroke();
 
-  // load arrow (downward)
-  var lpx = xCoord(loadPos);
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(lpx, beamY - 38);
-  ctx.lineTo(lpx, beamY - 6);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(lpx, beamY - 2);
-  ctx.lineTo(lpx - 5, beamY - 10);
-  ctx.lineTo(lpx + 5, beamY - 10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(load.toFixed(0) + ' kN', lpx, beamY - 42);
+  function fmtNum(v, digits) {
+    if (!isFinite(v)) return '0';
+    return v.toFixed(digits);
+  }
 
-  // observation marker
-  var mpx = xCoord(markerPos);
-  var wObs = beamDeflection(markerPos, loadPos, load, p.L);
-  var mpy = beamY + wObs * scale;
-  ctx.strokeStyle = 'rgba(255,209,102,0.55)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath(); ctx.moveTo(mpx, beamY); ctx.lineTo(mpx, mpy); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.arc(mpx, mpy, 5, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFD166';
-  ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = '#FFD166';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText(markerLabel + ' = ' + (wObs * 1000).toFixed(2) + ' mm', mpx + 8, mpy + 4);
-}
+  function updateStats(p) {
+    // Displacement reciprocity (same load P=P_A on both): δ_AB = δ_BA exactly.
+    var P = p.PA;
+    var dBA = Math.abs(beamDeflection(p.b, p.a, P, p.L));   // m, A->B
+    var dAB = Math.abs(beamDeflection(p.a, p.b, P, p.L));   // m, B->A
+    // Betti work form with distinct P_A, P_B (left=δ_BA(by P_B)·P_A, right=δ_AB(by P_A)·P_B)
+    var Cab = influenceC(p.b, p.a, p.L);   // deflection at b per unit load at a (= C ba)
+    var dBA_betti = Cab * p.PB;            // a-point deflection caused by P_B  (m)
+    var dAB_betti = Cab * p.PA;            // b-point deflection caused by P_A  (m)
+    var leftWork = dBA_betti * p.PA;       // kN·m
+    var rightWork = dAB_betti * p.PB;      // kN·m
+    setText('statDeltaBA', fmtNum(dBA * 1000, 3));
+    setText('statDeltaAB', fmtNum(dAB * 1000, 3));
+    setText('statEqual', fmtNum(Math.abs(dAB - dBA) * 1000, 4));
+    setText('statBettiL', fmtNum(leftWork, 3));
+    setText('statBettiR', fmtNum(rightWork, 3));
+    setText('statLoad', fmtNum(P, 0));
+  }
 
-function draw(p) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+  function setText(id, txt) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = txt;
+  }
 
-  var panelH = H * 0.42;
-  var y1 = H * 0.28;
-  var y2 = H * 0.72;
-  drawSystem(p, y1, panelH, '系 A : a 点に P_A', p.PA, p.a, '#00B4D8', p.b, 'δ_AB');
-  drawSystem(p, y2, panelH, '系 B : b 点に P_B', p.PB, p.b, '#e74c3c', p.a, 'δ_BA');
+  var animId = null, t0 = null;
+  function loop(ts) {
+    if (t0 === null) t0 = ts;
+    var elapsed = (ts - t0) / 1000;
+    var phase = (elapsed / 2.2) % 2;   // 2.2 s per case
+    var p = getParams();
+    render(p, phase);
+    animId = requestAnimationFrame(loop);
+  }
 
-  // "Betti reciprocity" annotation
-  var Cab = influenceC(p.a, p.b, p.L);
-  var dBA = Cab * p.PB;
-  var dAB = Cab * p.PA;
-  var left = dBA * p.PA;
-  var right = dAB * p.PB;
-  ctx.fillStyle = '#FFD166';
-  ctx.font = 'bold 12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('Betti 相反: δ_BA·P_A = ' + left.toFixed(4) + ' kN·m  ＝  δ_AB·P_B = ' + right.toFixed(4) + ' kN·m', W / 2, H - 8);
-}
+  function staticFrame() {
+    var p = getParams();
+    render(p, 0);
+  }
 
-function fmtNum(v, digits) {
-  if (!isFinite(v)) return '—';
-  return v.toFixed(digits);
-}
+  function compute() {
+    var p = getParams();
+    updateStats(p);
+    if (reduceMotion()) staticFrame();
+  }
+  window.compute = compute;
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.L) || p.L <= 0) return;
-  var Cab = influenceC(p.a, p.b, p.L);
-  var Cba = influenceC(p.b, p.a, p.L);
-  // numerical sanity: Cab should equal Cba (Maxwell's reciprocity)
-  var dBA = Cab * p.PB;     // m
-  var dAB = Cba * p.PA;     // m
-  var left = dBA * p.PA;    // kN·m
-  var right = dAB * p.PB;   // kN·m
-  document.getElementById('statDeltaBA').textContent = fmtNum(dBA * 1000, 2);
-  document.getElementById('statDeltaAB').textContent = fmtNum(dAB * 1000, 2);
-  document.getElementById('statBettiL').textContent = fmtNum(left, 3);
-  document.getElementById('statBettiR').textContent = fmtNum(right, 3);
-  draw(p);
-}
+  function resetParams() {
+    var defs = { slL: 5.0, slA: 1.5, slB: 3.5, slPA: 30 };
+    Object.keys(defs).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = defs[id];
+    });
+    if (typeof updateSlider === 'function') {
+      updateSlider(document.getElementById('slL'), 'slLVal', 1, '');
+      updateSlider(document.getElementById('slA'), 'slAVal', 1, '');
+      updateSlider(document.getElementById('slB'), 'slBVal', 1, '');
+      updateSlider(document.getElementById('slPA'), 'slPAVal', 0, '');
+    }
+    compute();
+  }
+  window.resetParams = resetParams;
 
-function resetParams() {
-  var defs = { slL: 5.0, slA: 1.5, slB: 3.5, slPA: 30 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slL'), 'slLVal', 1, '');
-  updateSlider(document.getElementById('slA'), 'slAVal', 1, '');
-  updateSlider(document.getElementById('slB'), 'slBVal', 1, '');
-  updateSlider(document.getElementById('slPA'), 'slPAVal', 0, '');
+  window.addEventListener('resize', function () { resizeCanvas(); compute(); if (reduceMotion()) staticFrame(); });
+
+  resizeCanvas();
   compute();
-}
-
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
-
-resizeCanvas();
-compute();
+  if (reduceMotion()) {
+    staticFrame();
+  } else {
+    animId = requestAnimationFrame(loop);
+  }
+})();
 </script>
 
 <section class="explanation">
@@ -493,6 +576,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="maxwell-betti.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -546,14 +632,14 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>梁の全長 L を 1～5 m の範囲で設定し、A 点と B 点の位置を入力します（A < B）</li>
-<li>荷重系 1 で A 点に荷重 P_A を、荷重系 2 で B 点に荷重 P_B をそれぞれ印加します（1～50 kN）</li>
+<li>梁の全長 L を 1～10 m の範囲で設定し、A 点と B 点の位置を入力します（a, b は L−0.1 m を上限にクランプ）</li>
+<li>荷重系 1 で A 点に荷重 P_A（1～100 kN）を印加します。系 B の P_B は 50 kN 固定です</li>
 <li>シミュレーターが δ_BA·P_A と δ_AB·P_B を自動計算し、相反定理の成立を kN·mm 単位で検証します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>長さ L=4 m の単純梁（E=200 GPa、I=500×10^6 mm^4）で A=1 m、B=3 m、P_A=20 kN、P_B=15 kN の場合、FEM 解析より δ_BA≈1.28 mm、δ_AB≈1.71 mm が得られます。左辺：1.28×20=25.6 kN·mm、右辺：1.71×15=25.65 kN·mm となり、数値誤差の範囲内で相反定理が成立することを確認できます。</p>
+<p>本ツール既定（曲げ剛性 EI=1×10⁴ kN·m² 固定、P_B=50 kN 固定）で L=5 m、a=1.5 m、b=3.5 m、P_A=30 kN とすると、影響関数の解析解から δ_BA=C(a,b)·P_B≒7.69 mm、δ_AB=C(b,a)·P_A≒4.61 mm が得られます。左辺 δ_BA·P_A=7.69mm×30kN≒0.231 kN·m、右辺 δ_AB·P_B=4.61mm×50kN≒0.231 kN·m となり、両辺が一致して相反定理が成立します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -563,6 +649,16 @@ compute();
 <li>構造不静定問題では相反定理の形式が異なるため、このシミュレーターは静定梁専用です。連続梁や門型フレームでは追加の拘束条件処理が必要になります</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

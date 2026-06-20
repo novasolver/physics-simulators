@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ホール効果 シミュレーター",
       "description": "電流・磁場・キャリア密度・試料厚さから、ホール電圧とホール係数を実時間で計算・可視化する半導体キャリア濃度測定の教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/hall-effect.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ホール電圧の実時間計算","ホール係数によるキャリア密度の同定","電流・磁場・厚さ・キャリア密度の対数調整","ホール電圧と n の関係グラフ表示"],
       "keywords": "ホール効果,ホール電圧,ホール係数,キャリア密度,半導体,磁場センサ,ローレンツ力,電子物性,ホールバー,ガリウムヒ素",
       "datePublished": "2026-05-15",
@@ -103,6 +103,24 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 #hallCanvas,#chartCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
 .aux-readout{ font-size:0.7rem; color:var(--muted); margin-top:2px; font-family:'Roboto Mono',monospace; }
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.toggle-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.82rem;font-family:inherit;cursor:pointer;transition:all .2s}
+.toggle-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:4px 10px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:14px;height:14px;border-radius:3px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.toggle-btn,.preset-btn{transition:none}}
 </style>
 </head>
 <body>
@@ -131,6 +149,32 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 <div class="main">
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div style="margin-bottom:10px;">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">材料プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setMaterial('copper')">銅（金属）</button>
+        <button type="button" class="preset-btn" onclick="setMaterial('ntype')">n型半導体</button>
+        <button type="button" class="preset-btn" onclick="setMaterial('ptype')">p型半導体</button>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin:8px 0 6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">シナリオ</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setScenario('electrons')">電子が偏向</button>
+        <button type="button" class="preset-btn" onclick="setScenario('holes')">正孔→符号反転</button>
+        <button type="button" class="preset-btn" onclick="setScenario('strong')">強磁場</button>
+        <button type="button" class="preset-btn" onclick="setScenario('lown')">低キャリア密度→大V_H</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">キャリア種別</span>
+        <button type="button" class="toggle-btn" id="carrierToggle" onclick="toggleCarrier()"><i class="fas fa-minus-circle"></i> 電子</button>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">電子（負電荷）か正孔（正電荷）かで蓄積面と V_H の符号が反転します。</div>
+    </div>
 
     <div class="param-group">
       <div class="param-label">
@@ -168,33 +212,56 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> n をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">試料幅は w = 10 mm 固定、電気素量 q = 1.602e-19 C。キャリア密度は対数スケールのスライダーで、ホール電圧の大きさのみを扱います。</p>
+    <div class="play-row">
+      <span style="font-size:.72rem;color:var(--muted)">速度</span>
+      <button type="button" class="preset-btn speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+      <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="setSpeed(1)">1×</button>
+      <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">試料幅は w = 10 mm 固定、電気素量 q = 1.602e-19 C。アニメーションはキャリアのドリフトと偏向を可視化し、定常状態でホール電界がローレンツ力と釣り合います。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="カオス・フラクタルの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">カオス・フラクタル の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-      <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statVH">—</div><div class="sl">ホール電圧 V_H</div></div>
-        <div class="stat-card"><div class="sv" id="statRH">—</div><div class="sl">ホール係数 R_H</div></div>
-        <div class="stat-card"><div class="sv" id="statEH">—</div><div class="sl">ホール電界 E_H</div></div>
-        <div class="stat-card"><div class="sv" id="statJ">—</div><div class="sl">電流密度 j</div></div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roVH">—</div><div class="rl">ホール電圧 V_H</div></div>
+        <div class="live-ro"><div class="rv" id="roRH">—</div><div class="rl">ホール係数 R_H</div></div>
+        <div class="live-ro"><div class="rv" id="roVd">—</div><div class="rl">ドリフト速度 v_d</div></div>
+        <div class="live-ro"><div class="rv" id="roEH">—</div><div class="rl">ホール電界 E_H</div></div>
+        <div class="live-ro"><div class="rv" id="roJ">—</div><div class="rl">電流密度 j</div></div>
       </div>
+      <div class="aux-readout" id="balanceRO" style="text-align:center;font-size:0.78rem;">釣り合い: q·E_H = q·v_d·B</div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-cube"></i> ホール素子の模式図</div>
-      <canvas id="hallCanvas"></canvas>
-      <p class="canvas-hint">直方体の試料に縦方向の電流 I、紙面外向きの磁場 B、横方向に発生するホール電圧 V_H を表示</p>
+      <div class="chart-title"><i class="fas fa-atom"></i> ホール効果アニメーション</div>
+      <canvas id="hallCanvas" tabindex="0" role="img" aria-label="導体スラブ中のキャリアが電流方向にドリフトし、磁場でローレンツ力を受けて横方向に偏向、片側に蓄積してホール電界が立ち上がる様子のアニメーション"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#FF9F43"></i>電流 I</span>
+        <span><i class="swatch" style="background:#4dd0e1"></i>キャリア</span>
+        <span><i class="swatch" style="background:#ff5252"></i>ローレンツ力 F</span>
+        <span><i class="swatch" style="background:#FFD166"></i>蓄積(+) / <span style="color:#9bd5ff">(−)</span></span>
+      </div>
+      <p class="canvas-hint">電流 I に沿ってドリフトするキャリアが磁場 B（紙面外）でローレンツ力を受け偏向→片側に蓄積→ホール電界が立ち上がり定常化。キャリア種別を切り替えると蓄積面と V_H 符号が反転します。</p>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> ホール電圧 vs キャリア密度（両対数）</div>
+      <div class="chart-title"><i class="fas fa-chart-line"></i> ホール電圧 vs 磁場 B（線形）</div>
       <canvas id="chartCanvas"></canvas>
-      <p class="canvas-hint">横軸＝log₁₀(n)、縦軸＝|V_H|（対数）／V_H ∝ 1/n の直線／黄点＝現在の運転点</p>
+      <p class="canvas-hint">横軸＝磁場 B [T]、縦軸＝V_H／傾き＝I/(nqt)・符号はキャリア種別で反転／黄点＝現在の運転点</p>
     </div>
 
     <div class="chart-card">
@@ -206,30 +273,52 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       $$R_H = \frac{1}{n\,q},\qquad E_H = \frac{V_H}{w}$$
       <p style="margin-top:6px;">電流密度：</p>
       $$j = \frac{I}{w\,t}$$
-      <p style="margin-top:8px;">$q = 1.602\times10^{-19}$ C は電気素量、$w$ は試料幅、$t$ は試料厚さです。本ツールでは大きさのみを扱い、$R_H$ の符号によるキャリアの種類判定は考慮しません。</p>
+      <p style="margin-top:6px;">釣り合い条件（定常状態）：</p>
+      $$q\,E_H = q\,v_d\,B,\qquad v_d=\frac{I}{nqwt}$$
+      <p style="margin-top:8px;">$q = 1.602\times10^{-19}$ C は電気素量、$w$ は試料幅、$t$ は試料厚さ。$R_H$ の符号はキャリアの種類を示し、電子で負・正孔で正となります（アニメーションで蓄積面と V_H の符号が反転）。</p>
+      <p style="margin-top:6px;font-size:.8rem;color:var(--muted)">検証例：$I=10$ mA, $B=0.5$ T, $n=10^{23}$/m³, $t=100$ μm → $V_H\approx 3.12$ mV, $R_H\approx 6.24\times10^{-5}$ m³/C。銅（$n=8.5\times10^{28}$）では $V_H\approx 0.37$ μV と極小、低密度半導体ほど大きな $V_H$ が得られます。</p>
     </div>
   </div>
 </div>
 
 <script>
-// ========== Hall Effect Simulator ==========
+"use strict";
+// ========== Hall Effect Simulator v2 ==========
+var HALL_I18N = {
+  carrierElectron: '電子', carrierHole: '正孔',
+  pause: '一時停止', play: '再生',
+  drift: 'ドリフト v', lorentz: 'ローレンツ力 F',
+  buildup: 'ホール電界 立ち上がり中…', steady: '定常状態：q·E_H = q·v_d·B',
+  accPlus: '＋蓄積', accMinus: '−蓄積',
+  outOfPage: '（紙面外）', fixedW: 'w = 10 mm 固定',
+  vhVsB: 'V_H', bAxis: 'B [T]'
+};
+HALL_MAIN(HALL_I18N);
+function HALL_MAIN(L){
 var hallCanvas = document.getElementById('hallCanvas');
 var hallCtx = hallCanvas.getContext('2d');
 var chartCanvas = document.getElementById('chartCanvas');
 var chartCtx = chartCanvas.getContext('2d');
-var playing = false;
+var playing = true;
 var animId = null;
+var speedMult = 1;
+var carrierSign = -1;      // -1 electron, +1 hole
 var Q = 1.602e-19;   // elementary charge [C]
 var W_M = 0.01;      // sample width 10 mm [m] (fixed)
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var accFrac = 0;     // 0..1 accumulation/Hall-field buildup progress
+var particles = [];
+var lastTs = 0;
 
 function fmtVH(VH) {
   if (!isFinite(VH)) return '—';
+  var s = VH < 0 ? '-' : '';
   var a = Math.abs(VH);
   if (a === 0) return '0 V';
-  if (a >= 1) return VH.toFixed(2) + ' V';
-  if (a >= 1e-3) return (VH * 1e3).toFixed(2) + ' mV';
-  if (a >= 1e-6) return (VH * 1e6).toFixed(2) + ' μV';
-  return VH.toExponential(2) + ' V';
+  if (a >= 1) return s + a.toFixed(2) + ' V';
+  if (a >= 1e-3) return s + (a * 1e3).toFixed(2) + ' mV';
+  if (a >= 1e-6) return s + (a * 1e6).toFixed(2) + ' μV';
+  return (VH).toExponential(2) + ' V';
 }
 function fmtSci(v, unit) {
   if (!isFinite(v)) return '—';
@@ -237,7 +326,6 @@ function fmtSci(v, unit) {
   if (a === 0) return '0 ' + unit;
   if (a < 0.01 || a >= 1e4) return v.toExponential(2) + ' ' + unit;
   if (a >= 100) return v.toFixed(1) + ' ' + unit;
-  if (a >= 1) return v.toFixed(3) + ' ' + unit;
   return v.toFixed(3) + ' ' + unit;
 }
 function fmtJ(j) {
@@ -246,6 +334,14 @@ function fmtJ(j) {
   if (a === 0) return '0 A/m²';
   if (a < 100 || a >= 1e4) return j.toExponential(2) + ' A/m²';
   return j.toFixed(0) + ' A/m²';
+}
+function fmtVd(v){
+  if(!isFinite(v)) return '—';
+  var a=Math.abs(v);
+  if(a===0) return '0 m/s';
+  if(a<1e-3||a>=1e4) return v.toExponential(2)+' m/s';
+  if(a<1) return (v*1e3).toFixed(2)+' mm/s';
+  return v.toFixed(2)+' m/s';
 }
 
 function getParams() {
@@ -256,7 +352,14 @@ function getParams() {
   var I = I_mA * 1e-3;       // A
   var t = t_um * 1e-6;       // m
   var n = Math.pow(10, logN); // /m^3
-  return { I_mA: I_mA, B: B, logN: logN, t_um: t_um, I: I, t: t, n: n };
+  // physical Hall quantities; sign carried by carrier type
+  var VHmag = I * B / (n * Q * t);
+  var VH = carrierSign < 0 ? -VHmag : VHmag;   // electron negative, hole positive (sign convention)
+  var RH = carrierSign / (n * Q);
+  var EH = VH / W_M;
+  var j = I / (W_M * t);
+  var vd = I / (n * Q * W_M * t);  // drift speed magnitude
+  return { I_mA:I_mA, B:B, logN:logN, t_um:t_um, I:I, t:t, n:n, VH:VH, VHmag:VHmag, RH:RH, EH:EH, j:j, vd:vd };
 }
 
 function __novaCanvasCssW(canvas){
@@ -283,326 +386,360 @@ function resizeCanvases() {
   });
 }
 
-function drawHall(p, VH) {
+// ---- slab geometry (front face) ----
+function slabGeom(W, H){
+  var cx = W * 0.5, cy = H * 0.5;
+  var barW = Math.min(W * 0.46, 300);
+  var barH = Math.min(H * 0.6, 240);
+  var x0 = cx - barW/2, y0 = cy - barH/2;
+  return { cx:cx, cy:cy, barW:barW, barH:barH, x0:x0, y0:y0, x1:x0+barW, y1:y0+barH };
+}
+
+function initParticles(g){
+  particles = [];
+  var N = reduceMotion ? 26 : 40;
+  for (var i=0;i<N;i++){
+    particles.push({
+      x: g.x0 + Math.random()*g.barW,
+      y: g.y0 + Math.random()*g.barH,
+      yoff: 0
+    });
+  }
+}
+
+function drawArrowH(ctx, x0,y0,x1,y1,color,width){
+  ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width;
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+  var ang=Math.atan2(y1-y0,x1-x0), h=6+width;
+  ctx.beginPath(); ctx.moveTo(x1,y1);
+  ctx.lineTo(x1-h*Math.cos(ang-0.4), y1-h*Math.sin(ang-0.4));
+  ctx.lineTo(x1-h*Math.cos(ang+0.4), y1-h*Math.sin(ang+0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+function drawHall(p, dt) {
   var ctx = hallCtx, W = __novaCanvasCssW(hallCanvas), H = __novaCanvasCssH(hallCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
+  var g = slabGeom(W, H);
+  if (!particles.length) initParticles(g);
 
-  // Geometry: front face of bar
-  var cx = W * 0.5, cy = H * 0.5;
-  var barW = Math.min(W * 0.5, 320);
-  var barH = Math.min(H * 0.62, 260);
-  var depth = Math.min(barW, barH) * 0.22;
+  // accumulation / Hall-field buildup progresses toward steady state, faster with stronger B
+  var target = (p.B > 0) ? 1 : 0;
+  var rate = (0.6 + p.B*0.25) * dt;
+  if (reduceMotion){ accFrac = target; }
+  else { accFrac += (target - accFrac) * Math.min(1, rate); }
 
-  var x0 = cx - barW / 2, y0 = cy - barH / 2;
-  var x1 = x0 + barW, y1 = y0 + barH;
+  // accumulation side: electrons (carrierSign<0) and holes pushed to SAME face by F=qv×B,
+  // but opposite charge -> opposite sign on that face. Take "+ charge face" for drawing.
+  // For our convention: positive charge accumulates on the RIGHT when carrierSign hole(+),
+  // electrons accumulate (negative) on the right too -> so right face sign = carrierSign.
+  var rightIsPlus = (carrierSign > 0); // hole -> + on right ; electron -> - on right
+  var x0=g.x0,y0=g.y0,x1=g.x1,y1=g.y1;
 
-  // Back face offset
-  function bx(x) { return x + depth; }
-  function by(y) { return y - depth; }
+  // slab faces with accumulation glow
+  var accAlpha = 0.10 + 0.55*accFrac*Math.min(1,p.B/1.5);
+  // right face
+  var rg = ctx.createLinearGradient(x1-22,0,x1,0);
+  rg.addColorStop(0,'rgba(0,0,0,0)');
+  rg.addColorStop(1, (rightIsPlus?'rgba(255,209,102,':'rgba(155,213,255,')+accAlpha+')');
+  ctx.fillStyle=rg; ctx.fillRect(x1-22,y0,22,y1-y0);
+  // left face
+  var lg = ctx.createLinearGradient(x0+22,0,x0,0);
+  lg.addColorStop(0,'rgba(0,0,0,0)');
+  lg.addColorStop(1, (rightIsPlus?'rgba(155,213,255,':'rgba(255,209,102,')+accAlpha+')');
+  ctx.fillStyle=lg; ctx.fillRect(x0,y0,22,y1-y0);
 
-  // Draw back face
-  ctx.fillStyle = 'rgba(0,180,216,0.20)';
-  ctx.strokeStyle = 'rgba(143,184,224,0.6)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(bx(x0), by(y0));
-  ctx.lineTo(bx(x1), by(y0));
-  ctx.lineTo(bx(x1), by(y1));
-  ctx.lineTo(bx(x0), by(y1));
-  ctx.closePath();
-  ctx.fill(); ctx.stroke();
+  // slab body
+  ctx.fillStyle='rgba(0,180,216,0.12)';
+  ctx.strokeStyle='#9bd5ff'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.rect(x0,y0,g.barW,g.barH); ctx.fill(); ctx.stroke();
 
-  // Connecting edges
-  ctx.beginPath();
-  ctx.moveTo(x0, y0); ctx.lineTo(bx(x0), by(y0));
-  ctx.moveTo(x1, y0); ctx.lineTo(bx(x1), by(y0));
-  ctx.moveTo(x1, y1); ctx.lineTo(bx(x1), by(y1));
-  ctx.moveTo(x0, y1); ctx.lineTo(bx(x0), by(y1));
-  ctx.stroke();
-
-  // Front face
-  ctx.fillStyle = 'rgba(0,180,216,0.35)';
-  ctx.strokeStyle = '#9bd5ff';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.rect(x0, y0, barW, barH);
-  ctx.fill(); ctx.stroke();
-
-  // Sign of charge accumulation (positive on right per +carrier convention in F = qv×B)
-  // Positive charges accumulate on right side: V_H > 0 -> + on right edge.
-  // Just draw + and - on the two vertical sides.
-  ctx.fillStyle = '#FFD166';
-  ctx.font = 'bold 14px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  // right (+) side
-  for (var k = 0; k < 3; k++) {
-    var yy = y0 + barH * (0.25 + k * 0.25);
-    ctx.fillText('+', x1 + 6, yy + 4);
-  }
-  // left (-) side
-  ctx.textAlign = 'right';
-  ctx.fillStyle = '#9bd5ff';
-  for (var k2 = 0; k2 < 3; k2++) {
-    var yy2 = y0 + barH * (0.25 + k2 * 0.25);
-    ctx.fillText('−', x0 - 6, yy2 + 4);
+  // accumulation signs on faces
+  ctx.font='bold 14px "Roboto Mono",monospace';
+  var rSign = rightIsPlus?'+':'−', lSign = rightIsPlus?'−':'+';
+  for (var k=0;k<3;k++){
+    var yy=y0+g.barH*(0.25+k*0.25);
+    ctx.fillStyle = rightIsPlus?'#FFD166':'#9bd5ff';
+    ctx.textAlign='left'; ctx.fillText(rSign, x1+6, yy+4);
+    ctx.fillStyle = rightIsPlus?'#9bd5ff':'#FFD166';
+    ctx.textAlign='right'; ctx.fillText(lSign, x0-6, yy+4);
   }
 
-  // Current I: arrow pointing downward through the bar (top -> bottom)
-  ctx.strokeStyle = '#FF9F43';
-  ctx.fillStyle = '#FF9F43';
-  ctx.lineWidth = 3;
-  var ix = cx;
-  ctx.beginPath();
-  ctx.moveTo(ix, y0 - 28);
-  ctx.lineTo(ix, y1 + 28);
-  ctx.stroke();
-  // arrowhead bottom
-  ctx.beginPath();
-  ctx.moveTo(ix, y1 + 30);
-  ctx.lineTo(ix - 7, y1 + 18);
-  ctx.lineTo(ix + 7, y1 + 18);
-  ctx.closePath();
-  ctx.fill();
-  ctx.font = 'bold 13px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('I = ' + p.I_mA.toFixed(1) + ' mA', ix + 10, y0 - 14);
+  // animate + draw carriers
+  // drift direction along current: conventional current flows top->bottom (+y).
+  // electrons drift opposite (-y, upward); holes drift with current (+y, downward).
+  var driftDir = (carrierSign < 0) ? -1 : 1;
+  var vpix = (reduceMotion?0:1) * (1.1 + p.vd*0.0) * (40 + p.I_mA*0.6) * dt * speedMult;
+  // lateral deflection magnitude shrinks as Hall field builds (straightening), grows with B
+  var latMax = g.barH*0.32 * Math.min(1, p.B/1.0);
+  var deflectNow = latMax * (1-accFrac); // transient sideways push that vanishes at steady state
+  // which side carriers move toward: same face for both => toward rightIsPlus?
+  // Holes(+) pushed toward right (rightIsPlus true). Electrons pushed toward right too (accumulate -, rightIsPlus false but physical motion to right).
+  var sideDir = 1; // +x (toward right face) for default B out of page, current top->bottom
+  for (var i=0;i<particles.length;i++){
+    var pt=particles[i];
+    pt.y += driftDir * vpix;
+    // recycle vertically
+    if (pt.y > y1){ pt.y = y0; pt.x = x0 + Math.random()*g.barW; }
+    if (pt.y < y0){ pt.y = y1; pt.x = x0 + Math.random()*g.barW; }
+    // transient lateral curve: more deflection near entry, settle toward center band
+    var prog = (driftDir>0) ? (pt.y - y0)/g.barH : (y1 - pt.y)/g.barH;
+    pt.yoff = sideDir * deflectNow * Math.sin(prog*Math.PI*0.5);
+    var drawX = pt.x + pt.yoff*0.0; // x already moves below
+    // shift x toward accumulation face during transient
+    var px2 = pt.x + sideDir*deflectNow*Math.min(1,prog*1.3);
+    if (px2 < x0+3) px2 = x0+3; if (px2 > x1-3) px2 = x1-3;
+    // color by carrier
+    ctx.beginPath();
+    ctx.arc(px2, pt.y, 3.2, 0, Math.PI*2);
+    ctx.fillStyle = (carrierSign<0)?'#4dd0e1':'#ff8a65';
+    ctx.fill();
+    // sign glyph
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.font='8px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText(carrierSign<0?'−':'+', px2, pt.y-5);
+  }
 
-  // Magnetic field B: dot in circle (out of page)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.fillStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  var bcx = x0 - 50, bcy = y0 + barH * 0.5;
-  if (bcx < 30) bcx = 30;
-  ctx.beginPath();
-  ctx.arc(bcx, bcy, 14, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(bcx, bcy, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.font = 'bold 12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('B = ' + p.B.toFixed(2) + ' T', bcx, bcy + 32);
-  ctx.font = '9px "Roboto Mono",monospace';
-  ctx.fillText('(out of page)', bcx, bcy + 44);
+  // representative Lorentz force arrow on a mid carrier (transient only)
+  if (p.B>0 && deflectNow>1){
+    var mx=g.cx, my=g.cy;
+    drawArrowH(ctx, mx, my, mx + 30*Math.min(1,p.B/1.0), my, '#ff5252', 2.4);
+    ctx.fillStyle='#ff5252'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText('F', mx+34, my+4);
+  }
 
-  // Hall voltmeter: arc between left and right side with V label
-  ctx.strokeStyle = '#FFD166';
-  ctx.lineWidth = 2;
-  var vy = y0 + barH * 0.5;
-  ctx.beginPath();
-  ctx.moveTo(x0 - 4, vy);
-  ctx.bezierCurveTo(x0 - 30, vy - 80, x1 + 30, vy - 80, x1 + 4, vy);
-  ctx.stroke();
-  // V symbol at top of arc
-  var vcx = cx, vcy = vy - 60;
-  ctx.fillStyle = '#0a1929';
-  ctx.beginPath();
-  ctx.arc(vcx, vcy, 14, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#FFD166';
-  ctx.beginPath();
-  ctx.arc(vcx, vcy, 14, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = '#FFD166';
-  ctx.font = 'bold 14px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('V', vcx, vcy + 5);
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.fillText('V_H = ' + fmtVH(VH), vcx, vcy - 22);
+  // current arrow (conventional, top->bottom)
+  ctx.strokeStyle='#FF9F43'; ctx.fillStyle='#FF9F43'; ctx.lineWidth=3;
+  var ix=g.cx;
+  drawArrowH(ctx, ix, y0-26, ix, y1+26, '#FF9F43', 3);
+  ctx.font='bold 12px "Roboto Mono",monospace'; ctx.textAlign='left';
+  ctx.fillText('I = '+p.I_mA.toFixed(1)+' mA', ix+8, y0-12);
+  ctx.fillStyle='#cfe3f7'; ctx.font='9px "Roboto Mono",monospace';
+  ctx.fillText((carrierSign<0?L.carrierElectron:L.carrierHole), ix+8, y1+22);
 
-  // Thickness label
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('t = ' + p.t_um.toFixed(0) + ' μm', bx(x1) + 6, by(y0) + 12);
-  ctx.fillText('w = 10 mm (fixed)', bx(x1) + 6, by(y0) + 28);
+  // B field dots (out of page) across slab
+  ctx.strokeStyle='#00B4D8'; ctx.fillStyle='#00B4D8'; ctx.lineWidth=1.5;
+  var bcx=x0-44, bcy=g.cy; if (bcx<26) bcx=26;
+  ctx.beginPath(); ctx.arc(bcx,bcy,13,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(bcx,bcy,3.5,0,Math.PI*2); ctx.fill();
+  ctx.font='bold 11px "Roboto Mono",monospace'; ctx.textAlign='center';
+  ctx.fillText('B = '+p.B.toFixed(2)+' T', bcx, bcy+30);
+  ctx.font='8px "Roboto Mono",monospace';
+  ctx.fillText(L.outOfPage, bcx, bcy+42);
 
-  // Axes / orientation triad bottom-right
-  var ax0 = W - 70, ay0 = H - 16;
-  ctx.strokeStyle = '#FF9F43'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax0, ay0 - 30); ctx.stroke();
-  ctx.fillStyle = '#FF9F43'; ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center'; ctx.fillText('I', ax0, ay0 - 34);
-  ctx.strokeStyle = '#FFD166';
-  ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax0 + 30, ay0); ctx.stroke();
-  ctx.fillStyle = '#FFD166'; ctx.fillText('V_H', ax0 + 30, ay0 + 12);
-  ctx.fillStyle = '#00B4D8';
-  ctx.beginPath(); ctx.arc(ax0 - 14, ay0 - 8, 6, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.arc(ax0 - 14, ay0 - 8, 2, 0, Math.PI * 2); ctx.fill();
-  ctx.fillText('B', ax0 - 14, ay0 + 12);
+  // Hall voltmeter
+  ctx.strokeStyle='#FFD166'; ctx.lineWidth=2;
+  var vy=g.cy;
+  ctx.beginPath(); ctx.moveTo(x0-4,vy);
+  ctx.bezierCurveTo(x0-26,vy-72,x1+26,vy-72,x1+4,vy); ctx.stroke();
+  var vcx=g.cx, vcy=vy-54;
+  ctx.fillStyle='#0a1929'; ctx.beginPath(); ctx.arc(vcx,vcy,13,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#FFD166'; ctx.beginPath(); ctx.arc(vcx,vcy,13,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='#FFD166'; ctx.font='bold 13px "Roboto Mono",monospace'; ctx.textAlign='center';
+  ctx.fillText('V', vcx, vcy+5);
+  ctx.font='11px "Roboto Mono",monospace';
+  ctx.fillText('V_H = '+fmtVH(p.VH), vcx, vcy-20);
+
+  // thickness label
+  ctx.fillStyle='#cfe3f7'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='left';
+  ctx.fillText('t = '+p.t_um.toFixed(0)+' μm', x1+18, y0+12);
+  ctx.fillText(L.fixedW, x1+18, y0+26);
+
+  // steady/buildup annotation
+  ctx.textAlign='center'; ctx.font='11px "Roboto Mono",monospace';
+  if (p.B>0){
+    if (accFrac>0.92){ ctx.fillStyle='#7CFFB2'; ctx.fillText(L.steady, g.cx, y1+44); }
+    else { ctx.fillStyle='#ffd54a'; ctx.fillText(L.buildup, g.cx, y1+44); }
+  }
 }
 
-function drawChart(p, VH) {
+function drawChart(p) {
   var ctx = chartCtx, W = __novaCanvasCssW(chartCanvas), H = __novaCanvasCssH(chartCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
 
-  var mx = 64, my = 30;
-  var x0 = mx, x1 = W - 14, y0 = H - my, y1 = my + 6;
-  var gw = x1 - x0, gh = y0 - y1;
+  var mL=58, mR=16, mT=22, mB=34;
+  var x0=mL, x1=W-mR, y0=H-mB, y1=mT;
+  var gw=x1-x0, gh=y0-y1;
 
-  // X: log10(n) in [22, 29]
-  var XL = 22, XH = 29;
-  // Y: log10(|V_H|) — bound based on I, B, t fixed at current values, n sweeping
-  function VHat(logN) {
-    var n = Math.pow(10, logN);
-    return Math.abs(p.I * p.B / (n * Q * p.t));
+  var BL=0, BH=5;
+  // slope = I/(nqt) with carrier sign
+  var slope = carrierSign * p.I / (p.n * Q * p.t);
+  function VHatB(B){ return slope*B; }
+  var vAt5 = VHatB(BH);
+  var amp = Math.max(Math.abs(vAt5), 1e-12);
+  var YH = amp, YL = -amp;
+  // symmetric axis through 0 so the sign flip is visible
+  function px(B){ return x0 + (B-BL)/(BH-BL)*gw; }
+  function py(v){ return y0 - (v-YL)/(YH-YL)*gh; }
+
+  // zero line
+  ctx.strokeStyle='rgba(143,184,224,0.5)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x0,py(0)); ctx.lineTo(x1,py(0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y1); ctx.stroke();
+
+  // x grid
+  ctx.fillStyle='#8fb8e0'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+  for (var b=0;b<=5;b++){
+    var xx=px(b);
+    ctx.strokeStyle='rgba(143,184,224,0.15)';
+    ctx.beginPath(); ctx.moveTo(xx,y1); ctx.lineTo(xx,y0); ctx.stroke();
+    ctx.fillStyle='#8fb8e0'; ctx.fillText(b.toFixed(0), xx, y0+14);
   }
-  var VHmin = VHat(XH);
-  var VHmax = VHat(XL);
-  if (!isFinite(VHmin) || VHmin <= 0) VHmin = 1e-12;
-  if (!isFinite(VHmax) || VHmax <= 0) VHmax = 1e-3;
-  var YL = Math.floor(Math.log10(VHmin) - 0.3);
-  var YH = Math.ceil(Math.log10(VHmax) + 0.3);
-  if (YH - YL < 2) { YH = YL + 2; }
-
-  function px(lx) { return x0 + (lx - XL) / (XH - XL) * gw; }
-  function py(ly) { return y0 - (ly - YL) / (YH - YL) * gh; }
-
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-
-  // X grid + labels
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  for (var lx = 22; lx <= 29; lx++) {
-    var xx = px(lx);
-    ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-    ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText('10^' + lx, xx, y0 + 14);
+  // y labels (top/zero/bottom)
+  ctx.textAlign='right';
+  function yLabel(v){
+    var a=Math.abs(v), s='';
+    if(a>=1) s=v.toFixed(2)+'V';
+    else if(a>=1e-3) s=(v*1e3).toFixed(1)+'mV';
+    else if(a>=1e-6) s=(v*1e6).toFixed(1)+'μV';
+    else if(a===0) s='0';
+    else s=v.toExponential(1);
+    return s;
   }
-  // Y grid + labels (integer decades)
-  ctx.textAlign = 'right';
-  for (var ly = YL; ly <= YH; ly++) {
-    var yy = py(ly);
-    ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-    ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText('10^' + ly, x0 - 4, yy + 3);
-  }
+  ctx.fillStyle='#8fb8e0';
+  ctx.fillText(yLabel(YH), x0-4, py(YH)+9);
+  ctx.fillText(yLabel(0), x0-4, py(0)+3);
+  ctx.fillText(yLabel(YL), x0-4, py(YL)-2);
 
   // axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('n (/m³)', (x0 + x1) / 2, H - 4);
-  ctx.save();
-  ctx.translate(14, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('|V_H| (V)', 0, 0);
-  ctx.restore();
+  ctx.fillStyle='#cfe3f7'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='center';
+  ctx.fillText(L.bAxis, (x0+x1)/2, H-3);
+  ctx.save(); ctx.translate(13,(y0+y1)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText(L.vhVsB+' [V]', 0, 0); ctx.restore();
 
-  // V_H curve (line in log-log: slope = -1)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
+  // line V_H = slope*B
+  ctx.strokeStyle = (carrierSign<0)?'#4dd0e1':'#ff8a65';
+  ctx.lineWidth=2.5;
   ctx.beginPath();
-  var firstP = true;
-  for (var lxi = XL; lxi <= XH + 0.001; lxi += 0.05) {
-    var v = VHat(lxi);
-    var ly2 = Math.log10(v);
-    if (!isFinite(ly2) || ly2 < YL || ly2 > YH) { firstP = true; continue; }
-    var xPix = px(lxi), yPix = py(ly2);
-    if (firstP) { ctx.moveTo(xPix, yPix); firstP = false; } else { ctx.lineTo(xPix, yPix); }
-  }
+  ctx.moveTo(px(0), py(VHatB(0)));
+  ctx.lineTo(px(5), py(VHatB(5)));
   ctx.stroke();
 
-  // current operating point
-  if (isFinite(VH) && VH > 0) {
-    var lyc = Math.log10(VH);
-    if (lyc >= YL && lyc <= YH) {
-      var cx = px(p.logN), cy = py(lyc);
-      ctx.beginPath();
-      ctx.arc(cx, cy, 7, 0, Math.PI * 2);
-      ctx.fillStyle = '#FFD166';
-      ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 12;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#001F3F';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
+  // operating point
+  var cxp=px(p.B), cyp=py(p.VH);
+  if (isFinite(cyp)){
+    ctx.beginPath(); ctx.arc(cxp,cyp,7,0,Math.PI*2);
+    ctx.fillStyle='#FFD166'; ctx.shadowColor='#FFD166'; ctx.shadowBlur=12; ctx.fill();
+    ctx.shadowBlur=0; ctx.strokeStyle='#001F3F'; ctx.lineWidth=1.5; ctx.stroke();
   }
-
-  // Semiconductor / metal hint shading
-  // Semiconductor region: log n in [22, 25.5]
-  ctx.fillStyle = 'rgba(0,180,216,0.07)';
-  ctx.fillRect(px(22), y1, px(25.5) - px(22), y0 - y1);
-  // Metal region: log n in [28, 29]
-  ctx.fillStyle = 'rgba(255,159,67,0.07)';
-  ctx.fillRect(px(28), y1, px(29) - px(28), y0 - y1);
-  ctx.fillStyle = '#00B4D8'; ctx.font = '9px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('semiconductor', (px(22) + px(25.5)) / 2, y1 + 12);
-  ctx.fillStyle = '#FF9F43';
-  ctx.fillText('metal', (px(28) + px(29)) / 2, y1 + 12);
+  // slope annotation
+  ctx.fillStyle='#cfe3f7'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='left';
+  ctx.fillText('slope=I/(nqt)'+(carrierSign<0?' (−)':' (+)'), x0+8, y1+10);
 }
 
+function updateReadouts(p){
+  document.getElementById('roVH').textContent = fmtVH(p.VH);
+  document.getElementById('roRH').textContent = (p.RH).toExponential(2)+' m³/C';
+  document.getElementById('roVd').textContent = fmtVd(p.vd);
+  document.getElementById('roEH').textContent = fmtSci(p.EH,'V/m');
+  document.getElementById('roJ').textContent = fmtJ(p.j);
+  document.getElementById('auxN').textContent = 'n = '+p.n.toExponential(2)+' /m³';
+}
+
+var lastP = null;
 function compute() {
   var p = getParams();
-  if (!isFinite(p.I) || !isFinite(p.B) || !isFinite(p.n) || !isFinite(p.t) || p.n <= 0 || p.t <= 0) return;
-  var VH = p.I * p.B / (p.n * Q * p.t);
-  var RH = 1 / (p.n * Q);
-  var EH = VH / W_M;
-  var j = p.I / (W_M * p.t);
-
-  document.getElementById('statVH').textContent = fmtVH(VH);
-  document.getElementById('statRH').textContent = RH.toExponential(2) + ' m³/C';
-  document.getElementById('statEH').textContent = fmtSci(EH, 'V/m');
-  document.getElementById('statJ').textContent = fmtJ(j);
-  document.getElementById('auxN').textContent = 'n = ' + p.n.toExponential(2) + ' /m³';
-
-  drawHall(p, VH);
-  drawChart(p, VH);
+  if (!isFinite(p.I)||!isFinite(p.B)||!isFinite(p.n)||!isFinite(p.t)||p.n<=0||p.t<=0) return;
+  lastP = p;
+  updateReadouts(p);
+  drawChart(p);
+  if (!playing){ drawHall(p, 0); }
 }
 
-function animationStep() {
+function frame(ts){
   if (!playing) return;
-  var sl = document.getElementById('slLogN');
-  var v = parseFloat(sl.value) + 0.05;
-  if (v > 29) v = 22;
-  sl.value = v;
-  updateSlider(sl, 'slLogNVal', 1, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
+  var dt = lastTs ? Math.min(0.05, (ts-lastTs)/1000) : 0.016;
+  lastTs = ts;
+  var p = getParams();
+  if (isFinite(p.n)&&p.n>0&&isFinite(p.t)&&p.t>0){
+    drawHall(p, dt);
+  }
+  animId = requestAnimationFrame(frame);
+}
+
+function startAnim(){
+  if (reduceMotion){ if(lastP) drawHall(lastP,0); return; }
+  if (animId) cancelAnimationFrame(animId);
+  lastTs = 0;
+  animId = requestAnimationFrame(frame);
 }
 
 function togglePlay() {
   playing = !playing;
   var btn = document.getElementById('playBtn');
   if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
+    btn.innerHTML = '<i class="fas fa-pause"></i> '+L.pause;
+    startAnim();
   } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> n をスイープ';
+    btn.innerHTML = '<i class="fas fa-play"></i> '+L.play;
     if (animId) cancelAnimationFrame(animId);
   }
 }
 
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> n をスイープ';
-  var defs = { slI: 10.0, slB: 0.50, slLogN: 23.0, slT_um: 100 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slI'), 'slIVal', 1, '');
-  updateSlider(document.getElementById('slB'), 'slBVal', 2, '');
-  updateSlider(document.getElementById('slLogN'), 'slLogNVal', 1, '');
-  updateSlider(document.getElementById('slT_um'), 'slT_umVal', 0, '');
+function setSpeed(s){
+  speedMult = s;
+  var btns = document.querySelectorAll('.speed-btn');
+  for (var i=0;i<btns.length;i++){
+    btns[i].classList.toggle('active', parseFloat(btns[i].dataset.speed)===s);
+  }
+}
+
+function toggleCarrier(){
+  carrierSign = -carrierSign;
+  var btn = document.getElementById('carrierToggle');
+  if (carrierSign<0){ btn.innerHTML = '<i class="fas fa-minus-circle"></i> '+L.carrierElectron; }
+  else { btn.innerHTML = '<i class="fas fa-plus-circle"></i> '+L.carrierHole; }
+  accFrac = 0;
   compute();
 }
 
-window.addEventListener('resize', function () { resizeCanvases(); compute(); });
+function applyVals(I,B,logN,t_um){
+  document.getElementById('slI').value=I;
+  document.getElementById('slB').value=B;
+  document.getElementById('slLogN').value=logN;
+  document.getElementById('slT_um').value=t_um;
+  updateSlider(document.getElementById('slI'),'slIVal',1,'');
+  updateSlider(document.getElementById('slB'),'slBVal',2,'');
+  updateSlider(document.getElementById('slLogN'),'slLogNVal',1,'');
+  updateSlider(document.getElementById('slT_um'),'slT_umVal',0,'');
+  accFrac=0;
+  compute();
+}
+
+function setCarrier(sign){
+  carrierSign = sign;
+  var btn=document.getElementById('carrierToggle');
+  if (carrierSign<0){ btn.innerHTML='<i class="fas fa-minus-circle"></i> '+L.carrierElectron; }
+  else { btn.innerHTML='<i class="fas fa-plus-circle"></i> '+L.carrierHole; }
+}
+
+function setMaterial(m){
+  if (m==='copper'){ setCarrier(-1); applyVals(10.0,0.50,28.93,100); }      // n≈8.5e28
+  else if (m==='ntype'){ setCarrier(-1); applyVals(10.0,0.50,22.0,100); }    // n=1e22
+  else if (m==='ptype'){ setCarrier(1); applyVals(10.0,0.50,22.0,100); }
+}
+function setScenario(s){
+  if (s==='electrons'){ setCarrier(-1); applyVals(10.0,1.0,23.0,100); }
+  else if (s==='holes'){ setCarrier(1); applyVals(10.0,1.0,23.0,100); }
+  else if (s==='strong'){ setCarrier(-1); applyVals(20.0,5.0,23.0,100); }
+  else if (s==='lown'){ setCarrier(-1); applyVals(10.0,0.50,22.0,20); }
+}
+
+function resetParams() {
+  setCarrier(-1);
+  applyVals(10.0,0.50,23.0,100);
+  setSpeed(1);
+  if (!playing){ togglePlay(); }
+}
+
+window.addEventListener('resize', function () { resizeCanvases(); if(lastP){drawChart(lastP); if(!playing)drawHall(lastP,0);} });
 
 resizeCanvases();
 compute();
+startAnim();
+}
 </script>
 
 <section class="explanation">
@@ -670,6 +807,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="hall-effect.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -725,13 +865,13 @@ compute();
 <ol>
 <li>電流値(mA)をスライダーslIで設定します。典型値は10～100mAです。</li>
 <li>磁束密度(T)をslBで入力します。半導体測定では0.1～1.0Tが標準です。</li>
-<li>キャリア濃度の対数値(log₁₀ cm⁻³)をslLogNで調整し、10¹⁴～10¹⁸cm⁻³範囲を指定します。</li>
+<li>キャリア密度の対数値 log₁₀n（n は /m³ 単位）を slLogN で調整します。スライダー範囲は22～29で、半導体（22～25）から金属（28～29）までをカバーします。</li>
 <li>試料厚さ(μm)をslT_umで設定し、シミュレーターが自動計算します。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>GaAs半導体試料(n型、キャリア濃度2×10¹⁶cm⁻³)に電流50mA、磁束密度0.5Tを印加した場合：ホール係数R_H=3.1×10⁻²cm³/C、電流密度j=5×10³A/cm²、ホール電界E_H=1.55mV/cm、ホール電圧V_H(試料幅1mm時)=1.55μVとなります。移動度μ=eR_H/ρ=9,500cm²/Vs相当の高速キャリア特性が得られます。</p>
+<p>既定条件（電流I=10mA、磁束密度B=0.5T、キャリア密度n=1×10²³/m³、試料厚さt=100μm、試料幅w=10mm固定）の場合：ホール電圧V_H≈3.12mV、ホール係数R_H≈6.24×10⁻⁵ m³/C、ホール電界E_H≈0.31V/m、電流密度j≈1.0×10⁴ A/m²となります。スライダーでlog₁₀n=23→29（金属側）に動かすと、V_HはミリボルトからマイクロボルトへとV_H∝1/nで低下します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -741,6 +881,16 @@ compute();
 <li>試料接触抵抗が0.1Ω以上あると測定値が30%程度悪化するため、金メッキ電極で接触抵抗を10mΩ以下に制御してください。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4480093370?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4480093370.09._SCMZZZZZZ_.jpg" alt="カオス・フラクタルの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">カオス・フラクタル の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

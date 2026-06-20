@@ -36,7 +36,7 @@ MathJax = { tex: { inlineMath: [['$','$']] }, options: { skipHtmlTags: ['script'
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "結晶格子構造ビジュアライザ",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Web",
@@ -204,9 +204,15 @@ details p { padding: 12px 16px; font-size: 0.88rem; line-height: 1.7; background
       <div class="tab" onclick="switchTab('coord')">最近接距離</div>
     </div>
     <div class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 格子</div><canvas id="latticeCanvas" width="700" height="400"></canvas></div>
-      <div id="fillChart" class="canvas-wrap"><div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 充填</div><canvas class="ux-chartjs-canvas" id="fillChartCanvas"></canvas></div></div>
-      <div id="coordChart" class="canvas-wrap"><canvas class="ux-chartjs-canvas" id="coordChartCanvas"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-cube"></i> 回転する単位格子（リアルタイム3D）</div><canvas id="latticeCanvas" width="700" height="400"></canvas>
+        <div class="anim-controls" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button type="button" id="playPauseBtn" class="btn-lattice" style="flex:0 0 auto;min-width:96px">⏸ 一時停止</button>
+          <button type="button" id="resetViewBtn" class="btn-lattice" style="flex:0 0 auto;min-width:96px">↺ リセット</button>
+          <span id="liveRelation" style="margin-left:auto;align-self:center;font-size:.8rem;font-weight:700;color:var(--accent);font-family:'Roboto Mono',monospace"></span>
+        </div>
+      </div>
+      <div id="fillChart" class="canvas-wrap" style="display:none"><div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 充填</div><canvas class="ux-chartjs-canvas" id="fillChartCanvas"></canvas></div></div>
+      <div id="coordChart" class="canvas-wrap" style="display:none"><canvas class="ux-chartjs-canvas" id="coordChartCanvas"></canvas></div>
     </div>
   <div class="chart-card">
   <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
@@ -258,112 +264,81 @@ details p { padding: 12px 16px; font-size: 0.88rem; line-height: 1.7; background
 
 
 <script>
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
+(function(){
+'use strict';
+function hidpi(canvas, ctx){
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 320));
+  var w = Math.max(1, Math.round(canvas.clientWidth || canvas.width || 700));
+  var h = Math.max(1, Math.round(canvas.clientHeight || canvas.height || 400));
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
   canvas.width = Math.round(w * dpr);
   canvas.height = Math.round(h * dpr);
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
   if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
+  return { w: w, h: h };
 }
 
-let currentLattice = 'SC';
-let fillChart = null, coordChart = null;
-const latticeData = {
-  SC:  { fill: 52.36, coord: 6,  atoms: 1, a2r: a => a/2,          nn: a => a,         color: '#FF6B6B', name: '単純立方' },
-  BCC: { fill: 68.02, coord: 8,  atoms: 2, a2r: a => a*Math.sqrt(3)/4, nn: a => a*Math.sqrt(3)/2, color: '#4ECDC4', name: '体心立方' },
-  FCC: { fill: 74.05, coord: 12, atoms: 4, a2r: a => a*Math.sqrt(2)/4, nn: a => a/Math.sqrt(2),   color: '#007BFF', name: '面心立方' },
-  HCP: { fill: 74.05, coord: 12, atoms: 6, a2r: a => a/2,           nn: a => a,         color: '#9B59B6', name: '六方最密' }
+var currentLattice = 'FCC';
+var fillChart = null, coordChart = null;
+var spin = 0.6;            // current rotation angle (rad)
+var spinning = true;       // play/pause state
+var animId = null;
+var lastT = 0;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+var latticeData = {
+  SC:  { fill: 52.36, coord: 6,  atoms: 1, a2r: function(a){return a/2;},            nn: function(a){return a;},               color: '#FF6B6B', name: '単純立方', rel: '2r = a' },
+  BCC: { fill: 68.02, coord: 8,  atoms: 2, a2r: function(a){return a*Math.sqrt(3)/4;}, nn: function(a){return a*Math.sqrt(3)/2;}, color: '#4ECDC4', name: '体心立方', rel: '4r = √3·a' },
+  FCC: { fill: 74.05, coord: 12, atoms: 4, a2r: function(a){return a*Math.sqrt(2)/4;}, nn: function(a){return a/Math.sqrt(2);},   color: '#007BFF', name: '面心立方', rel: '4r = √2·a' },
+  HCP: { fill: 74.05, coord: 12, atoms: 6, a2r: function(a){return a/2;},            nn: function(a){return a;},               color: '#9B59B6', name: '六方最密', rel: '2r = a, c/a≈1.633' }
 };
 
 function setLattice(type) {
   currentLattice = type;
-  document.querySelectorAll('.btn-lattice').forEach((b,i) => {
-    b.classList.toggle('active', ['SC','BCC','FCC','HCP'][i] === type);
-  });
-  const d = latticeData[type];
-  const a = parseFloat(document.getElementById('aSlider').value);
+  var order = ['SC','BCC','FCC','HCP'];
+  var btns = document.querySelectorAll('.btn-lattice');
+  btns.forEach(function(b){ if(b.dataset && b.dataset.lat){ b.classList.toggle('active', b.dataset.lat === type); } });
+  var d = latticeData[type];
+  var a = parseFloat(document.getElementById('aSlider').value);
   document.getElementById('rSlider').value = Math.min(2.5, Math.max(0.5, d.a2r(a))).toFixed(2);
-  updateSliders();
+  updateStats();
 }
 
-function updateSliders() {
-  const a = parseFloat(document.getElementById('aSlider').value);
-  const r = parseFloat(document.getElementById('rSlider').value);
-  const rot = parseFloat(document.getElementById('rotSlider').value);
-  var _gaVal=document.getElementById('aValNum');if(_gaVal)_gaVal.textContent = a.toFixed(2);
-  var _grVal=document.getElementById('rValNum');if(_grVal)_grVal.textContent = r.toFixed(2);
-  var _grotVal=document.getElementById('rotValNum');if(_grotVal)_grotVal.textContent = rot;
-  (function(){var e=document.getElementById('aValNum');if(e)e.value=a.toFixed(2);})();
-  (function(){var e=document.getElementById('rValNum');if(e)e.value=r.toFixed(2);})();
-  (function(){var e=document.getElementById('rotValNum');if(e)e.value=rot;})();
-  const d = latticeData[currentLattice];
+function updateStats() {
+  var a = parseFloat(document.getElementById('aSlider').value);
+  var r = parseFloat(document.getElementById('rSlider').value);
+  var rot = parseFloat(document.getElementById('rotSlider').value);
+  var ea=document.getElementById('aValNum'); if(ea){ ea.value=a.toFixed(2); }
+  var er=document.getElementById('rValNum'); if(er){ er.value=r.toFixed(2); }
+  var erot=document.getElementById('rotValNum'); if(erot){ erot.value=rot; }
+  var d = latticeData[currentLattice];
   document.getElementById('fillRate').textContent = d.fill.toFixed(2);
   document.getElementById('coordNum').textContent = d.coord;
   document.getElementById('atomPerCell').textContent = d.atoms;
   document.getElementById('nnDist').textContent = d.nn(a).toFixed(2);
-  drawLattice(a, r, rot);
+  var lr = document.getElementById('liveRelation');
+  if (lr) lr.textContent = d.rel;
+  // sync manual rotation slider into the live spin when paused
+  if (!spinning) spin = rot * Math.PI / 180;
+  drawLattice();
 }
 
-function drawLattice(a, r, rot) {
-  const canvas = document.getElementById('latticeCanvas');
-  const ctx = canvas.getContext('2d');const __novaDims0 = __novaHiDpiCanvas(canvas, canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height, ctx);
-const W = __novaDims0.w, H = __novaDims0.h;
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#0a0f1e';
-  ctx.fillRect(0, 0, W, H);
-
-  const cx = W/2, cy = H/2;
-  const scale = Math.min(W, H) * 0.18;
-  const angle = rot * Math.PI / 180;
-  const tilt = 0.4;
-
-  // 3D isometric projection helper
-  function project(x, y, z) {
-    const rx = Math.cos(angle)*x - Math.sin(angle)*y;
-    const ry = Math.sin(angle)*x + Math.cos(angle)*y;
-    return {
-      px: cx + (rx - ry) * scale * 0.7,
-      py: cy + (rx + ry) * tilt * scale - z * scale * 0.8
-    };
-  }
-
-  const atomR = (r / a) * scale * 0.4;
-  const clampR = Math.max(4, Math.min(20, atomR));
-
-  // Draw edges
-  ctx.strokeStyle = 'rgba(0,123,255,0.4)';
-  ctx.lineWidth = 1.5;
-  const corners = [];
-  for (let x=0; x<=1; x++) for (let y=0; y<=1; y++) for (let z=0; z<=1; z++) corners.push([x,y,z]);
-  const edges = [[0,1],[0,2],[0,4],[1,3],[1,5],[2,3],[2,6],[3,7],[4,5],[4,6],[5,7],[6,7]];
-  edges.forEach(([i,j]) => {
-    const p1 = project(...corners[i]), p2 = project(...corners[j]);
-    ctx.beginPath(); ctx.moveTo(p1.px,p1.py); ctx.lineTo(p2.px,p2.py); ctx.stroke();
-  });
-
-  // Atom positions based on lattice type
-  let atoms = [];
+function buildAtoms() {
+  var atoms = [];
   if (currentLattice === 'SC') {
-    for (let x=0;x<=1;x++) for (let y=0;y<=1;y++) for (let z=0;z<=1;z++) atoms.push([x,y,z,1]);
+    for (var x=0;x<=1;x++) for (var y=0;y<=1;y++) for (var z=0;z<=1;z++) atoms.push([x,y,z,1]);
   } else if (currentLattice === 'BCC') {
-    for (let x=0;x<=1;x++) for (let y=0;y<=1;y++) for (let z=0;z<=1;z++) atoms.push([x,y,z,1]);
+    for (var x2=0;x2<=1;x2++) for (var y2=0;y2<=1;y2++) for (var z2=0;z2<=1;z2++) atoms.push([x2,y2,z2,1]);
     atoms.push([0.5,0.5,0.5,1]);
   } else if (currentLattice === 'FCC') {
-    for (let x=0;x<=1;x++) for (let y=0;y<=1;y++) for (let z=0;z<=1;z++) atoms.push([x,y,z,0.5]);
-    [[0.5,0.5,0],[0.5,0,0.5],[0,0.5,0.5],[0.5,0.5,1],[0.5,1,0.5],[1,0.5,0.5]].forEach(p => atoms.push([...p,1]));
+    for (var x3=0;x3<=1;x3++) for (var y3=0;y3<=1;y3++) for (var z3=0;z3<=1;z3++) atoms.push([x3,y3,z3,0.55]);
+    [[0.5,0.5,0],[0.5,0,0.5],[0,0.5,0.5],[0.5,0.5,1],[0.5,1,0.5],[1,0.5,0.5]].forEach(function(p){ atoms.push([p[0],p[1],p[2],1]); });
   } else if (currentLattice === 'HCP') {
-    // Simplified HCP top/bottom layers + center
-    for (let i=0;i<6;i++) {
-      const ang = i*Math.PI/3;
-      atoms.push([0.5+0.4*Math.cos(ang), 0.5+0.4*Math.sin(ang), 0, 0.6]);
-      atoms.push([0.5+0.4*Math.cos(ang), 0.5+0.4*Math.sin(ang), 1, 0.6]);
+    for (var i=0;i<6;i++) {
+      var ang = i*Math.PI/3;
+      atoms.push([0.5+0.4*Math.cos(ang), 0.5+0.4*Math.sin(ang), 0, 0.7]);
+      atoms.push([0.5+0.4*Math.cos(ang), 0.5+0.4*Math.sin(ang), 1, 0.7]);
     }
     atoms.push([0.5, 0.5, 0, 1]);
     atoms.push([0.5, 0.5, 1, 1]);
@@ -371,40 +346,108 @@ const W = __novaDims0.w, H = __novaDims0.h;
     atoms.push([0.5+0.4*Math.cos(Math.PI/6+2*Math.PI/3), 0.5+0.4*Math.sin(Math.PI/6+2*Math.PI/3), 0.5, 1]);
     atoms.push([0.5+0.4*Math.cos(Math.PI/6+4*Math.PI/3), 0.5+0.4*Math.sin(Math.PI/6+4*Math.PI/3), 0.5, 1]);
   }
+  return atoms;
+}
 
-  const color = latticeData[currentLattice].color;
-  atoms.sort((a,b) => {
-    const pa = project(a[0],a[1],a[2]), pb = project(b[0],b[1],b[2]);
-    return pa.py - pb.py;
+function drawLattice() {
+  var canvas = document.getElementById('latticeCanvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dims = hidpi(canvas, ctx);
+  var W = dims.w, H = dims.h;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0f1e';
+  ctx.fillRect(0, 0, W, H);
+
+  var cx = W/2, cy = H/2;
+  var scale = Math.min(W, H) * 0.18;
+  var angle = spin;
+  var tilt = 0.4;
+  function project(x, y, z) {
+    var ox = x - 0.5, oy = y - 0.5;
+    var rx = Math.cos(angle)*ox - Math.sin(angle)*oy;
+    var ry = Math.sin(angle)*ox + Math.cos(angle)*oy;
+    return { px: cx + (rx - ry) * scale * 0.95, py: cy + (rx + ry) * tilt * scale - (z-0.5) * scale * 1.1 };
+  }
+
+  var r = parseFloat(document.getElementById('rSlider').value);
+  var a = parseFloat(document.getElementById('aSlider').value);
+  var atomR = (r / a) * scale * 0.9;
+  var clampR = Math.max(6, Math.min(26, atomR));
+
+  // cell edges
+  ctx.strokeStyle = 'rgba(0,123,255,0.45)';
+  ctx.lineWidth = 1.5;
+  var corners = [];
+  for (var x=0; x<=1; x++) for (var y=0; y<=1; y++) for (var z=0; z<=1; z++) corners.push([x,y,z]);
+  var edges = [[0,1],[0,2],[0,4],[1,3],[1,5],[2,3],[2,6],[3,7],[4,5],[4,6],[5,7],[6,7]];
+  edges.forEach(function(e){
+    var p1 = project(corners[e[0]][0],corners[e[0]][1],corners[e[0]][2]);
+    var p2 = project(corners[e[1]][0],corners[e[1]][1],corners[e[1]][2]);
+    ctx.beginPath(); ctx.moveTo(p1.px,p1.py); ctx.lineTo(p2.px,p2.py); ctx.stroke();
   });
 
-  atoms.forEach(([x,y,z,alpha]) => {
-    const p = project(x,y,z);
-    const grad = ctx.createRadialGradient(p.px-clampR*0.3, p.py-clampR*0.3, clampR*0.1, p.px, p.py, clampR);
-    grad.addColorStop(0, `rgba(255,255,255,${0.9*alpha})`);
-    grad.addColorStop(0.4, `${color}${Math.floor(alpha*255).toString(16).padStart(2,'0')}`);
-    grad.addColorStop(1, `rgba(0,0,0,${0.7*alpha})`);
+  var color = latticeData[currentLattice].color;
+  var atoms = buildAtoms();
+  atoms.sort(function(p,q){
+    var pa = project(p[0],p[1],p[2]), pb = project(q[0],q[1],q[2]);
+    return pa.py - pb.py;
+  });
+  atoms.forEach(function(at){
+    var p = project(at[0],at[1],at[2]);
+    var alpha = at[3];
+    var grad = ctx.createRadialGradient(p.px-clampR*0.3, p.py-clampR*0.3, clampR*0.1, p.px, p.py, clampR);
+    grad.addColorStop(0, 'rgba(255,255,255,'+(0.9*alpha)+')');
+    grad.addColorStop(0.4, color + Math.floor(alpha*255).toString(16).padStart(2,'0'));
+    grad.addColorStop(1, 'rgba(0,0,0,'+(0.7*alpha)+')');
     ctx.beginPath();
     ctx.arc(p.px, p.py, clampR*alpha*0.8+clampR*0.2, 0, Math.PI*2);
     ctx.fillStyle = grad;
     ctx.fill();
   });
 
-  // Label
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  // overlaid annotation
+  var d = latticeData[currentLattice];
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.font = 'bold 14px Roboto Mono, monospace';
-  ctx.fillText(`${currentLattice} — 充填率 ${latticeData[currentLattice].fill}%`, 16, H-16);
+  ctx.fillText(currentLattice + '（' + d.name + '） — 充填率 ' + d.fill + '%', 14, 24);
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '12px Roboto Mono, monospace';
+  ctx.fillText('配位数 ' + d.coord + ' / 単位格子内原子数 ' + d.atoms + ' / ' + d.rel, 14, H-16);
+}
+
+function loop(t) {
+  if (!lastT) lastT = t;
+  var dt = (t - lastT) / 1000; lastT = t;
+  if (spinning && !reduceMotion) {
+    spin += dt * 0.6;
+    var slider = document.getElementById('rotSlider');
+    if (slider) {
+      var deg = ((spin * 180 / Math.PI) % 360 + 360) % 360;
+      slider.value = deg.toFixed(0);
+      var rv = document.getElementById('rotValNum'); if (rv) rv.value = deg.toFixed(0);
+    }
+    drawLattice();
+  }
+  animId = requestAnimationFrame(loop);
+}
+
+function setPlay(on) {
+  spinning = on;
+  var btn = document.getElementById('playPauseBtn');
+  if (btn) btn.textContent = on ? '⏸ 一時停止' : '▶ 再生';
 }
 
 function setTabCanvasDisplay(id, display){
-  const canvas=document.getElementById(id);
+  var canvas=document.getElementById(id);
   if(!canvas)return;
-  const card=canvas.closest ? canvas.closest('.chart-card') : null;
+  var card=canvas.closest ? canvas.closest('.chart-card') : null;
   if(card) card.style.display=display;
   else canvas.style.display=display;
 }
 function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['3d','fill','coord'][i]===tab));
+  var order=['3d','fill','coord'];
+  document.querySelectorAll('.tab').forEach(function(tb,i){ tb.classList.toggle('active', order[i]===tab); });
   setTabCanvasDisplay('latticeCanvas', tab==='3d' ? 'block' : 'none');
   document.getElementById('fillChart').style.display = tab==='fill' ? 'block' : 'none';
   document.getElementById('coordChart').style.display = tab==='coord' ? 'block' : 'none';
@@ -413,54 +456,52 @@ function switchTab(tab) {
 }
 
 function drawFillChart() {
+  if (typeof Chart === 'undefined') return;
   if (fillChart) fillChart.destroy();
   fillChart = new Chart(document.getElementById('fillChartCanvas'), {
     type: 'bar',
-    data: {
-      labels: ['SC', 'BCC', 'FCC', 'HCP'],
-      datasets: [{
-        label: '充填率 (%)',
-        data: [52.36, 68.02, 74.05, 74.05],
-        backgroundColor: ['#FF6B6B','#4ECDC4','#007BFF','#9B59B6'],
-        borderRadius: 6
-      }]
-    },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      scales: { y: { min: 40, max: 80, title: { display: true, text: '充填率 (%)' } } },
-      plugins: { legend: { display: false } }
-    }
+    data: { labels: ['SC','BCC','FCC','HCP'], datasets: [{ label: '充填率 (%)', data: [52.36,68.02,74.05,74.05], backgroundColor: ['#FF6B6B','#4ECDC4','#007BFF','#9B59B6'], borderRadius: 6 }] },
+    options: { responsive: true, animation: false, maintainAspectRatio: false, resizeDelay:100, scales: { y: { min: 40, max: 80, title: { display: true, text: '充填率 (%)' } } }, plugins: { legend: { display: false } } }
   });
 }
 
 function drawCoordChart() {
+  if (typeof Chart === 'undefined') return;
   if (coordChart) coordChart.destroy();
-  const a = parseFloat(document.getElementById('aSlider').value);
+  var a = parseFloat(document.getElementById('aSlider').value);
   coordChart = new Chart(document.getElementById('coordChartCanvas'), {
     type: 'bar',
-    data: {
-      labels: ['SC', 'BCC', 'FCC', 'HCP'],
-      datasets: [{
-        label: '最近接距離 (Å)',
-        data: [
-          latticeData.SC.nn(a).toFixed(3),
-          latticeData.BCC.nn(a).toFixed(3),
-          latticeData.FCC.nn(a).toFixed(3),
-          latticeData.HCP.nn(a).toFixed(3)
-        ],
-        backgroundColor: ['#FF6B6B','#4ECDC4','#007BFF','#9B59B6'],
-        borderRadius: 6
-      }]
-    },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      scales: { y: { title: { display: true, text: '最近接距離 (Å)' } } },
-      plugins: { legend: { display: false } }
-    }
+    data: { labels: ['SC','BCC','FCC','HCP'], datasets: [{ label: '最近接距離 (Å)', data: [latticeData.SC.nn(a).toFixed(3),latticeData.BCC.nn(a).toFixed(3),latticeData.FCC.nn(a).toFixed(3),latticeData.HCP.nn(a).toFixed(3)], backgroundColor: ['#FF6B6B','#4ECDC4','#007BFF','#9B59B6'], borderRadius: 6 }] },
+    options: { responsive: true, animation: false, maintainAspectRatio: false, resizeDelay:100, scales: { y: { title: { display: true, text: '最近接距離 (Å)' } } }, plugins: { legend: { display: false } } }
   });
 }
 
-window.addEventListener('load', () => { setLattice('FCC'); drawFillChart(); });
+function init() {
+  // tag lattice buttons for state sync
+  var btns = document.querySelectorAll('.btn-lattice[onclick]');
+  ['SC','BCC','FCC','HCP'].forEach(function(t,i){ if(btns[i]) btns[i].dataset.lat = t; });
+  ['aSlider','rSlider','rotSlider'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', function(){
+      if (id === 'rotSlider') { spinning = false; setPlay(false); spin = parseFloat(el.value)*Math.PI/180; }
+      updateStats();
+    });
+  });
+  var pp = document.getElementById('playPauseBtn');
+  if (pp) pp.addEventListener('click', function(){ setPlay(!spinning); if(spinning) lastT=0; });
+  var rv = document.getElementById('resetViewBtn');
+  if (rv) rv.addEventListener('click', function(){ spin = 0.6; setPlay(!reduceMotion); lastT=0; var rs=document.getElementById('rotSlider'); if(rs){rs.value=34;} updateStats(); });
+
+  setLattice('FCC');
+  drawFillChart();
+  if (reduceMotion) { setPlay(false); drawLattice(); }
+  animId = requestAnimationFrame(loop);
+}
+
+window.setLattice = setLattice;
+window.switchTab = switchTab;
+window.addEventListener('load', init);
+})();
 </script>
 <script src="/tools/related-tools.js" defer></script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>
@@ -480,7 +521,8 @@ window.addEventListener('load', () => { setLattice('FCC'); drawFillChart(); });
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" type="button" onclick="toggleFaq(this)">スライダーを動かしても表示が変わらないのですが、どうすればいいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">スライダーで格子定数や原子半径を変更すると、充填率や配位数などの数値はリアルタイムで更新されます。3D表示の見た目が変わらない場合は、ブラウザの再読み込みをお試しください。また、一部の環境ではWebGLが無効になっている可能性がありますので、設定をご確認ください。</div>
+    <div class="faq-a">この表示はCanvas 2Dで描画しています。スライダーで格子定数や原子半径を変更すると、数値はリアルタイムで更新されますが、模式図の原子サイズは見やすさ優先の固定スケールです。表示が崩れた場合はブラウザの再読み込みをお試しください。</div>
+  </div>
   <div class="faq-item">
     <button class="faq-q" type="button" onclick="toggleFaq(this)">SC、BCC、FCC、HCPの違いを簡単に教えてください。 <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
     <div class="faq-a">SCは原子が立方体の頂点のみに配置され充填率が低く（約52%）、BCCは中心にも原子があり充填率が上がります（約68%）。FCCとHCPはどちらも最密充填構造で充填率約74%ですが、原子の積み重ね方が異なります。配位数はSCで6、BCCで8、FCCとHCPで12です。</div>
@@ -490,7 +532,7 @@ window.addEventListener('load', () => { setLattice('FCC'); drawFillChart(); });
   </div>
   <div class="faq-item">
     <button class="faq-q" type="button" onclick="toggleFaq(this)">原子半径と格子定数の関係式はどこで確認できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">画面上部の「物理モデル概要」セクションに主要な数式が表示されています。例えばBCCではa = 4r/√3、FCCではa = 4r/√2と表記され、スライダー操作に応じて数値が自動計算されます。詳細な導出過程はヘルプボタンからも参照可能です。</div>
+    <div class="faq-a">画面上部の「理論・主要公式」セクションに主要な数式が表示されています。例えばBCCではa = 4r/√3、FCCではa = 4r/√2と表記されています。数値欄は選択した格子構造の幾何関係に基づいて更新されます。</div>
 
 </div>
 </div>
@@ -565,15 +607,15 @@ window.addEventListener('load', () => { setLattice('FCC'); drawFillChart(); });
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>aValNum または aSlider で格子定数（単位Å）を設定。SC構造は3.0Å、BCC構造は2.87Å、FCC・HCP構造は4.05Åが標準値です</li><li>rValNum または rSlider で原子半径（単位Å）を調整。半径を増加させると充填率が変化し、充填限界まで可視化されます</li><li>rotValNum または rotSlider で3D表示の回転角度を設定し、[100]・[110]・[111]各方位から格子構造を観察します</li></ol>
+<ol><li>aValNum または aSlider で格子定数（単位Å）を設定します</li><li>rValNum または rSlider で原子半径（単位Å）を調整します。半径スライダーは数値表示上の原子サイズを更新するもので、模式図の充填率は構造ごとの理論値として表示されます</li><li>rotValNum または rotSlider でCanvas 2Dの擬似3D表示を回転させ、格子構造を観察します</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>鉄（Fe）のBCC構造：格子定数a=2.87Å、原子半径r=1.24Åの場合、充填率は68%、配位数は8です。一方、銅（Cu）のFCC構造：a=3.61Å、r=1.28Åでは充填率74%、配位数は12となります。HCP構造の亜鉛（Zn）：a=2.66Å、c/a比=1.856では充填率74.1%、配位数12です。各パラメータを動的に変更すると、体心立方晶系から面心立方晶系への構造転移時の密度変化がリアルタイムで数値更新されます</p>
+<p>鉄（Fe）のBCC構造：格子定数a=2.87Å、原子半径r=1.24Åの場合、充填率は68%、配位数は8です。一方、銅（Cu）のFCC構造：a=3.61Å、r=1.28Åでは充填率74%、配位数は12となります。HCP構造の亜鉛（Zn）：a=2.66Å、c/a比=1.856では、理想HCPの74.1%ではなく実際のc/a比に基づく単純換算で充填率は約65.2%まで低下します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
-<ol><li>鋼の焼き入れ時、オーステナイト（FCC、γ鉄）からマルテンサイト（BCT、斜方晶）への相変態により、原子配列が急激に変化するため、a値とr値の同時調整で格子歪みを把握してください</li><li>アルミニウム合金（FCC系）の強化機構では、格子定数のわずか0.1Å変化が析出物との整合性に大きく影響するため、精密な値入力が必要です</li><li>マグネシウム合金（HCP系）の異方性評価では、c/a比が1.633から1.856の範囲で機械特性が大きく変動するため、結晶方位依存性の比較観察を推奨します</li></ol>
+<ol><li>鋼の焼き入れ時、オーステナイト（FCC、γ鉄）からマルテンサイト（BCT、正方晶）への相変態では格子ひずみが生じます。ただし本ツールはBCT構造を直接表示しないため、詳細評価には専用モデルを使用してください</li><li>アルミニウム合金（FCC系）の強化機構では、格子定数のわずか0.1Å変化が析出物との整合性に大きく影響するため、精密な値入力が必要です</li><li>マグネシウム合金（HCP系）の異方性評価では、c/a比が1.633から1.856の範囲で機械特性が大きく変動するため、結晶方位依存性の比較観察を推奨します</li></ol>
 </div>
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
@@ -588,7 +630,5 @@ window.addEventListener('load', () => { setLattice('FCC'); drawFillChart(); });
 </div>
 </footer>
   <script defer src="/tools/tool-ux-template.js?v20260517r4"></script>
-
-</div>
 </body>
 </html>

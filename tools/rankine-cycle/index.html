@@ -43,7 +43,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ランキンサイクル・冷凍サイクルシミュレーター",
       "description": "蒸気動力（ランキン）サイクルと冷凍サイクルをT-s線図・P-h線図でリアルタイム可視化し、熱効率・COPを自動計算する無料熱力学シミュレーター。",
       "url": "https://novasolver.jp/tools/rankine-cycle.html",
@@ -53,7 +53,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ランキンサイクル T-s線図・P-h線図","冷凍サイクル COP計算","飽和曲線ドームの描画","タービン・ポンプ等エントロピー効率の反映","各状態点（h,s,T,P）の表示"],
       "keywords": "ランキンサイクル,冷凍サイクル,T-s線図,P-h線図,熱効率,COP,蒸気タービン,熱力学,蒸気動力プラント",
       "datePublished": "2026-04-08",
@@ -133,6 +133,25 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== rkv2 plant animation hero ===== */
+#rkv2-canvas{display:block;width:100%;max-width:100%;border-radius:8px;background:#0a1628}
+#rkv2-canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.rkv2-live{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.rkv2-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.rkv2-rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.rkv2-rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.rkv2-ro.accent .rkv2-rv{color:#ffd54a}
+.rkv2-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.rkv2-btn{padding:8px 14px;font-size:0.82rem}
+.rkv2-speed{display:flex;gap:4px;align-items:center;margin-left:auto}
+.rkv2-spd-lbl{font-size:0.72rem;color:var(--muted);margin-right:2px}
+.rkv2-spd.rkv2-spd-on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.rkv2-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.rkv2-legend span{display:inline-flex;align-items:center;gap:5px}
+.rkv2-sw{width:14px;height:14px;border-radius:50%;display:inline-block}
+@media(max-width:600px){.rkv2-live{grid-template-columns:repeat(2,1fr)}}
+@media(prefers-reduced-motion:reduce){.rkv2-spd,.rkv2-btn{transition:none}}
+/* end rkv2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/rankine-cycle.html">
@@ -245,6 +264,30 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-industry"></i> 発電プラント・サイクルアニメーション</div>
+      <div class="rkv2-live">
+        <div class="rkv2-ro accent"><div class="rkv2-rv" id="rkv2-comp">ボイラ</div><div class="rkv2-rl">現在の機器</div></div>
+        <div class="rkv2-ro"><div class="rkv2-rv" id="rkv2-eta">32%</div><div class="rkv2-rl" id="rkv2-etal">熱効率 η</div></div>
+        <div class="rkv2-ro"><div class="rkv2-rv" id="rkv2-qin">0</div><div class="rkv2-rl" id="rkv2-qinl">Q_in [kJ/kg]</div></div>
+        <div class="rkv2-ro"><div class="rkv2-rv" id="rkv2-wnet">0</div><div class="rkv2-rl" id="rkv2-wnetl">正味仕事 [kJ/kg]</div></div>
+      </div>
+      <canvas id="rkv2-canvas" height="340" tabindex="0" role="img" aria-label="蒸気動力プラントのループ。ボイラ・タービン・凝縮器・ポンプを作動流体が循環し、相変化する様子をアニメーション表示します。"></canvas>
+      <div class="rkv2-controls">
+        <button class="btn rkv2-btn" type="button" id="rkv2-play"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary rkv2-btn" type="button" id="rkv2-reset"><i class="fas fa-rotate-left"></i> リセット</button>
+        <div class="rkv2-speed">
+          <span class="rkv2-spd-lbl">速度</span>
+          <button class="preset-btn rkv2-spd" type="button" data-spd="0.5">0.5×</button>
+          <button class="preset-btn rkv2-spd rkv2-spd-on" type="button" data-spd="1">1×</button>
+          <button class="preset-btn rkv2-spd" type="button" data-spd="2">2×</button>
+        </div>
+      </div>
+      <div class="rkv2-legend">
+        <span><i class="rkv2-sw" style="background:#4aa3ff"></i>液体</span>
+        <span><i class="rkv2-sw" style="background:#ff6b35"></i>蒸気</span>
+        <span><i class="rkv2-sw" style="background:#ffd54a"></i>T-s上の現在点</span>
+      </div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards" id="refrig-stats" style="display:none">
       <div class="stat-card highlight"><div class="sv" id="sv-cop">3.20</div><div class="sl">COP</div></div>
@@ -346,7 +389,7 @@ function isentropicExpansion(s3, h3, P_low_MPa){
 function satR134a(T_C){
   // Very approximate polynomial fits for R-134a
   const T = T_C;
-  const P = Math.exp(10.4 - 2160 / (T + 273.15)) * 0.001; // MPa approx
+  const P = Math.exp(8.504 - 2658 / (T + 273.15)); // MPa approx
   const hf = 200 + 1.35 * T;
   const hfg = 200 - 0.6 * T;
   const hg = hf + hfg;
@@ -670,6 +713,269 @@ setupSlider('sl-Tcond','val-Tcond',0);
 setupSlider('sl-eta-c','val-eta-c',2);
 </script>
 
+<script>
+/* ===== rkv2: real-time steam-plant cycle animation (IIFE, prefixed) ===== */
+(function(){
+"use strict";
+var cv=document.getElementById('rkv2-canvas');
+if(!cv) return;
+var cx=cv.getContext('2d');
+var L={comp:'現在の機器',boiler:'ボイラ',turbine:'タービン',condenser:'凝縮器',pump:'ポンプ',
+       boilerS:'ボイラ（加熱 Q_in）',turbineS:'タービン（仕事 W_out）',condenserS:'凝縮器（放熱 Q_out）',pumpS:'ポンプ（W_in）',
+       qin:'Q_in',qout:'Q_out',wt:'W_t',wp:'W_p',eta:'熱効率 η',cop:'COP',
+       liquid:'液体',vapor:'蒸気',start:'再生',pause:'一時停止',ts:'T-s 線図'};
+var lang=(document.documentElement.lang||'ja').toLowerCase();
+if(lang.indexOf('en')===0){L={comp:'Component',boiler:'Boiler',turbine:'Turbine',condenser:'Condenser',pump:'Pump',
+   boilerS:'Boiler (Q_in)',turbineS:'Turbine (W_out)',condenserS:'Condenser (Q_out)',pumpS:'Pump (W_in)',
+   qin:'Q_in',qout:'Q_out',wt:'W_t',wp:'W_p',eta:'Efficiency η',cop:'COP',
+   liquid:'Liquid',vapor:'Vapor',start:'Play',pause:'Pause',ts:'T-s diagram'};}
+else if(lang.indexOf('zh')===0){L={comp:'当前部件',boiler:'锅炉',turbine:'汽轮机',condenser:'冷凝器',pump:'泵',
+   boilerS:'锅炉（加热 Q_in）',turbineS:'汽轮机（做功 W_out）',condenserS:'冷凝器（放热 Q_out）',pumpS:'泵（W_in）',
+   qin:'Q_in',qout:'Q_out',wt:'W_t',wp:'W_p',eta:'热效率 η',cop:'COP',
+   liquid:'液体',vapor:'蒸气',start:'播放',pause:'暂停',ts:'T-s 图'};}
+
+var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var playing=!reduce, speed=1, phase=0, blade=0, rafId=null, lastTs=0;
+var cssW=0,cssH=340,dpr=1;
+
+function num(id){var e=document.getElementById(id);return e?parseFloat(e.value):NaN;}
+function mode(){var b=document.getElementById('btn-refrig');return (b&&b.classList.contains('active'))?'refrig':'rankine';}
+
+/* Layout of the plant loop (normalized 0..1 coords), corners of a rectangular circuit.
+   Order: boiler(top) -> turbine(right) -> condenser(bottom) -> pump(left) -> boiler */
+function geom(W,H){
+  var mx=0.16*W, my=0.20*H;
+  return {
+    boiler:{x:0.30*W,y:my,w:0.40*W},          // top edge
+    turbineX:W-mx, condenserY:H-my, pumpX:mx,
+    // path corners (clockwise)
+    p:[ {x:0.30*W,y:my},{x:W-mx,y:my},{x:W-mx,y:H-my},{x:mx,y:H-my},{x:mx,y:my},{x:0.30*W,y:my} ]
+  };
+}
+// segment phase mapping: which leg each component sits on
+// leg0: boiler top (2->3 heating, liquid->vapor)
+// leg1: right down (3->4 turbine, vapor)
+// leg2: bottom (4->1 condenser, vapor->liquid)
+// leg3: left up + top-left to boiler (1->2 pump, liquid)
+function pathPoint(g,u){ // u in 0..1 around loop
+  var segs=[];var tot=0;
+  for(var i=0;i<g.p.length-1;i++){var a=g.p[i],b=g.p[i+1];var d=Math.hypot(b.x-a.x,b.y-a.y);segs.push({a:a,b:b,d:d});tot+=d;}
+  var dist=u*tot, acc=0;
+  for(var j=0;j<segs.length;j++){
+    if(dist<=acc+segs[j].d||j===segs.length-1){
+      var f=(dist-acc)/segs[j].d; f=Math.max(0,Math.min(1,f));
+      var s=segs[j];
+      return {x:s.a.x+(s.b.x-s.a.x)*f,y:s.a.y+(s.b.y-s.a.y)*f,leg:j};
+    }
+    acc+=segs[j].d;
+  }
+  return {x:g.p[0].x,y:g.p[0].y,leg:0};
+}
+// phase (0=liquid..1=vapor) as fluid travels: vapor on top(boiler exit)+right+part bottom, liquid after condenser+left
+function fluidPhase(u){
+  // u: 0 at boiler-left start. boiler heats across leg0 -> vapor by end of leg0
+  if(u<0.22) return u/0.22;            // boiler: liquid->vapor
+  if(u<0.55) return 1;                  // turbine + upper condenser: vapor
+  if(u<0.73) return 1-(u-0.55)/0.18;    // condenser: vapor->liquid
+  return 0;                             // pump + return: liquid
+}
+function lerpColor(a,b,t){return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)];}
+var LIQ=[74,163,255], VAP=[255,107,53];
+
+function resize(){
+  var rect=cv.parentElement.getBoundingClientRect();
+  cssW=Math.max(280,Math.floor(rect.width-44));
+  cssH=Math.max(280,Math.min(420,Math.round(cssW*0.62)));
+  dpr=Math.min(window.devicePixelRatio||1,2.5);
+  cv.style.width=cssW+'px';cv.style.height=cssH+'px';
+  cv.width=Math.round(cssW*dpr);cv.height=Math.round(cssH*dpr);
+  cx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function roundRect(x,y,w,h,r){cx.beginPath();
+  if(cx.roundRect){cx.roundRect(x,y,w,h,r);}else{cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath();}
+}
+function box(x,y,w,h,fill,stroke,label,sub){
+  roundRect(x-w/2,y-h/2,w,h,8);cx.fillStyle=fill;cx.fill();cx.strokeStyle=stroke;cx.lineWidth=2;cx.stroke();
+  cx.fillStyle='#fff';cx.font='bold 12px Noto Sans JP, sans-serif';cx.textAlign='center';cx.textBaseline='middle';
+  cx.fillText(label,x,sub?y-7:y);
+  if(sub){cx.font='9px Noto Sans JP, sans-serif';cx.fillStyle='rgba(255,255,255,.75)';cx.fillText(sub,x,y+8);}
+}
+
+function activeComp(u){
+  if(u<0.22) return 'boiler';
+  if(u>=0.30&&u<0.50) return 'turbine';
+  if(u>=0.55&&u<0.73) return 'condenser';
+  if(u>=0.80) return 'pump';
+  return '';
+}
+
+function draw(){
+  resize();
+  var W=cssW,H=cssH;
+  cx.clearRect(0,0,W,H);cx.fillStyle='#0a1628';cx.fillRect(0,0,W,H);
+  var g=geom(W,H);
+  var m=mode();
+  var heatGlow=0.5+0.5*Math.sin(phase*4);
+
+  // pipe loop
+  cx.lineCap='round';cx.lineJoin='round';
+  cx.strokeStyle='rgba(255,255,255,0.14)';cx.lineWidth=10;
+  cx.beginPath();cx.moveTo(g.p[0].x,g.p[0].y);for(var i=1;i<g.p.length;i++)cx.lineTo(g.p[i].x,g.p[i].y);cx.stroke();
+
+  // circulating fluid dots
+  var N=46;
+  for(var k=0;k<N;k++){
+    var u=((k/N)+phase)%1;
+    var pt=pathPoint(g,u);
+    var ph=fluidPhase(u);
+    var c=lerpColor(LIQ,VAP,ph);
+    var rad=ph>0.5?4.2:3.4;
+    cx.beginPath();cx.arc(pt.x,pt.y,rad,0,7);
+    cx.fillStyle='rgba('+c[0]+','+c[1]+','+c[2]+',0.95)';cx.fill();
+    if(ph>0.55){cx.beginPath();cx.arc(pt.x,pt.y,rad+2.5,0,7);cx.fillStyle='rgba('+c[0]+','+c[1]+','+c[2]+',0.18)';cx.fill();}
+  }
+
+  // ---- components ----
+  // Boiler (top), glowing with heat
+  var by=g.p[0].y, bx=(g.p[0].x+g.p[1].x)/2;
+  box(bx,by,140,46,'rgba(255,107,53,'+(0.30+0.25*heatGlow)+')','#ff6b35',L.boiler,L.qin);
+  // heat waves under boiler
+  cx.strokeStyle='rgba(255,160,80,'+(0.4+0.4*heatGlow)+')';cx.lineWidth=2;
+  for(var w=0;w<3;w++){var hx=bx-30+w*30;cx.beginPath();
+    for(var t=0;t<=10;t++){var yy=by+26+t*2;var xx=hx+Math.sin(t*0.9+phase*8)*4;if(t===0)cx.moveTo(xx,yy);else cx.lineTo(xx,yy);}cx.stroke();}
+
+  // Turbine (right) - spinning rotor
+  var tx=g.p[1].x, ty=(g.p[1].y+g.p[2].y)/2;
+  box(tx,ty,86,70,'rgba(0,180,216,0.22)','#00B4D8',L.turbine,m==='refrig'?'W_in':'W_out');
+  cx.save();cx.translate(tx,ty+2);cx.rotate(blade);
+  cx.strokeStyle='#9fe8ff';cx.lineWidth=3;
+  for(var bld=0;bld<6;bld++){cx.rotate(Math.PI/3);cx.beginPath();cx.moveTo(0,0);cx.lineTo(0,-18);cx.stroke();
+    cx.beginPath();cx.ellipse(0,-18,4,7,0,0,7);cx.fillStyle='#9fe8ff';cx.fill();}
+  cx.beginPath();cx.arc(0,0,4,0,7);cx.fillStyle='#fff';cx.fill();cx.restore();
+
+  // Condenser (bottom)
+  var ccx=(g.p[2].x+g.p[3].x)/2, ccy=g.p[2].y;
+  box(ccx,ccy,140,46,'rgba(74,163,255,0.22)','#4aa3ff',L.condenser,L.qout);
+  cx.strokeStyle='rgba(140,200,255,0.7)';cx.lineWidth=2;
+  for(var c2=0;c2<3;c2++){var cx2=ccx-30+c2*30;cx.beginPath();
+    for(var t2=0;t2<=10;t2++){var yy2=ccy-26-t2*2;var xx2=cx2+Math.sin(t2*0.9-phase*8)*4;if(t2===0)cx.moveTo(xx2,yy2);else cx.lineTo(xx2,yy2);}cx.stroke();}
+
+  // Pump (left)
+  var pmx=g.p[3].x, pmy=(g.p[3].y+g.p[4].y)/2;
+  box(pmx,pmy,72,58,'rgba(0,123,255,0.22)','#007BFF',L.pump,'W_in');
+  cx.save();cx.translate(pmx,pmy);cx.rotate(-blade*0.8);
+  cx.strokeStyle='#7fb8ff';cx.lineWidth=2.5;
+  for(var pb=0;pb<4;pb++){cx.rotate(Math.PI/2);cx.beginPath();cx.moveTo(0,0);cx.lineTo(0,-13);cx.stroke();}
+  cx.restore();
+
+  // ---- mini T-s diagram inset (top-left) showing moving marker ----
+  drawTSInset(W,H,((phase)%1));
+
+  // active component highlight ring
+  var au=phase%1, ac=activeComp(au);
+  highlightActive(g,ac);
+
+  // update readouts
+  updateReadouts(m,ac);
+}
+
+function highlightActive(g,ac){
+  var W=cssW,H=cssH,pos=null,r=0;
+  if(ac==='boiler'){pos={x:(g.p[0].x+g.p[1].x)/2,y:g.p[0].y};r=78;}
+  else if(ac==='turbine'){pos={x:g.p[1].x,y:(g.p[1].y+g.p[2].y)/2};r=50;}
+  else if(ac==='condenser'){pos={x:(g.p[2].x+g.p[3].x)/2,y:g.p[2].y};r=78;}
+  else if(ac==='pump'){pos={x:g.p[3].x,y:(g.p[3].y+g.p[4].y)/2};r=44;}
+  if(pos){cx.strokeStyle='rgba(255,213,74,0.9)';cx.lineWidth=2.5;roundRect(pos.x-r,pos.y-26,r*2,52,10);cx.stroke();}
+}
+
+// Approximate cycle on T-s for the inset (schematic shape from slider values)
+function cycleTS(){
+  var m=mode();
+  if(m==='refrig'){
+    var Te=num('sl-Tevap'),Tc=num('sl-Tcond');
+    // refrigeration: 1 evap(vapor) low T, 2 comp hot high T, 3 cond liquid, 4 throttle
+    return {pts:[{s:0.85,T:Te},{s:0.92,T:Tc+25},{s:0.30,T:Tc},{s:0.40,T:Te},{s:0.85,T:Te}],Tmin:Te-10,Tmax:Tc+35};
+  }
+  var Ph=num('sl-Phigh'),Pl=num('sl-Plow')/1000,et=num('sl-eta-t');
+  var Tlow=33, Thigh=42.7*Math.pow(Ph,0.2514)+111.9*Math.log(Ph+0.001)+15; Thigh=Math.min(374,Thigh);
+  var T3=Thigh+20;
+  var s4=0.78+(1-et)*0.25; // irreversibility shifts point 4 right
+  return {pts:[{s:0.30,T:Tlow},{s:0.31,T:Tlow+4},{s:0.92,T:T3},{s:s4*1.0+0.0+0.0,T:Tlow},{s:0.30,T:Tlow}],
+          map:[{s:0.30,T:Tlow},{s:0.31,T:Tlow+3},{s:0.92,T:T3},{s:0.30+(s4),T:Tlow},{s:0.30,T:Tlow}],Tmin:0,Tmax:Math.max(T3*1.1,120)};
+}
+function drawTSInset(W,H,u){
+  var iw=Math.min(150,W*0.30), ih=iw*0.74;
+  var ox=10, oy=10;
+  cx.fillStyle='rgba(255,255,255,0.05)';roundRect(ox,oy,iw,ih,6);cx.fill();
+  cx.strokeStyle='rgba(255,255,255,0.18)';cx.lineWidth=1;cx.stroke();
+  cx.fillStyle='rgba(255,255,255,0.55)';cx.font='9px Noto Sans JP, sans-serif';cx.textAlign='left';cx.textBaseline='top';
+  cx.fillText(L.ts,ox+6,oy+4);
+  var c=cycleTS();var pts=c.map||c.pts;
+  var smin=0.2,smax=1.0,Tmin=c.Tmin,Tmax=c.Tmax;
+  var px0=ox+10,py0=oy+ih-12,pw=iw-20,ph=ih-30;
+  function X(s){return px0+(s-smin)/(smax-smin)*pw;}
+  function Y(T){return py0-(T-Tmin)/(Tmax-Tmin||1)*ph;}
+  // dome (schematic bell)
+  cx.strokeStyle='rgba(0,180,216,0.45)';cx.lineWidth=1.2;cx.beginPath();
+  for(var d=0;d<=20;d++){var s=0.25+d/20*0.7;var T=Tmin+(Tmax-Tmin)*(1-Math.pow(2*(s-0.6),2));cx.lineTo(X(s),Y(Math.max(Tmin,T)));}
+  cx.stroke();
+  // cycle path
+  cx.strokeStyle='#ff6b35';cx.lineWidth=1.6;cx.beginPath();
+  for(var q=0;q<pts.length;q++){var P=pts[q];if(q===0)cx.moveTo(X(P.s),Y(P.T));else cx.lineTo(X(P.s),Y(P.T));}
+  cx.stroke();
+  // moving marker around cycle
+  var seg=u*(pts.length-1);var i0=Math.floor(seg);var f=seg-i0;i0=Math.min(i0,pts.length-2);
+  var A=pts[i0],B=pts[i0+1];var ms=A.s+(B.s-A.s)*f,mT=A.T+(B.T-A.T)*f;
+  cx.beginPath();cx.arc(X(ms),Y(mT),4,0,7);cx.fillStyle='#ffd54a';cx.fill();
+  cx.strokeStyle='#fff';cx.lineWidth=1;cx.stroke();
+}
+
+function updateReadouts(m,ac){
+  var compEl=document.getElementById('rkv2-comp');
+  if(compEl){var nm=L.comp;
+    if(ac==='boiler')nm=L.boiler;else if(ac==='turbine')nm=L.turbine;else if(ac==='condenser')nm=L.condenser;else if(ac==='pump')nm=L.pump;
+    compEl.textContent=nm;}
+  if(m==='refrig'){
+    var cop=document.getElementById('sv-cop');var qref=document.getElementById('sv-qref');var wc=document.getElementById('sv-wcomp');
+    setR('rkv2-eta',cop?cop.textContent:'—');setRL('rkv2-etal',L.cop);
+    setR('rkv2-qin',qref?qref.textContent:'—');setRL('rkv2-qinl','q_evap [kJ/kg]');
+    setR('rkv2-wnet',wc?wc.textContent:'—');setRL('rkv2-wnetl','w_comp [kJ/kg]');
+  }else{
+    var eta=document.getElementById('sv-eta');var qin=document.getElementById('sv-qin');var wnet=document.getElementById('sv-wnet');
+    setR('rkv2-eta',eta?eta.textContent:'—');setRL('rkv2-etal',L.eta);
+    setR('rkv2-qin',qin?qin.textContent:'—');setRL('rkv2-qinl','Q_in [kJ/kg]');
+    setR('rkv2-wnet',wnet?wnet.textContent:'—');setRL('rkv2-wnetl',(lang.indexOf('en')===0?'Net work [kJ/kg]':(lang.indexOf('zh')===0?'净功 [kJ/kg]':'正味仕事 [kJ/kg]')));
+  }
+}
+function setR(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+function setRL(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+
+function loop(ts){
+  if(!lastTs)lastTs=ts;var dt=Math.min(0.05,(ts-lastTs)/1000);lastTs=ts;
+  if(playing){phase=(phase+dt*0.18*speed)%1;blade+=dt*6*speed;}
+  draw();
+  rafId=requestAnimationFrame(loop);
+}
+
+// controls
+var playBtn=document.getElementById('rkv2-play');
+function setPlay(p){playing=p;if(playBtn){playBtn.innerHTML=p?('<i class="fas fa-pause"></i> '+L.pause):('<i class="fas fa-play"></i> '+L.start);}}
+if(playBtn)playBtn.addEventListener('click',function(){setPlay(!playing);});
+var resetBtn=document.getElementById('rkv2-reset');
+if(resetBtn)resetBtn.addEventListener('click',function(){phase=0;blade=0;draw();});
+Array.prototype.forEach.call(document.querySelectorAll('.rkv2-spd'),function(b){
+  b.addEventListener('click',function(){speed=parseFloat(b.getAttribute('data-spd'))||1;
+    Array.prototype.forEach.call(document.querySelectorAll('.rkv2-spd'),function(o){o.classList.remove('rkv2-spd-on');});
+    b.classList.add('rkv2-spd-on');});
+});
+window.addEventListener('resize',function(){draw();});
+
+setPlay(!reduce);
+if(reduce){draw();}else{rafId=requestAnimationFrame(loop);}
+})();
+</script>
+
 <section class="explanation">
   <h2>ランキンサイクル・冷凍サイクルとは</h2>
   <div class="chat">
@@ -692,7 +998,27 @@ setupSlider('sl-eta-c','val-eta-c',2);
       <div class="bub">その通り、COP（成績係数）は大きいほど省エネだ。家庭用エアコンだと2〜6くらいだね。大きくするには、冷凍効果を大きくするか、圧縮機の仕事を減らせばいい。シミュレーターの右側で試してみよう。「蒸発温度」を上げると冷凍効果が増えてCOPが上がる。逆に「凝縮温度」を下げると圧縮機仕事が減って、やはりCOPが上がる。現場のエンジニアはこのバランスを考えながら設計してるんだ。</div>
     </div>
   </div>
-  <h2>よくある質問</h2>
+  <h2>ランキンサイクルの4過程と熱効率</h2>
+<div class="fblock">
+<p>ランキンサイクルは蒸気を作動流体とする<strong>火力・原子力発電の基本サイクル</strong>で、4つの過程からなります。</p>
+<ol>
+<li><strong>ポンプ（断熱圧縮）：</strong>復水を高圧へ昇圧（仕事 $w_p$ を加える）。</li>
+<li><strong>ボイラ（等圧加熱）：</strong>高圧水を加熱・蒸発・過熱（熱 $q_{in}$ を加える）。</li>
+<li><strong>タービン（断熱膨張）：</strong>高温高圧蒸気が膨張して仕事 $w_t$ を取り出す。</li>
+<li><strong>復水器（等圧冷却）：</strong>蒸気を凝縮（熱 $q_{out}$ を放出）。</li>
+</ol>
+<p style="text-align:center">熱効率 $\eta = \dfrac{w_{net}}{q_{in}} = \dfrac{w_t - w_p}{q_{in}} = 1 - \dfrac{q_{out}}{q_{in}}$</p>
+<p>効率を高めるには<strong>ボイラ圧力・過熱温度を上げ、復水器圧力（背圧）を下げる</strong>のが基本で、再熱・再生サイクルでさらに改善します。</p>
+</div>
+
+<h2>冷凍サイクルとCOP</h2>
+<div class="fblock">
+<p>ランキンサイクルを<strong>逆向き</strong>に運転すると<strong>冷凍サイクル（ヒートポンプ）</strong>になります。圧縮機・凝縮器・膨張弁・蒸発器で冷媒を循環させ、低温部から熱を汲み上げます。性能は仕事あたりの熱量＝<strong>成績係数 COP</strong> で評価します。</p>
+<p style="text-align:center">冷房 $COP_R = \dfrac{q_{L}}{w_{in}}, \qquad 暖房 COP_{HP} = \dfrac{q_{H}}{w_{in}} = COP_R + 1$</p>
+<p>COP は1より大きく（投入仕事より多くの熱を移動でき）、温度差が小さいほど高くなります。これがヒートポンプ給湯・エアコンが高効率な理由です。本シミュレーターで圧力・温度を変え、効率やCOPの変化を確認できます。</p>
+</div>
+
+<h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">T-s線図やP-h線図はどのように操作できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -751,6 +1077,55 @@ setupSlider('sl-eta-c','val-eta-c',2);
 <li>P-h線図でドライフリクション領域（湿り蒸気域の右側）に状態点がある場合、液滴衝撃によるタービン破損リスクがあり、リヒーター追加が必要です</li>
 </ul>
 </div>
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="rankine-cycle.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/refrigeration-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">蒸気圧縮冷凍サイクル計算ツール</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">蒸気圧縮冷凍サイクルのP-h線図をリアルタイムで可視化し、COP・冷凍効果・圧縮仕事を即座に計算できるシミュレーターです。冷媒R134a、R410A、R290に対応。蒸発温度や凝縮温...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/steam-rankine.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">水蒸気・ランキンサイクル 計算機</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">水蒸気・ランキンサイクル 計算機では、熱移動、温度差、冷却余裕の前提を変えたときに設計余裕がどう動くかを比較します。</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/bell-coleman-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ベルコールマンサイクル（空気冷凍）シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ベルコールマンサイクル（逆ブレイトン・空気冷凍サイクル）の成績係数COP・各点の温度・冷凍効果・正味仕事を計算。冷却室温度・周囲温度・圧力比・比熱比を変えて、航空機の空調にも使われる...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/brayton-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ブレイトンサイクル シミュレーター — ガスタービンの熱効率</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ブレイトンサイクル シミュレーターは、空気標準サイクルとして圧力比・比熱比・吸気温度・タービン入口温度から熱効率・圧縮機出口温度・タービン出口温度・ネット仕事をリアルタイム計算します...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/combined-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">コンバインドサイクル発電シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">ガスタービン（ブレイトン）と蒸気タービン（ランキン）を組み合わせたコンバインドサイクル発電所の総合熱効率・総発電出力・排熱回収量を計算。ガス・蒸気の各熱効率、燃料投入熱量、HRSG回...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/atkinson-cycle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-temperature-high"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">アトキンソンサイクル シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">アトキンソンサイクル（完全膨張サイクル）の熱効率・各点の温度と圧力・膨張比・正味仕事を計算。圧縮比・比熱比・吸気条件・加熱量を変えて、ハイブリッド車に使われる過膨張エンジンの性能をP...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

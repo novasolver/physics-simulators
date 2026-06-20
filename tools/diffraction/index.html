@@ -121,14 +121,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "回折・ヤングの二重スリット干渉計算機",
       "description": "ヤングの二重スリット・単スリット・回折格子の干渉縞をリアルタイム可視化。波長・スリット間隔・スリット幅・スクリーン距離を設定して強度分布I(θ)を描画。縞間隔・回折格子の分解能を自動計算。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/diffraction.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -266,7 +266,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -292,12 +300,21 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 可視化</div><canvas id="canvas" height="360"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-wave-square"></i> 波面の干渉と干渉縞（ライブ）</div>
+        <canvas id="canvas" height="380" role="img" aria-label="スリットから広がる波面が重なり合い、スクリーン上に干渉縞を生成する様子のアニメーション"></canvas>
+        <div class="play-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+          <button class="btn" type="button" id="btnPlay" onclick="toggleWaveAnim()"><i class="fas fa-pause"></i> 一時停止</button>
+          <div class="wave-legend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-left:auto">
+            <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:14px;height:14px;border-radius:50%;background:radial-gradient(circle,#fff,rgba(0,180,216,.2));display:inline-block"></i>波源（Huygens）</span>
+            <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:3px;border-radius:2px;background:#ffd54a;display:inline-block"></i>強度 I(y)</span>
+          </div>
+        </div>
+      </div>
 
-      <div style="margin-top:14px;">
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-drafting-compass"></i> 経路差ダイアグラム</div>
         <canvas id="pathCanvas" height="120" style="background:#0d1f3c;border-radius:8px;"></canvas>
       </div>
-    
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
         <div id="theoryContent">
@@ -314,292 +331,335 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 
 <script>
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
+(function(){
+"use strict";
+var L10N = {
+  source:'波源', screen:'スクリーン', slit:'スリット',
+  posLabel:'スクリーン位置 y [mm]', intLabel:'I/I₀',
+  bright:'明線 d·sinθ=mλ', central:'中央極大', envelope:'回折包絡 sinc²'
+};
+
+function hidpi(canvas, cssW, cssH, ctx){
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / dpr || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / dpr || 320));
-  canvas.style.setProperty('width', w + 'px', 'important');
-  canvas.style.setProperty('height', h + 'px', 'important');
-  var bw = Math.round(w * dpr);
-  var bh = Math.round(h * dpr);
-  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
+  canvas.setAttribute('data-ux-no-scale','1');
+  var w = Math.max(1, Math.round(cssW));
+  var h = Math.max(1, Math.round(cssH));
+  canvas.style.setProperty('width', w+'px','important');
+  canvas.style.setProperty('height', h+'px','important');
+  var bw = Math.round(w*dpr), bh = Math.round(h*dpr);
+  if(canvas.width!==bw||canvas.height!==bh){canvas.width=bw;canvas.height=bh;}
+  if(ctx&&ctx.setTransform) ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {w:w,h:h};
 }
 
+var mode = 'double';
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var phase = 0;            // wavefront phase (animated)
+var running = !reduceMotion;
+var rafId = null;
 
-let mode = 'double';
+function el(id){ return document.getElementById(id); }
+function gv(id){ return parseFloat(el(id).value); }
 
 function wavelengthToRGB(wl){
-  let r=0,g=0,b=0;
-  if(wl>=380&&wl<440){r=(440-wl)/60;g=0;b=1;}else if(wl>=440&&wl<490){r=0;g=(wl-440)/50;b=1;}else if(wl>=490&&wl<510){r=0;g=1;b=(510-wl)/20;}else if(wl>=510&&wl<580){r=(wl-510)/70;g=1;b=0;}else if(wl>=580&&wl<645){r=1;g=(645-wl)/65;b=0;}else if(wl>=645&&wl<=780){r=1;g=0;b=0;}let factor=1;
+  var r=0,g=0,b=0;
+  if(wl>=380&&wl<440){r=(440-wl)/60;g=0;b=1;}else if(wl>=440&&wl<490){r=0;g=(wl-440)/50;b=1;}else if(wl>=490&&wl<510){r=0;g=1;b=(510-wl)/20;}else if(wl>=510&&wl<580){r=(wl-510)/70;g=1;b=0;}else if(wl>=580&&wl<645){r=1;g=(645-wl)/65;b=0;}else if(wl>=645&&wl<=780){r=1;g=0;b=0;}
+  var factor=1;
   if(wl>=380&&wl<420)factor=0.3+0.7*(wl-380)/40;
   else if(wl>700&&wl<=780)factor=0.3+0.7*(780-wl)/80;
-  r=Math.round(255*r*factor);
-  g=Math.round(255*g*factor);
-  b=Math.round(255*b*factor);
-  return`rgb(${r},${g},${b})`;
-}function setMode(m){
-  mode = m;
-  ['double','single','grating'].forEach(t=>{
-    document.getElementById('tab-'+t).classList.toggle('active',t===m);
-  });
-  document.getElementById('pg-d').classList.toggle('hidden', m==='single');
-  document.getElementById('pg-N').classList.toggle('hidden', m!=='grating');
-  document.getElementById('pg-a').classList.remove('hidden');
+  r=Math.round(255*r*factor);g=Math.round(255*g*factor);b=Math.round(255*b*factor);
+  return [r,g,b];
+}
+function rgbStr(c,a){ return a==null?('rgb('+c[0]+','+c[1]+','+c[2]+')'):('rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'); }
 
-  // Update theory
-  const tc = document.getElementById('theoryContent');
-  if(m==='double'){
-    tc.innerHTML=`<p><strong>二重スリット干渉（Young's experiment）</strong></p>
-$$I(\\theta)=I_0\\cos^2\\!\\left(\\frac{\\pi d\\sin\\theta}{\\lambda}\\right)\\cdot\\text{sinc}^2\\!\\left(\\frac{\\pi a\\sin\\theta}{\\lambda}\\right)$$
-<p style="margin-top:6px;">明線条件（極大）：$d\\sin\\theta = m\\lambda$</p>
-<p style="margin-top:4px;">暗線条件（極小）：$d\\sin\\theta = \\left(m+\\tfrac{1}{2}\\right)\\lambda$</p>
-<p style="margin-top:4px;">縞間隔：$\\Delta y = \\dfrac{\\lambda L}{d}$</p>`;
-  }else if(m==='single'){
-    tc.innerHTML=`<p><strong>単スリット回折</strong></p>
-$$I(\\theta)=I_0\\,\\text{sinc}^2\\!\\left(\\frac{\\pi a\\sin\\theta}{\\lambda}\\right)$$
-<p style="margin-top:6px;">暗線条件：$a\\sin\\theta = m\\lambda \\ (m=\\pm1,\\pm2,\\ldots)$</p>
-<p style="margin-top:4px;">中央極大幅（半値幅）：$w = \\dfrac{2\\lambda L}{a}$</p>`;
-  }else{
-    tc.innerHTML=`<p><strong>回折格子（N スリット）</strong></p>
-$$I(\\theta)=I_0\\left(\\frac{\\sin(N\\delta/2)}{N\\sin(\\delta/2)}\\right)^2\\cdot\\text{sinc}^2\\!\\left(\\frac{\\pi a\\sin\\theta}{\\lambda}\\right)$$
-<p style="margin-top:6px;">ここで $\\delta = \\dfrac{2\\pi d\\sin\\theta}{\\lambda}$，主極大条件：$d\\sin\\theta = m\\lambda$</p>
-<p style="margin-top:4px;">分解能：$R = mN$，　縞間隔：$\\Delta y = \\dfrac{\\lambda L}{d}$</p>`;
+function sinc(x){ if(Math.abs(x)<1e-10) return 1; return Math.sin(x)/x; }
+
+// Physical intensity I/I0 at angle theta (radians)
+function intensity(theta){
+  var wl = gv('wl')*1e-9;
+  var d  = gv('d')*1e-3;
+  var a  = gv('a')*1e-6;
+  var N  = parseInt(el('N').value,10);
+  var s  = Math.sin(theta);
+  var sincArg = Math.PI*a*s/wl;
+  var diff = sinc(sincArg)*sinc(sincArg);            // single-slit envelope
+  if(mode==='single') return diff;
+  if(mode==='double'){
+    var cosArg = Math.PI*d*s/wl;
+    return Math.cos(cosArg)*Math.cos(cosArg)*diff;    // two-slit interference x envelope
   }
-  if(window.MathJax && typeof MathJax.typesetPromise === 'function') MathJax.typesetPromise([document.getElementById('theoryContent')]);
-  compute();
-}function updateWL(){
-  const el = document.getElementById('wl');
-  const wl = parseFloat(el.value);
-  (function(){var _e=document.getElementById('wlVal');if(_e){if(_e.tagName==='INPUT')_e.value=wl.toFixed(0);else _e.textContent=wl.toFixed(0)+' nm';}})();
-  const min=380,max=780;
-  el.style.setProperty('--pct', ((wl-min)/(max-min)*100).toFixed(1)+'%');
-  document.getElementById('wlSwatch').style.background = wavelengthToRGB(wl);
-  compute();
-}function sinc(x){
-  if(Math.abs(x)<1e-10) return 1;
-  return Math.sin(x)/x;
-}function getIntensity(theta){
-  const wl = parseFloat(document.getElementById('wl').value)*1e-9;
-  const d  = parseFloat(document.getElementById('d').value)*1e-3;
-  const a  = parseFloat(document.getElementById('a').value)*1e-6;
-  const N  = parseInt(document.getElementById('N').value);
-  const sincArg = Math.PI*a*Math.sin(theta)/wl;
-  const sincFactor = sinc(sincArg)*sinc(sincArg);
-
-  if(mode==='single') return sincFactor;
-  if(mode==='double') {
-    const cosArg = Math.PI*d*Math.sin(theta)/wl;
-    return Math.cos(cosArg)*Math.cos(cosArg)*sincFactor;
-  }// grating
-  const delta = 2*Math.PI*d*Math.sin(theta)/wl;
-  let grating;
-  const denom = Math.sin(delta/2);
+  // grating: N-slit interference function
+  var delta = 2*Math.PI*d*s/wl;
+  var denom = Math.sin(delta/2), grating;
   if(Math.abs(denom)<1e-10) grating=1;
-  else{ const num=Math.sin(N*delta/2); grating=(num/(N*denom))*(num/(N*denom)); }
-  return grating*sincFactor;
-}function compute(){
-  const wl = parseFloat(document.getElementById('wl').value)*1e-9;
-  const d  = parseFloat(document.getElementById('d').value)*1e-3;
-  const a  = parseFloat(document.getElementById('a').value)*1e-6;
-  const L  = parseFloat(document.getElementById('L').value);
-  const N  = parseInt(document.getElementById('N').value);
+  else { var num=Math.sin(N*delta/2); grating=(num/(N*denom))*(num/(N*denom)); }
+  return grating*diff;
+}
 
-  // Stats
-  const fringe = (mode!=='single') ? (wl*L/d*1e3) : 0;
-  const theta1_rad = (mode!=='single') ? Math.asin(wl/d) : Math.asin(wl/a);
-  const theta1_deg = theta1_rad*180/Math.PI;
-  const centralW = 2*wl*L/a*1e3;
-  const R = (mode==='grating') ? N : (mode==='double'?2:0);
+function computeStats(){
+  var wl = gv('wl')*1e-9, d = gv('d')*1e-3, a = gv('a')*1e-6, Lm = gv('L');
+  var N = parseInt(el('N').value,10);
+  var fringe = (mode!=='single') ? (wl*Lm/d*1e3) : 0;     // Δy = λL/d [mm]
+  var theta1 = (mode!=='single') ? Math.asin(Math.min(1,wl/d)) : Math.asin(Math.min(1,wl/a));
+  var theta1_deg = theta1*180/Math.PI;
+  var centralW = 2*wl*Lm/a*1e3;                            // 2λL/a [mm]
+  el('statFringe').textContent   = (mode!=='single')?fringe.toFixed(2):'N/A';
+  el('statTheta1').textContent   = theta1_deg.toFixed(3);
+  el('statCentral').textContent  = centralW.toFixed(2);
+  el('statResolving').textContent= (mode==='grating')?String(N):(mode==='double'?'2':'—');
+  var cw = el('cwVal'); if(cw) cw.textContent = centralW.toFixed(2)+' mm';
+  return {wl:wl,d:d,a:a,Lm:Lm,N:N,fringe:fringe,theta1_deg:theta1_deg,centralW:centralW};
+}
 
-  document.getElementById('statFringe').textContent = (mode!=='single')?fringe.toFixed(2):'N/A';
-  document.getElementById('statTheta1').textContent = theta1_deg.toFixed(3);
-  document.getElementById('statCentral').textContent = centralW.toFixed(2);
-  document.getElementById('statResolving').textContent = (mode==='grating')?N.toString():'—';
-  document.getElementById('cwVal').textContent = centralW.toFixed(2)+' mm';
+// angular half-window shown, chosen so several fringes are visible
+function thetaMax(){
+  var wl = gv('wl')*1e-9, d = gv('d')*1e-3, a = gv('a')*1e-6;
+  var base;
+  if(mode==='single'){ base = 3.0*wl/a; }            // ~3 diffraction minima
+  else { base = Math.max(6.0*wl/d, 2.2*wl/a); }      // several fringes within envelope
+  return Math.min(Math.max(base, 0.01), 0.6);
+}
 
-  drawPattern();
-  drawPathDiagram();
-}function drawPattern(){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const __novaDims = __novaHiDpiCanvas(canvas, canvas.offsetWidth || 700, 360, ctx);
-  const W = __novaDims.w;
-  const H = __novaDims.h;
+/* ===== Hero animation: wavefronts + screen fringes + intensity curve ===== */
+function drawHero(){
+  var canvas = el('canvas');
+  if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var st = computeStats();
+  var dims = hidpi(canvas, canvas.offsetWidth || canvas.parentElement.clientWidth-44 || 660, 380, ctx);
+  var W = dims.w, H = dims.h;
   ctx.clearRect(0,0,W,H);
+  var bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#0a1628'); bg.addColorStop(1,'#0d2040');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
 
-  // Background
-  const bgGrad = ctx.createLinearGradient(0,0,0,H);
-  bgGrad.addColorStop(0,'#0a1628');
-  bgGrad.addColorStop(1,'#0d2040');
-  ctx.fillStyle=bgGrad;
-  ctx.fillRect(0,0,W,H);
+  var col = wavelengthToRGB(gv('wl'));
 
-  const wl = parseFloat(document.getElementById('wl').value);
-  const color = wavelengthToRGB(wl);
+  // --- layout: top field (wavefronts+screen), bottom intensity curve ---
+  var fieldH = Math.round(H*0.60);
+  var curveTop = fieldH+8, curveH = H-curveTop-4;
+  var slitX = 70;
+  var screenX = W-58;
+  var cy = fieldH/2;
 
-  const padL=50, padR=20, padT=20, padB=40;
-  const plotW = W-padL-padR;
-  const plotH = H-padT-padB;
+  // slit geometry (display): spacing proportional to physical d (clamped)
+  var d_mm = gv('d'), a_um = gv('a');
+  var Nslit = (mode==='single')?1:(mode==='grating')?Math.min(parseInt(el('N').value,10),7):2;
+  var pxPerMm = 220; // display scale for slit plane
+  var dispSep = Math.min(fieldH*0.34, Math.max(10, d_mm*pxPerMm));
+  var slitYs = [];
+  if(Nslit===1){ slitYs=[cy]; }
+  else {
+    var span = dispSep*(Nslit-1);
+    for(var i=0;i<Nslit;i++) slitYs.push(cy - span/2 + i*span/(Nslit-1));
+  }
 
-  // Axis
-  ctx.strokeStyle='rgba(255,255,255,0.4)';
-  ctx.lineWidth=1.5;
+  // --- screen + fringe bar (built from intensity) ---
+  var tmax = thetaMax();
+  ctx.fillStyle='rgba(255,255,255,0.10)';
+  ctx.fillRect(screenX,6,7,fieldH-12);
+  // fringes painted along the screen
+  for(var sy=8; sy<fieldH-8; sy+=2){
+    var frac = (sy - fieldH/2)/(fieldH/2 - 8);   // -1..1
+    var th = Math.atan( Math.tan(tmax)*frac );
+    var I = intensity(th);
+    var br = Math.pow(I,0.7);
+    ctx.fillStyle = rgbStr(col, 0.12+0.88*br);
+    ctx.fillRect(screenX+7, sy, 16, 2);
+  }
+
+  // --- Huygens wavefronts: expanding rings from each slit, phase animated ---
+  var wlPix = Math.max(13, Math.min(34, 9000/gv('wl')*0.9)); // visual wavelength in px
+  ctx.save();
   ctx.beginPath();
-  ctx.moveTo(padL,padT);
-  ctx.lineTo(padL,H-padB);
-  ctx.lineTo(W-padR,H-padB);
-  ctx.stroke();
+  ctx.rect(slitX, 4, screenX-slitX, fieldH-8);
+  ctx.clip();
+  var maxR = (screenX-slitX)+dispSep+40;
+  ctx.lineWidth = 1.4;
+  for(var k=0;k<slitYs.length;k++){
+    var oy = slitYs[k];
+    // rings spaced by wavelength, animated outward via phase
+    for(var r = (phase%wlPix); r < maxR; r += wlPix){
+      var alpha = 0.42*(1 - r/maxR);
+      if(alpha<=0.02) continue;
+      ctx.strokeStyle = rgbStr(col, alpha);
+      ctx.beginPath();
+      // forward half-circle (toward screen)
+      ctx.arc(slitX, oy, r, -Math.PI/2.05, Math.PI/2.05, false);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 
-  // Grid lines
-  ctx.strokeStyle='rgba(255,255,255,0.07)';
-  ctx.lineWidth=1;
-  for(let i=1;i<=4;i++){
-    const y=padT+plotH*(1-i/4);
-    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
-    ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='9px Roboto Mono';
-    ctx.fillText((i/4).toFixed(2),4,y+3);
-  }// Labels
-  ctx.fillStyle='rgba(255,255,255,0.55)';
-  ctx.font='10px Noto Sans JP';
-  ctx.textAlign='center';
-  ctx.fillText('I/I₀',12,padT+plotH/2);
-  ctx.fillText('スクリーン位置 y [mm]',padL+plotW/2,H-4);
+  // incoming plane wave (left of slits)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(4,4,slitX-4,fieldH-8); ctx.clip();
+  ctx.lineWidth=1.2;
+  for(var px=slitX-(phase%wlPix); px>4; px-=wlPix){
+    ctx.strokeStyle=rgbStr(col,0.28*(px/slitX));
+    ctx.beginPath(); ctx.moveTo(px,6); ctx.lineTo(px,fieldH-6); ctx.stroke();
+  }
+  ctx.restore();
+
+  // barrier with slit openings
+  ctx.fillStyle='rgba(160,180,210,0.55)';
+  ctx.fillRect(slitX-3,4,6,fieldH-8);
+  ctx.fillStyle='#0a1628';
+  for(var j=0;j<slitYs.length;j++){
+    var hw = Math.max(2, Math.min(7, a_um*0.06));
+    ctx.fillRect(slitX-3, slitYs[j]-hw, 6, hw*2);
+  }
+  // glowing slit sources
+  for(var s2=0;s2<slitYs.length;s2++){
+    var g2 = ctx.createRadialGradient(slitX,slitYs[s2],0,slitX,slitYs[s2],7);
+    g2.addColorStop(0,'rgba(255,255,255,0.95)');
+    g2.addColorStop(1,rgbStr(col,0));
+    ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(slitX,slitYs[s2],7,0,7); ctx.fill();
+  }
+
+  // labels
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='10px Noto Sans JP'; ctx.textAlign='center';
+  ctx.fillText(L10N.slit, slitX, fieldH+4-fieldH+16);
+  ctx.fillText(L10N.screen, screenX-2, 16);
   ctx.textAlign='left';
 
-  const L  = parseFloat(document.getElementById('L').value);
-  const yRange = Math.min(15, parseFloat(document.getElementById('d').value||'0.2')*1e-3*10*L*1e3);
-  const yMax = Math.max(yRange, 5);
+  // --- intensity curve I(y) below the field (glowing) ---
+  var padL=46, padR=20;
+  var plotW = screenX - slitX; var cx0 = slitX;
+  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(cx0,curveTop+curveH); ctx.lineTo(cx0+plotW+24,curveTop+curveH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx0,curveTop); ctx.lineTo(cx0,curveTop+curveH); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='9px Roboto Mono'; ctx.textAlign='right';
+  ctx.fillText('1', cx0-3, curveTop+8); ctx.fillText('0', cx0-3, curveTop+curveH);
+  ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='10px Noto Sans JP';
+  ctx.fillText(L10N.intLabel, cx0+4, curveTop-2);
 
-  // Intensity curve
-  const pts=[];
-  const steps=800;
-  for(let i=0;i<=steps;i++){
-    const yMM = -yMax + 2*yMax*i/steps;
-    const yM = yMM*1e-3;
-    const theta = Math.atan2(yM,L);
-    const I = getIntensity(theta);
-    const px = padL + (i/steps)*plotW;
-    const py = padT + plotH*(1-I);
-    pts.push({px,py,I,yMM});
-  }// Fill under curve
+  var steps=520, pts=[];
+  for(var ii=0;ii<=steps;ii++){
+    var fr = ii/steps;                       // 0..1 across screen
+    var frac2 = (fr*2-1);
+    var th2 = Math.atan(Math.tan(tmax)*frac2);
+    var I2 = intensity(th2);
+    var pxx = cx0+8 + fr*(plotW-8);
+    var pyy = curveTop + curveH*(1-I2);
+    pts.push([pxx,pyy,I2]);
+  }
+  // fill
+  ctx.beginPath(); ctx.moveTo(pts[0][0],curveTop+curveH);
+  for(var p1=0;p1<pts.length;p1++) ctx.lineTo(pts[p1][0],pts[p1][1]);
+  ctx.lineTo(pts[pts.length-1][0],curveTop+curveH); ctx.closePath();
+  var fg=ctx.createLinearGradient(0,curveTop,0,curveTop+curveH);
+  fg.addColorStop(0,rgbStr(col,0.40)); fg.addColorStop(1,rgbStr(col,0.02));
+  ctx.fillStyle=fg; ctx.fill();
+  // glow line
+  ctx.shadowColor=rgbStr(col,0.9); ctx.shadowBlur=8;
+  ctx.strokeStyle='#ffd54a'; ctx.lineWidth=2;
   ctx.beginPath();
-  ctx.moveTo(pts[0].px, H-padB);
-  pts.forEach(p=>ctx.lineTo(p.px,p.py));
-  ctx.lineTo(pts[pts.length-1].px, H-padB);
-  ctx.closePath();
-  const fillGrad=ctx.createLinearGradient(0,padT,0,H-padB);
-  fillGrad.addColorStop(0,color.replace('rgb','rgba').replace(')',',0.35)'));
-  fillGrad.addColorStop(1,color.replace('rgb','rgba').replace(')',',0.02)'));
-  ctx.fillStyle=fillGrad;
-  ctx.fill();
+  for(var p2=0;p2<pts.length;p2++){ if(p2===0)ctx.moveTo(pts[p2][0],pts[p2][1]); else ctx.lineTo(pts[p2][0],pts[p2][1]); }
+  ctx.stroke(); ctx.shadowBlur=0;
 
-  // Line
-  ctx.beginPath();
-  pts.forEach((p,i)=>i===0?ctx.moveTo(p.px,p.py):ctx.lineTo(p.px,p.py));
-  ctx.strokeStyle=color;
-  ctx.lineWidth=2;
-  ctx.stroke();
-
-  // X-axis ticks
-  ctx.fillStyle='rgba(255,255,255,0.45)';
-  ctx.font='9px Roboto Mono';
-  ctx.textAlign='center';
-  for(let t=-3;t<=3;t++){
-    const px=padL+(t/(yMax*2)+0.5)*plotW;
-    if(px<padL||px>W-padR) continue;
-    ctx.fillText(((t*yMax/3)).toFixed(1),px,H-padB+14);
-    ctx.strokeStyle='rgba(255,255,255,0.15)';
-    ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(px,H-padB);ctx.lineTo(px,H-padB+5);ctx.stroke();
+  // annotate central max + first maxima
+  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='10px Noto Sans JP'; ctx.textAlign='center';
+  ctx.fillText(L10N.central, cx0+8+(plotW-8)/2, curveTop+12);
+  if(mode!=='single' && st.fringe>0){
+    ctx.fillStyle='rgba(255,213,74,0.85)';
+    ctx.fillText(L10N.bright, cx0+8+(plotW-8)*0.5, curveTop+curveH+0);
   }
   ctx.textAlign='left';
-}function drawPathDiagram(){
-  const canvas = document.getElementById('pathCanvas');
-  const ctx = canvas.getContext('2d');
-  const __novaDims = __novaHiDpiCanvas(canvas, canvas.offsetWidth || 700, 120, ctx);
-  const W = __novaDims.w;
-  const H = __novaDims.h;
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#0d1f3c';
-  ctx.fillRect(0,0,W,H);
+}
 
-  const wl = parseFloat(document.getElementById('wl').value);
-  const color = wavelengthToRGB(wl);
-  const d_mm = parseFloat(document.getElementById('d').value||'0.2');
-  const L = parseFloat(document.getElementById('L').value);
-
-  // Draw slit(s)
-  const slitX = 60;
-  const cy = H/2;
-  const sep = Math.min(40, H*0.3);
-
-  ctx.strokeStyle='rgba(255,255,255,0.15)';
-  ctx.lineWidth=1;
-  ctx.setLineDash([4,3]);
-  ctx.beginPath();ctx.moveTo(slitX,0);ctx.lineTo(slitX,H);ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Slit openings
+function drawPathDiagram(){
+  var canvas = el('pathCanvas');
+  if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dims = hidpi(canvas, canvas.offsetWidth || canvas.parentElement.clientWidth-44 || 660, 120, ctx);
+  var W=dims.w,H=dims.h;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0d1f3c'; ctx.fillRect(0,0,W,H);
+  var wl=gv('wl'); var col=wavelengthToRGB(wl);
+  var d_mm=gv('d'); var Lm=gv('L');
+  var slitX=60, cy=H/2, sep=Math.min(40,H*0.3);
+  ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(slitX,0); ctx.lineTo(slitX,H); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle='rgba(255,255,255,0.7)';
-  if(mode!=='single'){
-    ctx.fillRect(slitX-2,cy-sep-4,4,8);
-    ctx.fillRect(slitX-2,cy+sep-4,4,8);
-  }else{
-    ctx.fillRect(slitX-2,cy-10,4,20);
-  }// Rays to screen
-  const screenX = W-40;
-  const angles = [-0.15,-0.07,0,0.07,0.15];
-  angles.forEach((a,i)=>{
-    const endY = cy + Math.tan(a)*(screenX-slitX);
+  if(mode!=='single'){ ctx.fillRect(slitX-2,cy-sep-4,4,8); ctx.fillRect(slitX-2,cy+sep-4,4,8); }
+  else { ctx.fillRect(slitX-2,cy-10,4,20); }
+  var screenX=W-40; var angles=[-0.15,-0.07,0,0.07,0.15];
+  for(var i=0;i<angles.length;i++){
+    var a=angles[i]; var endY=cy+Math.tan(a)*(screenX-slitX);
     ctx.beginPath();
-    if(mode!=='single'){
-      ctx.moveTo(slitX,cy-sep);
-      ctx.lineTo(screenX,endY);
-      ctx.moveTo(slitX,cy+sep);
-      ctx.lineTo(screenX,endY);
-    }else{
-      ctx.moveTo(slitX,cy);
-      ctx.lineTo(screenX,endY);
-    }const alpha = 0.15+0.2*(4-i);
-    ctx.strokeStyle=color.replace('rgb','rgba').replace(')',`,${alpha})`);
-    ctx.lineWidth=1;
-    ctx.stroke();
+    if(mode!=='single'){ ctx.moveTo(slitX,cy-sep); ctx.lineTo(screenX,endY); ctx.moveTo(slitX,cy+sep); ctx.lineTo(screenX,endY); }
+    else { ctx.moveTo(slitX,cy); ctx.lineTo(screenX,endY); }
+    var alpha=0.15+0.2*(4-i);
+    ctx.strokeStyle=rgbStr(col,alpha); ctx.lineWidth=1; ctx.stroke();
+  }
+  ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.fillRect(screenX,0,6,H);
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='10px Noto Sans JP';
+  ctx.fillText(L10N.slit,slitX-22,14); ctx.fillText(L10N.screen,screenX-30,14);
+  ctx.fillText('λ='+wl.toFixed(0)+'nm',10,H-8);
+  ctx.fillText('d='+d_mm.toFixed(2)+'mm',90,H-8);
+  ctx.fillText('L='+Lm.toFixed(2)+'m',180,H-8);
+}
+
+function frame(){
+  if(running){ phase += 0.9; if(phase>1e6) phase=0; }
+  drawHero();
+  rafId = requestAnimationFrame(frame);
+}
+
+function compute(){
+  computeStats();
+  drawHero();
+  drawPathDiagram();
+}
+window.compute = compute;
+
+window.toggleWaveAnim = function(){
+  running = !running;
+  var b = el('btnPlay');
+  if(b) b.innerHTML = running ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+};
+
+window.updateWL = function(){
+  var wl = gv('wl');
+  var sw = el('wlSwatch'); if(sw) sw.style.background = rgbStr(wavelengthToRGB(wl));
+  var el2 = el('wl'); el2.style.setProperty('--pct', ((wl-380)/(780-380)*100).toFixed(1)+'%');
+  compute();
+};
+
+window.setMode = function(m){
+  mode = m;
+  ['double','single','grating'].forEach(function(t){ el('tab-'+t).classList.toggle('active', t===m); });
+  el('pg-d').classList.toggle('hidden', m==='single');
+  el('pg-N').classList.toggle('hidden', m!=='grating');
+  el('pg-a').classList.remove('hidden');
+  var tc = el('theoryContent');
+  if(m==='double'){
+    tc.innerHTML='<p><strong>二重スリット干渉（Young\'s experiment）</strong></p>$$I(\\theta)=I_0\\cos^2\\!\\left(\\frac{\\pi d\\sin\\theta}{\\lambda}\\right)\\cdot\\text{sinc}^2\\!\\left(\\frac{\\pi a\\sin\\theta}{\\lambda}\\right)$$<p style="margin-top:6px;">明線条件（極大）：$d\\sin\\theta = m\\lambda$</p><p style="margin-top:4px;">暗線条件（極小）：$d\\sin\\theta = \\left(m+\\tfrac{1}{2}\\right)\\lambda$</p><p style="margin-top:4px;">縞間隔：$\\Delta y = \\dfrac{\\lambda L}{d}$</p>';
+  } else if(m==='single'){
+    tc.innerHTML='<p><strong>単スリット回折</strong></p>$$I(\\theta)=I_0\\,\\text{sinc}^2\\!\\left(\\frac{\\pi a\\sin\\theta}{\\lambda}\\right)$$<p style="margin-top:6px;">暗線条件：$a\\sin\\theta = m\\lambda \\ (m=\\pm1,\\pm2,\\ldots)$</p><p style="margin-top:4px;">中央極大幅（半値幅）：$w = \\dfrac{2\\lambda L}{a}$</p>';
+  } else {
+    tc.innerHTML='<p><strong>回折格子（N スリット）</strong></p>$$I(\\theta)=I_0\\left(\\frac{\\sin(N\\delta/2)}{N\\sin(\\delta/2)}\\right)^2\\cdot\\text{sinc}^2\\!\\left(\\frac{\\pi a\\sin\\theta}{\\lambda}\\right)$$<p style="margin-top:6px;">ここで $\\delta = \\dfrac{2\\pi d\\sin\\theta}{\\lambda}$，主極大条件：$d\\sin\\theta = m\\lambda$</p><p style="margin-top:4px;">分解能：$R = mN$，　縞間隔：$\\Delta y = \\dfrac{\\lambda L}{d}$</p>';
+  }
+  if(window.MathJax && typeof MathJax.typesetPromise==='function') MathJax.typesetPromise([tc]);
+  compute();
+};
+
+// init
+(function init(){
+  var sw=el('wlSwatch'); if(sw) sw.style.background=rgbStr(wavelengthToRGB(550));
+  ['d','a','L','N'].forEach(function(id){
+    var e=el(id); if(!e) return;
+    var pct=((parseFloat(e.value)-parseFloat(e.min))/(parseFloat(e.max)-parseFloat(e.min))*100);
+    e.style.setProperty('--pct',pct.toFixed(1)+'%');
   });
+  var wlEl=el('wl'); if(wlEl) wlEl.style.setProperty('--pct',((550-380)/(780-380)*100).toFixed(1)+'%');
+  compute();
+  if(reduceMotion){ running=false; drawHero(); var b=el('btnPlay'); if(b) b.innerHTML='<i class="fas fa-play"></i> 再生'; }
+  else { rafId=requestAnimationFrame(frame); }
+  window.addEventListener('resize', compute);
+})();
 
-  // Screen
-  ctx.fillStyle='rgba(255,255,255,0.08)';
-  ctx.fillRect(screenX,0,6,H);
-
-  // Label
-  ctx.fillStyle='rgba(255,255,255,0.5)';
-  ctx.font='10px Noto Sans JP';
-  ctx.fillText('スリット',slitX-22,14);
-  ctx.fillText('スクリーン',screenX-30,14);
-  ctx.fillText(`λ=${wl.toFixed(0)}nm`,10,H-8);
-  ctx.fillText(`d=${d_mm.toFixed(2)}mm`,90,H-8);
-  ctx.fillText(`L=${L.toFixed(2)}m`,180,H-8);
-}// Init
-
-document.getElementById('wlSwatch').style.background = wavelengthToRGB(550);
-const initSliders = [{id:'d',   valId:'dVal',   dec:2, unit:'mm'},{id:'a',   valId:'aVal',   dec:1, unit:'μm'},{id:'L',   valId:'lVal',   dec:2, unit:'m'},{id:'N',   valId:'nVal',   dec:0, unit:''},
-];
-initSliders.forEach(s=>{
-  const el=document.getElementById(s.id);
-  updateSlider(el,s.valId,s.dec,s.unit);
-});
-compute();
-window.addEventListener('resize',()=>compute());
+})();
 </script>
 
 <section class="explanation">
@@ -662,6 +722,9 @@ window.addEventListener('resize',()=>compute());
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="diffraction.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -715,14 +778,14 @@ window.addEventListener('resize',()=>compute());
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>波長(wl)を150～700nm範囲で設定。可視光の場合は赤色650nm、緑色550nm、青色450nmを標準値として使用</li>
+<li>波長(wl)を380～780nm範囲で設定。可視光の場合は赤色650nm、緑色550nm、青色450nmを標準値として使用</li>
 <li>スリット間隔(d)を0.1～0.5mm、スリット幅(a)を0.02～0.1mmの範囲で入力。光学実験では通常d/a=5～10の比率を維持</li>
 <li>スクリーン距離(L)を0.5～3m設定後、リアルタイム計算により干渉縞間隔Δy、回折第1極大角θ₁、中央極大幅、分解能Rが自動更新</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>波長λ=550nm(緑色)、スリット間隔d=0.25mm、スリット幅a=0.05mm、スクリーン距離L=1.5mの場合：縞間隔Δy=(λL/d)=3.3mm、第1極小角θ₁=sin⁻¹(λ/a)=0.63°(中央極大幅≈19mm)、分解能R=d/λ=454。この設定は高等学校物理実験室での標準的な条件。λ=405nm(紫外)とd=0.1mmに変更すると、より細かい干渉縞構造が観測可能</p>
+<p>波長λ=550nm(緑色)、スリット間隔d=0.25mm、スリット幅a=0.05mm、スクリーン距離L=1.5mの場合：縞間隔Δy=λL/d=3.30mm、単スリット回折の第1極小角はsin⁻¹(λ/a)=0.63°で中央極大幅≈33mm（=2λL/a）。二重スリットモードのθ₁表示はsin⁻¹(λ/d)=0.126°です。分解能はR=mN（回折格子モードでスリット数N、二重スリットでは2）で定義され、d/λは分解能ではありません。λ=405nm(紫外)に変更すると、より細かい干渉縞構造が観測可能</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -732,6 +795,16 @@ window.addEventListener('resize',()=>compute());
 <li>実験では空気中の気流や振動による位相変動で縞がぼけるため、シミュレーション値との差が1～2%程度発生。短波長ほど環境安定性が重要</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "柱の座屈荷重計算ツール",
       "description": "柱の座屈荷重をオイラー式とJohnson放物線で計算。端末条件・断面形状・スレンダー比・臨界応力をリアルタイム可視化。",
       "url": "https://novasolver.jp/tools/euler-buckling-beam.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["オイラー座屈荷重の計算","Johnson放物線による中間柱の評価","端末条件別の座屈形状の可視化","断面2次モーメント自動計算"],
       "keywords": "座屈荷重,オイラー座屈,Johnson放物線,スレンダー比,有効座屈長さ,臨界応力,構造解析",
       "datePublished": "2026-04-09",
@@ -129,6 +129,19 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 live readouts / hero ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.62rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+#bcanvas{display:block;width:100%;background:#0a1628;border-radius:8px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+@media (prefers-reduced-motion: reduce){input[type=range]::-webkit-slider-thumb{transition:none}}
+/* end v2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/euler-buckling-beam.html">
@@ -204,19 +217,45 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <input type="range" id="slP" oninput="syncToNum('slP','slPNum');syncToNum('slP','lblPNum')" min="1" max="5000" step="1" value="50">
 <input type="number" class="num-input" id="slPNum" value="50" min="1" max="5000" step="1" style="width:70px;margin-left:6px;" oninput="syncFromNum('slP','slPNum')">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roPcr">—</div><div class="rl">臨界荷重 Pcr [kN]</div></div>
+        <div class="live-ro"><div class="rv" id="roRatio">—</div><div class="rl">荷重比 P / Pcr</div></div>
+        <div class="live-ro"><div class="rv" id="roKL">—</div><div class="rl">有効長 KL [m]</div></div>
+        <div class="live-ro"><div class="rv" id="roSlender">—</div><div class="rl">細長比 KL/r</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 座屈ライブアニメーション</div>
+      <canvas id="bcanvas" height="360" role="img" aria-label="軸圧縮荷重が増えると柱が座屈モードに変形する様子のアニメーション"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#00B4D8"></i>柱（変形）</span>
+        <span><i class="swatch" style="background:#ff5252"></i>軸荷重 P</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>Pcr しきい値</span>
+      </div>
+      <div style="font-size:.74rem;color:var(--muted);margin-top:8px" id="bnote">荷重 P を上げると、P が Pcr に達した瞬間に柱が座屈モード形状へ急変します。</div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stats-grid" id="statsGrid"></div>
     </div>
 
     <div class="chart-row">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 曲線</div><canvas id="chartCurve"></canvas></div>
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 座屈モード形状</div><canvas id="chartShape"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> σcr–細長比 曲線</div><canvas id="chartCurve"></canvas></div>
     </div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 オイラー座屈: $P_{cr}=\dfrac{\pi^2 EI}{(KL)^2}$<br>
       遷移スレンダー比: $\lambda_c=\pi\sqrt{\dfrac{2E}{F_y}}$<br>
@@ -229,6 +268,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
+(function(){
+"use strict";
 
 // ---- Section dimension controls ----
 
@@ -255,7 +296,7 @@ function buildDimControls(){
       <div class="ctrl-group">
         <label>${d.label}<span id="lbl_${d.id}">${d.val}${d.unit}</span></label>
         <input type="range" id="sl_${d.id}" min="${d.min}" max="${d.max}" step="${d.step}" value="${d.val}" oninput="syncToNum('sl_${d.id}','sl_${d.id}Num')">
-<input type="number" class="num-input" id="sl_${d.id}Num" value="${d.val}" min="${d.min}" max="${d.max}" step="${d.step}" style="width:70px;margin-left:6px;" oninput="syncFromNum('sl_${d.id}','sl_${d.id}Num')">
+<input type="number" class="num-input" id="sl_${d.id}Num" value="${d.val}" min="${d.min}" max="${d.max}" step="${d.step}" style="width:70px;margin-left:6px;" oninput="syncFromNum('sl_${d.id}','sl_${d.id}Num');dimVals['${d.id}']=+this.value;document.getElementById('lbl_${d.id}').textContent=this.value+' '+'${d.unit}';update();">
       </div>`;
   });
   defs.forEach(d =>{
@@ -292,7 +333,7 @@ function buildDimControls(){
   }return{ I, A }; // mm^4, mm^2
 }// ---- Charts ----
 
-let chartCurve, chartShape;
+let chartCurve;
 
 function initCharts(){
   const ctxC = document.getElementById('chartCurve').getContext('2d');
@@ -312,40 +353,128 @@ function initCharts(){
       }
     }
   });
+}
 
-  const ctxS = document.getElementById('chartShape').getContext('2d');
-  chartShape = new Chart(ctxS,{
-    type: 'line',
-    data: { datasets: [] },
-    options:{
-      responsive: true,
-      animation: false,
-      plugins: {
-        legend: { display: false },
-        title:{ display: true, text: '座屈形状（変形後）', font: { size: 12 } }
-      },
-      scales:{
-        x: { type:'linear', title: { display: true, text: '水平変位 (相対)' }, min: -1.2, max: 1.2 },
-        y:{ title: { display: true, text: '柱軸方向 (0=下端, 1=上端)' }, min: -0.05, max: 1.05 }
-      }
-    }
-  });
-}function getBuckledShape(endCond){
-  const pts = 60;
-  const data = [];
-  for (let i = 0; i <= pts; i++) {
-    const eta = i / pts; // 0=bottom 1=top
-    let x;
-    switch(endCond) {
-      case '1.0': x = Math.sin(Math.PI * eta); break;
-      case '2.0': x = 1 - Math.cos(Math.PI * eta / 2); break;
-      case '0.7': x = Math.sin(Math.PI * eta / 0.7) - (Math.sin(Math.PI / 0.7) * eta); break;
-      case '0.5': x = Math.sin(2 * Math.PI * eta) * 0.5; break;
-      default:    x = Math.sin(Math.PI * eta);
-    }data.push({ x: x, y: eta });
+// ---- Buckled mode shape (normalised lateral profile, 0=bottom 1=top) ----
+function modeShape(K, eta){
+  if (K === 2.0) return 1 - Math.cos(Math.PI * eta / 2);          // fixed-free quarter sine
+  if (K === 0.5) return 0.5 * (1 - Math.cos(2 * Math.PI * eta));  // fixed-fixed full wave
+  if (K === 0.7) {                                                // fixed-pinned
+    const b = Math.PI / 0.699;
+    return Math.sin(b * eta) - Math.sin(b) * eta;
   }
-  return data;
-}function update(){
+  return Math.sin(Math.PI * eta);                                 // pinned-pinned half sine
+}
+
+// ============ Live buckling hero animation ============
+const bcanvas = document.getElementById('bcanvas');
+const bctx = bcanvas ? bcanvas.getContext('2d') : null;
+let bDpr = 1, bW = 0, bH = 360;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let heroState = { K:1 };
+let loadPhase = 0;   // 0..1 animated ramp; mapped to P/Pcr 0..1.25
+
+function resizeHero(){
+  if (!bcanvas) return;
+  const rect = bcanvas.parentElement.getBoundingClientRect();
+  bW = Math.max(260, Math.floor(rect.width - 24));
+  bH = 360;
+  bDpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  bcanvas.style.width = bW + 'px';
+  bcanvas.style.height = bH + 'px';
+  bcanvas.width = Math.round(bW * bDpr);
+  bcanvas.height = Math.round(bH * bDpr);
+  bctx.setTransform(bDpr, 0, 0, bDpr, 0, 0);
+}
+
+function drawHero(ratio){
+  if (!bctx) return;
+  resizeHero();
+  const W = bW, H = bH;
+  bctx.clearRect(0,0,W,H);
+  bctx.fillStyle = '#0a1628'; bctx.fillRect(0,0,W,H);
+
+  const padT = 46, padB = 40;
+  const colTop = padT, colBot = H - padB;
+  const colH = colBot - colTop;
+  const cx = W * 0.46;
+
+  const buckled = ratio >= 1;
+  const amp = buckled ? Math.min(0.95, 1.7 * Math.sqrt(ratio - 1 + 1e-4)) : 0;
+  const ampPx = amp * (W * 0.20);
+
+  // ground / base hatch
+  bctx.strokeStyle = 'rgba(120,200,120,0.55)'; bctx.lineWidth = 2;
+  bctx.beginPath(); bctx.moveTo(cx-46, colBot); bctx.lineTo(cx+46, colBot); bctx.stroke();
+  bctx.strokeStyle = 'rgba(120,200,120,0.35)'; bctx.lineWidth = 1;
+  for (let i=-4;i<=4;i++){ bctx.beginPath(); bctx.moveTo(cx+i*10, colBot); bctx.lineTo(cx+i*10-8, colBot+9); bctx.stroke(); }
+
+  // column with buckled mode shape (slight axial shortening with load)
+  const shorten = Math.min(0.04, ratio*0.03) * colH;
+  const yTop = colTop + shorten;
+  const K = heroState.K;
+  bctx.lineWidth = 7; bctx.lineCap = 'round';
+  bctx.strokeStyle = buckled ? '#ff7a7a' : '#00B4D8';
+  bctx.beginPath();
+  const N = 48;
+  let topX = cx, topY = yTop;
+  for (let i=0;i<=N;i++){
+    const eta = i / N;                       // 0 bottom -> 1 top
+    const yy = colBot - eta * (colH - shorten);
+    const xx = cx + modeShape(K, eta) * ampPx;
+    if (i===0) bctx.moveTo(xx, yy); else bctx.lineTo(xx, yy);
+    if (i===N){ topX = xx; topY = yy; }
+  }
+  bctx.stroke();
+
+  // undeformed reference axis
+  bctx.strokeStyle = 'rgba(255,255,255,0.18)'; bctx.lineWidth = 1; bctx.setLineDash([4,4]);
+  bctx.beginPath(); bctx.moveTo(cx, colBot); bctx.lineTo(cx, yTop); bctx.stroke(); bctx.setLineDash([]);
+
+  // top loading plate + growing load arrow
+  const aLen = 14 + Math.min(40, ratio*30);
+  bctx.fillStyle = '#cfd8e3'; bctx.fillRect(topX-16, topY-6, 32, 6);
+  bctx.strokeStyle = '#ff5252'; bctx.fillStyle = '#ff5252'; bctx.lineWidth = 3;
+  bctx.beginPath(); bctx.moveTo(topX, topY - aLen - 6); bctx.lineTo(topX, topY - 8); bctx.stroke();
+  bctx.beginPath();
+  bctx.moveTo(topX, topY - 3);
+  bctx.lineTo(topX - 6, topY - 12);
+  bctx.lineTo(topX + 6, topY - 12);
+  bctx.closePath(); bctx.fill();
+  bctx.fillStyle = '#ff8a8a'; bctx.font = 'bold 12px Roboto Mono'; bctx.textAlign = 'center';
+  bctx.fillText('P', topX, topY - aLen - 12);
+
+  // Pcr threshold gauge (right side)
+  const gx = W - 26, gTop = padT, gBot = colBot;
+  const gmax = 1.25;
+  bctx.strokeStyle = 'rgba(255,255,255,0.22)'; bctx.lineWidth = 6; bctx.lineCap='butt';
+  bctx.beginPath(); bctx.moveTo(gx, gBot); bctx.lineTo(gx, gTop); bctx.stroke();
+  const fillFrac = Math.min(ratio, gmax) / gmax;
+  bctx.strokeStyle = buckled ? '#ff5252' : '#00B4D8'; bctx.lineWidth = 6;
+  bctx.beginPath(); bctx.moveTo(gx, gBot); bctx.lineTo(gx, gBot - fillFrac*(gBot-gTop)); bctx.stroke();
+  const yPcr = gBot - (1/gmax)*(gBot-gTop);
+  bctx.strokeStyle = '#ffd54a'; bctx.lineWidth = 2; bctx.setLineDash([4,3]);
+  bctx.beginPath(); bctx.moveTo(gx-12, yPcr); bctx.lineTo(gx+8, yPcr); bctx.stroke(); bctx.setLineDash([]);
+  bctx.fillStyle = '#ffd54a'; bctx.font = '10px Roboto Mono'; bctx.textAlign = 'right';
+  bctx.fillText('Pcr', gx-14, yPcr+3);
+
+  // status annotation
+  bctx.textAlign = 'left'; bctx.font = 'bold 13px Noto Sans JP';
+  bctx.fillStyle = buckled ? '#ff7a7a' : '#7fe3ff';
+  bctx.fillText(buckled ? '座屈発生：P ≥ Pcr' : '安定：P < Pcr（直立）', 14, 24);
+  bctx.font = '11px Roboto Mono'; bctx.fillStyle = 'rgba(255,255,255,0.7)';
+  bctx.fillText('P/Pcr = ' + ratio.toFixed(2), 14, 40);
+}
+
+function heroLoop(){
+  if (reduceMotion) return;
+  loadPhase += 0.006;
+  if (loadPhase > 1) loadPhase = 0;
+  drawHero(loadPhase * 1.25);
+  requestAnimationFrame(heroLoop);
+}
+
+function update(){
   const K = +document.getElementById('endCond').value;
   const type = document.getElementById('sectionType').value;
   const L = +document.getElementById('slL').value * 1000; // mm
@@ -414,25 +543,24 @@ function initCharts(){
   chartCurve.options.scales.y.max = Math.min(Fy * 1.4, 1500);
   chartCurve.update();
 
-  // Buckling shape
-  const shapeData = getBuckledShape(String(K));
-  chartShape.data.datasets = [{
-      data: shapeData,
-      borderColor: '#007BFF',
-      backgroundColor: 'rgba(0,123,255,0.08)',
-      borderWidth: 2.5,
-      pointRadius: 0,
-      fill: false,
-      tension: 0.4
-    },{ // Axis (undeformed)
-      data: [{x:0,y:0},{x:0,y:1}],
-      borderColor: 'rgba(0,0,0,0.2)',
-      borderWidth: 1,
-      borderDash: [3,3],
-      pointRadius: 0,
-      fill: false
-    }];
-  chartShape.update();
+  // Feed the live buckling hero
+  heroState.K = K;
+  const KL_m = K * L / 1000; // m
+  const loadRatio = Pcr > 0 ? P_applied / Pcr : 0;
+  document.getElementById('roPcr').textContent = (Pcr/1000).toFixed(1);
+  document.getElementById('roRatio').textContent = loadRatio.toFixed(2);
+  document.getElementById('roKL').textContent = KL_m.toFixed(2);
+  document.getElementById('roSlender').textContent = KLr.toFixed(0);
+  const bnote = document.getElementById('bnote');
+  if (bnote){
+    bnote.textContent = loadRatio >= 1
+      ? `現在の荷重 P は Pcr の ${loadRatio.toFixed(2)} 倍。柱は座屈モード形状（K=${K}）へ変形します。`
+      : `現在の荷重 P は Pcr の ${loadRatio.toFixed(2)} 倍で安定。P を上げると Pcr で座屈します。`;
+  }
+  if (reduceMotion){
+    // static frame: show actual current load ratio (clamped for view)
+    drawHero(Math.min(loadRatio, 1.25));
+  }
 
   // Stats
   const regionLabel = region === 'euler' ? '<span class="status-badge status-euler">オイラー領域</span>' :
@@ -474,9 +602,20 @@ document.getElementById('endCond').addEventListener('change', update);
   });
 });
 
+// expose update() for inline dim-control oninput handlers
+window.update = update;
+
 buildDimControls();
 initCharts();
 update();
+
+if (reduceMotion){
+  drawHero(1.1); // static buckled frame
+} else {
+  requestAnimationFrame(heroLoop);
+}
+window.addEventListener('resize', () => { if (reduceMotion) update(); });
+})();
 </script>
 
 <section class="explanation">
@@ -501,7 +640,43 @@ update();
       <div class="bub">いいところに気づいたね！オイラー式は細長い柱にだけ有効で、太短い柱は材料の降伏で壊れる。その中間の「中細長柱」は、初期の歪みや残留応力の影響でオイラー式より早くダメになる。それを補正するのがJohnson式だ。断面形状を「H形」から「円形」に変えると、断面二次半径rが変わり、この遷移の様子がグラフでよくわかるよ。</div>
     </div>
   </div>
-  <h2>よくある質問</h2>
+  <h2>オイラーの座屈荷重と有効座屈長</h2>
+<div class="fblock">
+<p>細長い柱が軸圧縮を受けると、降伏前に横へ急に変形する<strong>座屈</strong>を起こします。理想弾性柱の座屈荷重（オイラー座屈荷重）と座屈応力は次式です。</p>
+<p style="text-align:center">$P_{cr} = \dfrac{\pi^2 E I}{(K L)^2}, \qquad \sigma_{cr}=\dfrac{P_{cr}}{A}=\dfrac{\pi^2 E}{\lambda^2}, \qquad \lambda=\dfrac{KL}{i},\ i=\sqrt{\dfrac{I}{A}}$</p>
+<p>$L_{cr}=KL$ は有効座屈長、$\lambda$ は<strong>細長比</strong>、$i$ は断面二次半径です。端部の拘束が強いほど $K$ が小さく座屈に強くなります。</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">端部条件</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">$K$（理論値）</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">$L_{cr}$</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">両端ピン</td><td style="border:1px solid #d0d7de;padding:6px 8px">1.0</td><td style="border:1px solid #d0d7de;padding:6px 8px">$L$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">固定–自由（片持ち）</td><td style="border:1px solid #d0d7de;padding:6px 8px">2.0</td><td style="border:1px solid #d0d7de;padding:6px 8px">$2L$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">固定–ピン</td><td style="border:1px solid #d0d7de;padding:6px 8px">0.7</td><td style="border:1px solid #d0d7de;padding:6px 8px">$0.7L$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">両端固定</td><td style="border:1px solid #d0d7de;padding:6px 8px">0.5</td><td style="border:1px solid #d0d7de;padding:6px 8px">$0.5L$</td></tr>
+</tbody>
+</table>
+</div>
+<p>座屈は最も曲がりやすい軸（最小の $I$）まわりで起こります。断面二次モーメントは、中実円 $I=\pi d^4/64$、中空円 $I=\pi(D^4-d^4)/64$、矩形 $I=bh^3/12$ です。</p>
+</div>
+
+<h2>短柱・中間柱・長柱と限界細長比</h2>
+<div class="fblock">
+<p>オイラー式は<strong>長柱（細長い柱）</strong>でのみ有効です。座屈応力が降伏応力 $\sigma_y$ を超える太く短い柱では、座屈ではなく圧縮降伏が先に起こります。境界となる<strong>限界細長比</strong>は次式です。</p>
+<p style="text-align:center">$\lambda_1 = \pi\sqrt{\dfrac{E}{\sigma_y}}$</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">分類</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">細長比</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">支配・評価</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">短柱</td><td style="border:1px solid #d0d7de;padding:6px 8px">小（$\lambda$ 小）</td><td style="border:1px solid #d0d7de;padding:6px 8px">圧縮降伏 $\sigma_{cr}\approx\sigma_y$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">中間柱</td><td style="border:1px solid #d0d7de;padding:6px 8px">中程度</td><td style="border:1px solid #d0d7de;padding:6px 8px">非弾性座屈（ジョンソン式 $\sigma_{cr}=\sigma_y-\dfrac{\sigma_y^2}{4\pi^2 E}\lambda^2$ など）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">長柱</td><td style="border:1px solid #d0d7de;padding:6px 8px">大（$\lambda>\lambda_1$）</td><td style="border:1px solid #d0d7de;padding:6px 8px">弾性座屈（オイラー式）</td></tr>
+</tbody>
+</table>
+</div>
+<p>座屈は突然・破滅的に起こるため、実際の設計では安全率を大きく取り、初期不整・偏心も考慮します。細長比を下げる（太く・短く・拘束を強く）ことが座屈対策の基本です。</p>
+</div>
+
+<h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">端末条件の有効長係数Kはどのように設定すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -537,6 +712,9 @@ update();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="euler-buckling-beam.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -587,6 +765,16 @@ update();
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

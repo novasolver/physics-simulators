@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "線形破壊力学・応力拡大係数計算機",
       "description": "LEFM理論に基づき、き裂長さ・試験片形状・材料特性から応力拡大係数 K_I、破壊安全率、塑性域半径、臨界き裂長さ a_c を計算するインタラクティブツール。",
       "url": "https://novasolver.jp/tools/fracture-mechanics.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["センタークラック・エッジクラック・CT・3点曲げの形状係数Y","応力拡大係数 K_I (MPa√m)","破壊安全率 K_Ic/K_I","塑性域半径 r_p","臨界き裂長さ a_c","K vs a のChart.jsグラフ"],
       "keywords": "線形破壊力学,応力拡大係数,LEFM,破壊靭性,臨界き裂長さ,塑性域,CAE計算機",
       "datePublished": "2026-04-08",
@@ -226,7 +226,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <input type="range" id="sliderSy" min="100" max="2000" step="50" value="350"
         oninput="syncToNum('sliderSy','valSyNum');updateSlider(this);compute()">
     </div>
-    
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -241,7 +249,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="stat-card"><div class="sv" id="svAc">—</div><div class="sl">臨界 a_c (mm)</div></div>
       <div class="stat-card"><div class="sv" id="svY">—</div><div class="sl">形状係数 Y</div></div>
     </div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> き裂</div><canvas id="crackCanvas" width="700" height="260"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> モードI き裂開口アニメーション（荷重↑で開口・先端応力集中・K_I=K_Icで進展）</div>
+      <canvas id="crackCanvas" width="700" height="300" tabindex="0" role="img" aria-label="モードIき裂の開口アニメーション。引張荷重でき裂面が開き、先端応力が集中し、K_IがK_Icに達すると不安定進展します。"></canvas>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+        <button class="btn" type="button" id="btnAnim" onclick="toggleAnim()" style="display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font:inherit;font-weight:600"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" id="btnFrac" onclick="forceFracture()" style="display:inline-flex;align-items:center;gap:6px;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:8px 16px;border-radius:8px;cursor:pointer;font:inherit;font-weight:600"><i class="fas fa-bolt"></i> 荷重を上限まで</button>
+        <span style="font-size:.74rem;color:var(--muted)">赤=破壊条件 K_I&ge;K_Ic ／ 青=安全</span>
+      </div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 応力拡大係数 K vs 亀裂長</div><canvas class="ux-chartjs-canvas" id="kaChart"></canvas></div>
   
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
@@ -256,191 +271,301 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
+(function(){
+"use strict";
+/* ===== NovaSolver v2 — Mode I (opening) fracture mechanics ===== */
+var T = {
+  af:'破壊条件 K_I ≥ K_Ic に到達 — 不安定進展！',
+  load:'荷重', open:'開口', tip:'先端応力集中', prop:'き裂進展',
+  ki:'K_I', kic:'K_Ic', sigma:'σ', sigApp:'負荷応力',
+  axisA:'き裂長さ a (mm)', axisK:'K_I (MPa√m)', critical:'K_Ic（破壊靭性）'
+};
+
+function $(id){ return document.getElementById(id); }
+function hidpi(canvas, cssW, cssH, ctx){
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
+  canvas.setAttribute('data-ux-no-scale','1');
   var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
+  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 300));
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
+  if (ctx && ctx.setTransform) ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { w:w, h:h, dpr:dpr };
 }
 
-
-let kaChart = null;
-
-const materials ={
-  steel:   { kic: 50,  sy: 350  },
-  hss:{ kic: 80,  sy: 900  },
-  al7075:{ kic: 26,  sy: 503  },
-  ti6al4v:{ kic: 75,  sy: 880  },
-  custom:{ kic: 50,  sy: 350  }
+var kaChart = null;
+var materials = {
+  steel:{kic:50,sy:350}, hss:{kic:80,sy:900},
+  al7075:{kic:26,sy:503}, ti6al4v:{kic:75,sy:880}, custom:{kic:50,sy:350}
 };
 
 function applyMaterial(){
-  const key = document.getElementById('materialPreset').value;
-  const m = materials[key];
-  const slKic = document.getElementById('sliderKic');
-  const slSy  = document.getElementById('sliderSy');
+  var key = $('materialPreset').value, m = materials[key];
+  var slKic = $('sliderKic'), slSy = $('sliderSy');
   slKic.value = m.kic; slSy.value = m.sy;
-  updateSlider(slKic);
-  updateSlider(slSy);
+  if (typeof updateSlider === 'function'){ updateSlider(slKic); updateSlider(slSy); }
+  if (typeof syncToNum === 'function'){ syncToNum('sliderKic','valKicNum'); syncToNum('sliderSy','valSyNum'); }
   compute();
-}function getYFactor(type, aW){
-  // Standard polynomial approximations
+}
+
+function getYFactor(type, aW){
   if (aW >= 1) aW = 0.99;
-  switch(type) {
-    case 'center': {
-      // Feddersen formula for CCT
-      const t = Math.PI * aW / 2;
-      return Math.sqrt(Math.tan(t) / t) * (1 - 0.1 * aW**2 + 0.96 * aW**4);
-    }case 'edge':{
-      // Tada single edge crack
-      return 1.12 - 0.231*aW + 10.55*aW**2 - 21.72*aW**3 + 30.39*aW**4;
-    }case 'ct':{
-      // ASTM CT specimen
-      const r = aW;
-      return ((2+r) / (1-r)**1.5) * (0.886 + 4.64*r - 13.32*r**2 + 14.72*r**3 - 5.6*r**4);
-    }case 'bend':{
-      // SENB 3-point
-      const r = aW;
-      return (3*Math.sqrt(r) / (2*(1-r)**1.5)) * (1.99 - r*(1-r)*(2.15 - 3.93*r + 2.7*r**2));
-    }
+  switch(type){
+    case 'center': { var t = Math.PI*aW/2; return Math.sqrt(Math.tan(t)/t)*(1 - 0.1*aW*aW + 0.96*Math.pow(aW,4)); }
+    case 'edge':   return 1.12 - 0.231*aW + 10.55*aW*aW - 21.72*Math.pow(aW,3) + 30.39*Math.pow(aW,4);
+    case 'ct':   { var r=aW; return ((2+r)/Math.pow(1-r,1.5))*(0.886 + 4.64*r - 13.32*r*r + 14.72*Math.pow(r,3) - 5.6*Math.pow(r,4)); }
+    case 'bend': { var s=aW; return (3*Math.sqrt(s)/(2*Math.pow(1-s,1.5)))*(1.99 - s*(1-s)*(2.15 - 3.93*s + 2.7*s*s)); }
     default: return 1.0;
   }
-}function compute(){
-  const sigma = parseFloat(document.getElementById('sliderSig').value);
-  const a_mm  = parseFloat(document.getElementById('sliderA').value);
-  const W_mm  = parseFloat(document.getElementById('sliderW').value);
-  const Kic   = parseFloat(document.getElementById('sliderKic').value);
-  const sy    = parseFloat(document.getElementById('sliderSy').value);
-  const type  = document.getElementById('specimenType').value;
+}
 
-  const a = a_mm / 1000; // m
-  const W = W_mm / 1000;
-  const aW = a_mm / W_mm;
+/* current model state */
+var st = { sigma:100, a_mm:10, W_mm:100, Kic:50, sy:350, type:'center', Y:1, KI:0, SF:0, rp:0, ac:0 };
 
-  const Y = getYFactor(type, aW);
-  const KI = sigma * Y * Math.sqrt(Math.PI * a); // MPa*sqrt(m)
-  const SF = Kic / KI;
-  const rp_mm = (1 / (2 * Math.PI)) * (KI / sy) ** 2 * 1e6; // mm
-  const ac_mm = (1 / Math.PI) * (Kic / (sigma * Y)) ** 2 * 1e3; // mm
+function compute(){
+  st.sigma = parseFloat($('sliderSig').value);
+  st.a_mm  = parseFloat($('sliderA').value);
+  st.W_mm  = parseFloat($('sliderW').value);
+  st.Kic   = parseFloat($('sliderKic').value);
+  st.sy    = parseFloat($('sliderSy').value);
+  st.type  = $('specimenType').value;
 
-  document.getElementById('svKI').textContent = KI.toFixed(2);
-  document.getElementById('svSF').textContent = SF.toFixed(2);
-  document.getElementById('svRp').textContent = rp_mm.toFixed(2);
-  document.getElementById('svAc').textContent = ac_mm.toFixed(1);
-  document.getElementById('svY').textContent  = Y.toFixed(3);
+  var a = st.a_mm/1000;
+  var aW = st.a_mm/st.W_mm;
+  st.Y  = getYFactor(st.type, aW);
+  st.KI = st.sigma * st.Y * Math.sqrt(Math.PI*a);   // MPa√m
+  st.SF = st.Kic / st.KI;
+  st.rp = (1/(2*Math.PI))*Math.pow(st.KI/st.sy,2)*1e3; // mm (plane stress)
+  st.ac = (1/Math.PI)*Math.pow(st.Kic/(st.sigma*st.Y),2)*1e3; // mm
 
-  // Colour safety card
-  const scKI = document.getElementById('scKI');
-  const scSF = document.getElementById('scSF');
-  scKI.className = 'stat-card' + (KI > Kic ? ' danger' : KI > Kic*0.8 ? ' warn' : ' safe');
-  scSF.className = 'stat-card' + (SF < 1 ? ' danger' : SF < 1.5 ? ' warn' : ' safe');
-  document.getElementById('svKI').style.color = KI > Kic ? '#e74c3c' : KI > Kic*0.8 ? '#e67e22' : '#2ecc71';
-  document.getElementById('svSF').style.color = SF < 1 ? '#e74c3c' : SF < 1.5 ? '#e67e22' : '#2ecc71';
+  // reset the load ramp toward full applied stress on any parameter change
+  fractured = false;
+  updateChart();
+  // numbers refreshed each animation frame; also refresh immediately
+  refreshStats(loadFrac);
+}
 
-  drawSpecimen(type, aW, KI, Kic, rp_mm);
-  updateChart(type, sigma, W_mm, Kic, sy, a_mm);
-}function drawSpecimen(type, aW, KI, Kic, rp_mm){
-  const canvas = document.getElementById('crackCanvas');
-  const ctx = canvas.getContext('2d');const __novaDims0 = __novaHiDpiCanvas(canvas, canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height, ctx);
-const W = __novaDims0.w, H = __novaDims0.h;
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = '#0a0e1a'; ctx.fillRect(0,0,W,H);
+function refreshStats(lf){
+  // lf = fraction of applied load currently acting (0..1+)
+  var KInow = st.KI * lf;
+  var SFnow = KInow > 0 ? st.Kic / KInow : 999;
+  var rpNow = (1/(2*Math.PI))*Math.pow(KInow/st.sy,2)*1e3;
+  $('svKI').textContent = KInow.toFixed(2);
+  $('svSF').textContent = (SFnow>99?'99+':SFnow.toFixed(2));
+  $('svRp').textContent = rpNow.toFixed(2);
+  $('svAc').textContent = st.ac.toFixed(1);
+  $('svY').textContent  = st.Y.toFixed(3);
+  var dng = KInow >= st.Kic, wrn = KInow >= st.Kic*0.8;
+  $('scKI').className = 'stat-card' + (dng?' danger':wrn?' warn':' safe');
+  $('scSF').className = 'stat-card' + (SFnow<1?' danger':SFnow<1.5?' warn':' safe');
+  $('svKI').style.color = dng?'#e74c3c':wrn?'#e67e22':'#2ecc71';
+  $('svSF').style.color = SFnow<1?'#e74c3c':SFnow<1.5?'#e67e22':'#2ecc71';
+}
 
-  const pw = 320, ph = 160;
-  const ox = (W - pw) / 2, oy = (H - ph) / 2;
+/* ===== Live Mode-I opening animation ===== */
+var cv = $('crackCanvas');
+var cx2d = cv.getContext('2d');
+var loadFrac = 0;      // ramps 0 -> 1 (applied load fraction)
+var fractured = false; // K_I reached K_Ic
+var fracProg = 0;      // crack-extension progress after fracture (0..1)
+var phase = 0;         // breathing phase for opening
+var animOn = true, rafId = null, lastTs = 0;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Draw specimen body
-  ctx.fillStyle = 'rgba(100,140,200,0.15)';
-  ctx.strokeStyle = 'rgba(100,140,200,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.fillRect(ox, oy, pw, ph);
-  ctx.strokeRect(ox, oy, pw, ph);
+function drawScene(){
+  var d = hidpi(cv, cv.clientWidth || 700, 300, cx2d);
+  var W = d.w, H = d.h;
+  cx2d.clearRect(0,0,W,H);
+  cx2d.fillStyle = '#0a0e1a'; cx2d.fillRect(0,0,W,H);
 
-  // Crack
-  const crackLen = aW * pw;
-  const crackY = oy + ph / 2;
-  const color = KI > Kic ? '#e74c3c' : KI > Kic*0.8 ? '#e67e22' : '#00B4D8';
+  var KInow = st.KI * loadFrac;
+  var ratio = st.Kic>0 ? KInow/st.Kic : 0;            // 0..1+ toward fracture
+  var dng = ratio >= 1.0, wrn = ratio >= 0.8;
+  var crackCol = dng ? '#e74c3c' : wrn ? '#e67e22' : '#00B4D8';
 
-  if (type === 'center') {
-    const cx = W/2;
-    ctx.beginPath();
-    ctx.moveTo(cx - crackLen/2, crackY);
-    ctx.lineTo(cx + crackLen/2, crackY);
-    ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.stroke();
-    // Plastic zone circles at tips
-    const rpPx = Math.min(rp_mm / 0.3, 30);
-    [[cx - crackLen/2, crackY],[cx + crackLen/2, crackY]].forEach(([cx2,cy2])=>{
-      ctx.beginPath(); ctx.arc(cx2, cy2, rpPx, 0, 2*Math.PI);
-      ctx.strokeStyle='rgba(255,200,0,0.5)'; ctx.lineWidth=1; ctx.stroke();
-    });
-  }else{
-    ctx.beginPath();
-    ctx.moveTo(ox, crackY);
-    ctx.lineTo(ox + crackLen, crackY);
-    ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.stroke();
-    const rpPx = Math.min(rp_mm / 0.3, 30);
-    ctx.beginPath(); ctx.arc(ox + crackLen, crackY, rpPx, 0, 2*Math.PI);
-    ctx.strokeStyle='rgba(255,200,0,0.5)'; ctx.lineWidth=1; ctx.stroke();
-  }// Stress gradient at crack tip
-  const tipX = type === 'center' ? W/2 + crackLen/2 : ox + crackLen;
-  for (let dx2 = 2; dx2 < 60; dx2 += 3){
-    const stress = KI / Math.sqrt(2 * Math.PI * dx2/1000 * 0.3); // heuristic
-    const alpha = Math.min(0.6, stress / 500);
-    ctx.fillStyle = `rgba(255,80,60,${alpha})`;
-    ctx.fillRect(tipX + dx2, crackY - 2, 3, 4);
-  }// Labels
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.font = '12px Roboto Mono, monospace';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.fillText(`a/W = ${aW.toFixed(2)}`, W/2, oy + ph + 8);
-  ctx.fillStyle = color;
-  ctx.fillText(`K_I = ${KI.toFixed(1)} MPa√m`, W/2, oy - 22);
-}function updateChart(type, sigma, W_mm, Kic, sy, currentA){
-  const aVals = [], kVals = [], kcLine = [];
-  for (let ai = 1; ai <= W_mm * 0.8; ai += W_mm * 0.01) {
-    const aW = ai / W_mm;
-    const Y = getYFactor(type, aW);
-    const k = sigma * Y * Math.sqrt(Math.PI * ai / 1000);
+  // plate geometry
+  var pw = Math.min(360, W*0.56), ph = 168;
+  var ox = (W - pw)/2, oy = (H - ph)/2 + 4;
+  var midY = oy + ph/2;
+  var center = st.type === 'center';
+
+  // ----- tensile load arrows (top up / bottom down), length scales with load -----
+  var arL = 14 + 30*Math.min(1.3, loadFrac);
+  cx2d.strokeStyle = 'rgba(120,180,255,0.85)'; cx2d.fillStyle = 'rgba(120,180,255,0.85)';
+  cx2d.lineWidth = 2;
+  for (var ai=0; ai<4; ai++){
+    var axp = ox + pw*(ai+0.5)/4;
+    // top arrow pointing up
+    cx2d.beginPath(); cx2d.moveTo(axp, oy-6); cx2d.lineTo(axp, oy-6-arL); cx2d.stroke();
+    cx2d.beginPath(); cx2d.moveTo(axp, oy-6-arL); cx2d.lineTo(axp-4, oy-2-arL); cx2d.lineTo(axp+4, oy-2-arL); cx2d.closePath(); cx2d.fill();
+    // bottom arrow pointing down
+    cx2d.beginPath(); cx2d.moveTo(axp, oy+ph+6); cx2d.lineTo(axp, oy+ph+6+arL); cx2d.stroke();
+    cx2d.beginPath(); cx2d.moveTo(axp, oy+ph+6+arL); cx2d.lineTo(axp-4, oy+ph+2+arL); cx2d.lineTo(axp+4, oy+ph+2+arL); cx2d.closePath(); cx2d.fill();
+  }
+
+  // ----- crack opening displacement (faces separate perpendicular to load) -----
+  // COD ~ K_I (and breathing wobble); grows toward fracture
+  var aWnow = st.a_mm/st.W_mm;
+  var halfCrack = (center ? aWnow*pw*0.5 : aWnow*pw);
+  var baseOpen = (4 + 26*Math.min(1.25, ratio));
+  if (!reduceMotion) baseOpen *= (1 + 0.06*Math.sin(phase));
+  // crack extension after fracture: tips run outward fast
+  var extend = fractured ? fracProg*(pw*0.5 - halfCrack) : 0;
+
+  // body split into upper/lower halves that separate around the crack ligament
+  var gap = baseOpen;
+  // upper plate
+  cx2d.fillStyle = 'rgba(100,140,200,0.16)';
+  cx2d.strokeStyle = 'rgba(120,160,220,0.65)'; cx2d.lineWidth = 1.5;
+  cx2d.fillRect(ox, oy, pw, ph/2 - 1); cx2d.strokeRect(ox, oy, pw, ph/2 - 1);
+  cx2d.fillRect(ox, oy+ph/2+1, pw, ph/2 - 1); cx2d.strokeRect(ox, oy+ph/2+1, pw, ph/2 - 1);
+
+  // crack as an opened lens (ellipse-like void) on the mid-line
+  function crackTipX(sign){
+    if (center) return W/2 + sign*(halfCrack + extend);
+    // edge crack starts at left edge, single tip on right
+    return sign>0 ? ox + halfCrack + extend : ox;
+  }
+  var xL = center ? W/2 - (halfCrack+extend) : ox;
+  var xR = center ? W/2 + (halfCrack+extend) : ox + halfCrack + extend;
+
+  cx2d.beginPath();
+  cx2d.moveTo(xL, midY);
+  cx2d.quadraticCurveTo((xL+xR)/2, midY - gap, xR, midY);
+  cx2d.quadraticCurveTo((xL+xR)/2, midY + gap, xL, midY);
+  cx2d.closePath();
+  cx2d.fillStyle = '#0a0e1a'; cx2d.fill();
+  cx2d.strokeStyle = crackCol; cx2d.lineWidth = 2.4; cx2d.stroke();
+
+  // ----- crack-tip stress concentration lobe (intensity peaks at tip) -----
+  var tips = center ? [xR, xL] : [xR];
+  tips.forEach(function(tx){
+    var dir = (tx >= W/2 || !center) ? 1 : -1;
+    if (!center) dir = 1;
+    var rMax = 26 + 70*Math.min(1.3, ratio);   // lobe size grows with K_I
+    var g = cx2d.createRadialGradient(tx, midY, 1, tx, midY, rMax);
+    var peak = Math.min(0.85, 0.25 + 0.6*ratio);
+    g.addColorStop(0, 'rgba(255,70,50,'+peak.toFixed(3)+')');
+    g.addColorStop(0.4, 'rgba(255,150,40,'+(peak*0.5).toFixed(3)+')');
+    g.addColorStop(1, 'rgba(255,200,40,0)');
+    cx2d.fillStyle = g;
+    cx2d.beginPath(); cx2d.arc(tx, midY, rMax, 0, 2*Math.PI); cx2d.fill();
+    // plastic zone ring (Irwin)
+    var rpPx = Math.min(28, 2 + st.rp*loadFrac*loadFrac*1.6);
+    cx2d.beginPath(); cx2d.arc(tx, midY, rpPx, 0, 2*Math.PI);
+    cx2d.strokeStyle = 'rgba(255,213,74,0.7)'; cx2d.lineWidth = 1.2; cx2d.stroke();
+  });
+
+  // ----- K_I vs K_Ic comparison bar (top-left) -----
+  var bx = 14, by = 14, bw = Math.min(180, W*0.34), bh = 12;
+  cx2d.fillStyle = 'rgba(255,255,255,0.12)'; cx2d.fillRect(bx, by, bw, bh);
+  var fillW = bw*Math.min(1.15, ratio);
+  cx2d.fillStyle = crackCol; cx2d.fillRect(bx, by, Math.min(bw,fillW), bh);
+  // K_Ic threshold mark at ratio=1
+  cx2d.strokeStyle = '#e74c3c'; cx2d.lineWidth = 2;
+  cx2d.beginPath(); cx2d.moveTo(bx+bw, by-3); cx2d.lineTo(bx+bw, by+bh+3); cx2d.stroke();
+  cx2d.fillStyle = 'rgba(255,255,255,0.85)'; cx2d.font = '11px Roboto Mono, monospace';
+  cx2d.textAlign = 'left'; cx2d.textBaseline = 'alphabetic';
+  cx2d.fillText('K_I = '+KInow.toFixed(1)+'  /  K_Ic = '+st.Kic.toFixed(0)+' MPa√m', bx, by-4);
+
+  // labels
+  cx2d.fillStyle = 'rgba(255,255,255,0.6)'; cx2d.font = '11px Roboto Mono, monospace';
+  cx2d.textAlign = 'center';
+  cx2d.fillText('a/W = '+aWnow.toFixed(2)+'   Y = '+st.Y.toFixed(2), W/2, oy+ph+30);
+
+  if (fractured){
+    cx2d.fillStyle = '#ff5a4a'; cx2d.font = 'bold 14px Noto Sans JP, sans-serif';
+    cx2d.fillText(T.af, W/2, oy - arL - 14);
+  } else {
+    cx2d.fillStyle = crackCol; cx2d.font = '12px Noto Sans JP, sans-serif';
+    cx2d.fillText(T.sigApp+' '+T.sigma+' = '+(st.sigma*loadFrac).toFixed(0)+' MPa', W/2, oy - arL - 12);
+  }
+  cx2d.textAlign = 'left';
+}
+
+function frame(ts){
+  if (!lastTs) lastTs = ts;
+  var dt = Math.min(0.05, (ts-lastTs)/1000); lastTs = ts;
+  phase += dt*2.4;
+  if (!fractured){
+    // ramp the applied load up to 1.0
+    loadFrac += dt*0.45;
+    if (loadFrac >= 1){ loadFrac = 1; }
+    // fracture if at full load K_I meets/exceeds K_Ic
+    if (loadFrac >= 1 && st.KI >= st.Kic){ fractured = true; fracProg = 0; }
+  } else {
+    fracProg += dt*0.9;
+    if (fracProg >= 1){ fracProg = 1; }
+  }
+  refreshStats(loadFrac);
+  drawScene();
+  if (animOn) rafId = requestAnimationFrame(frame);
+}
+
+function startAnim(){
+  if (reduceMotion){ loadFrac = 1; if (st.KI>=st.Kic){fractured=true;fracProg=1;} refreshStats(1); drawScene(); return; }
+  animOn = true; lastTs = 0;
+  if (!rafId) rafId = requestAnimationFrame(frame);
+}
+function stopAnim(){ animOn = false; if (rafId){ cancelAnimationFrame(rafId); rafId = null; } }
+function toggleAnim(){
+  var b = $('btnAnim');
+  if (animOn && rafId){ stopAnim(); b.innerHTML = '<i class="fas fa-play"></i> 再生'; }
+  else { startAnim(); b.innerHTML = '<i class="fas fa-pause"></i> 一時停止'; }
+}
+function forceFracture(){
+  loadFrac = 1;
+  if (st.KI >= st.Kic){ fractured = true; }
+  refreshStats(1); drawScene();
+}
+
+/* ===== K vs a chart (Chart.js) ===== */
+function updateChart(){
+  if (typeof Chart === 'undefined') return;
+  var aVals=[], kVals=[], kcLine=[];
+  for (var ai=1; ai<=st.W_mm*0.8; ai += st.W_mm*0.01){
+    var aW = ai/st.W_mm;
+    var Y = getYFactor(st.type, aW);
     aVals.push(ai.toFixed(1));
-    kVals.push(k.toFixed(3));
-    kcLine.push(Kic);
-  }if (kaChart){ kaChart.destroy(); }const ctx2 = document.getElementById('kaChart').getContext('2d');
-  kaChart = new Chart(ctx2,{
-    type: 'line',
-    data: {
-      labels: aVals,
-      datasets: [
-        { label: 'K_I (MPa√m)', data: kVals, borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.08)', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true },{ label: 'K_Ic (限界)', data: kcLine, borderColor: '#e74c3c', borderDash: [6,3], borderWidth: 1.5, pointRadius: 0, fill: false }
-      ]
-    },
-    options:{
-      responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
-      animation: { duration: 200 },
-      plugins:{
-        legend: { labels: { color: '#1a1a2e', font: { size: 11 } } },
-        tooltip:{ mode: 'index', intersect: false }
-      },
+    kVals.push((st.sigma*Y*Math.sqrt(Math.PI*ai/1000)).toFixed(3));
+    kcLine.push(st.Kic);
+  }
+  if (kaChart){ kaChart.destroy(); }
+  var c2 = $('kaChart').getContext('2d');
+  kaChart = new Chart(c2, {
+    type:'line',
+    data:{ labels:aVals, datasets:[
+      { label:'K_I (MPa√m)', data:kVals, borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,0.08)', borderWidth:2, pointRadius:0, tension:0.3, fill:true },
+      { label:T.critical, data:kcLine, borderColor:'#e74c3c', borderDash:[6,3], borderWidth:1.5, pointRadius:0, fill:false }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, resizeDelay:100, animation:false,
+      plugins:{ legend:{ labels:{ color:'#1a1a2e', font:{size:11} } }, tooltip:{ mode:'index', intersect:false } },
       scales:{
-        x: { title: { display: true, text: 'き裂長さ a (mm)', color: '#6c757d' }, ticks:{ maxTicksLimit: 8, color: '#6c757d' }, grid:{ color: 'rgba(0,0,0,0.04)' } },
-        y:{ title: { display: true, text: 'K_I (MPa√m)', color: '#6c757d' }, ticks:{ color: '#6c757d' }, grid:{ color: 'rgba(0,0,0,0.04)' }, beginAtZero: true }
+        x:{ title:{display:true,text:T.axisA,color:'#6c757d'}, ticks:{maxTicksLimit:8,color:'#6c757d'}, grid:{color:'rgba(0,0,0,0.04)'} },
+        y:{ title:{display:true,text:T.axisK,color:'#6c757d'}, ticks:{color:'#6c757d'}, grid:{color:'rgba(0,0,0,0.04)'}, beginAtZero:true }
       }
     }
   });
-}// Init sliders
-['sliderSig','sliderA','sliderW','sliderKic','sliderSy'].forEach(id =>{
-  const el = document.getElementById(id);
-  const pct = ((parseFloat(el.value)-parseFloat(el.min))/(parseFloat(el.max)-parseFloat(el.min))*100).toFixed(1);
+}
+
+/* expose handlers used by inline attributes */
+window.compute = compute;
+window.applyMaterial = applyMaterial;
+window.toggleAnim = toggleAnim;
+window.forceFracture = forceFracture;
+
+/* init slider fills */
+['sliderSig','sliderA','sliderW','sliderKic','sliderSy'].forEach(function(id){
+  var el = $(id); if (!el) return;
+  var pct = ((parseFloat(el.value)-parseFloat(el.min))/(parseFloat(el.max)-parseFloat(el.min))*100).toFixed(1);
   el.style.setProperty('--pct', pct+'%');
 });
+cv.addEventListener('keydown', function(e){ if (e.key===' '||e.key==='Enter'){ e.preventDefault(); toggleAnim(); } });
+window.addEventListener('resize', function(){ drawScene(); });
+
 compute();
+startAnim();
+})();
 </script>
 
 <section class="explanation">
@@ -501,6 +626,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fracture-mechanics.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -563,7 +691,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>構造用鋼(K_Ic=70 MPa√m)の接続部にき裂が検出された場合：σ=300 MPa、a=5 mm、W=60 mmで計算すると、形状係数Y≈1.12、K_I≈18.5 MPa√mとなります。このとき塑性域半径r_p≈0.58 mm（線形破壊力学の範囲内）、破壊安全率N_f=3.78（K_Ic/K_I）、臨界き裂長さa_c≈23 mmです。ブロック設計では安全率N_f≥2.0を確保する必要があります。</p>
+<p>構造用鋼(K_Ic=70 MPa√m)のセンタークラック板にき裂が検出された場合：σ=300 MPa、a=5 mm、W=60 mmで計算すると、形状係数Y≈1.00、K_I≈37.7 MPa√mとなります。このとき塑性域半径r_p≈1.85 mm（降伏応力σ_y=350 MPaのとき、線形破壊力学の範囲内）、破壊安全率N_f≈1.86（K_Ic/K_I）、臨界き裂長さa_c≈17 mmです。設計では安全率N_f≥2.0を確保する必要があり、この例はやや余裕不足です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -574,6 +702,16 @@ compute();
 <li>繰り返し荷重下ではき裂が臨界長さa_cより小さくても進展し破壊するため、疲労き裂成長則(Paris則)との併用が必須です</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

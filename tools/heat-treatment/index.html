@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "熱処理CCT図シミュレーター",
       "description": "鋼材の炭素量・合金種・冷却速度でCCT図と冷却曲線を表示。Ms温度・推定硬さ・組織分率を計算。",
       "url": "https://novasolver.jp/tools/heat-treatment.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["CCT図の簡易描画と冷却曲線オーバーレイ","マルテンサイト変態点Msの計算","組織分率と推定ビッカース硬さの予測"],
       "keywords": "熱処理,CCT図,マルテンサイト,焼入れ,鋼材,硬さ,Ms温度",
       "datePublished": "2026-04-08",
@@ -156,8 +156,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="param-group">
-      <div class="param-label"><span class="param-name">冷却速度 (°C/s)</span><div class="num-wrap"><input type="number" class="num-input" id="vCRNum" value="1" min="-1" max="2" step="0.05" oninput="syncFromNum('sCR','vCRNum')"><span class="num-unit">°C/s</span></div></div>
-      <input type="range" id="sCR" min="-1" max="2" step="0.05" value="1" oninput="syncToNum('sCR','vCRNum');updateCoolingRate(this);calc()">
+      <div class="param-label"><span class="param-name">冷却速度 (°C/s)</span><div class="num-wrap"><input type="number" class="num-input" id="vCRNum" value="10" min="0.1" max="1000" step="1" oninput="syncFromNum('sCR','vCRNum')"><span class="num-unit">°C/s</span></div></div>
+      <input type="range" id="sCR" min="0.1" max="1000" step="1" value="10" oninput="syncToNum('sCR','vCRNum');updateCoolingRate(this);calc()">
     </div>
 
     <div class="divider"></div>
@@ -175,7 +175,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="micro-pct" style="color:#27ae60" id="mP">—%</div>
       </div>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -212,17 +220,28 @@ const ALLOYS={
 let chart=null;
 
 function updateCoolingRate(el){
-  const lv=parseFloat(el.value);
-  const cr=Math.pow(10,lv).toFixed(lv<0?2:1);
-  var _gvCR=document.getElementById('vCRNum');if(_gvCR)_gvCR.textContent=cr;
+  const cr=parseFloat(el.value);
+  const txt=cr<10?cr.toFixed(1):cr.toFixed(0);
+  var _gvCR=document.getElementById('vCRNum');if(_gvCR){if(_gvCR.tagName==='INPUT')_gvCR.value=txt;else _gvCR.textContent=txt;}
+  var _gsCR=document.getElementById('sCRNum');if(_gsCR){if(_gsCR.tagName==='INPUT')_gsCR.value=txt;else _gsCR.textContent=txt;}
   const mn=parseFloat(el.min),mx=parseFloat(el.max),v=parseFloat(el.value);
   el.style.setProperty('--pct',((v-mn)/(mx-mn)*100)+'%');
-}function calc(){
+}
+function hvToHrc(HV){
+  const anchors=[[240,20.3],[300,29.8],[400,40.8],[500,49.1],[600,55.2],[700,60.1],[800,64.0]];
+  if(HV<240) return 20;
+  if(HV>800) return 65;
+  for(let i=0;i<anchors.length-1;i++){
+    const h0=anchors[i][0], r0=anchors[i][1], h1=anchors[i+1][0], r1=anchors[i+1][1];
+    if(HV<=h1) return r0+(HV-h0)*(r1-r0)/(h1-h0);
+  }
+  return 64;
+}
+function calc(){
   const C=parseFloat(document.getElementById('sC').value);
   const alloyKey=document.getElementById('sAlloy').value;
   const alloy=ALLOYS[alloyKey];
-  const crLog=parseFloat(document.getElementById('sCR').value);
-  const CR=Math.pow(10,crLog);
+  const CR=parseFloat(document.getElementById('sCR').value);
 
   // Ms temperature (Andrews)
   const Ms=539-423*C-30.4*alloy.Mn-17.7*alloy.Ni-12.1*alloy.Cr-7.5*alloy.Mo;
@@ -260,7 +279,7 @@ function updateCoolingRate(el){
   const HV_bainite=350+100*C;
   const HV_pearlite=170+200*C;
   const HV=fM*HV_martensite+fB*HV_bainite+fP*HV_pearlite;
-  const HRC=Math.max(0,Math.min(70,(HV-80)/6.0));
+  const HRC=hvToHrc(HV);
 
   document.getElementById('sMs').textContent=Math.round(Ms);
   document.getElementById('sHV').textContent=Math.round(HV);
@@ -378,6 +397,9 @@ window.addEventListener('resize',calc);
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-treatment.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -431,7 +453,7 @@ window.addEventListener('resize',calc);
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>S55C（炭素0.55 wt%）鋼において、冷却速度50 °C/sでシミュレーションした場合、Ms温度は約340°C、推定硬さはHV 450相当、HRC 42程度となります。同じ鋼を500 °C/sで急冷すると、Ms温度は変わりませんが組織がマルテンサイト優先となり推定硬さはHV 680、HRC 62に上昇します。対照的に冷却速度が5 °C/sの徐冷では、パーライト・フェライト混合組織となり推定硬さはHV 200程度に低下します。</p>
+<p>S55C（炭素0.55 wt%）鋼では、冷却速度50 °C/sの条件でMs温度は約297°C、組織はパーライト主体（P≈70%、B≈20%、M≈10%）、推定硬さはHV 353、HRC 35.6となります。500 °C/sまで上げるとMs温度は同じですがマルテンサイト主体（M≈95%）となり、推定硬さはHV 735、HRC 61.5に上昇します。5 °C/sの徐冷も本モデルではパーライト主体で、HV 353、HRC 35.6程度です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -441,6 +463,16 @@ window.addEventListener('resize',calc);
 <li>実際の熱処理では鋳造欠陥や合金元素の偏析がCCT図を左右するため、本シミュレーション値を単独で信頼せず、試験片での硬さ測定・金相検査で検証してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

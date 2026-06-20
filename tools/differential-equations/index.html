@@ -122,14 +122,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "常微分方程式・相平面解析シミュレーター",
       "description": "2次元自律系ODEの方向場・ヌルクライン・位相軌跡・平衡点安定性をリアルタイム可視化。振り子・ロトカ-ボルテラ・ファン・デル・ポール・SIRモデルに対応。ヤコビアン固有値で安定性を自動分類。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/differential-equations.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -269,10 +269,39 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="panel-title"><i class="fas fa-info-circle"></i> 平衡点情報</div>
       <div class="eq-info" id="eqInfo">—</div>
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> 積分中ライブ数値（RK4で軌跡をトレース）</div>
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="sv" id="statT">0.00</div>
+        <div class="sl">時刻 t</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statX">0.00</div>
+        <div class="sl">x(t)</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statY">0.00</div>
+        <div class="sl">y(t)</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statSlope">0.00</div>
+        <div class="sl">速度 |dx/dt, dy/dt|</div>
+      </div>
+    </div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -307,18 +336,17 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
     <div class="chart-card">
   <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
-  <p>$$\frac{d^2y}{dt^2} + 2\zeta\omega_n\frac{dy}{dt} + \omega_n^2 y = f(t)$$</p>
-  <p style="margin-top:6px;">一般2次系：$\zeta$ は減衰比、$\omega_n$ は固有角周波数（rad/s）。</p>
-  <p>$$\omega_d = \omega_n\sqrt{1-\zeta^2}$$</p>
-  <p style="margin-top:6px;">減衰固有角周波数（rad/s）：$\zeta \lt  1$（不足減衰）の場合の振動周波数。</p>
-  <p>$$y_p = \frac{F_0/m}{\sqrt{(\omega_n^2-\omega^2)^2 + (2\zeta\omega_n\omega)^2}}$$</p>
-  <p style="margin-top:6px;">強制振動の振幅（定常解）：$\omega = \omega_n$ 付近で共振ピークが現れる。</p>
+  <p>$$\dot{x}=f(x,y),\qquad \dot{y}=g(x,y)$$</p>
+  <p style="margin-top:6px;">2次元自律系。平衡点は $f=g=0$ を満たす点。</p>
+  <p>$$J=\begin{pmatrix}\partial f/\partial x & \partial f/\partial y\\ \partial g/\partial x & \partial g/\partial y\end{pmatrix},\quad \lambda_{1,2}=\frac{\mathrm{tr}J\pm\sqrt{\mathrm{tr}J^2-4\det J}}{2}$$</p>
+  <p style="margin-top:6px;">ヤコビアン固有値 $\lambda$ の実部符号で安定性を分類（両負→安定、両正→不安定、異符号→鞍点）。</p>
 </div>
 </div>
 </div>
 
 <script>
-
+(function(){
+"use strict";
 const systems ={
   pendulum: {
     name: '振り子（非線形）',
@@ -395,6 +423,7 @@ const systems ={
 let currentSystem = 'pendulum';
 let timeChart = null;
 let animId = null;
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function loadSystem(){
   currentSystem = document.getElementById('systemSel').value;
@@ -466,44 +495,36 @@ function loadSystem(){
     return hasIm ? '中心（中立）' : '非双曲型';
   }
   return '不明';
-}const traj_colors = ['#007BFF','#00b894','#e17055','#fdcb6e','#a29bfe','#fd79a8'];
+}const traj_colors = ['#00b894','#e17055','#fdcb6e','#a29bfe','#fd79a8','#48dbfb'];
 
-function render(){
-  if (animId) { cancelAnimationFrame(animId); animId = null; }
-  const sys = systems[currentSystem];
-  const p1 = parseFloat(document.getElementById('param1').value);
-  const p2 = parseFloat(document.getElementById('param2').value);
-  const x0 = parseFloat(document.getElementById('ic_x').value);
-  const y0 = parseFloat(document.getElementById('ic_y').value);
-  const R = parseFloat(document.getElementById('viewRange').value);
-  const f = sys.eq;
+// ===== shared render state (set by render(), used by the animation loop) =====
+let scene = null;
 
+function setupCanvas(){
   const canvas = document.getElementById('phaseCanvas');
   const W = canvas.offsetWidth || 500; const H = 340;
-  var __novaW = W;
-  var __novaH = H;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
   const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return {ctx, W, H};
+}
 
-  const scaleX = W / (2*R), scaleY = H / (2*R);
-  const cx = W/2, cy = H/2;
-
-  function tx(x) { return cx + x*scaleX; }function ty(y){ return cy - y*scaleY; }ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+// Draw the static backdrop: grid, axes, nullclines, direction field, reference trajectories.
+function drawStatic(sc){
+  const {ctx, W, H, R, f, p1, p2, tx, ty, scaleX, scaleY, cx, cy} = sc;
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
 
   // Grid
   ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1;
   for(let g=-Math.ceil(R);g<=Math.ceil(R);g++){
     ctx.beginPath();ctx.moveTo(tx(g),0);ctx.lineTo(tx(g),H);ctx.stroke();
     ctx.beginPath();ctx.moveTo(0,ty(g));ctx.lineTo(W,ty(g));ctx.stroke();
-  }// Axes
+  }
+  // Axes
   ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=1.5;
   ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(W,cy);ctx.stroke();
   ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,H);ctx.stroke();
@@ -512,36 +533,30 @@ function render(){
 
   // Nullclines
   const Ng = 60;
-  const dx = 2*R/Ng;
-  // f=0 (y-nullcline, blue)
-  ctx.strokeStyle='rgba(0,180,216,.7)'; ctx.lineWidth=1.5;
+  const dxn = 2*R/Ng;
+  ctx.strokeStyle='rgba(0,180,216,.7)'; ctx.lineWidth=1.5; // f=0 (blue)
   for(let i=0;i<Ng;i++){
     for(let j=0;j<Ng;j++){
-      const xi=-R+i*dx, yi=-R+j*dx;
+      const xi=-R+i*dxn, yi=-R+j*dxn;
       const [fx1] = f(xi,yi,p1,p2);
-      const [fx2] = f(xi+dx,yi,p1,p2);
-      const [fx3] = f(xi,yi+dx,p1,p2);
-      if(fx1*fx2<0){
-        ctx.beginPath();ctx.moveTo(tx(xi),ty(yi));ctx.lineTo(tx(xi+dx),ty(yi));ctx.stroke();
-      }if(fx1*fx3<0){
-        ctx.beginPath();ctx.moveTo(tx(xi),ty(yi));ctx.lineTo(tx(xi),ty(yi+dx));ctx.stroke();
-      }
+      const [fx2] = f(xi+dxn,yi,p1,p2);
+      const [fx3] = f(xi,yi+dxn,p1,p2);
+      if(fx1*fx2<0){ctx.beginPath();ctx.moveTo(tx(xi),ty(yi));ctx.lineTo(tx(xi+dxn),ty(yi));ctx.stroke();}
+      if(fx1*fx3<0){ctx.beginPath();ctx.moveTo(tx(xi),ty(yi));ctx.lineTo(tx(xi),ty(yi+dxn));ctx.stroke();}
     }
-  }// g=0 (x-nullcline, red)
-  ctx.strokeStyle='rgba(225,112,85,.7)'; ctx.lineWidth=1.5;
+  }
+  ctx.strokeStyle='rgba(225,112,85,.7)'; ctx.lineWidth=1.5; // g=0 (red)
   for(let i=0;i<Ng;i++){
     for(let j=0;j<Ng;j++){
-      const xi=-R+i*dx, yi=-R+j*dx;
-      const [gy1] = f(xi,yi,p1,p2);
-      const [gy2] = f(xi+dx,yi,p1,p2);
-      const [gy3] = f(xi,yi+dx,p1,p2);
-      if(gy1*gy2<0){
-        ctx.beginPath();ctx.moveTo(tx(xi),ty(yi));ctx.lineTo(tx(xi+dx),ty(yi));ctx.stroke();
-      }if(gy1*gy3<0){
-        ctx.beginPath();ctx.moveTo(tx(xi),ty(yi));ctx.lineTo(tx(xi),ty(yi+dx));ctx.stroke();
-      }
+      const xi=-R+i*dxn, yi=-R+j*dxn;
+      const [,gy1] = f(xi,yi,p1,p2);
+      const [,gy2] = f(xi+dxn,yi,p1,p2);
+      const [,gy3] = f(xi,yi+dxn,p1,p2);
+      if(gy1*gy2<0){ctx.beginPath();ctx.moveTo(tx(xi),ty(yi));ctx.lineTo(tx(xi+dxn),ty(yi));ctx.stroke();}
+      if(gy1*gy3<0){ctx.beginPath();ctx.moveTo(tx(xi),ty(yi));ctx.lineTo(tx(xi),ty(yi+dxn));ctx.stroke();}
     }
-  }// Direction field
+  }
+  // Direction (slope) field — each arrow has slope (dx/dt,dy/dt)=f(x,y) at that grid point
   const Narr = 20;
   const darr = 2*R/Narr;
   for(let i=0;i<=Narr;i++){
@@ -556,7 +571,6 @@ function render(){
       const x2=x1+dxi*len*scaleX, y2=y1-dyi*len*scaleY;
       ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=1;
       ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-      // Arrow head
       const angle=Math.atan2(y2-y1,x2-x1);
       ctx.beginPath();
       ctx.moveTo(x2,y2);
@@ -565,35 +579,98 @@ function render(){
       ctx.closePath();
       ctx.fillStyle='rgba(255,255,255,.4)';ctx.fill();
     }
-  }// Draw trajectories
-  const allICs = [...sys.ics, [x0, y0]];
-  allICs.forEach((ic, idx) =>{
-    const [xi, yi] = ic;
-    const traj = integrate(f, xi, yi, p1, p2, 25, 0.02);
+  }
+  // Reference trajectories (faint context curves)
+  sc.refTrajs.forEach((traj, idx) =>{
     const color = traj_colors[idx % traj_colors.length];
-    ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.4;
     ctx.beginPath();
     let started = false;
     traj.forEach(([x,y]) => {
-      if(!isFinite(x)||!isFinite(y)||Math.abs(x)>R*3||Math.abs(y)>R*3){started=false;return;}const px=tx(x), py=ty(y);
+      if(!isFinite(x)||!isFinite(y)||Math.abs(x)>R*3||Math.abs(y)>R*3){started=false;return;}
+      const px=tx(x), py=ty(y);
       if(!started){ctx.moveTo(px,py);started=true;}else ctx.lineTo(px,py);
     });
-    ctx.stroke();
-    // Starting dot
+    ctx.stroke(); ctx.globalAlpha = 1;
     ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(tx(xi),ty(yi),4,0,2*Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(tx(traj[0][0]),ty(traj[0][1]),3,0,2*Math.PI); ctx.fill();
   });
+}
 
-  // Highlighted trajectory (user IC)
-  const mainTraj = integrate(f, x0, y0, p1, p2, 25, 0.02);
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5;
+// Draw the user's integral curve up to point index n, with a moving solution dot + slope arrow.
+function drawSolution(sc, n){
+  const {ctx, R, f, p1, p2, tx, ty, scaleX, scaleY} = sc;
+  const main = sc.mainTraj;
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.6; ctx.lineJoin='round';
   ctx.beginPath(); let s2=false;
-  mainTraj.forEach(([x,y])=>{
-    if(!isFinite(x)||!isFinite(y)||Math.abs(x)>R*3||Math.abs(y)>R*3){s2=false;return;}if(!s2){ctx.moveTo(tx(x),ty(y));s2=true;}else ctx.lineTo(tx(x),ty(y));
-  });
+  for(let i=0;i<=n && i<main.length;i++){
+    const [x,y]=main[i];
+    if(!isFinite(x)||!isFinite(y)||Math.abs(x)>R*3||Math.abs(y)>R*3){s2=false;continue;}
+    if(!s2){ctx.moveTo(tx(x),ty(y));s2=true;}else ctx.lineTo(tx(x),ty(y));
+  }
   ctx.stroke();
 
-  // Stability analysis at (0,0)
+  // start dot
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(tx(main[0][0]),ty(main[0][1]),3.5,0,2*Math.PI); ctx.fill();
+
+  const idx = Math.min(n, main.length-1);
+  const [cxp,cyp] = main[idx];
+  if(isFinite(cxp)&&isFinite(cyp)&&Math.abs(cxp)<R*3&&Math.abs(cyp)<R*3){
+    const px=tx(cxp), py=ty(cyp);
+    // local slope vector (dx/dt, dy/dt) at the current point
+    let [dxc,dyc]=f(cxp,cyp,p1,p2);
+    const mag=Math.hypot(dxc,dyc);
+    if(mag>1e-9){
+      const ux=dxc/mag, uy=dyc/mag, alen=22;
+      const ex=px+ux*alen, ey=py-uy*alen;
+      ctx.strokeStyle='#ffd54a'; ctx.lineWidth=2.2;
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(ex,ey); ctx.stroke();
+      const ang=Math.atan2(ey-py,ex-px);
+      ctx.fillStyle='#ffd54a'; ctx.beginPath();
+      ctx.moveTo(ex,ey);
+      ctx.lineTo(ex-7*Math.cos(ang-0.4),ey-7*Math.sin(ang-0.4));
+      ctx.lineTo(ex-7*Math.cos(ang+0.4),ey-7*Math.sin(ang+0.4));
+      ctx.closePath(); ctx.fill();
+    }
+    // moving solution point (glowing)
+    const grd=ctx.createRadialGradient(px,py,0,px,py,9);
+    grd.addColorStop(0,'#ffffff'); grd.addColorStop(1,'#007BFF');
+    ctx.fillStyle=grd;
+    ctx.beginPath(); ctx.arc(px,py,6,0,2*Math.PI); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=1; ctx.stroke();
+
+    // live numbers
+    const slope=Math.hypot(dxc,dyc);
+    document.getElementById('statT').textContent=(idx*sc.dt).toFixed(2);
+    document.getElementById('statX').textContent=cxp.toFixed(3);
+    document.getElementById('statY').textContent=cyp.toFixed(3);
+    document.getElementById('statSlope').textContent=slope.toFixed(3);
+  }
+}
+
+function render(){
+  if (animId) { cancelAnimationFrame(animId); clearTimeout(animId); animId = null; }
+  const sys = systems[currentSystem];
+  const p1 = parseFloat(document.getElementById('param1').value);
+  const p2 = parseFloat(document.getElementById('param2').value);
+  const x0 = parseFloat(document.getElementById('ic_x').value);
+  const y0 = parseFloat(document.getElementById('ic_y').value);
+  const R = parseFloat(document.getElementById('viewRange').value);
+  const f = sys.eq;
+  const dt = 0.02;
+
+  const {ctx, W, H} = setupCanvas();
+  const scaleX = W/(2*R), scaleY = H/(2*R), cx = W/2, cy = H/2;
+  const tx = x => cx + x*scaleX;
+  const ty = y => cy - y*scaleY;
+
+  const refTrajs = sys.ics.map(([xi,yi]) => integrate(f, xi, yi, p1, p2, 25, dt));
+  const mainTraj = integrate(f, x0, y0, p1, p2, 25, dt);
+
+  scene = {ctx, W, H, R, f, p1, p2, tx, ty, scaleX, scaleY, cx, cy, dt, refTrajs, mainTraj};
+
+  // ----- static stats: equilibrium count + stability at (0,0) -----
   const J = jacobian(f, 0, 0, p1, p2);
   const eigs = eigenvalues2x2(J);
   const stab = classifyStability(eigs);
@@ -603,20 +680,18 @@ function render(){
   document.getElementById('statStab').textContent = stab.includes('安定') && !stab.includes('不安定') ? '安定' : stab.includes('不安定') ? '不安定' : stab.includes('鞍') ? '不安定' : '中立';
   document.getElementById('statType').textContent = stab.replace('安定','').replace('不安定','').trim() || 'N/A';
 
-  // Time series chart
+  // ----- time series chart -----
   const tsCtx = document.getElementById('timeChart').getContext('2d');
   if (timeChart) timeChart.destroy();
-  const tArr = mainTraj.map((_,i)=>(i*0.02).toFixed(2));
+  const tArr = mainTraj.map((_,i)=>(i*dt).toFixed(2));
   const xArr = mainTraj.map(([x])=>isFinite(x)?Math.max(-20,Math.min(20,x)):0);
-  const yArr = mainTraj.map(([y])=>isFinite(y)?Math.max(-20,Math.min(20,y)):0);
+  const yArr = mainTraj.map(([,y])=>isFinite(y)?Math.max(-20,Math.min(20,y)):0);
   timeChart = new Chart(tsCtx,{
     type: 'line',
-    data: {
-      labels: tArr,
-      datasets: [
-        {label:'x(t)', data:xArr, borderColor:'#007BFF', borderWidth:2, pointRadius:0, fill:false},{label:'y(t)', data:yArr, borderColor:'#e17055', borderWidth:2, pointRadius:0, fill:false, borderDash:[4,3]}
-      ]
-    },
+    data: { labels: tArr, datasets: [
+      {label:'x(t)', data:xArr, borderColor:'#007BFF', borderWidth:2, pointRadius:0, fill:false},
+      {label:'y(t)', data:yArr, borderColor:'#e17055', borderWidth:2, pointRadius:0, fill:false, borderDash:[4,3]}
+    ]},
     options:{
       responsive:true, maintainAspectRatio:false,resizeDelay:100, animation:false,
       plugins:{legend:{labels:{color:'#6c757d',font:{size:11}}}},
@@ -626,10 +701,32 @@ function render(){
       }
     }
   });
+
+  // ----- draw / animate -----
+  drawStatic(scene);
+  if (REDUCED){
+    // static frame: full integral curve + final point, no animation
+    drawSolution(scene, mainTraj.length-1);
+    return;
+  }
+  let n = 0;
+  const step = Math.max(1, Math.round(mainTraj.length/300)); // points advanced per frame
+  function frame(){
+    drawStatic(scene);
+    drawSolution(scene, n);
+    n += step;
+    if (n < mainTraj.length){
+      animId = requestAnimationFrame(frame);
+    } else {
+      // hold final frame, then loop after a short pause so the curve keeps "being drawn"
+      drawStatic(scene); drawSolution(scene, mainTraj.length-1);
+      animId = setTimeout(()=>{ n = 0; animId = requestAnimationFrame(frame); }, 1100);
+    }
+  }
+  animId = requestAnimationFrame(frame);
 }
 
 // Allow clicking on phase canvas to set IC
-
 document.getElementById('phaseCanvas').addEventListener('click', e => {
   const canvas = document.getElementById('phaseCanvas');
   const R = parseFloat(document.getElementById('viewRange').value);
@@ -652,7 +749,13 @@ document.getElementById('phaseCanvas').addEventListener('click', e => {
   const min=parseFloat(el.min),max=parseFloat(el.max),val=parseFloat(el.value);
   el.style.setProperty('--pct',((val-min)/(max-min)*100).toFixed(1)+'%');
 });
+
+// expose handlers used by inline HTML attributes
+window.loadSystem = loadSystem;
+window.render = render;
+
 loadSystem();
+})();
 </script>
 
 <section class="explanation">
@@ -738,6 +841,9 @@ loadSystem();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="differential-equations.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -795,6 +901,16 @@ loadSystem();
 <li>ヌルクライン交点(平衡点)が複数存在する場合、各点の固有値実部を確認し、正値なら不安定、負値なら安定と判定してください。複素固有値虚部の大きさは周期的挙動の振動数に対応します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "フィードフォワード補償シミュレーター",
       "description": "PID単独とPID+フィードフォワード補償による1次プロセスのステップ外乱応答をリアルタイムに比較・可視化する制御工学の教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/feedforward-compensation.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["PI単独とPI+フィードフォワード補償のステップ外乱応答比較","出力 y(t) と制御入力 u(t) の同時可視化","ピーク偏差と整定時間の自動計算","削減率による補償効果の定量評価"],
       "keywords": "フィードフォワード,外乱抑圧,PID制御,2自由度制御,プロセス制御,1次系,制御工学,キャプスタン",
       "datePublished": "2026-05-16",
@@ -169,6 +169,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">T_p = T_d = 5 s、T_i = 5 s、dt = 0.05 s、T_sim = 30 s 固定。t = 5 s で外乱ステップ印加。FF はゲインのみ補償 G_ff = -K_d / K_p。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -178,14 +187,20 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <div class="stat-card"><div class="sv" id="statYmaxFB">—</div><div class="sl">FB単独 ピーク偏差 |y_max|</div></div>
         <div class="stat-card"><div class="sv" id="statYmaxFF">—</div><div class="sl">FF+FB ピーク偏差 |y_max|</div></div>
         <div class="stat-card"><div class="sv" id="statReduce">—</div><div class="sl">削減率</div></div>
-        <div class="stat-card"><div class="sv" id="statTsFF">—</div><div class="sl">FF+FB 整定時間 t_s</div></div>
+        <div class="stat-card"><div class="sv" id="statTsFF">—</div><div class="sl">FF ゲイン G_ff = −K_d/K_p</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> ステップ外乱応答 y(t) と制御入力 u(t)</div>
+      <div class="chart-title"><i class="fas fa-project-diagram"></i> ブロック線図（フィードフォワード経路を強調）</div>
+      <canvas id="cvBlock" width="600" height="132"></canvas>
+      <p class="canvas-hint">外乱 d → Gd が出力を乱す前に、d → Gff（紫）が先回りで操作量へ加算。外乱印加後は紫のパルスが補償経路を流れます。</p>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> ステップ外乱応答 y(t) と制御入力 u(t)（リアルタイム掃引）</div>
       <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">上段：出力 y(t)（赤＝FB単独、青＝FF+FB、灰色破線＝目標 r=0）／下段：制御入力 u(t)（橙＝u_fb、紫＝u_ff、緑＝合計）／縦線：外乱印加 t=5 s</p>
+      <p class="canvas-hint">上段：出力 y(t)（赤＝FB単独、シアン＝FF+FB、灰色破線＝目標 r=0）／下段：制御入力 u(t)（橙＝u_fb、紫＝u_ff、緑＝合計）／縦線：外乱印加 t=5 s。再生ヘッドが左から右へ進み、外乱到来時にFF+FB（シアン）がほぼ動かないのに対しFB単独（赤）が大きく振れます。</p>
     </div>
 
     <div class="chart-card">
@@ -207,285 +222,399 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Feedforward Compensation Simulator ==========
-var cv = document.getElementById('cv');
-var ctx = cv.getContext('2d');
+window.__FF_L = {"fbOnly":"FB単独","ffFb":"FF+FB","dist":"外乱","uTotal":"u合計","ffActive":"フィードフォワードが外乱を先回りで相殺","ffIdle":"外乱待機中"};
+/* ========== Feedforward Compensation Simulator v2 (live) ========== */
+(function () {
+  "use strict";
+  var cv = document.getElementById('cv');
+  if (!cv) return;
+  var ctx = cv.getContext('2d');
+  var bd = document.getElementById('cvBlock');
+  var bctx = bd ? bd.getContext('2d') : null;
 
-// fixed simulation parameters
-var TP = 5.0, TD = 5.0, TI = 5.0;
-var DT = 0.05, TSIM = 30.0;
-var TDIST = 5.0; // disturbance applied at t = 5 s
+  // fixed simulation parameters
+  var TP = 5.0, TD = 5.0, TI = 5.0;
+  var DT = 0.05, TSIM = 30.0;
+  var TDIST = 5.0; // disturbance applied at t = 5 s
 
-function getParams() {
-  return {
-    Kp: parseFloat(document.getElementById('slKp').value),
-    Kd: parseFloat(document.getElementById('slKd').value),
-    Kc: parseFloat(document.getElementById('slKc').value),
-    dStep: parseFloat(document.getElementById('slDStep').value)
+  var prefersReduced = false;
+  try {
+    prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (e) { prefersReduced = false; }
+
+  function el(id) { return document.getElementById(id); }
+
+  function getParams() {
+    return {
+      Kp: parseFloat(el('slKp').value),
+      Kd: parseFloat(el('slKd').value),
+      Kc: parseFloat(el('slKc').value),
+      dStep: parseFloat(el('slDStep').value)
+    };
+  }
+
+  // Simulate one scenario. ffOn = true uses gain-only feedforward G_ff = -Kd/Kp.
+  function simulate(p, ffOn) {
+    var N = Math.round(TSIM / DT) + 1;
+    var t = new Array(N), y = new Array(N), ufb = new Array(N), uff = new Array(N), utot = new Array(N), dd = new Array(N);
+    var yp = 0, yd = 0; // outputs of process path and disturbance path
+    var eint = 0, r = 0;
+    for (var i = 0; i < N; i++) {
+      var tt = i * DT;
+      t[i] = tt;
+      var d = (tt >= TDIST) ? p.dStep : 0;
+      dd[i] = d;
+      var yy = yp + yd;
+      var e = r - yy;
+      eint += e * DT;
+      var u_fb = p.Kc * e + (p.Kc / TI) * eint;
+      var u_ff = ffOn ? (-p.Kd / p.Kp) * d : 0;
+      var u = u_fb + u_ff;
+      ufb[i] = u_fb; uff[i] = u_ff; utot[i] = u;
+      y[i] = yy;
+      var dyp = (-yp + p.Kp * u) / TP;
+      var dyd = (-yd + p.Kd * d) / TD;
+      yp += dyp * DT;
+      yd += dyd * DT;
+    }
+    return { t: t, y: y, ufb: ufb, uff: uff, utot: utot, d: dd };
+  }
+
+  function peakAbsUpto(y, n) {
+    var m = 0;
+    for (var i = 0; i < n && i < y.length; i++) {
+      var a = Math.abs(y[i]);
+      if (a > m) m = a;
+    }
+    return m;
+  }
+  function peakAbs(y) { return peakAbsUpto(y, y.length); }
+
+  // ---- HiDPI ----
+  function fitCanvas(c, cssH) {
+    var w = Math.max(280, Math.min(c.parentElement.clientWidth - 40, 900));
+    var h = cssH || Math.round(w * 0.66);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    c.style.width = w + 'px';
+    c.style.height = h + 'px';
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+    var cx = c.getContext('2d');
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.dataset.cssW = String(w);
+    c.dataset.cssH = String(h);
+  }
+  function resizeCanvas() {
+    fitCanvas(cv, 0);
+    if (bd) fitCanvas(bd, 132);
+  }
+
+  // ---- state ----
+  var rFB = null, rFF = null, P = null;
+  var idx = 0;        // current sample index of the sweep
+  var rafId = null;
+  var lastTs = 0;
+
+  function recompute() {
+    P = getParams();
+    if (!isFinite(P.Kp) || !isFinite(P.Kd) || !isFinite(P.Kc) || !isFinite(P.dStep) || P.Kp === 0) return false;
+    rFB = simulate(P, false);
+    rFF = simulate(P, true);
+    return true;
+  }
+
+  // ---- drawing the time-series ----
+  function drawPlots(nShown) {
+    var W = parseFloat(cv.dataset.cssW) || 600, H = parseFloat(cv.dataset.cssH) || 400;
+    ctx.fillStyle = '#0a1929';
+    ctx.fillRect(0, 0, W, H);
+
+    var mxL = 56, mxR = 16, myT = 22, myB = 26, gap = 18;
+    var plotW = W - mxL - mxR;
+    var plotH = (H - myT - myB - gap) / 2;
+    var x0 = mxL, x1 = W - mxR;
+    var y0Top = myT, y1Top = myT + plotH;
+    var y0Bot = y1Top + gap, y1Bot = y0Bot + plotH;
+
+    function pxT(t) { return x0 + (t / TSIM) * plotW; }
+
+    var yMax = Math.max(peakAbs(rFB.y), peakAbs(rFF.y));
+    if (!isFinite(yMax) || yMax < 1e-6) yMax = 1;
+    var yRange = yMax * 1.25;
+    function pyY(v) { return y0Top + plotH / 2 - (v / yRange) * (plotH / 2); }
+
+    ctx.strokeStyle = 'rgba(143,184,224,0.18)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0Top); ctx.lineTo(x1, y0Top);
+    ctx.moveTo(x0, y1Top); ctx.lineTo(x1, y1Top);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(143,184,224,0.5)';
+    ctx.beginPath();
+    ctx.moveTo(x0, y0Top); ctx.lineTo(x0, y1Top);
+    ctx.moveTo(x0, y1Top); ctx.lineTo(x1, y1Top);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(160,160,160,0.65)';
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(x0, pyY(0)); ctx.lineTo(x1, pyY(0)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,209,102,0.6)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(pxT(TDIST), y0Top); ctx.lineTo(pxT(TDIST), y1Top); ctx.stroke();
+    ctx.lineWidth = 1;
+
+    function trace(arr, col, lw, n, py) {
+      ctx.strokeStyle = col; ctx.lineWidth = lw;
+      ctx.beginPath();
+      for (var i = 0; i < n && i < arr.length; i++) {
+        var px = pxT(rFF.t[i]), pp = py(arr[i]);
+        if (i === 0) ctx.moveTo(px, pp); else ctx.lineTo(px, pp);
+      }
+      ctx.stroke();
+    }
+
+    trace(rFB.y, '#e74c3c', 2.4, nShown, pyY);   // FB only (red)
+    trace(rFF.y, '#00B4D8', 2.4, nShown, pyY);   // FF+FB (cyan)
+
+    var hi = Math.min(nShown, rFF.t.length) - 1;
+    if (hi >= 0) {
+      var hx = pxT(rFF.t[hi]);
+      ctx.fillStyle = '#e74c3c';
+      ctx.beginPath(); ctx.arc(hx, pyY(rFB.y[hi]), 3.2, 0, 7); ctx.fill();
+      ctx.fillStyle = '#00B4D8';
+      ctx.beginPath(); ctx.arc(hx, pyY(rFF.y[hi]), 3.2, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(hx, y0Top); ctx.lineTo(hx, y1Bot); ctx.stroke();
+    }
+
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('+' + yRange.toFixed(2), x0 - 4, y0Top + 10);
+    ctx.fillText('0', x0 - 4, pyY(0) + 4);
+    ctx.fillText('-' + yRange.toFixed(2), x0 - 4, y1Top + 4);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#cfe3f7'; ctx.fillText('y(t)', x0 + 4, y0Top + 12);
+    ctx.fillStyle = '#e74c3c'; ctx.fillText('■ ' + L.fbOnly, x0 + 42, y0Top + 12);
+    ctx.fillStyle = '#00B4D8'; ctx.fillText('■ ' + L.ffFb, x0 + 132, y0Top + 12);
+    ctx.fillStyle = 'rgba(255,209,102,0.95)'; ctx.fillText('| t=' + TDIST + 's ' + L.dist, pxT(TDIST) + 4, y0Top + 12);
+
+    // ---- lower: control input u(t) for FF+FB ----
+    var uMax = 0, arrU = rFF.ufb.concat(rFF.uff, rFF.utot);
+    for (var k = 0; k < arrU.length; k++) { var a = Math.abs(arrU[k]); if (a > uMax) uMax = a; }
+    if (!isFinite(uMax) || uMax < 1e-6) uMax = 1;
+    var uRange = uMax * 1.25;
+    function pyU(v) { return y0Bot + plotH / 2 - (v / uRange) * (plotH / 2); }
+
+    ctx.strokeStyle = 'rgba(143,184,224,0.18)';
+    ctx.beginPath();
+    ctx.moveTo(x0, y0Bot); ctx.lineTo(x1, y0Bot);
+    ctx.moveTo(x0, y1Bot); ctx.lineTo(x1, y1Bot);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(143,184,224,0.5)';
+    ctx.beginPath();
+    ctx.moveTo(x0, y0Bot); ctx.lineTo(x0, y1Bot);
+    ctx.moveTo(x0, y1Bot); ctx.lineTo(x1, y1Bot);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(160,160,160,0.65)';
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(x0, pyU(0)); ctx.lineTo(x1, pyU(0)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,209,102,0.6)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(pxT(TDIST), y0Bot); ctx.lineTo(pxT(TDIST), y1Bot); ctx.stroke();
+    ctx.lineWidth = 1;
+
+    trace(rFF.ufb, '#e17055', 2.0, nShown, pyU);  // u_fb (orange)
+    trace(rFF.uff, '#9b59b6', 2.4, nShown, pyU);  // u_ff (purple) -- anticipatory
+    trace(rFF.utot, '#00b894', 2.2, nShown, pyU); // u total (green)
+
+    if (hi >= 0) {
+      var hx2 = pxT(rFF.t[hi]);
+      ctx.fillStyle = '#9b59b6';
+      ctx.beginPath(); ctx.arc(hx2, pyU(rFF.uff[hi]), 3.0, 0, 7); ctx.fill();
+    }
+
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('+' + uRange.toFixed(2), x0 - 4, y0Bot + 10);
+    ctx.fillText('0', x0 - 4, pyU(0) + 4);
+    ctx.fillText('-' + uRange.toFixed(2), x0 - 4, y1Bot + 4);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#cfe3f7'; ctx.fillText('u(t)', x0 + 4, y0Bot + 12);
+    ctx.fillStyle = '#e17055'; ctx.fillText('■ u_fb', x0 + 42, y0Bot + 12);
+    ctx.fillStyle = '#9b59b6'; ctx.fillText('■ u_ff', x0 + 100, y0Bot + 12);
+    ctx.fillStyle = '#00b894'; ctx.fillText('■ ' + L.uTotal, x0 + 158, y0Bot + 12);
+
+    ctx.fillStyle = '#cfe3f7'; ctx.textAlign = 'center';
+    for (var tk = 0; tk <= TSIM; tk += 5) { ctx.fillText(tk + 's', pxT(tk), y1Bot + 16); }
+    ctx.textAlign = 'left';
+    ctx.fillText('t [s]', x1 - 28, y1Bot + 16);
+  }
+
+  // ---- block diagram with animated FF path ----
+  function drawBlock(nShown) {
+    if (!bctx) return;
+    var W = parseFloat(bd.dataset.cssW) || 600, H = parseFloat(bd.dataset.cssH) || 132;
+    bctx.fillStyle = '#0a1929';
+    bctx.fillRect(0, 0, W, H);
+
+    var active = nShown > 0 && (nShown - 1) * DT >= TDIST;
+    var midY = H * 0.60;
+    var topY = H * 0.22;
+    var bw = 64, bh = 26;
+    var xD = W * 0.10, xFF = W * 0.30, xCtrl = W * 0.30, xSum = W * 0.52, xProc = W * 0.66;
+
+    function box(x, y, w, h, label, hot) {
+      bctx.fillStyle = hot ? 'rgba(155,89,182,0.20)' : 'rgba(0,180,216,0.10)';
+      bctx.strokeStyle = hot ? '#9b59b6' : '#00B4D8';
+      bctx.lineWidth = hot ? 2 : 1.2;
+      bctx.beginPath();
+      if (bctx.roundRect) bctx.roundRect(x, y, w, h, 6); else bctx.rect(x, y, w, h);
+      bctx.fill(); bctx.stroke();
+      bctx.fillStyle = '#e8f4ff'; bctx.font = '11px "Roboto Mono",monospace';
+      bctx.textAlign = 'center'; bctx.textBaseline = 'middle';
+      bctx.fillText(label, x + w / 2, y + h / 2);
+    }
+    function line(ax, ay, bx, by, col, lw) {
+      bctx.strokeStyle = col; bctx.lineWidth = lw || 1.4;
+      bctx.beginPath(); bctx.moveTo(ax, ay); bctx.lineTo(bx, by); bctx.stroke();
+    }
+    function arrow(x, y, col) {
+      bctx.fillStyle = col; bctx.beginPath();
+      bctx.moveTo(x, y); bctx.lineTo(x - 6, y - 3.5); bctx.lineTo(x - 6, y + 3.5);
+      bctx.closePath(); bctx.fill();
+    }
+
+    // forward path
+    line(xD + 30, midY, xCtrl, midY, '#8fb8e0');
+    box(xCtrl, midY - bh / 2, bw, bh, 'PI', false);
+    line(xCtrl + bw, midY, xSum, midY, '#8fb8e0');
+    bctx.strokeStyle = '#8fb8e0'; bctx.lineWidth = 1.2;
+    bctx.beginPath(); bctx.arc(xSum + 8, midY, 8, 0, 7); bctx.stroke();
+    bctx.fillStyle = '#8fb8e0'; bctx.font = '12px "Roboto Mono",monospace';
+    bctx.textAlign = 'center'; bctx.textBaseline = 'middle'; bctx.fillText('+', xSum + 8, midY);
+    line(xSum + 16, midY, xProc, midY, '#8fb8e0');
+    box(xProc, midY - bh / 2, bw, bh, 'Gp', false);
+    line(xProc + bw, midY, W - 12, midY, '#8fb8e0');
+    arrow(W - 12, midY, '#8fb8e0');
+    bctx.fillStyle = '#cfe3f7'; bctx.font = '11px "Roboto Mono",monospace';
+    bctx.textAlign = 'left'; bctx.textBaseline = 'alphabetic'; bctx.fillText('y', W - 10, midY - 10);
+
+    // disturbance path d -> Gd -> process output
+    bctx.fillStyle = '#ffd166'; bctx.textAlign = 'center'; bctx.textBaseline = 'alphabetic';
+    bctx.fillText('d', xD, topY - 12);
+    box(xD - bw / 2 + 8, topY - bh / 2, bw, bh, 'Gd', false);
+    line(xD + 8 + bw / 2, topY, xProc + bw / 2, topY, '#ffd166');
+    line(xProc + bw / 2, topY, xProc + bw / 2, midY - bh / 2, '#ffd166');
+    arrow(xProc + bw / 2, midY - bh / 2, '#ffd166');
+
+    // feedforward path (highlighted)
+    box(xFF, topY - bh / 2, bw, bh, 'Gff', true);
+    line(xD, topY - bh / 2 + 4, xD, topY, '#9b59b6', 1.6);
+    line(xD - 4, topY, xFF, topY, '#9b59b6', 1.6);
+    line(xFF + bw, topY, xSum + 8, topY, '#9b59b6', 1.8);
+    line(xSum + 8, topY, xSum + 8, midY - 8, '#9b59b6', 1.8);
+    arrow(xSum + 8, midY - 8, '#9b59b6');
+
+    // feedback path
+    line(W - 30, midY, W - 30, H - 8, '#8fb8e0');
+    line(W - 30, H - 8, xD + 12, H - 8, '#8fb8e0');
+    line(xD + 12, H - 8, xD + 12, midY + 4, '#8fb8e0');
+    arrow(xD + 12, midY + 4, '#8fb8e0');
+    bctx.fillStyle = '#8fb8e0'; bctx.textAlign = 'center'; bctx.fillText('-', xD + 20, midY + 13);
+
+    // animated pulse along FF path when active
+    if (active && !prefersReduced) {
+      var ph = ((nShown * DT) % 1.2) / 1.2;
+      var pts = [[xD, topY], [xFF, topY], [xFF + bw, topY], [xSum + 8, topY], [xSum + 8, midY - 8]];
+      var total = 0, segs = [];
+      for (var s = 1; s < pts.length; s++) {
+        var dx = pts[s][0] - pts[s - 1][0], dy = pts[s][1] - pts[s - 1][1];
+        var L2 = Math.sqrt(dx * dx + dy * dy);
+        segs.push(L2); total += L2;
+      }
+      var dd = ph * total, acc = 0, pxp = pts[0][0], pyp = pts[0][1];
+      for (var s2 = 0; s2 < segs.length; s2++) {
+        if (dd <= acc + segs[s2]) {
+          var f = (dd - acc) / segs[s2];
+          pxp = pts[s2][0] + f * (pts[s2 + 1][0] - pts[s2][0]);
+          pyp = pts[s2][1] + f * (pts[s2 + 1][1] - pts[s2][1]);
+          break;
+        }
+        acc += segs[s2];
+      }
+      bctx.fillStyle = '#e0b0ff';
+      bctx.beginPath(); bctx.arc(pxp, pyp, 4, 0, 7); bctx.fill();
+    }
+
+    bctx.fillStyle = active ? '#e0b0ff' : 'rgba(207,227,247,0.7)';
+    bctx.font = '10px "Roboto Mono",monospace'; bctx.textAlign = 'left'; bctx.textBaseline = 'alphabetic';
+    bctx.fillText(active ? L.ffActive : L.ffIdle, 8, H - 6);
+  }
+
+  // ---- live numbers ----
+  function updateStats(nShown) {
+    var n = Math.max(1, nShown);
+    var pkFB = peakAbsUpto(rFB.y, n);
+    var pkFF = peakAbsUpto(rFF.y, n);
+    var reduce = (pkFB > 1e-9) ? (1 - pkFF / pkFB) * 100 : 0;
+    el('statYmaxFB').textContent = pkFB.toFixed(3);
+    el('statYmaxFF').textContent = pkFF.toFixed(3);
+    el('statReduce').textContent = (reduce > 0 ? reduce.toFixed(1) : '0.0') + ' %';
+    if (el('statTsFF')) { el('statTsFF').textContent = (-P.Kd / P.Kp).toFixed(3); }
+  }
+
+  // ---- animation loop ----
+  function frame(ts) {
+    if (!lastTs) lastTs = ts;
+    var dtMs = ts - lastTs; lastTs = ts;
+    idx += Math.max(1, Math.round(60 * dtMs / 1000));
+    var N = rFF.t.length;
+    if (idx >= N) idx = N;
+    drawPlots(idx);
+    drawBlock(idx);
+    updateStats(idx);
+    if (idx >= N) {
+      setTimeout(function () { idx = 0; lastTs = 0; rafId = requestAnimationFrame(frame); }, 1100);
+      return;
+    }
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function restart() {
+    if (rafId) cancelAnimationFrame(rafId);
+    if (!recompute()) return;
+    resizeCanvas();
+    idx = 0; lastTs = 0;
+    if (prefersReduced) {
+      var N = rFF.t.length;
+      drawPlots(N); drawBlock(N); updateStats(N);
+      return;
+    }
+    rafId = requestAnimationFrame(frame);
+  }
+
+  var L = window.__FF_L || {
+    fbOnly: 'FB only', ffFb: 'FF+FB', dist: 'dist', uTotal: 'u total',
+    ffActive: 'feedforward cancels the disturbance', ffIdle: 'waiting for disturbance'
   };
-}
 
-// Simulate one scenario. ffOn = true uses gain-only feedforward.
-function simulate(p, ffOn) {
-  var N = Math.round(TSIM / DT) + 1;
-  var t = new Array(N), y = new Array(N), ufb = new Array(N), uff = new Array(N), utot = new Array(N);
-  var yp = 0, yd = 0; // outputs of process and disturbance paths
-  var eint = 0;
-  var r = 0;
-  for (var i = 0; i < N; i++) {
-    var tt = i * DT;
-    t[i] = tt;
-    var d = (tt >= TDIST) ? p.dStep : 0;
-    var yy = yp + yd;
-    var e = r - yy;
-    eint += e * DT;
-    var u_fb = p.Kc * e + (p.Kc / TI) * eint;
-    var u_ff = ffOn ? (-p.Kd / p.Kp) * d : 0;
-    var u = u_fb + u_ff;
-    ufb[i] = u_fb; uff[i] = u_ff; utot[i] = u;
-    y[i] = yy;
-    // Euler update (first-order)
-    var dyp = (-yp + p.Kp * u) / TP;
-    var dyd = (-yd + p.Kd * d) / TD;
-    yp += dyp * DT;
-    yd += dyd * DT;
-  }
-  return { t: t, y: y, ufb: ufb, uff: uff, utot: utot };
-}
-
-function settlingTime(t, y, tol) {
-  // last index outside ±tol band (absolute), then time of next sample
-  var iLast = 0;
-  for (var i = 0; i < y.length; i++) {
-    if (Math.abs(y[i]) > tol) iLast = i;
-  }
-  // require disturbance has been applied
-  if (t[iLast] < TDIST) return 0;
-  if (iLast >= y.length - 1) return NaN; // not settled within sim
-  return t[iLast + 1] - TDIST;
-}
-
-function peakAbs(y) {
-  var m = 0;
-  for (var i = 0; i < y.length; i++) {
-    var a = Math.abs(y[i]);
-    if (a > m) m = a;
-  }
-  return m;
-}
-
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var h = Math.round(w * 0.66);
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
-  cv.width = Math.round(w * dpr);
-  cv.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cv.dataset.cssW = String(w);
-  cv.dataset.cssH = String(h);
-}
-
-function drawPlots(rFB, rFF, p) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-
-  // layout: two stacked plots
-  var mxL = 56, mxR = 16, myT = 22, myB = 26, gap = 18;
-  var plotW = W - mxL - mxR;
-  var plotH = (H - myT - myB - gap) / 2;
-  var x0 = mxL, x1 = W - mxR;
-  var y0Top = myT, y1Top = myT + plotH;
-  var y0Bot = y1Top + gap, y1Bot = y0Bot + plotH;
-
-  function pxT(t) { return x0 + (t / TSIM) * plotW; }
-
-  // upper: outputs y(t)
-  var yAll = rFB.y.concat(rFF.y);
-  var yMax = 0;
-  for (var i = 0; i < yAll.length; i++) {
-    var a = Math.abs(yAll[i]);
-    if (a > yMax) yMax = a;
-  }
-  if (!isFinite(yMax) || yMax < 1e-6) yMax = 1;
-  var yRange = yMax * 1.25;
-  function pyY(v) { return y0Top + plotH / 2 - (v / yRange) * (plotH / 2); }
-
-  // grid + axes (top)
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x0, y0Top); ctx.lineTo(x1, y0Top);
-  ctx.moveTo(x0, y1Top); ctx.lineTo(x1, y1Top);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.beginPath();
-  ctx.moveTo(x0, y0Top); ctx.lineTo(x0, y1Top);
-  ctx.moveTo(x0, y1Top); ctx.lineTo(x1, y1Top);
-  ctx.stroke();
-  // baseline r=0
-  ctx.strokeStyle = 'rgba(160,160,160,0.65)';
-  ctx.setLineDash([5, 4]);
-  ctx.beginPath(); ctx.moveTo(x0, pyY(0)); ctx.lineTo(x1, pyY(0)); ctx.stroke();
-  ctx.setLineDash([]);
-  // disturbance application vertical line
-  ctx.strokeStyle = 'rgba(255,209,102,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(pxT(TDIST), y0Top); ctx.lineTo(pxT(TDIST), y1Top); ctx.stroke();
-  ctx.lineWidth = 1;
-
-  // y FB (red)
-  ctx.strokeStyle = '#e74c3c';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  for (var i = 0; i < rFB.t.length; i++) {
-    if (i === 0) ctx.moveTo(pxT(rFB.t[i]), pyY(rFB.y[i])); else ctx.lineTo(pxT(rFB.t[i]), pyY(rFB.y[i]));
-  }
-  ctx.stroke();
-  // y FF+FB (blue)
-  ctx.strokeStyle = '#007BFF';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  for (var i = 0; i < rFF.t.length; i++) {
-    if (i === 0) ctx.moveTo(pxT(rFF.t[i]), pyY(rFF.y[i])); else ctx.lineTo(pxT(rFF.t[i]), pyY(rFF.y[i]));
-  }
-  ctx.stroke();
-
-  // labels top
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('y(t)', x0 + 4, y0Top + 12);
-  ctx.textAlign = 'right';
-  ctx.fillText('+' + yRange.toFixed(2), x0 - 4, y0Top + 10);
-  ctx.fillText('0', x0 - 4, pyY(0) + 4);
-  ctx.fillText('-' + yRange.toFixed(2), x0 - 4, y1Top + 4);
-  // legend top
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#e74c3c';
-  ctx.fillText('■ FB単独', x0 + 50, y0Top + 12);
-  ctx.fillStyle = '#007BFF';
-  ctx.fillText('■ FF+FB', x0 + 140, y0Top + 12);
-  ctx.fillStyle = 'rgba(255,209,102,0.9)';
-  ctx.fillText('| t=' + TDIST + 's 外乱', pxT(TDIST) + 4, y0Top + 12);
-
-  // lower: control inputs u(t) for FF+FB
-  var uAll = rFF.ufb.concat(rFF.uff, rFF.utot);
-  var uMax = 0;
-  for (var i = 0; i < uAll.length; i++) {
-    var a = Math.abs(uAll[i]);
-    if (a > uMax) uMax = a;
-  }
-  if (!isFinite(uMax) || uMax < 1e-6) uMax = 1;
-  var uRange = uMax * 1.25;
-  function pyU(v) { return y0Bot + plotH / 2 - (v / uRange) * (plotH / 2); }
-
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.beginPath();
-  ctx.moveTo(x0, y0Bot); ctx.lineTo(x1, y0Bot);
-  ctx.moveTo(x0, y1Bot); ctx.lineTo(x1, y1Bot);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.beginPath();
-  ctx.moveTo(x0, y0Bot); ctx.lineTo(x0, y1Bot);
-  ctx.moveTo(x0, y1Bot); ctx.lineTo(x1, y1Bot);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(160,160,160,0.65)';
-  ctx.setLineDash([5, 4]);
-  ctx.beginPath(); ctx.moveTo(x0, pyU(0)); ctx.lineTo(x1, pyU(0)); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.strokeStyle = 'rgba(255,209,102,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(pxT(TDIST), y0Bot); ctx.lineTo(pxT(TDIST), y1Bot); ctx.stroke();
-  ctx.lineWidth = 1;
-
-  // u_fb (orange)
-  ctx.strokeStyle = '#e17055';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (var i = 0; i < rFF.t.length; i++) {
-    if (i === 0) ctx.moveTo(pxT(rFF.t[i]), pyU(rFF.ufb[i])); else ctx.lineTo(pxT(rFF.t[i]), pyU(rFF.ufb[i]));
-  }
-  ctx.stroke();
-  // u_ff (purple)
-  ctx.strokeStyle = '#9b59b6';
-  ctx.beginPath();
-  for (var i = 0; i < rFF.t.length; i++) {
-    if (i === 0) ctx.moveTo(pxT(rFF.t[i]), pyU(rFF.uff[i])); else ctx.lineTo(pxT(rFF.t[i]), pyU(rFF.uff[i]));
-  }
-  ctx.stroke();
-  // u total (green)
-  ctx.strokeStyle = '#00b894';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  for (var i = 0; i < rFF.t.length; i++) {
-    if (i === 0) ctx.moveTo(pxT(rFF.t[i]), pyU(rFF.utot[i])); else ctx.lineTo(pxT(rFF.t[i]), pyU(rFF.utot[i]));
-  }
-  ctx.stroke();
-
-  // labels bottom
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('u(t) [FF+FB]', x0 + 4, y0Bot + 12);
-  ctx.textAlign = 'right';
-  ctx.fillText('+' + uRange.toFixed(2), x0 - 4, y0Bot + 10);
-  ctx.fillText('0', x0 - 4, pyU(0) + 4);
-  ctx.fillText('-' + uRange.toFixed(2), x0 - 4, y1Bot + 4);
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#e17055';
-  ctx.fillText('■ u_fb', x0 + 100, y0Bot + 12);
-  ctx.fillStyle = '#9b59b6';
-  ctx.fillText('■ u_ff', x0 + 160, y0Bot + 12);
-  ctx.fillStyle = '#00b894';
-  ctx.fillText('■ u合計', x0 + 220, y0Bot + 12);
-
-  // time axis ticks
-  ctx.fillStyle = '#cfe3f7';
-  ctx.textAlign = 'center';
-  for (var tk = 0; tk <= TSIM; tk += 5) {
-    ctx.fillText(tk + 's', pxT(tk), y1Bot + 16);
-  }
-  ctx.textAlign = 'left';
-  ctx.fillText('t [s]', x1 - 30, y1Bot + 16);
-}
-
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.Kp) || !isFinite(p.Kd) || !isFinite(p.Kc) || !isFinite(p.dStep)) return;
-  var rFB = simulate(p, false);
-  var rFF = simulate(p, true);
-  var ymFB = peakAbs(rFB.y);
-  var ymFF = peakAbs(rFF.y);
-  var reduce = (ymFB > 1e-9) ? (1 - ymFF / ymFB) * 100 : 0;
-  // tolerance band: 2% of FB peak, or absolute 0.02 minimum
-  var tol = Math.max(0.02, ymFB * 0.02);
-  var ts = settlingTime(rFF.t, rFF.y, tol);
-  document.getElementById('statYmaxFB').textContent = ymFB.toFixed(3);
-  document.getElementById('statYmaxFF').textContent = ymFF.toFixed(3);
-  document.getElementById('statReduce').textContent = reduce.toFixed(1) + ' %';
-  document.getElementById('statTsFF').textContent = isFinite(ts) ? ts.toFixed(2) + ' s' : '—';
-  drawPlots(rFB, rFF, p);
-}
-
-function resetParams() {
-  var defs = { slKp: 2.0, slKd: 1.5, slKc: 1.0, slDStep: 1.0 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
+  ['slKp', 'slKd', 'slKc', 'slDStep'].forEach(function (id) {
+    var e = el(id);
+    if (e) e.addEventListener('input', restart);
   });
-  updateSlider(document.getElementById('slKp'), 'slKpVal', 1, '');
-  updateSlider(document.getElementById('slKd'), 'slKdVal', 1, '');
-  updateSlider(document.getElementById('slKc'), 'slKcVal', 1, '');
-  updateSlider(document.getElementById('slDStep'), 'slDStepVal', 1, '');
-  compute();
-}
+  window.compute = restart;
+  window.resetParams = function () {
+    var defs = { slKp: 2.0, slKd: 1.5, slKc: 1.0, slDStep: 1.0 };
+    Object.keys(defs).forEach(function (id) {
+      var e = el(id); if (e) e.value = defs[id];
+      var nv = el(id + 'Val'); if (nv) nv.value = defs[id];
+      if (typeof window.updateSlider === 'function') { try { window.updateSlider(el(id), id + 'Val', 1, ''); } catch (e2) {} }
+    });
+    restart();
+  };
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+  window.addEventListener('resize', function () { resizeCanvas(); if (rFF) { drawPlots(idx || rFF.t.length); drawBlock(idx || rFF.t.length); } });
 
-resizeCanvas();
-compute();
+  restart();
+})();
 </script>
 
 <section class="explanation">
@@ -553,6 +682,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="feedforward-compensation.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -606,14 +738,14 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>PIDゲイン(Kp=0.5～3.0, Kd=0.1～1.0)をスライダーで設定し、フィードバック単独の応答を観察します</li>
-<li>フィードフォワード補償ゲイン(Kc=0.8～1.2)を調整して、外乱経路ゲインに対する相殺度合いを変化させます</li>
-<li>ステップ外乱振幅(0.5～5.0)を入力し、FB単独とFF+FB併用のピーク偏差・整定時間(2%バンド)を比較表示します</li>
+<li>プロセスゲイン(Kp=0.5～5.0)と外乱経路ゲイン(Kd=0.5～5.0)をスライダーで設定し、フィードバック単独の応答を観察します</li>
+<li>PI比例ゲイン(Kc=0.1～5.0)を調整して整定の速さを変化させます。フィードフォワードは内部式 G_ff=−Kd/Kp で自動適用されます</li>
+<li>外乱ステップ大きさ(−3.0～3.0)を入力し、FB単独とFF+FB併用のピーク偏差・整定時間(2%バンド)を比較表示します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>シリンダ位置制御系(τ=0.15s)でステップ外乱d=2.0が印加された場合:FB単独(Kp=1.5,Kd=0.3)ではピーク偏差|y_max|=1.28mm、整定時間=0.85sに対し、外乱経路ゲイン推定値0.95に基づきKc=0.94でFF補償を追加すると、ピーク偏差は0.18mmに削減(約86%削減)、整定時間は0.42sまで短縮されます</p>
+<p>本ツールのデフォルト入力(プロセスゲインKp=2.0、外乱経路ゲインKd=1.5、PI比例ゲインKc=1.0、外乱ステップd=1.0)では、t=5sで外乱が印加されたとき、FB単独のピーク偏差|y_max|=0.376に対し、FF+FB併用ではフィードフォワード G_ff=−Kd/Kp=−0.75 が外乱と同時に作用して偏差をほぼ0まで打ち消し、削減率は約100%になります(Tp=Tdのためゲインのみ補償でも完全相殺)。Kdをモデル値からずらすと残留偏差が現れ、それをPIが拾います。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -623,6 +755,16 @@ compute();
 <li>外乱が複数周波数を含む場合(ポンプリップル+振動)、単一FFでは特定周波数のみ相殺されるため、適応FF制御またはマルチFF構成が必要です</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

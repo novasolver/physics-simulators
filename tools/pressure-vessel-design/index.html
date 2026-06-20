@@ -40,7 +40,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "圧力容器設計計算機",
       "description": "圧力容器の薄肉理論（フープ応力・軸応力）と厚肉ラメ方程式を計算。内圧・肉厚・降伏強度から安全率とフォンミーゼス応力をリアルタイム算出。",
       "url": "https://novasolver.jp/tools/pressure-vessel-design.html",
@@ -50,7 +50,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["薄肉理論：フープ応力・軸応力計算","厚肉ラメ方程式による応力分布","フォンミーゼス応力と安全率計算","最小必要肉厚の算出","断面応力分布グラフ"],
       "keywords": "圧力容器,フープ応力,ラメ方程式,安全率,フォンミーゼス,薄肉理論,厚肉容器,ASME,設計計算",
       "datePublished": "2026-04-08",
@@ -183,10 +183,18 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <input type="range" id="sy" min="100" max="1500" step="10" value="250" oninput="syncToNum('sy','syValNum');upd('sy',this.value,0);updateChart()">
     </div>
     <div class="ctrl-row">
-      <label>摩擦係数（腐食代） <div class="num-wrap"><input type="number" class="num-input" id="caValNum" value="1.5" min="0" max="10" step="0.5" oninput="syncFromNum('ca','caValNum')"><span class="num-unit">mm</span></div> </label>
+      <label>腐食代 ca <div class="num-wrap"><input type="number" class="num-input" id="caValNum" value="1.5" min="0" max="10" step="0.5" oninput="syncFromNum('ca','caValNum')"><span class="num-unit">mm</span></div> </label>
       <input type="range" id="ca" min="0" max="10" step="0.5" value="1.5" oninput="syncToNum('ca','caValNum');upd('ca',this.value,1);updateChart()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -241,33 +249,48 @@ function setType(type, btn) {
 }function calcAll(){
   const Ri = R, Ro = R + t;
   const tRatio = t / R;
-  let hoop, axial;
+  let hoop, axial, radial, vm;
 
   if (vesselType === 'cylinder') {
-    hoop = P * R / t;
-    axial = P * R / (2 * t);
+    if (tRatio <= 0.1) {
+      hoop = P * R / t;
+      axial = P * R / (2 * t);
+      radial = 0;
+      vm = Math.sqrt(hoop * hoop - hoop * axial + axial * axial);
+    } else {
+      const A = P * Ri * Ri / (Ro * Ro - Ri * Ri);
+      const B = A * Ro * Ro;
+      hoop = A + B / (Ri * Ri);
+      radial = -P;
+      axial = P * Ri * Ri / (Ro * Ro - Ri * Ri);
+      vm = Math.sqrt(0.5 * ((hoop - radial) ** 2 + (radial - axial) ** 2 + (axial - hoop) ** 2));
+    }
   }else{
-    // Sphere: both directions equal = PR/2t
-    hoop = P * R / (2 * t);
-    axial = hoop;
-  }let vm;
-  if (vesselType === 'cylinder'){
-    vm = Math.sqrt(hoop * hoop - hoop * axial + axial * axial);
-  }else{
-    vm = hoop; // equal biaxial → vm = hoop
+    if (tRatio <= 0.1) {
+      hoop = P * R / (2 * t);
+      axial = hoop;
+      radial = 0;
+      vm = hoop;
+    } else {
+      const A = P * Math.pow(Ri, 3) / (Math.pow(Ro, 3) - Math.pow(Ri, 3));
+      const B = P * Math.pow(Ri, 3) * Math.pow(Ro, 3) / (Math.pow(Ro, 3) - Math.pow(Ri, 3));
+      hoop = A + 0.5 * B / Math.pow(Ri, 3);
+      axial = hoop;
+      radial = -P;
+      vm = Math.abs(hoop - radial);
+    }
   }const sf = sy / vm;
-  // Minimum thickness from ASME: σ_allow = sy/3, so t_min = P*R / σ_allow + ca
+  // ASME-style minimum thickness with joint efficiency E=1.0.
   const sig_allow = sy / 3.5;
-  const tmin = (vesselType === 'cylinder') ?
-    (P * R / sig_allow) + ca :
-    (P * R / (2 * sig_allow)) + ca;
+  const denom = vesselType === 'cylinder' ? sig_allow - 0.6 * P : 2 * sig_allow - 0.2 * P;
+  const tmin = denom > 0 ? (P * R / denom) + ca : Infinity;
 
   document.getElementById('st-hoop').textContent = hoop.toFixed(1);
   document.getElementById('st-axial').textContent = axial.toFixed(1);
   document.getElementById('st-vm').textContent = vm.toFixed(1);
   document.getElementById('st-tr').textContent = tRatio.toFixed(3) + (tRatio < 0.1 ? ' ✓薄肉' : ' ✗厚肉');
   document.getElementById('st-sf').textContent = sf.toFixed(2);
-  document.getElementById('st-tmin').textContent = tmin.toFixed(1);
+  document.getElementById('st-tmin').textContent = isFinite(tmin) ? tmin.toFixed(1) : '適用外';
 
   const sfCard = document.getElementById('sf-card');
   const sfFill = document.getElementById('sf-fill');
@@ -284,17 +307,25 @@ function setType(type, btn) {
     sfFill.style.background = '#dc3545';
   }
 
-  updateChart(Ri, Ro, P);
+  updateChart(Ri, Ro, P, vesselType);
   drawVessel(hoop, axial, sf);
-}function updateChart(Ri, Ro, P){
+}function updateChart(Ri, Ro, P, type){
   const nPts = 40;
   const labels = [], hoopData = [], radialData = [];
   for (let i = 0; i <= nPts; i++) {
     const r = Ri + (Ro - Ri) * i / nPts;
-    const A = P * Ri * Ri / (Ro * Ro - Ri * Ri);
-    const B = A * Ro * Ro;
-    const sigT = A + B / (r * r);
-    const sigR = A - B / (r * r);
+    let sigT, sigR;
+    if (type === 'sphere') {
+      const A = P * Math.pow(Ri, 3) / (Math.pow(Ro, 3) - Math.pow(Ri, 3));
+      const B = P * Math.pow(Ri, 3) * Math.pow(Ro, 3) / (Math.pow(Ro, 3) - Math.pow(Ri, 3));
+      sigT = A + 0.5 * B / Math.pow(r, 3);
+      sigR = A - B / Math.pow(r, 3);
+    } else {
+      const A = P * Ri * Ri / (Ro * Ro - Ri * Ri);
+      const B = A * Ro * Ro;
+      sigT = A + B / (r * r);
+      sigR = A - B / (r * r);
+    }
     labels.push((r - Ri).toFixed(1));
     hoopData.push(sigT);
     radialData.push(sigR);
@@ -458,6 +489,9 @@ function setType(type, btn) {
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="pressure-vessel-design.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -507,6 +541,16 @@ function setType(type, btn) {
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

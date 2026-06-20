@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "コンプトン散乱 シミュレーター",
       "description": "入射光子エネルギー、散乱角、標的質量からコンプトン散乱の波長シフト Δλ、散乱光子エネルギー、反跳電子の運動エネルギーと散乱角をリアルタイム計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/compton-scattering.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["入射光子エネルギー・散乱角・標的質量から Δλ と散乱後エネルギーを計算","反跳電子の運動エネルギーと散乱角を表示","散乱の幾何を入射・散乱光子と反跳電子で可視化","Δλ(θ) 曲線で角度依存性を直感的に理解"],
       "keywords": "コンプトン散乱,Compton scattering,光子,電子,波長シフト,X線,γ線,量子力学",
       "datePublished": "2026-05-15",
@@ -104,6 +104,30 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
 .detect-on{ color:#5cd6a8; font-weight:700; }
 .detect-off{ color:#ff6b6b; font-weight:700; }
+/* ===== v2 live readouts / controls ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+.live-ro.in .rv{color:#FFD166}
+.live-ro.out .rv{color:#00B4D8}
+.live-ro.elec .rv{color:#ff8a8a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.speed-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:4px 10px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.cons-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.8rem;color:var(--text);margin-top:4px}
+.cons-pill{font-family:'Roboto Mono',monospace;background:rgba(0,123,255,.08);border:1px solid rgba(0,123,255,.2);border-radius:6px;padding:3px 8px;color:var(--accent)}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{transition:none}
+}
 </style>
 </head>
 <body>
@@ -144,9 +168,20 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">散乱角 θ</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slThetaVal" value="90" min="0" max="180" step="1" oninput="syncFromNum('slTheta','slThetaVal')"><span class="num-unit">deg</span></div>
+        <div class="num-wrap"><input type="number" class="num-input" id="slThetaVal" value="90" min="0" max="180" step="1" oninput="syncFromNum('slTheta','slThetaVal');compute()"><span class="num-unit">deg</span></div>
       </div>
       <input type="range" id="slTheta" min="0" max="180" step="1" value="90" oninput="syncToNum('slTheta','slThetaVal');updateSlider(this,'slThetaVal',0,'');compute()">
+    </div>
+
+    <div style="margin:4px 0 12px;">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setPreset('fwd')">θ=0 シフト無し</button>
+        <button type="button" class="preset-btn" onclick="setPreset('p90')">θ=90° Δλ=2.43pm</button>
+        <button type="button" class="preset-btn" onclick="setPreset('back')">θ=180° 後方散乱</button>
+        <button type="button" class="preset-btn" onclick="setPreset('gamma')">高エネルギーγ</button>
+        <button type="button" class="preset-btn" onclick="setPreset('mo')">Mo Kα (XRD)</button>
+      </div>
     </div>
 
     <div class="param-group">
@@ -168,28 +203,61 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 散乱角をスイープ</button>
+      <button type="button" class="btn" id="sweepBtn" onclick="toggleSweep()"><i class="fas fa-arrows-left-right"></i> 散乱角をスイープ</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">電子のコンプトン波長 λ_C = h/(m_e c) ≈ 2.426 pm。標的質量を陽子の 1836 倍に近づけると Δλ はほぼゼロになり、トムソン散乱（弾性）に漸近します。検出器のエネルギー閾値以下の散乱光子は計数されません。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130626345?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130626345.09._SCMZZZZZZ_.jpg" alt="量子力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">量子力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-      <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statEf">—</div><div class="sl">散乱光子エネルギー E_f</div></div>
-        <div class="stat-card"><div class="sv" id="statDeltaLambda">—</div><div class="sl">波長シフト Δλ</div></div>
-        <div class="stat-card"><div class="sv" id="statKE">—</div><div class="sl">電子運動エネルギー</div></div>
-        <div class="stat-card"><div class="sv" id="statPhiE">—</div><div class="sl">電子散乱角 φ_e</div></div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（光子-電子衝突）</div>
+      <div class="live-readouts">
+        <div class="live-ro in"><div class="rv" id="roEin">100</div><div class="rl">入射 E_in [keV]</div></div>
+        <div class="live-ro in"><div class="rv" id="roLin">12.40</div><div class="rl">入射 λ_in [pm]</div></div>
+        <div class="live-ro accent"><div class="rv" id="roTheta">90°</div><div class="rl">散乱角 θ</div></div>
+        <div class="live-ro accent"><div class="rv" id="roDl">2.426</div><div class="rl">波長シフト Δλ [pm]</div></div>
+        <div class="live-ro out"><div class="rv" id="roLf">14.83</div><div class="rl">散乱 λ' [pm]</div></div>
+        <div class="live-ro out"><div class="rv" id="roEf">83.6</div><div class="rl">散乱 E' [keV]</div></div>
+        <div class="live-ro elec"><div class="rv" id="roKE">16.4</div><div class="rl">電子反跳 KE_e [keV]</div></div>
+        <div class="live-ro elec"><div class="rv" id="roPhi">39.9°</div><div class="rl">電子反跳角 φ_e</div></div>
       </div>
-      <p style="font-size:0.78rem;color:var(--muted);margin-top:8px;text-align:center;">検出器判定：<span id="detectStatus">—</span></p>
+      <div class="cons-row">
+        <span>エネルギー保存:</span>
+        <span class="cons-pill" id="consEq">E = E' + KE_e</span>
+        <span style="color:var(--muted)">λ_C = h/(m_e c) = <span id="roLc">2.426</span> pm</span>
+      </div>
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:8px;">検出器判定：<span id="detectStatus">—</span></p>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-bullseye"></i> 散乱の幾何模式図</div>
-      <canvas id="scatterCanvas"></canvas>
-      <p class="canvas-hint">左から入射光子（黄、波長 λ_in）が標的電子（中央）に衝突。散乱光子（青）は θ 方向、反跳電子（赤）は φ_e 方向へ。波形の間隔が λ_in と λ_f の比率を表す</p>
+      <div class="chart-title"><i class="fas fa-atom"></i> 光子-電子散乱アニメーション</div>
+      <canvas id="scatterCanvas" tabindex="0" role="img" aria-label="入射光子が標的電子に衝突し、波長の伸びた散乱光子と反跳電子が放出される様子のアニメーション"></canvas>
+      <div class="play-row">
+        <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 衝突を再生</button>
+        <button type="button" class="btn secondary" id="replayBtn" onclick="replayCollision()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button type="button" class="preset-btn speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+          <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="setSpeed(1)">1×</button>
+          <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#FFD166"></i>入射光子 λ_in</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>散乱光子 λ'（より長い）</span>
+        <span><i class="swatch" style="background:#FF6B6B"></i>反跳電子 φ_e</span>
+        <span><i class="swatch" style="background:#5cd6a8"></i>標的電子 e⁻</span>
+      </div>
+      <p class="canvas-hint">入射光子（黄）が静止電子に衝突すると、散乱光子（青）は θ 方向へ波長を伸ばして飛び、電子（赤）は φ_e 方向へ反跳します。運動量ベクトルと Δλ をその場に表示。再生で衝突が繰り返されます。</p>
     </div>
 
     <div class="chart-card">
@@ -213,13 +281,28 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Compton Scattering Simulator ==========
+// ========== Compton Scattering Simulator (v2) ==========
+var I18N = {
+  playStart: '<i class="fas fa-play"></i> 衝突を再生',
+  playPause: '<i class="fas fa-pause"></i> 一時停止',
+  sweepStart: '<i class="fas fa-arrows-left-right"></i> 散乱角をスイープ',
+  sweepStop: '<i class="fas fa-pause"></i> スイープ停止',
+  detectOn: '検出', detectOff: '未検出',
+  margin: ' / 余裕 ',
+  noShift: '波長シフト無し（前方散乱）'
+};
 var scatterCanvas = document.getElementById('scatterCanvas');
 var scatterCtx = scatterCanvas.getContext('2d');
 var shiftCanvas = document.getElementById('shiftCanvas');
 var shiftCtx = shiftCanvas.getContext('2d');
-var playing = false;
-var animId = null;
+var sweeping = false;        // θ auto-sweep
+var sweepId = null;
+var collidePlaying = false;  // collision animation running
+var collideId = null;
+var animPhase = 0;           // 0..1 collision progress
+var lastTs = 0;
+var speedMult = 1;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 var LAMBDA_C_PM = 2.4263102387;   // electron Compton wavelength in pm
 var MEC2_KEV = 510.99895;          // electron rest energy in keV
@@ -354,89 +437,103 @@ function drawWave(ctx, x1, y1, x2, y2, wavelengthPx, color, amplitudePx) {
   ctx.fill();
 }
 
-function drawScatter(p, r) {
+// phase: 0..1. <0.5 incoming photon approaches; >0.5 scattered photon + recoil electron leave.
+function drawScatter(p, r, phase) {
   var ctx = scatterCtx, W = __novaCanvasCssW(scatterCanvas), H = __novaCanvasCssH(scatterCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
 
   var cx = W * 0.45, cy = H * 0.55;
-  var armLen = Math.min(W, H) * 0.36;
+  var armLen = Math.min(W, H) * 0.40;
+  var theta = p.thetaDeg * Math.PI / 180;
+  var phiR = r.phiE * Math.PI / 180;
 
-  // Reference incoming photon axis (left to center)
-  ctx.strokeStyle = 'rgba(143,184,224,0.25)';
+  // Reference incoming photon axis (dashed) + axes guide
+  ctx.strokeStyle = 'rgba(143,184,224,0.22)';
   ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(cx - armLen * 1.05, cy);
-  ctx.lineTo(cx + armLen * 1.05, cy);
-  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx - armLen * 1.15, cy); ctx.lineTo(cx + armLen * 1.15, cy); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Theta arc (between +x axis and scattered photon)
-  var theta = p.thetaDeg * Math.PI / 180;
+  // Theta arc
   ctx.strokeStyle = 'rgba(0,180,216,0.55)';
   ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, armLen * 0.32, 0, -theta, true);
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, armLen * 0.30, 0, -theta, true); ctx.stroke();
   ctx.fillStyle = '#00B4D8';
   ctx.font = '11px "Roboto Mono",monospace';
-  ctx.fillText('θ = ' + p.thetaDeg.toFixed(0) + '°', cx + armLen * 0.36, cy - armLen * 0.12);
+  ctx.textAlign = 'left';
+  ctx.fillText('θ = ' + p.thetaDeg.toFixed(0) + '°', cx + armLen * 0.33, cy - armLen * 0.10);
 
-  // Phi_e arc (below x axis)
+  // Phi_e arc
   ctx.strokeStyle = 'rgba(255,107,107,0.55)';
-  ctx.beginPath();
-  ctx.arc(cx, cy, armLen * 0.22, 0, r.phiE * Math.PI / 180, false);
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, armLen * 0.20, 0, phiR, false); ctx.stroke();
   ctx.fillStyle = '#FF6B6B';
-  ctx.fillText('φ_e = ' + r.phiE.toFixed(1) + '°', cx + armLen * 0.26, cy + armLen * 0.18);
+  ctx.fillText('φ_e = ' + r.phiE.toFixed(1) + '°', cx + armLen * 0.24, cy + armLen * 0.16);
 
-  // Incoming photon (from left)
-  var lambdaScaleIn = Math.max(6, Math.min(40, r.lambdaIn * 2.0));
-  drawWave(ctx, cx - armLen, cy, cx - 14, cy, lambdaScaleIn, '#FFD166', 6);
+  var inDone = phase >= 0.5;
+  var inT = Math.min(1, phase / 0.5);       // 0..1 incoming progress
+  var outT = Math.max(0, (phase - 0.5) / 0.5); // 0..1 outgoing progress
+
+  var lambdaScaleIn = Math.max(6, Math.min(34, r.lambdaIn * 1.4));
+  var lambdaScaleF = Math.max(6, Math.min(54, r.lambdaF * 1.4));
+
+  // Incoming photon: travels from far-left toward the electron until impact
+  if (!inDone) {
+    var headX = cx - 16 - armLen * 1.05 * (1 - inT);
+    drawWave(ctx, cx - armLen * 1.15, cy, headX, cy, lambdaScaleIn, '#FFD166', 6);
+  }
   ctx.fillStyle = '#FFD166';
   ctx.font = '11px "Roboto Mono",monospace';
   ctx.textAlign = 'left';
-  ctx.fillText('λ_in = ' + r.lambdaIn.toFixed(2) + ' pm', cx - armLen, cy - 14);
-  ctx.fillText('E_in = ' + p.Ei.toFixed(0) + ' keV', cx - armLen, cy - 28);
+  ctx.fillText('λ_in = ' + r.lambdaIn.toFixed(2) + ' pm', cx - armLen * 1.12, cy - 16);
+  ctx.fillText('E_in = ' + p.Ei.toFixed(0) + ' keV', cx - armLen * 1.12, cy - 30);
 
-  // Scattered photon (at angle theta, going up-right when theta<180)
-  var sx = cx + armLen * Math.cos(-theta);
-  var sy = cy + armLen * Math.sin(-theta);
-  var lambdaScaleF = Math.max(6, Math.min(60, r.lambdaF * 2.0));
-  drawWave(ctx, cx + 14, cy, sx, sy, lambdaScaleF, '#00B4D8', 6);
-  ctx.fillStyle = '#00B4D8';
-  ctx.textAlign = 'left';
-  var labelX = sx + 6, labelY = sy;
-  if (sx < cx) { ctx.textAlign = 'right'; labelX = sx - 6; }
-  ctx.fillText('λ_f = ' + r.lambdaF.toFixed(2) + ' pm', labelX, labelY);
-  ctx.fillText('E_f = ' + r.Ef.toFixed(1) + ' keV', labelX, labelY + 14);
-
-  // Recoil electron (downward at +phi_e from x axis)
-  if (r.KE > 0.001) {
-    var phiR = r.phiE * Math.PI / 180;
-    var ex = cx + armLen * 0.85 * Math.cos(phiR);
-    var ey = cy + armLen * 0.85 * Math.sin(phiR);
-    ctx.strokeStyle = '#FF6B6B';
-    ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    ctx.moveTo(cx + 10, cy + 4);
-    ctx.lineTo(ex, ey);
-    ctx.stroke();
-    var ah2 = 9, ang2 = Math.atan2(ey - cy, ex - cx);
-    ctx.fillStyle = '#FF6B6B';
-    ctx.beginPath();
-    ctx.moveTo(ex, ey);
-    ctx.lineTo(ex - ah2 * Math.cos(ang2 - 0.4), ey - ah2 * Math.sin(ang2 - 0.4));
-    ctx.lineTo(ex - ah2 * Math.cos(ang2 + 0.4), ey - ah2 * Math.sin(ang2 + 0.4));
-    ctx.closePath();
-    ctx.fill();
+  // Scattered photon + recoil electron: emerge after impact
+  if (inDone) {
+    // flash at collision point
+    if (outT < 0.2) {
+      ctx.save();
+      ctx.globalAlpha = (0.2 - outT) / 0.2;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(cx, cy, 10 + 40 * outT, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    var sLen = armLen * (0.25 + 0.75 * outT);
+    var sx = cx + sLen * Math.cos(-theta);
+    var sy = cy + sLen * Math.sin(-theta);
+    drawWave(ctx, cx + 14 * Math.cos(-theta), cy + 14 * Math.sin(-theta), sx, sy, lambdaScaleF, '#00B4D8', 6);
+    ctx.fillStyle = '#00B4D8';
+    var labelX = sx + 6, labelY = sy;
     ctx.textAlign = 'left';
-    ctx.fillText('e⁻ KE = ' + r.KE.toFixed(1) + ' keV', ex + 6, ey + 4);
+    if (sx < cx) { ctx.textAlign = 'right'; labelX = sx - 6; }
+    ctx.fillText("λ' = " + r.lambdaF.toFixed(2) + ' pm', labelX, labelY - 4);
+    ctx.fillText("E' = " + r.Ef.toFixed(1) + ' keV', labelX, labelY + 12);
+
+    // recoil electron
+    if (r.KE > 0.001) {
+      var eLen = armLen * 0.9 * (0.25 + 0.75 * outT);
+      var ex = cx + eLen * Math.cos(phiR);
+      var ey = cy + eLen * Math.sin(phiR);
+      ctx.strokeStyle = '#FF6B6B';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+      var ah2 = 9, ang2 = Math.atan2(ey - cy, ex - cx);
+      ctx.fillStyle = '#FF6B6B';
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - ah2 * Math.cos(ang2 - 0.4), ey - ah2 * Math.sin(ang2 - 0.4));
+      ctx.lineTo(ex - ah2 * Math.cos(ang2 + 0.4), ey - ah2 * Math.sin(ang2 + 0.4));
+      ctx.closePath(); ctx.fill();
+      // moving electron dot
+      ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0, Math.PI * 2); ctx.fillStyle = '#ff8a8a'; ctx.fill();
+      ctx.fillStyle = '#FF6B6B';
+      ctx.textAlign = 'left';
+      ctx.fillText('e⁻ KE_e = ' + r.KE.toFixed(1) + ' keV', ex + 8, ey + 4);
+    }
   }
 
-  // Target electron (centre, drawn last so it sits on top)
+  // Target electron at centre
   ctx.fillStyle = '#5cd6a8';
-  ctx.shadowColor = '#5cd6a8'; ctx.shadowBlur = 12;
+  ctx.shadowColor = '#5cd6a8'; ctx.shadowBlur = inDone ? 6 : 12;
   ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
   ctx.shadowBlur = 0;
   ctx.fillStyle = '#5cd6a8';
@@ -444,12 +541,12 @@ function drawScatter(p, r) {
   ctx.textAlign = 'center';
   ctx.fillText('e⁻', cx, cy + 22);
 
-  // Title
+  // overlay readouts
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '11px "Roboto Mono",monospace';
   ctx.textAlign = 'left';
   ctx.fillText('Δλ = ' + r.dLambda.toFixed(3) + ' pm', 12, 18);
-  ctx.fillText('E_detect = ' + p.Edet.toFixed(0) + ' keV', 12, 34);
+  ctx.fillText('E = E′ + KE_e : ' + p.Ei.toFixed(1) + ' = ' + r.Ef.toFixed(1) + ' + ' + r.KE.toFixed(1) + ' keV', 12, 34);
 }
 
 function drawShift(p, r) {
@@ -533,68 +630,141 @@ function drawShift(p, r) {
   ctx.fillText('θ = ' + p.thetaDeg.toFixed(0) + '°, Δλ = ' + r.dLambda.toFixed(3) + ' pm', cmx + 6, cmy - 6);
 }
 
+var lastR = null, lastP = null;
+
+function setText(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
+
 function compute() {
   var p = getParams();
   if (!isFinite(p.Ei) || !isFinite(p.thetaDeg) || !isFinite(p.mTarget) || !isFinite(p.Edet)) return;
   var r = computeScattering(p);
-  document.getElementById('statEf').textContent = fmtKeV(r.Ef);
-  document.getElementById('statDeltaLambda').textContent = fmtPm(r.dLambda);
-  document.getElementById('statKE').textContent = fmtKeV(r.KE);
-  document.getElementById('statPhiE').textContent = fmtDeg(r.phiE);
+  lastR = r; lastP = p;
+  // live readouts
+  setText('roEin', p.Ei.toFixed(0));
+  setText('roLin', r.lambdaIn.toFixed(2));
+  setText('roTheta', p.thetaDeg.toFixed(0) + '°');
+  setText('roDl', r.dLambda.toFixed(3));
+  setText('roLf', r.lambdaF.toFixed(2));
+  setText('roEf', r.Ef.toFixed(1));
+  setText('roKE', r.KE.toFixed(1));
+  setText('roPhi', r.phiE.toFixed(1) + '°');
+  setText('roLc', r.lambdaC_eff.toFixed(3));
+  setText('consEq', p.Ei.toFixed(1) + ' = ' + r.Ef.toFixed(1) + ' + ' + r.KE.toFixed(1) + ' keV');
   var ds = document.getElementById('detectStatus');
-  var margin = r.Ef - p.Edet;
-  var marginText = ' / 余裕 ' + (margin >= 0 ? '+' : '') + margin.toFixed(1) + ' keV';
-  if (r.Ef > p.Edet) {
-    ds.innerHTML = '<span class="detect-on">検出</span>（E_f &gt; E_detect' + marginText + '）';
-  } else {
-    ds.innerHTML = '<span class="detect-off">未検出</span>（E_f ≤ E_detect' + marginText + '）';
+  if (ds) {
+    var margin = r.Ef - p.Edet;
+    var marginText = I18N.margin + (margin >= 0 ? '+' : '') + margin.toFixed(1) + ' keV';
+    if (r.Ef > p.Edet) {
+      ds.innerHTML = '<span class="detect-on">' + I18N.detectOn + '</span>（E′ &gt; E_detect' + marginText + '）';
+    } else {
+      ds.innerHTML = '<span class="detect-off">' + I18N.detectOff + '</span>（E′ ≤ E_detect' + marginText + '）';
+    }
   }
-  drawScatter(p, r);
+  if (!collidePlaying) drawScatter(p, r, reduceMotion ? 1 : animPhase);
   drawShift(p, r);
 }
 
-function animationStep() {
-  if (!playing) return;
+/* ---- collision replay animation ---- */
+function collideStep(ts) {
+  if (!collidePlaying) return;
+  if (!lastTs) lastTs = ts;
+  var dt = (ts - lastTs) / 1000;
+  lastTs = ts;
+  animPhase += dt * 0.45 * speedMult;   // full cycle ~2.2s at 1x
+  if (animPhase >= 1.35) animPhase = 0; // brief pause at end then replay
+  var ph = Math.min(1, animPhase);
+  if (lastP && lastR) drawScatter(lastP, lastR, ph);
+  collideId = requestAnimationFrame(collideStep);
+}
+
+function togglePlay() {
+  var btn = document.getElementById('playBtn');
+  if (reduceMotion) { animPhase = 1; if (lastP) drawScatter(lastP, lastR, 1); return; }
+  collidePlaying = !collidePlaying;
+  if (collidePlaying) {
+    btn.innerHTML = I18N.playPause;
+    lastTs = 0;
+    collideId = requestAnimationFrame(collideStep);
+  } else {
+    btn.innerHTML = I18N.playStart;
+    if (collideId) cancelAnimationFrame(collideId);
+  }
+}
+
+function replayCollision() {
+  animPhase = 0;
+  if (!collidePlaying && !reduceMotion) togglePlay();
+  else if (reduceMotion && lastP) drawScatter(lastP, lastR, 1);
+}
+
+function setSpeed(s) {
+  speedMult = s;
+  var btns = document.querySelectorAll('.speed-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', parseFloat(btns[i].getAttribute('data-speed')) === s);
+  }
+}
+
+/* ---- θ auto-sweep (parameter panel) ---- */
+function sweepStep() {
+  if (!sweeping) return;
   var sl = document.getElementById('slTheta');
   var v = parseFloat(sl.value) + 1;
   if (v > 180) v = 0;
   sl.value = v;
   updateSlider(sl, 'slThetaVal', 0, '');
+  syncToNum('slTheta', 'slThetaVal');
   compute();
-  animId = requestAnimationFrame(animationStep);
+  sweepId = requestAnimationFrame(sweepStep);
 }
 
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
+function toggleSweep() {
+  sweeping = !sweeping;
+  var btn = document.getElementById('sweepBtn');
+  if (sweeping) {
+    btn.innerHTML = I18N.sweepStop;
+    sweepId = requestAnimationFrame(sweepStep);
   } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> 散乱角をスイープ';
-    if (animId) cancelAnimationFrame(animId);
+    btn.innerHTML = I18N.sweepStart;
+    if (sweepId) cancelAnimationFrame(sweepId);
   }
 }
 
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> 散乱角をスイープ';
-  var defs = { slEi: 100, slTheta: 90, slMtarget: 1, slEdetect: 20 };
+function setPreset(name) {
+  var s = { slEi: 100, slTheta: 90, slMtarget: 1, slEdetect: 20 };
+  if (name === 'fwd')   { s.slTheta = 0; }
+  if (name === 'p90')   { s.slTheta = 90; }
+  if (name === 'back')  { s.slTheta = 180; }
+  if (name === 'gamma') { s.slEi = 1000; s.slTheta = 90; }
+  if (name === 'mo')    { s.slEi = 17; s.slTheta = 90; }
+  applyParams(s);
+}
+
+function applyParams(defs) {
   Object.keys(defs).forEach(function (id) {
     document.getElementById(id).value = defs[id];
+    updateSlider(document.getElementById(id), id + 'Val', 0, '');
+    syncToNum(id, id + 'Val');
   });
-  updateSlider(document.getElementById('slEi'), 'slEiVal', 0, '');
-  updateSlider(document.getElementById('slTheta'), 'slThetaVal', 0, '');
-  updateSlider(document.getElementById('slMtarget'), 'slMtargetVal', 0, '');
-  updateSlider(document.getElementById('slEdetect'), 'slEdetectVal', 0, '');
+  animPhase = reduceMotion ? 1 : 0;
   compute();
+  if (!collidePlaying && !reduceMotion) togglePlay();
+}
+
+function resetParams() {
+  if (sweeping) toggleSweep();
+  if (collidePlaying) togglePlay();
+  animPhase = reduceMotion ? 1 : 0;
+  applyParams({ slEi: 100, slTheta: 90, slMtarget: 1, slEdetect: 20 });
+  if (collidePlaying) togglePlay();
 }
 
 window.addEventListener('resize', function () { resizeCanvases(); compute(); });
 
 resizeCanvases();
+if (reduceMotion) { animPhase = 1; }
 compute();
+if (!reduceMotion) { togglePlay(); }
 </script>
 
 <section class="explanation">
@@ -662,6 +832,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="compton-scattering.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -715,16 +888,16 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>入射光子エネルギー E_i（0.1～100 MeV）をスライダーで設定します。X線・ガンマ線領域の値を選択してください</li>
+<li>入射光子エネルギー E_in（10〜1000 keV）をスライダーで設定します。X線・ガンマ線領域の値を選択してください</li>
 <li>散乱角 θ（0～180°）を指定します。この角度が波長シフト Δλ = λ_f - λ_i に最も大きく影響します</li>
-<li>標的核種の静止質量を選択します（電子：0.511 MeV/c²、鉛：190 GeV/c² など）。質量が大きいほど反跳エネルギーは小さくなります</li>
+<li>標的質量倍率 m/m_e（1〜2000）をスライダーで設定します。電子は1倍、重い標的ほど波長シフトと反跳エネルギーが小さくなります</li>
 <li>検出器エネルギー感度を設定すると、散乱光子が実際に検出される確率領域が表示されます</li>
 <li>結果パネルから散乱光子エネルギー E_f、波長シフト Δλ、電子反跳角 φ_e をリアルタイムで確認します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>入射光子 E_i = 10 MeV、散乱角 θ = 90°、標的を鉛（M = 190 GeV/c²）とした場合、Δλ = 2.43 × 10⁻¹² m（2.43 pm）が得られます。同じ条件で電子標的（M = 0.511 MeV/c²）を使用すると Δλ = 4.85 pm に増加し、反跳電子の運動エネルギーは約 3.8 MeV になります。医療用ガンマナイフの 1.25 MeV Co-60 線源では θ = 60° 時に Δλ ≈ 1.21 pm となり、遮蔽設計に影響します</p>
+<p>入射光子 E_in = 100 keV、散乱角 θ = 90°、標的を電子（m_e c² = 511 keV）とした場合、入射波長 λ_in = 12.40 pm、波長シフト Δλ = λ_C(1 − cos90°) = 2.43 pm、散乱光子エネルギー E_f = 83.6 keV、反跳電子の運動エネルギー KE_e = 16.4 keV、電子散乱角 φ_e = 39.9° が得られます。標的を陽子のような重い粒子にすると Δλ は質量に反比例してほぼ0となり、トムソン散乱に漸近します。医療用ガンマナイフの 1.25 MeV Co-60 線源では θ = 60° 時に Δλ ≈ 1.21 pm となり、遮蔽設計に影響します</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -735,6 +908,16 @@ compute();
 <li>標的核の結合エネルギーを考慮する場合、軽い元素では有効質量が公称値から 0.5～2% 低下することがあります</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130626345?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130626345.09._SCMZZZZZZ_.jpg" alt="量子力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">量子力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

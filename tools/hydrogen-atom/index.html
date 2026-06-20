@@ -124,14 +124,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "水素原子スペクトル・ボーアモデルシミュレーター",
       "description": "水素原子のボーアモデルによるエネルギー準位遷移と発光・吸収スペクトルをインタラクティブに可視化。ライマン/バルマー/パッシェン/ブラケット/プファント系列対応。水素様イオン（Z=1〜5）対応。軌道アニメーション・可視光スペクトル表示付き。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/hydrogen-atom.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -268,6 +268,35 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
 
+    <!-- Presets -->
+    <div class="param-group">
+      <div class="param-label" style="margin-bottom:8px;">
+        <span class="param-name">プリセット</span>
+      </div>
+      <div class="btn-group">
+        <button class="toggle-btn" onclick="applyPreset('balmer-a')">バルマー Hα 3→2 (656nm)</button>
+        <button class="toggle-btn" onclick="applyPreset('lyman-a')">ライマン α 2→1 (122nm)</button>
+        <button class="toggle-btn" onclick="applyPreset('paschen')">パッシェン 4→3 (1875nm)</button>
+        <button class="toggle-btn" onclick="applyPreset('ionize')">電離 n→∞</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Photon trigger -->
+    <div class="param-group">
+      <div class="param-label" style="margin-bottom:8px;">
+        <span class="param-name">光子の放出・吸収</span>
+      </div>
+      <div class="btn-group">
+        <button class="btn" onclick="triggerTransition('emit')"><i class="fas fa-sun"></i> 光子を放出</button>
+        <button class="btn secondary" onclick="triggerTransition('absorb')"><i class="fas fa-moon"></i> 光子を吸収</button>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:6px;" id="transitionStatus">「光子を放出」で電子が nᵢ→nf にジャンプし光子が飛びます。</div>
+    </div>
+
+    <div class="divider"></div>
+
     <!-- Feature 2: Playback Controls -->
     <div class="param-group">
       <div class="param-label" style="margin-bottom:8px;">
@@ -297,10 +326,20 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <span class="param-value" id="overlayCount" style="min-width:40px">0 / 5</span>
       </div>
       <div class="btn-group">
+        <button class="btn" onclick="saveOverlay()" id="saveOverlayBtn"><i class="fas fa-layer-group"></i> 現在の軌道を保存</button>
+        <button class="btn secondary" onclick="clearOverlays()"><i class="fas fa-trash-alt"></i></button>
       </div>
       <div id="overlayList" style="margin-top:8px;"></div>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130626345?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130626345.09._SCMZZZZZZ_.jpg" alt="量子力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">量子力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -330,6 +369,22 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="stat-card">
         <div class="sv" id="statIonE">—</div>
         <div class="sl">nᵢからの電離エネルギー [eV]</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statEi">—</div>
+        <div class="sl">Eᵢ（始状態）[eV]</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statEf">—</div>
+        <div class="sl">E_f（終状態）[eV]</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statDE">—</div>
+        <div class="sl">ΔE（遷移）[eV]</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statRn">—</div>
+        <div class="sl">軌道半径 rₙ=n²a₀</div>
       </div>
     </div>
     </div>
@@ -361,465 +416,6 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 
 
-<script>
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / dpr || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / dpr || 320));
-  canvas.style.setProperty('width', w + 'px', 'important');
-  canvas.style.setProperty('height', h + 'px', 'important');
-  var bw = Math.round(w * dpr);
-  var bh = Math.round(h * dpr);
-  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
-}
-
-
-const RH = 1.0973732e7;   // m⁻¹
-
-const HC = 1.98645e-25;   // J·m (h*c)
-
-const EV = 1.60218e-19;
-const C = 2.998e8;
-const H = 6.626e-34;
-const E1 = 13.6;           // eV
-
-let mode = 'emission';
-let orbitAnimId = null;
-let orbitAngle = 0;
-let orbitRunning = false;
-let animSpeed = 1;
-let elapsedMs = 0;
-let lastFrameTime = null;
-const overlayColors = ['rgba(255,255,255,.25)','rgba(0,255,136,.35)','rgba(255,215,0,.35)','rgba(255,107,107,.35)','rgba(162,155,254,.35)'];
-let savedOverlays = []; //{ni, nf, Z, color}
-const ionNames ={ 1: 'H（水素）', 2: 'He⁺（ヘリウムイオン）', 3: 'Li²⁺（リチウムイオン）', 4: 'Be³⁺（ベリリウムイオン）', 5: 'B⁴⁺（ボロンイオン）' };
-const seriesNf ={ lyman: 1, balmer: 2, paschen: 3, brackett: 4, pfund: 5 };
-const seriesNames ={ lyman: 'ライマン系列', balmer: 'バルマー系列', paschen: 'パッシェン系列', brackett: 'ブラケット系列', pfund: 'プファント系列', custom: 'カスタム' };
-
-function updateIonLabel(){
-  const Z = parseInt(document.getElementById('sliderZ').value);
-  document.getElementById('ionLabel').textContent = 'Z=' + Z + ': ' + ionNames[Z];
-}function setMode(m){
-  mode = m;
-  document.getElementById('modeEmit').classList.toggle('active', m === 'emission');
-  document.getElementById('modeAbsorb').classList.toggle('active', m === 'absorption');
-  compute();
-}function setSeries(){
-  const s = document.getElementById('seriesSelect').value;
-  if (s !== 'custom' && seriesNf[s]) {
-    const nf = seriesNf[s];
-    document.getElementById('sliderNf').value = nf;
-    updateSlider(document.getElementById('sliderNf'));
-    const ni = Math.max(nf + 1, parseInt(document.getElementById('sliderNi').value));
-    document.getElementById('sliderNi').value = ni;
-    updateSlider(document.getElementById('sliderNi'));
-  }
-  compute();
-}function wavelengthToColor(wl){
-  if (wl < 380 || wl > 780) return null;
-  let r, g, b;
-  if (wl < 440) { r = -(wl - 440) / (440 - 380); g = 0; b = 1; }else if (wl < 490){ r = 0; g = (wl - 440) / (490 - 440); b = 1; }else if (wl < 510){ r = 0; g = 1; b = -(wl - 510) / (510 - 490); }else if (wl < 580){ r = (wl - 510) / (580 - 510); g = 1; b = 0; }else if (wl < 645){ r = 1; g = -(wl - 645) / (645 - 580); b = 0; }else{ r = 1; g = 0; b = 0; }const f = wl < 420 ? 0.3 + 0.7*(wl-380)/40 : wl > 700 ? 0.3 + 0.7*(780-wl)/80 : 1.0;
-  return `rgb(${Math.round(r*255*f)},${Math.round(g*255*f)},${Math.round(b*255*f)})`;
-}function colorName(wl){
-  if (wl < 380) return '紫外線 (UV)';
-  if (wl < 450) return '紫';
-  if (wl < 495) return '青';
-  if (wl < 570) return '緑';
-  if (wl < 590) return '黄';
-  if (wl < 620) return 'オレンジ';
-  if (wl <= 780) return '赤';
-  return '赤外線 (IR)';
-}function compute(){
-  const ni = parseInt(document.getElementById('sliderNi').value);
-  const nf = parseInt(document.getElementById('sliderNf').value);
-  const Z = parseInt(document.getElementById('sliderZ').value);
-
-  const niEff = mode === 'emission' ? Math.max(ni, nf + 1 > 1 ? nf + 1 : 2) : ni;
-  const nfEff = mode === 'emission' ? Math.min(nf, niEff - 1) : nf;
-
-  const inv_lambda = RH * Z * Z * (1 / (nfEff * nfEff) - 1 / (niEff * niEff));
-  let wl_nm = null, eph_eV = null, freq_THz = null;
-
-  if (inv_lambda > 0) {
-    wl_nm = (1 / inv_lambda) * 1e9;
-    const eph_J = HC * inv_lambda;
-    eph_eV = eph_J / EV;
-    freq_THz = (C * inv_lambda) / 1e12;
-  }const ionE = E1 * Z * Z / (niEff * niEff);
-  const seriesKey = document.getElementById('seriesSelect').value;
-
-  document.getElementById('statWl').textContent = wl_nm ? wl_nm.toFixed(2) + ' nm' : '—';
-  document.getElementById('statEph').textContent = eph_eV ? eph_eV.toFixed(4) + ' eV' : '—';
-  document.getElementById('statFreq').textContent = freq_THz ? freq_THz.toFixed(3) + ' THz' : '—';
-  document.getElementById('statSeries').textContent = seriesNames[seriesKey] || '—';
-  document.getElementById('statIonE').textContent = ionE.toFixed(4) + ' eV';
-
-  const colorEl = document.getElementById('statColor');
-  if (wl_nm){
-    const cn = colorName(wl_nm);
-    const col = wavelengthToColor(wl_nm);
-    colorEl.textContent = cn;
-    colorEl.style.color = col || 'var(--accent)';
-  }else{
-    colorEl.textContent = '—';
-    colorEl.style.color = '';
-  }
-
-  drawBohr(niEff, nfEff, Z, wl_nm);
-  drawLevels(niEff, nfEff, Z);
-  drawSpectrum(wl_nm);
-}function drawBohr(ni, nf, Z, wl_nm){
-  const canvas = document.getElementById('bohrCanvas');
-  const ctx = canvas.getContext('2d');
-  const __novaDims = __novaHiDpiCanvas(canvas, canvas.offsetWidth || 380, 300, ctx);
-  const W = __novaDims.w, H = __novaDims.h;
-  ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, W, H);
-
-  const cx = W / 2, cy = H / 2;
-  const maxOrbit = Math.min(W, H) / 2 - 18;
-  const maxN = Math.max(ni, nf, 4);
-
-  // Draw saved overlays first (behind current)
-  savedOverlays.forEach(function(ov) {
-    const ovMaxN = Math.max(ov.ni, ov.nf, 4);
-    const ovMaxOrbit = maxOrbit;
-    const ovRi = (ov.ni * ov.ni / (ovMaxN * ovMaxN)) * ovMaxOrbit;
-    const ovRf = (ov.nf * ov.nf / (ovMaxN * ovMaxN)) * ovMaxOrbit;
-    // overlay orbits
-    ctx.beginPath(); ctx.arc(cx, cy, ovRi, 0, Math.PI * 2);
-    ctx.strokeStyle = ov.color; ctx.lineWidth = 2.5; ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, ovRf, 0, Math.PI * 2);
-    ctx.strokeStyle = ov.color; ctx.lineWidth = 2.5; ctx.stroke();
-    // overlay transition arrow
-    var ovAngle = Math.PI * 0.15 + savedOverlays.indexOf(ov) * 0.35;
-    var oax1 = cx + ovRi * Math.cos(ovAngle), oay1 = cy + ovRi * Math.sin(ovAngle);
-    var oax2 = cx + ovRf * Math.cos(ovAngle), oay2 = cy + ovRf * Math.sin(ovAngle);
-    ctx.strokeStyle = ov.color; ctx.lineWidth = 1.8;
-    ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(oax1, oay1); ctx.lineTo(oax2, oay2); ctx.stroke();
-    ctx.setLineDash([]);
-    // small arrowhead
-    var odx = oax2 - oax1, ody = oay2 - oay1, olen = Math.sqrt(odx*odx+ody*ody);
-    if (olen > 0) {
-      var oux = odx/olen, ouy = ody/olen;
-      var ohx = oax2 - oux * 6, ohy = oay2 - ouy * 6;
-      ctx.beginPath(); ctx.moveTo(oax2, oay2);
-      ctx.lineTo(ohx - ouy * 3, ohy + oux * 3);
-      ctx.lineTo(ohx + ouy * 3, ohy - oux * 3);
-      ctx.closePath(); ctx.fillStyle = ov.color; ctx.fill();
-    }
-  });
-
-  // Draw orbits
-  for (let n = 1; n <= maxN; n++){
-    const r = (n * n / (maxN * maxN)) * maxOrbit;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = (n === ni || n === nf) ? 'rgba(0,180,216,0.5)' : 'rgba(80,100,140,0.3)';
-    ctx.lineWidth = (n === ni || n === nf) ? 1.5 : 0.8;
-    ctx.stroke();
-    ctx.fillStyle = '#667';
-    ctx.font = '9px Roboto Mono, monospace';
-    ctx.fillText('n=' + n, cx + r + 2, cy - 3);
-  }// Nucleus
-  ctx.beginPath();
-  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-  ctx.fillStyle = '#FF6B6B';
-  ctx.fill();
-  ctx.fillStyle = '#FF9999'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('Z=' + Z, cx, cy + 16);
-  ctx.textAlign = 'left';
-
-  // Electron on ni orbit
-  const ri = (ni * ni / (maxN * maxN)) * maxOrbit;
-  const rf = (nf * nf / (maxN * maxN)) * maxOrbit;
-  const angle = orbitRunning ? orbitAngle : (orbitAngle || Math.PI / 4);
-  const ex = cx + ri * Math.cos(angle);
-  const ey = cy + ri * Math.sin(angle);
-  ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2);
-  ctx.fillStyle = '#007BFF'; ctx.fill();
-  ctx.strokeStyle = '#5AF'; ctx.lineWidth = 1.5; ctx.stroke();
-
-  // Transition arrow
-  const arrowStartR = ri, arrowEndR = rf;
-  const arrowAngle = angle + Math.PI * 0.6;
-  const ax1 = cx + arrowStartR * Math.cos(arrowAngle);
-  const ay1 = cy + arrowStartR * Math.sin(arrowAngle);
-  const ax2 = cx + arrowEndR * Math.cos(arrowAngle);
-  const ay2 = cy + arrowEndR * Math.sin(arrowAngle);
-
-  const col = wl_nm ? (wavelengthToColor(wl_nm) || '#FFD700') : '#FFD700';
-  ctx.strokeStyle = col; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(ax1, ay1); ctx.lineTo(ax2, ay2); ctx.stroke();
-
-  // Arrowhead
-  const dx = ax2 - ax1, dy = ay2 - ay1, len = Math.sqrt(dx*dx+dy*dy);
-  if (len > 0){
-    const ux = dx/len, uy = dy/len;
-    const hx = ax2 - ux * 8, hy = ay2 - uy * 8;
-    ctx.beginPath();
-    ctx.moveTo(ax2, ay2);
-    ctx.lineTo(hx - uy * 4, hy + ux * 4);
-    ctx.lineTo(hx + uy * 4, hy - ux * 4);
-    ctx.closePath(); ctx.fillStyle = col; ctx.fill();
-  }// Photon wavy line label
-  if (wl_nm){
-    ctx.fillStyle = col; ctx.font = 'bold 10px Roboto Mono, monospace';
-    ctx.fillText(wl_nm.toFixed(1) + ' nm', 6, 16);
-  }
-}function drawLevels(ni, nf, Z){
-  const canvas = document.getElementById('levelCanvas');
-  const ctx = canvas.getContext('2d');
-  const __novaDims = __novaHiDpiCanvas(canvas, canvas.offsetWidth || 380, 300, ctx);
-  const W = __novaDims.w, H = __novaDims.h;
-  ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, W, H);
-
-  const maxN = 8;
-  const pad = { top: 14, bottom: 24, left: 60, right: 14 };
-  const drawH = H - pad.top - pad.bottom, drawW = W - pad.left - pad.right;
-
-  const eMin = -E1 * Z * Z, eMax = 0.5;
-  function yOf(e){ return pad.top + drawH - ((e - eMin) / (eMax - eMin)) * drawH; }ctx.fillStyle = '#778'; ctx.font = '10px Roboto Mono, monospace';
-  ctx.fillText('E (eV)', 2, pad.top + 8);
-
-  // Ionization line
-  ctx.strokeStyle = 'rgba(200,200,200,0.2)'; ctx.lineWidth = 0.8; ctx.setLineDash([3, 4]);
-  ctx.beginPath(); ctx.moveTo(pad.left, yOf(0)); ctx.lineTo(W - pad.right, yOf(0)); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#445'; ctx.font = '9px sans-serif'; ctx.fillText('E=0 電離', W - 60, yOf(0) - 3);
-
-  for (let n = 1; n <= maxN; n++){
-    const e = -E1 * Z * Z / (n * n);
-    const y = yOf(e);
-    const isNi = n === ni, isNf = n === nf;
-    ctx.strokeStyle = isNi ? '#007BFF' : isNf ? '#00b894' : '#334466';
-    ctx.lineWidth = (isNi || isNf) ? 2.5 : 1.2;
-    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
-
-    ctx.fillStyle = isNi ? '#5AF' : isNf ? '#5E5' : '#558';
-    ctx.font = (isNi || isNf) ? 'bold 10px Roboto Mono, monospace' : '9px Roboto Mono, monospace';
-    ctx.fillText('n=' + n, pad.left - 52, y + 4);
-    ctx.font = '8px Roboto Mono, monospace'; ctx.fillStyle = '#446';
-    ctx.fillText(e.toFixed(2), pad.left - 52, y + 13);
-
-    if (isNi || isNf) {
-      ctx.fillStyle = isNi ? 'rgba(0,123,255,0.15)' : 'rgba(0,184,148,0.15)';
-      ctx.fillRect(pad.left, y - 1, drawW, 12);
-    }
-  }
-
-  // Transition arrow
-  const yNi = yOf(-E1 * Z * Z / (ni * ni));
-  const yNf = yOf(-E1 * Z * Z / (nf * nf));
-  const arrowX = pad.left + drawW * 0.55;
-  ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(arrowX, yNi); ctx.lineTo(arrowX, yNf); ctx.stroke();
-  const arrowDir = yNi > yNf ? -1 : 1;
-  ctx.beginPath();
-  ctx.moveTo(arrowX, yNf);
-  ctx.lineTo(arrowX - 5, yNf + arrowDir * 8);
-  ctx.lineTo(arrowX + 5, yNf + arrowDir * 8);
-  ctx.closePath(); ctx.fillStyle = '#FFD700'; ctx.fill();
-}function drawSpectrum(wl_active){
-  const canvas = document.getElementById('spectrumCanvas');
-  const ctx = canvas.getContext('2d');
-  const __novaDims = __novaHiDpiCanvas(canvas, canvas.offsetWidth || 700, 90, ctx);
-  const W = __novaDims.w, H = __novaDims.h;
-  ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, W, H);
-
-  const wlMin = 300, wlMax = 850;
-  const specStart = 380, specEnd = 780;
-  const pad = { left: 40, right: 14, top: 14, bottom: 22 };
-  const drawW = W - pad.left - pad.right;
-  const drawH = H - pad.top - pad.bottom;
-
-  function xOf(wl){ return pad.left + (wl - wlMin) / (wlMax - wlMin) * drawW; }// UV band
-  ctx.fillStyle = 'rgba(100,80,160,0.25)';
-  ctx.fillRect(xOf(wlMin), pad.top, xOf(specStart) - xOf(wlMin), drawH);
-  ctx.fillStyle = '#557'; ctx.font = '9px sans-serif'; ctx.fillText('UV', xOf(wlMin) + 3, pad.top + drawH / 2);
-
-  // Visible spectrum gradient
-  const grad = ctx.createLinearGradient(xOf(specStart), 0, xOf(specEnd), 0);
-  grad.addColorStop(0, 'rgba(70,0,130,0.7)');
-  grad.addColorStop(0.15, 'rgba(0,0,255,0.7)');
-  grad.addColorStop(0.3, 'rgba(0,255,255,0.6)');
-  grad.addColorStop(0.5, 'rgba(0,255,0,0.6)');
-  grad.addColorStop(0.65, 'rgba(255,255,0,0.7)');
-  grad.addColorStop(0.8, 'rgba(255,100,0,0.7)');
-  grad.addColorStop(1, 'rgba(200,0,0,0.7)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(xOf(specStart), pad.top, xOf(specEnd) - xOf(specStart), drawH);
-
-  // IR band
-  ctx.fillStyle = 'rgba(160,60,0,0.2)';
-  ctx.fillRect(xOf(specEnd), pad.top, xOf(wlMax) - xOf(specEnd), drawH);
-  ctx.fillStyle = '#775'; ctx.font = '9px sans-serif'; ctx.fillText('IR', xOf(specEnd) + 3, pad.top + drawH / 2);
-
-  // Axis ticks
-  ctx.strokeStyle = '#445'; ctx.lineWidth = 0.8;
-  [400, 450, 500, 550, 600, 650, 700, 750, 800].forEach(wl =>{
-    const x = xOf(wl);
-    ctx.beginPath(); ctx.moveTo(x, pad.top + drawH); ctx.lineTo(x, pad.top + drawH + 4); ctx.stroke();
-    ctx.fillStyle = '#557'; ctx.font = '8px Roboto Mono, monospace';
-    ctx.fillText(wl, x - 8, H - 2);
-  });
-  ctx.fillStyle = '#668'; ctx.font = '9px sans-serif'; ctx.fillText('λ (nm)', 2, pad.top + drawH / 2);
-
-  // Active spectral line
-  if (wl_active !== null){
-    const x = xOf(wl_active);
-    const col = wavelengthToColor(wl_active) || (wl_active < 380 ? '#9966FF' : '#FF6633');
-    ctx.strokeStyle = col; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + drawH); ctx.stroke();
-    ctx.fillStyle = col; ctx.font = 'bold 9px Roboto Mono, monospace';
-    const lx = Math.min(Math.max(x - 16, 0), W - 50);
-    ctx.fillText(wl_active.toFixed(1), lx, pad.top - 2);
-  }
-}function toggleOrbitAnim(){
-  if (orbitRunning) { pauseOrbit(); }else{
-    orbitRunning = true;
-    lastFrameTime = performance.now();
-    document.getElementById('pbPlay').innerHTML = '<i class="fas fa-pause"></i>';
-    document.getElementById('pbPlay').classList.add('active');
-    runOrbit();
-  }
-}function pauseOrbit(){
-  orbitRunning = false;
-  lastFrameTime = null;
-  if (orbitAnimId) cancelAnimationFrame(orbitAnimId);
-  document.getElementById('pbPlay').innerHTML = '<i class="fas fa-play"></i>';
-  document.getElementById('pbPlay').classList.remove('active');
-}function resetOrbitAnim(){
-  pauseOrbit();
-  orbitAngle = 0;
-  elapsedMs = 0;
-  lastFrameTime = null;
-  document.getElementById('elapsedTime').textContent = '0.000 s';
-  compute();
-}function stepFrame(){
-  if (orbitRunning) pauseOrbit();
-  orbitAngle += 0.03 * animSpeed;
-  elapsedMs += 16.67 * animSpeed;
-  document.getElementById('elapsedTime').textContent = (elapsedMs / 1000).toFixed(3) + ' s';
-  const ni = parseInt(document.getElementById('sliderNi').value);
-  const nf = parseInt(document.getElementById('sliderNf').value);
-  const Z = parseInt(document.getElementById('sliderZ').value);
-  const wl = getWavelength(ni, nf, Z);
-  drawBohr(ni, nf, Z, wl);
-}function setSpeed(s){
-  animSpeed = s;
-  document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('sp' + String(s).replace('.','') ).classList.add('active');
-}function runOrbit(){
-  if (!orbitRunning) return;
-  const now = performance.now();
-  if (lastFrameTime !== null) {
-    const dt = now - lastFrameTime;
-    elapsedMs += dt * animSpeed;
-    document.getElementById('elapsedTime').textContent = (elapsedMs / 1000).toFixed(3) + ' s';
-  }
-  lastFrameTime = now;
-  orbitAngle += 0.03 * animSpeed;
-  const ni = parseInt(document.getElementById('sliderNi').value);
-  const nf = parseInt(document.getElementById('sliderNf').value);
-  const Z = parseInt(document.getElementById('sliderZ').value);
-  const wl = getWavelength(ni, nf, Z);
-  drawBohr(ni, nf, Z, wl);
-  orbitAnimId = requestAnimationFrame(runOrbit);
-}function getWavelength(ni, nf, Z){
-  const inv = RH * Z * Z * (1 / (nf * nf) - 1 / (ni * ni));
-  return inv > 0 ? (1 / inv) * 1e9 : null;
-}
-function saveOverlay(){
-  if (savedOverlays.length >= 5) return;
-  const ni = parseInt(document.getElementById('sliderNi').value);
-  const nf = parseInt(document.getElementById('sliderNf').value);
-  const Z = parseInt(document.getElementById('sliderZ').value);
-  const color = overlayColors[savedOverlays.length];
-  savedOverlays.push({ ni, nf, Z, color });
-  renderOverlayList();
-  compute();
-}function removeOverlay(idx){
-  savedOverlays.splice(idx, 1);
-  // reassign colors
-  savedOverlays.forEach((o, i) => o.color = overlayColors[i]);
-  renderOverlayList();
-  compute();
-}function clearOverlays(){
-  savedOverlays = [];
-  renderOverlayList();
-  compute();
-}function renderOverlayList(){
-  document.getElementById('overlayCount').textContent = savedOverlays.length + ' / 5';
-  const btn = document.getElementById('saveOverlayBtn');
-  if (savedOverlays.length >= 5) { if(btn)btn.style.opacity='.5'; if(btn)btn.style.pointerEvents='none'; }else{ if(btn)btn.style.opacity=''; if(btn)btn.style.pointerEvents=''; }const list = document.getElementById('overlayList');
-  list.innerHTML = '';
-  savedOverlays.forEach((o, i) =>{
-    const chip = document.createElement('div');
-    chip.className = 'overlay-chip';
-    chip.innerHTML = '<span class="oc-dot" style="background:' + o.color.replace(/[\d.]+\)$/, '1)') + '"></span>'
-      + 'n<sub>i</sub>=' + o.ni + ' → n<sub>f</sub>=' + o.nf + '  Z=' + o.Z
-      + '<button class="oc-remove" onclick="removeOverlay(' + i + ')" title="削除"><i class="fas fa-times"></i></button>';
-    list.appendChild(chip);
-  });
-}
-
-// Feature 1: Click on Bohr canvas to select orbital
-(function() {
-  const canvas = document.getElementById('bohrCanvas');
-  canvas.addEventListener('click', function(e) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-    const cx = canvas.width / 2, cy = canvas.height / 2;
-    const dist = Math.sqrt((mx - cx) * (mx - cx) + (my - cy) * (my - cy));
-
-    const ni = parseInt(document.getElementById('sliderNi').value);
-    const nf = parseInt(document.getElementById('sliderNf').value);
-    const Z = parseInt(document.getElementById('sliderZ').value);
-    const maxN = Math.max(ni, nf, 4);
-    const maxOrbit = Math.min(canvas.width, canvas.height) / 2 - 18;
-
-    let bestN = null, bestDist = Infinity;
-    for (let n = 1; n <= 10; n++) {
-      const r = (n * n / (maxN * maxN)) * maxOrbit;
-      const d = Math.abs(dist - r);
-      if (d < bestDist && d < 20) { bestDist = d; bestN = n; }
-    }if (bestN !== null){
-      // Click sets ni (initial level); hold shift to set nf
-      if (e.shiftKey) {
-        document.getElementById('sliderNf').value = bestN;
-        updateSlider(document.getElementById('sliderNf'));
-      }else{
-        document.getElementById('sliderNi').value = bestN;
-        updateSlider(document.getElementById('sliderNi'));
-      }
-      compute();
-    }
-  });
-})();
-
-// Init
-['sliderNi','sliderNf','sliderZ'].forEach(id =>{
-  const el = document.getElementById(id);
-  if (el) { const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value); el.style.setProperty('--pct', ((val - min) / (max - min) * 100).toFixed(1) + '%'); }
-});
-updateIonLabel();
-compute();
-</script>
 
 <section class="explanation">
   <h2>水素原子スペクトル・ボーアモデルとは</h2>
@@ -881,6 +477,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="hydrogen-atom.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -934,7 +533,7 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>初期準位nᵢ（1～7）と最終準位nf（1～6、nᵢより小）をスライダーで設定し、電子遷移の方向を決定</li>
+<li>初期準位nᵢ（1～10）と最終準位nf（1～10、放出ではnᵢより小）をスライダーで設定し、電子遷移の方向を決定</li>
 <li>原子番号Z（水素Z=1、He⁺=2、Li²⁺=3など多電子イオン対応）を選択して核電荷の影響を確認</li>
 <li>リアルタイム計算で遷移波長λ、光子エネルギー、振動数ν、系列名（ライマン・バルマー・パッシェン）、可視光色を表示</li>
 <li>nᵢ状態からの電離エネルギーを同時表示し、エネルギー準位図と対応させて理解</li>
@@ -942,7 +541,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>水素原子（Z=1）でnᵢ=3からnf=2へのバルマーα線遷移：リュードベリ公式により波長λ=656.3nm（赤色H-α）、光子エネルギー1.89eV、振動数457.9THz、n=3からの電離エネルギー1.51eVを計算。He⁺イオン（Z=2）の同じ遷移ではλ=164.0nm（遠紫外線）となり、エネルギーが4倍に増大。分光分析で高温プラズマ診断に用いられる。</p>
+<p>水素原子（Z=1）でnᵢ=3からnf=2へのバルマーα線遷移：リュードベリ公式により波長λ=656.3nm（赤色H-α）、光子エネルギー1.89eV、振動数456.9THz、n=3からの電離エネルギー1.51eVを計算。He⁺イオン（Z=2）の同じ遷移ではλ=164.0nm（遠紫外線）となり、エネルギーが4倍に増大。分光分析で高温プラズマ診断に用いられる。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -953,6 +552,16 @@ compute();
 <li>吸収スペクトルはnfが励起準位の場合；恒星大気では水素ライマンα（121.6nm）吸収が重要な温度指標</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130626345?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130626345.09._SCMZZZZZZ_.jpg" alt="量子力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">量子力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -966,7 +575,464 @@ compute();
 </div>
 </footer>
 <script>
-document.addEventListener('click',function(e){});
+
+function __novaCanvasCssW(canvas){return parseFloat(canvas.dataset.cssW)||canvas.clientWidth||parseFloat(canvas.getAttribute("width"))||canvas.width/Math.min(window.devicePixelRatio||1,2.5);}
+function __novaCanvasCssH(canvas){return parseFloat(canvas.dataset.cssH)||canvas.clientHeight||parseFloat(canvas.getAttribute("height"))||canvas.height/Math.min(window.devicePixelRatio||1,2.5);}
+function __novaHiDpiCanvas(canvas,cssW,cssH,ctx){var dpr=Math.min(window.devicePixelRatio||1,2.5);canvas.setAttribute('data-ux-no-scale','1');var w=Math.max(1,Math.round(cssW||canvas.clientWidth||parseFloat(canvas.getAttribute("width"))||canvas.width/dpr||600));var h=Math.max(1,Math.round(cssH||canvas.clientHeight||parseFloat(canvas.getAttribute("height"))||canvas.height/dpr||320));canvas.style.setProperty('width',w+'px','important');canvas.style.setProperty('height',h+'px','important');var bw=Math.round(w*dpr);var bh=Math.round(h*dpr);if(canvas.width!==bw||canvas.height!==bh){canvas.width=bw;canvas.height=bh;}canvas.dataset.cssW=String(w);canvas.dataset.cssH=String(h);if(ctx&&ctx.setTransform)ctx.setTransform(dpr,0,0,dpr,0,0);return{w:w,h:h,dpr:dpr};}
+
+const RH = 1.0973732e7;   // m^-1 (Rydberg, infinite-mass)
+const HC = 1.98645e-25;   // J*m (h*c)
+const EV = 1.60218e-19;   // J/eV
+const C  = 2.99792458e8;  // m/s
+const H  = 6.626e-34;     // J*s
+const E1 = 13.605693;     // eV (Rydberg energy)
+const A0 = 0.0529;        // nm (Bohr radius)
+
+const __LANG = (document.documentElement.lang || 'ja').toLowerCase();
+const __L = (function(){
+  const ja = {
+    ion:{1:'H（水素）',2:'He⁺（ヘリウムイオン）',3:'Li²⁺（リチウムイオン）',4:'Be³⁺（ベリリウムイオン）',5:'B⁴⁺（ボロンイオン）'},
+    series:{lyman:'ライマン系列',balmer:'バルマー系列',paschen:'パッシェン系列',brackett:'ブラケット系列',pfund:'プファント系列',custom:'カスタム'},
+    ionGeneric:'水素様イオン', e0:'E=0 電離', eAxis:'E (eV)',
+    emitMsg:'放出：電子が下の準位へ落ち、光子が飛び出します。',
+    absorbMsg:'吸収：電子が上の準位へ励起され、光子を取り込みます。',
+    invalidMsg:'この遷移は光子を放出/吸収しません（nᵢ=nf）。',
+    cUV:'紫外線 (UV)',cV:'紫',cB:'青',cG:'緑',cY:'黄',cO:'オレンジ',cR:'赤',cIR:'赤外線 (IR)',
+    photonOut:'光子放出',photonIn:'光子吸収'
+  };
+  const en = {
+    ion:{1:'H (Hydrogen)',2:'He⁺ (Helium ion)',3:'Li²⁺ (Lithium ion)',4:'Be³⁺ (Beryllium ion)',5:'B⁴⁺ (Boron ion)'},
+    series:{lyman:'Lyman series',balmer:'Balmer series',paschen:'Paschen series',brackett:'Brackett series',pfund:'Pfund series',custom:'Custom'},
+    ionGeneric:'Hydrogen-like ion', e0:'E=0 ionization', eAxis:'E (eV)',
+    emitMsg:'Emission: the electron drops to a lower level and a photon is emitted.',
+    absorbMsg:'Absorption: the electron is excited to a higher level, absorbing a photon.',
+    invalidMsg:'This transition emits/absorbs no photon (nᵢ=nf).',
+    cUV:'Ultraviolet (UV)',cV:'violet',cB:'blue',cG:'green',cY:'yellow',cO:'orange',cR:'red',cIR:'Infrared (IR)',
+    photonOut:'photon out',photonIn:'photon in'
+  };
+  const zh = {
+    ion:{1:'H（氢）',2:'He⁺（氦离子）',3:'Li²⁺（锂离子）',4:'Be³⁺（铍离子）',5:'B⁴⁺（硼离子）'},
+    series:{lyman:'莱曼系列',balmer:'巴尔末系列',paschen:'帕邢系列',brackett:'布拉开系列',pfund:'普丰德系列',custom:'自定义'},
+    ionGeneric:'类氢离子', e0:'E=0 电离', eAxis:'E (eV)',
+    emitMsg:'发射：电子跃迁到较低能级，放出一个光子。',
+    absorbMsg:'吸收：电子被激发到较高能级，吸收一个光子。',
+    invalidMsg:'此跃迁不放出/吸收光子（nᵢ=nf）。',
+    cUV:'紫外线 (UV)',cV:'紫',cB:'蓝',cG:'绿',cY:'黄',cO:'橙',cR:'红',cIR:'红外线 (IR)',
+    photonOut:'光子放出',photonIn:'光子吸收'
+  };
+  return __LANG.indexOf('en')===0 ? en : __LANG.indexOf('zh')===0 ? zh : ja;
+})();
+
+const prefersReduced = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+let mode = 'emission';
+let orbitAnimId = null;
+let orbitAngle = 0;
+let orbitRunning = false;
+let animSpeed = 1;
+let elapsedMs = 0;
+let lastFrameTime = null;
+// Transition (jump + photon) animation state
+let jump = null; // {t, dur, from, to, emit}
+const overlayColors = ['rgba(255,255,255,.5)','rgba(0,255,136,.6)','rgba(255,215,0,.6)','rgba(255,107,107,.6)','rgba(162,155,254,.6)'];
+let savedOverlays = [];
+const ionNames = __L.ion;
+const seriesNf = { lyman:1, balmer:2, paschen:3, brackett:4, pfund:5 };
+const seriesNames = __L.series;
+
+function gv(id){ return parseInt(document.getElementById(id).value); }
+function setV(id,v){ const el=document.getElementById(id); el.value=v; if(window.syncToNum){ try{ syncToNum(id, id.replace('slider','').toLowerCase()+'ValNum'); }catch(e){} } if(window.updateSlider) updateSlider(el); }
+
+function updateIonLabel(){
+  const Z = gv('sliderZ');
+  document.getElementById('ionLabel').textContent = 'Z=' + Z + ': ' + (ionNames[Z] || __L.ionGeneric);
+}
+function setMode(m){
+  mode = m;
+  document.getElementById('modeEmit').classList.toggle('active', m === 'emission');
+  document.getElementById('modeAbsorb').classList.toggle('active', m === 'absorption');
+  compute();
+}
+function setSeries(){
+  const s = document.getElementById('seriesSelect').value;
+  if (s !== 'custom' && seriesNf[s]) {
+    const nf = seriesNf[s];
+    setV('sliderNf', nf);
+    const ni = Math.max(nf + 1, gv('sliderNi'));
+    setV('sliderNi', ni);
+  }
+  compute();
+}
+function applyPreset(p){
+  const presets = {
+    'balmer-a': {ni:3,nf:2,Z:1,series:'balmer',mode:'emission'},
+    'lyman-a':  {ni:2,nf:1,Z:1,series:'lyman', mode:'emission'},
+    'paschen':  {ni:4,nf:3,Z:1,series:'paschen',mode:'emission'},
+    'ionize':   {ni:1,nf:10,Z:1,series:'custom',mode:'absorption'}
+  };
+  const c = presets[p]; if(!c) return;
+  document.getElementById('seriesSelect').value = c.series;
+  setV('sliderZ', c.Z);
+  setV('sliderNf', c.nf);
+  setV('sliderNi', c.ni);
+  updateIonLabel();
+  setMode(c.mode);
+  triggerTransition(c.mode === 'absorption' ? 'absorb' : 'emit');
+}
+function triggerTransition(kind){
+  const {niEff, nfEff} = effectiveLevels();
+  const emit = (kind === 'emit');
+  // electron jumps from high->low (emit) or low->high (absorb)
+  jump = { t:0, dur: prefersReduced ? 0.0001 : 1.0, from: emit?niEff:nfEff, to: emit?nfEff:niEff, emit:emit, photonT:0 };
+  document.getElementById('transitionStatus').textContent = emit ? __L.emitMsg : __L.absorbMsg;
+  if(!orbitRunning && !prefersReduced){ toggleOrbitAnim(); }
+  else { compute(); }
+}
+function wavelengthToColor(wl){
+  if (wl < 380 || wl > 780) return null;
+  let r,g,b;
+  if (wl < 440){ r=-(wl-440)/60; g=0; b=1; }
+  else if (wl < 490){ r=0; g=(wl-440)/50; b=1; }
+  else if (wl < 510){ r=0; g=1; b=-(wl-510)/20; }
+  else if (wl < 580){ r=(wl-510)/70; g=1; b=0; }
+  else if (wl < 645){ r=1; g=-(wl-645)/65; b=0; }
+  else { r=1; g=0; b=0; }
+  const f = wl<420 ? 0.3+0.7*(wl-380)/40 : wl>700 ? 0.3+0.7*(780-wl)/80 : 1.0;
+  return 'rgb(' + Math.round(r*255*f) + ',' + Math.round(g*255*f) + ',' + Math.round(b*255*f) + ')';
+}
+function colorName(wl){
+  if (wl < 380) return __L.cUV;
+  if (wl < 450) return __L.cV;
+  if (wl < 495) return __L.cB;
+  if (wl < 570) return __L.cG;
+  if (wl < 590) return __L.cY;
+  if (wl < 620) return __L.cO;
+  if (wl <= 780) return __L.cR;
+  return __L.cIR;
+}
+function effectiveLevels(){
+  const ni = gv('sliderNi'), nf = gv('sliderNf');
+  if (mode === 'emission'){ const niEff = Math.max(ni, nf+1); return { niEff, nfEff: Math.min(nf, niEff-1) }; }
+  return { niEff: ni, nfEff: nf };
+}
+function getWavelength(ni, nf, Z){
+  const inv = RH * Z * Z * (1/(nf*nf) - 1/(ni*ni));
+  return inv > 0 ? (1/inv)*1e9 : null;
+}
+function compute(){
+  const Z = gv('sliderZ');
+  const { niEff, nfEff } = effectiveLevels();
+  const inv = RH * Z * Z * (1/(nfEff*nfEff) - 1/(niEff*niEff));
+  let wl_nm=null, eph_eV=null, freq_THz=null;
+  if (inv > 0){ wl_nm = (1/inv)*1e9; eph_eV = HC*inv/EV; freq_THz = C*inv/1e12; }
+  const Ei = -E1*Z*Z/(niEff*niEff);
+  const Ef = -E1*Z*Z/(nfEff*nfEff);
+  const dE = Math.abs(Ef - Ei);
+  const ionE = E1*Z*Z/(niEff*niEff);
+  const rn = niEff*niEff*A0/Z;
+  const seriesKey = document.getElementById('seriesSelect').value;
+
+  const t = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  t('statWl', wl_nm ? wl_nm.toFixed(2)+' nm' : '—');
+  t('statEph', eph_eV ? eph_eV.toFixed(4)+' eV' : '—');
+  t('statFreq', freq_THz ? freq_THz.toFixed(2)+' THz' : '—');
+  t('statSeries', seriesNames[seriesKey] || '—');
+  t('statIonE', ionE.toFixed(4)+' eV');
+  t('statEi', Ei.toFixed(4)+' eV');
+  t('statEf', Ef.toFixed(4)+' eV');
+  t('statDE', dE.toFixed(4)+' eV');
+  t('statRn', rn.toFixed(4)+' nm');
+
+  const colorEl = document.getElementById('statColor');
+  if (colorEl){
+    if (wl_nm){ colorEl.textContent = colorName(wl_nm); colorEl.style.color = wavelengthToColor(wl_nm) || 'var(--accent)'; }
+    else { colorEl.textContent = '—'; colorEl.style.color = ''; }
+  }
+
+  drawBohr(niEff, nfEff, Z, wl_nm);
+  drawLevels(niEff, nfEff, Z, dE, wl_nm);
+  drawSpectrum(wl_nm);
+}
+function drawBohr(ni, nf, Z, wl_nm){
+  const canvas = document.getElementById('bohrCanvas');
+  const ctx = canvas.getContext('2d');
+  const d = __novaHiDpiCanvas(canvas, canvas.offsetWidth || 380, 300, ctx);
+  const W = d.w, Hh = d.h;
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,Hh);
+  const cx = W/2, cy = Hh/2;
+  const maxOrbit = Math.min(W,Hh)/2 - 18;
+  const maxN = Math.max(ni, nf, 4);
+  const rOf = n => (n*n/(maxN*maxN))*maxOrbit;
+
+  // saved overlays
+  savedOverlays.forEach(function(ov,i){
+    const ovMaxN = Math.max(ov.ni, ov.nf, 4);
+    const ri = (ov.ni*ov.ni/(ovMaxN*ovMaxN))*maxOrbit;
+    const rf = (ov.nf*ov.nf/(ovMaxN*ovMaxN))*maxOrbit;
+    ctx.strokeStyle = ov.color; ctx.lineWidth = 2;
+    [ri,rf].forEach(r=>{ ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); });
+    const a = Math.PI*0.15 + i*0.35;
+    ctx.setLineDash([4,3]); ctx.beginPath();
+    ctx.moveTo(cx+ri*Math.cos(a),cy+ri*Math.sin(a)); ctx.lineTo(cx+rf*Math.cos(a),cy+rf*Math.sin(a)); ctx.stroke(); ctx.setLineDash([]);
+  });
+
+  // orbits
+  for (let n=1; n<=maxN; n++){
+    const r = rOf(n);
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle = (n===ni||n===nf) ? 'rgba(0,180,216,0.5)' : 'rgba(80,100,140,0.3)';
+    ctx.lineWidth = (n===ni||n===nf) ? 1.5 : 0.8; ctx.stroke();
+    ctx.fillStyle = '#667'; ctx.font = '9px Roboto Mono, monospace';
+    ctx.fillText('n='+n, cx+r+2, cy-3);
+  }
+  // nucleus
+  ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2); ctx.fillStyle='#FF6B6B'; ctx.fill();
+  ctx.fillStyle='#FF9999'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('Z='+Z, cx, cy+16); ctx.textAlign='left';
+
+  // electron position: during a jump, interpolate radius from->to
+  let elecN = ni;
+  if (jump){
+    const e = Math.max(0, Math.min(1, jump.t/jump.dur));
+    const ease = e<0.5 ? 2*e*e : 1-Math.pow(-2*e+2,2)/2;
+    elecN = jump.from + (jump.to - jump.from)*ease;
+  }
+  const rElec = (function(){
+    const nn = elecN; return (nn*nn/(maxN*maxN))*maxOrbit;
+  })();
+  const angle = orbitRunning ? orbitAngle : (orbitAngle || Math.PI/4);
+  const ex = cx + rElec*Math.cos(angle);
+  const ey = cy + rElec*Math.sin(angle);
+
+  // transition arrow (static, ni->nf)
+  const ri = rOf(ni), rf = rOf(nf);
+  const aA = angle + Math.PI*0.6;
+  const ax1 = cx+ri*Math.cos(aA), ay1 = cy+ri*Math.sin(aA);
+  const ax2 = cx+rf*Math.cos(aA), ay2 = cy+rf*Math.sin(aA);
+  const col = wl_nm ? (wavelengthToColor(wl_nm) || '#FFD700') : '#FFD700';
+  ctx.strokeStyle = col; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(ax1,ay1); ctx.lineTo(ax2,ay2); ctx.stroke();
+  const dx=ax2-ax1, dy=ay2-ay1, len=Math.sqrt(dx*dx+dy*dy);
+  if (len>0){ const ux=dx/len, uy=dy/len, hx=ax2-ux*8, hy=ay2-uy*8;
+    ctx.beginPath(); ctx.moveTo(ax2,ay2); ctx.lineTo(hx-uy*4,hy+ux*4); ctx.lineTo(hx+uy*4,hy-ux*4);
+    ctx.closePath(); ctx.fillStyle=col; ctx.fill(); }
+
+  // electron
+  ctx.beginPath(); ctx.arc(ex,ey,5,0,Math.PI*2); ctx.fillStyle='#007BFF'; ctx.fill();
+  ctx.strokeStyle='#5AF'; ctx.lineWidth=1.5; ctx.stroke();
+
+  // photon (wavy) during jump
+  if (jump){
+    const pe = Math.max(0, Math.min(1, jump.photonT));
+    if (pe > 0){
+      const pcol = wl_nm ? (wavelengthToColor(wl_nm) || '#FFD700') : '#FFD700';
+      const maxR = maxOrbit + 30;
+      const pr = jump.emit ? (rf + pe*(maxR - rf)) : (maxR - pe*(maxR - rf));
+      const pAng = angle - Math.PI*0.3;
+      ctx.save();
+      ctx.strokeStyle = pcol; ctx.lineWidth = 2; ctx.globalAlpha = jump.emit ? (1-pe*0.5) : (0.5+pe*0.5);
+      ctx.beginPath();
+      for (let s=0; s<=24; s++){
+        const tt = s/24;
+        const rr = (jump.emit ? rf : maxR) + (pr - (jump.emit?rf:maxR))*tt;
+        const wob = Math.sin(tt*Math.PI*6)*4;
+        const px = cx + rr*Math.cos(pAng) + wob*Math.cos(pAng+Math.PI/2);
+        const py = cy + rr*Math.sin(pAng) + wob*Math.sin(pAng+Math.PI/2);
+        if (s===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+      // photon head
+      const hx2 = cx+pr*Math.cos(pAng), hy2 = cy+pr*Math.sin(pAng);
+      ctx.beginPath(); ctx.arc(hx2,hy2,4,0,Math.PI*2); ctx.fillStyle=pcol; ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = pcol; ctx.font = 'bold 9px Roboto Mono, monospace';
+      ctx.fillText(jump.emit ? __L.photonOut : __L.photonIn, hx2+6, hy2);
+      ctx.restore();
+    }
+  }
+
+  // wavelength label
+  if (wl_nm){ ctx.fillStyle=col; ctx.font='bold 10px Roboto Mono, monospace'; ctx.fillText(wl_nm.toFixed(1)+' nm', 6, 16); }
+}
+function drawLevels(ni, nf, Z, dE, wl_nm){
+  const canvas = document.getElementById('levelCanvas');
+  const ctx = canvas.getContext('2d');
+  const d = __novaHiDpiCanvas(canvas, canvas.offsetWidth || 380, 300, ctx);
+  const W = d.w, Hh = d.h;
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,Hh);
+  const maxN = 8;
+  const pad = { top:14, bottom:24, left:60, right:60 };
+  const drawH = Hh-pad.top-pad.bottom, drawW = W-pad.left-pad.right;
+  const eMin = -E1*Z*Z, eMax = 0.5;
+  const yOf = e => pad.top + drawH - ((e-eMin)/(eMax-eMin))*drawH;
+  ctx.fillStyle='#778'; ctx.font='10px Roboto Mono, monospace'; ctx.fillText(__L.eAxis, 2, pad.top+8);
+  // ionization line
+  ctx.strokeStyle='rgba(200,200,200,0.2)'; ctx.lineWidth=0.8; ctx.setLineDash([3,4]);
+  ctx.beginPath(); ctx.moveTo(pad.left,yOf(0)); ctx.lineTo(W-pad.right,yOf(0)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#557'; ctx.font='9px sans-serif'; ctx.fillText(__L.e0, W-pad.right-2, yOf(0)-3);
+  for (let n=1; n<=maxN; n++){
+    const e = -E1*Z*Z/(n*n), y = yOf(e);
+    const isNi = n===ni, isNf = n===nf;
+    if (isNi || isNf){ ctx.fillStyle = isNi?'rgba(0,123,255,0.15)':'rgba(0,184,148,0.15)'; ctx.fillRect(pad.left,y-1,drawW,12); }
+    ctx.strokeStyle = isNi?'#007BFF':isNf?'#00b894':'#334466';
+    ctx.lineWidth = (isNi||isNf)?2.5:1.2;
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(W-pad.right,y); ctx.stroke();
+    ctx.fillStyle = isNi?'#5AF':isNf?'#5E5':'#558';
+    ctx.font = (isNi||isNf)?'bold 10px Roboto Mono, monospace':'9px Roboto Mono, monospace';
+    ctx.fillText('n='+n, pad.left-52, y+4);
+    ctx.font='8px Roboto Mono, monospace'; ctx.fillStyle='#668';
+    ctx.fillText(e.toFixed(2), pad.left-52, y+13);
+  }
+  // transition arrow + dE/lambda labels
+  const yNi = yOf(-E1*Z*Z/(ni*ni)), yNf = yOf(-E1*Z*Z/(nf*nf));
+  const arrowX = pad.left + drawW*0.55;
+  const dir = yNi > yNf ? -1 : 1;
+  ctx.strokeStyle='#FFD700'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(arrowX,yNi); ctx.lineTo(arrowX,yNf); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(arrowX,yNf); ctx.lineTo(arrowX-5,yNf+dir*8); ctx.lineTo(arrowX+5,yNf+dir*8);
+  ctx.closePath(); ctx.fillStyle='#FFD700'; ctx.fill();
+  ctx.fillStyle='#FFD700'; ctx.font='bold 9px Roboto Mono, monospace'; ctx.textAlign='left';
+  ctx.fillText('ΔE='+dE.toFixed(3)+' eV', arrowX+8, (yNi+yNf)/2 - 2);
+  if (wl_nm) ctx.fillText('λ='+wl_nm.toFixed(1)+' nm', arrowX+8, (yNi+yNf)/2 + 10);
+}
+function drawSpectrum(wl_active){
+  const canvas = document.getElementById('spectrumCanvas');
+  const ctx = canvas.getContext('2d');
+  const d = __novaHiDpiCanvas(canvas, canvas.offsetWidth || 700, 90, ctx);
+  const W = d.w, Hh = d.h;
+  ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,Hh);
+  const wlMin=300, wlMax=850, specStart=380, specEnd=780;
+  const pad={left:40,right:14,top:14,bottom:22};
+  const drawW=W-pad.left-pad.right, drawH=Hh-pad.top-pad.bottom;
+  const xOf = wl => pad.left + (wl-wlMin)/(wlMax-wlMin)*drawW;
+  ctx.fillStyle='rgba(100,80,160,0.25)'; ctx.fillRect(xOf(wlMin),pad.top,xOf(specStart)-xOf(wlMin),drawH);
+  ctx.fillStyle='#557'; ctx.font='9px sans-serif'; ctx.fillText('UV',xOf(wlMin)+3,pad.top+drawH/2);
+  const grad = ctx.createLinearGradient(xOf(specStart),0,xOf(specEnd),0);
+  [[0,'rgba(70,0,130,0.7)'],[0.15,'rgba(0,0,255,0.7)'],[0.3,'rgba(0,255,255,0.6)'],[0.5,'rgba(0,255,0,0.6)'],[0.65,'rgba(255,255,0,0.7)'],[0.8,'rgba(255,100,0,0.7)'],[1,'rgba(200,0,0,0.7)']].forEach(p=>grad.addColorStop(p[0],p[1]));
+  ctx.fillStyle=grad; ctx.fillRect(xOf(specStart),pad.top,xOf(specEnd)-xOf(specStart),drawH);
+  ctx.fillStyle='rgba(160,60,0,0.2)'; ctx.fillRect(xOf(specEnd),pad.top,xOf(wlMax)-xOf(specEnd),drawH);
+  ctx.fillStyle='#775'; ctx.font='9px sans-serif'; ctx.fillText('IR',xOf(specEnd)+3,pad.top+drawH/2);
+  ctx.strokeStyle='#445'; ctx.lineWidth=0.8;
+  [400,450,500,550,600,650,700,750,800].forEach(wl=>{ const x=xOf(wl);
+    ctx.beginPath(); ctx.moveTo(x,pad.top+drawH); ctx.lineTo(x,pad.top+drawH+4); ctx.stroke();
+    ctx.fillStyle='#557'; ctx.font='8px Roboto Mono, monospace'; ctx.fillText(wl,x-8,Hh-2); });
+  ctx.fillStyle='#668'; ctx.font='9px sans-serif'; ctx.fillText('λ (nm)',2,pad.top+drawH/2);
+  // Balmer reference lines (faint)
+  [[656.3],[486.1],[434.0],[410.2]].forEach(b=>{ const x=xOf(b[0]); if(x>=pad.left&&x<=W-pad.right){
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x,pad.top); ctx.lineTo(x,pad.top+drawH); ctx.stroke(); } });
+  if (wl_active !== null){
+    const x = xOf(wl_active);
+    const col = wavelengthToColor(wl_active) || (wl_active<380?'#9966FF':'#FF6633');
+    ctx.strokeStyle=col; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x,pad.top); ctx.lineTo(x,pad.top+drawH); ctx.stroke();
+    ctx.fillStyle=col; ctx.font='bold 9px Roboto Mono, monospace';
+    const lx = Math.min(Math.max(x-16,0), W-50);
+    ctx.fillText(wl_active.toFixed(1), lx, pad.top-2);
+  }
+}
+function toggleOrbitAnim(){
+  if (orbitRunning){ pauseOrbit(); }
+  else {
+    orbitRunning = true; lastFrameTime = performance.now();
+    document.getElementById('pbPlay').innerHTML = '<i class="fas fa-pause"></i>';
+    document.getElementById('pbPlay').classList.add('active');
+    runOrbit();
+  }
+}
+function pauseOrbit(){
+  orbitRunning = false; lastFrameTime = null;
+  if (orbitAnimId) cancelAnimationFrame(orbitAnimId);
+  document.getElementById('pbPlay').innerHTML = '<i class="fas fa-play"></i>';
+  document.getElementById('pbPlay').classList.remove('active');
+}
+function resetOrbitAnim(){
+  pauseOrbit(); orbitAngle = 0; elapsedMs = 0; lastFrameTime = null; jump = null;
+  document.getElementById('elapsedTime').textContent = '0.000 s';
+  compute();
+}
+function stepFrame(){
+  if (orbitRunning) pauseOrbit();
+  orbitAngle += 0.03*animSpeed; elapsedMs += 16.67*animSpeed;
+  if (jump){ jump.t += 0.016*animSpeed; if (jump.t>=jump.dur) jump.photonT += 0.03*animSpeed; if (jump.photonT>1) jump=null; }
+  document.getElementById('elapsedTime').textContent = (elapsedMs/1000).toFixed(3)+' s';
+  compute();
+}
+function setSpeed(s){
+  animSpeed = s;
+  document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active'));
+  const btn = document.getElementById('sp'+String(s).replace('.',''));
+  if (btn) btn.classList.add('active');
+}
+function runOrbit(){
+  if (!orbitRunning) return;
+  const now = performance.now();
+  if (lastFrameTime !== null){
+    const dt = now - lastFrameTime; elapsedMs += dt*animSpeed;
+    document.getElementById('elapsedTime').textContent = (elapsedMs/1000).toFixed(3)+' s';
+  }
+  lastFrameTime = now;
+  orbitAngle += 0.03*animSpeed;
+  if (jump){
+    jump.t += (now ? 0.016 : 0.016)*animSpeed;
+    if (jump.t >= jump.dur){ jump.t = jump.dur; jump.photonT += 0.025*animSpeed; }
+    if (jump.photonT > 1){ jump = null; }
+  }
+  compute();
+  orbitAnimId = requestAnimationFrame(runOrbit);
+}
+function saveOverlay(){
+  if (savedOverlays.length >= 5) return;
+  const { niEff, nfEff } = effectiveLevels(); const Z = gv('sliderZ');
+  savedOverlays.push({ ni:niEff, nf:nfEff, Z, color:overlayColors[savedOverlays.length] });
+  renderOverlayList(); compute();
+}
+function removeOverlay(idx){
+  savedOverlays.splice(idx,1);
+  savedOverlays.forEach((o,i)=>o.color=overlayColors[i]);
+  renderOverlayList(); compute();
+}
+function clearOverlays(){ savedOverlays = []; renderOverlayList(); compute(); }
+function renderOverlayList(){
+  document.getElementById('overlayCount').textContent = savedOverlays.length + ' / 5';
+  const btn = document.getElementById('saveOverlayBtn');
+  if (btn){ const full = savedOverlays.length>=5; btn.style.opacity = full?'.5':''; btn.style.pointerEvents = full?'none':''; }
+  const list = document.getElementById('overlayList'); if(!list) return; list.innerHTML = '';
+  savedOverlays.forEach((o,i)=>{
+    const chip = document.createElement('div'); chip.className = 'overlay-chip';
+    chip.innerHTML = '<span class="oc-dot" style="background:'+o.color.replace(/[\d.]+\)$/,'1)')+'"></span>'
+      + 'n<sub>i</sub>='+o.ni+' → n<sub>f</sub>='+o.nf+'  Z='+o.Z
+      + '<button class="oc-remove" onclick="removeOverlay('+i+')"><i class="fas fa-times"></i></button>';
+    list.appendChild(chip);
+  });
+}
+// Click on Bohr canvas to select orbital
+(function(){
+  const canvas = document.getElementById('bohrCanvas'); if(!canvas) return;
+  canvas.addEventListener('click', function(e){
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX-rect.left)*canvas.width/rect.width;
+    const my = (e.clientY-rect.top)*canvas.height/rect.height;
+    const cx = canvas.width/2, cy = canvas.height/2;
+    const dist = Math.sqrt((mx-cx)*(mx-cx)+(my-cy)*(my-cy));
+    const { niEff, nfEff } = effectiveLevels();
+    const maxN = Math.max(niEff, nfEff, 4);
+    const maxOrbit = Math.min(canvas.width, canvas.height)/2 - 18;
+    let bestN=null, bestDist=Infinity;
+    for (let n=1; n<=10; n++){ const r=(n*n/(maxN*maxN))*maxOrbit; const dd=Math.abs(dist-r); if(dd<bestDist&&dd<20){bestDist=dd;bestN=n;} }
+    if (bestN !== null){
+      const id = e.shiftKey ? 'sliderNf' : 'sliderNi';
+      setV(id, bestN); compute();
+    }
+  });
+})();
+// Init
+['sliderNi','sliderNf','sliderZ'].forEach(id=>{
+  const el = document.getElementById(id);
+  if (el){ const mn=parseFloat(el.min), mx=parseFloat(el.max), v=parseFloat(el.value); el.style.setProperty('--pct', ((v-mn)/(mx-mn)*100).toFixed(1)+'%'); }
+});
+updateIonLabel();
+renderOverlayList();
+if (prefersReduced){ jump = null; }
+compute();
+
 </script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>
 <script src="/tools/related-tools.js" defer></script>

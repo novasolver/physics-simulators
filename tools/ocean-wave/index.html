@@ -41,7 +41,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "海洋波スペクトルシミュレーター",
       "description": "JONSWAP波スペクトルから不規則波をフーリエ合成してリアルタイムアニメーションと波スペクトルを可視化する海洋工学シミュレーター。",
       "url": "https://novasolver.jp/tools/ocean-wave.html",
@@ -51,7 +51,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["JONSWAP/Pierson-Moskowitzスペクトル計算","フーリエ合成による不規則波アニメーション","有義波高・平均ゼロクロス周期・波スペクトル表示"],
       "keywords": "海洋波,JONSWAPスペクトル,不規則波,有義波高,波スペクトル,海洋工学,沿岸工学",
       "datePublished": "2026-04-08",
@@ -173,13 +173,18 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="ctrl-label">JONSWAP γ <div class="num-wrap"><input type="number" class="num-input" id="gammaOWNum" value="3.3" min="1" max="7" step="0.1" oninput="syncFromNum('gamma','gammaOWNum')"><span class="num-unit"></span></div></div>
       <input type="range" id="gamma" min="1" max="7" step="0.1" value="3.3" oninput="syncToNum('gamma','gammaOWNum')">
     </div>
-    <div class="ctrl-group">
-      <div class="ctrl-label">風速 U10 <div class="num-wrap"><input type="number" class="num-input" id="windNum" value="15" min="5" max="40" step="1" oninput="syncFromNum('wind','windNum')"><span class="num-unit">m/s</span></div></div>
-      <input type="range" id="wind" min="5" max="40" step="1" value="15" oninput="syncToNum('wind','windNum')">
-    </div>
+
 
     <div class="section-title" style="margin-top:16px;">波の統計量</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -237,11 +242,12 @@ let animId=null, t=0;
 const N_COMP=80; // Fourier components
 
 let amps=[], freqs_arr=[], phases=[];
+let gammaNorm=1;
 const g_acc=9.81;
 
 function jonswap(f, Hs, Tp, gamma){
   const fp=1/Tp;
-  const alpha=5/16*Hs*Hs*fp*4; // simplified alpha
+  const alpha=5/16*Hs*Hs*Math.pow(fp,4)*Math.pow(2*Math.PI,4)/(g_acc*g_acc); // PM-equivalent alpha from Hs
   const S_PM=alpha*g_acc*g_acc/Math.pow(2*Math.PI,4)/Math.pow(f,5)*Math.exp(-5/4*Math.pow(fp/f,4));
   const sigma=f<=fp?0.07:0.09;
   const r=Math.exp(-Math.pow(f-fp,2)/(2*sigma*sigma*fp*fp));
@@ -251,15 +257,21 @@ function jonswap(f, Hs, Tp, gamma){
   const f_min=0.5*fp, f_max=4*fp;
   const df=(f_max-f_min)/N_COMP;
   amps=[]; freqs_arr=[]; phases=[];
-  let m0=0;
+  let m0raw=0; const Svals=[];
   for(let i=0;i<N_COMP;i++){
     const f=f_min+(i+0.5)*df;
     const S=jonswap(f,Hs,Tp,gamma);
-    const a=Math.sqrt(2*S*df);
-    amps.push(a);
+    Svals.push(S);
     freqs_arr.push(f);
     phases.push(Math.random()*2*Math.PI);
-    m0+=S*df;
+    m0raw+=S*df;
+  }
+  gammaNorm=m0raw>0?(Hs*Hs/16)/m0raw:1;
+  let m0=0;
+  for(let i=0;i<N_COMP;i++){
+    const a=Math.sqrt(2*Svals[i]*gammaNorm*df);
+    amps.push(a);
+    m0+=Svals[i]*gammaNorm*df;
   }
   return m0;
 }function getWaveAt(x, t){
@@ -319,7 +331,7 @@ function jonswap(f, Hs, Tp, gamma){
   const fp=1/Tp;
   const data=[], dataPM=[];
   for(let f=0.01;f<=4*fp;f+=fp*0.05){
-    const S=jonswap(f,Hs,Tp,gamma);
+    const S=jonswap(f,Hs,Tp,gamma)*gammaNorm;
     const S_PM=jonswap(f,Hs,Tp,1.0);
     data.push({x:f,y:S});
     dataPM.push({x:f,y:S_PM});
@@ -338,16 +350,14 @@ function jonswap(f, Hs, Tp, gamma){
   const Hs=parseFloat(document.getElementById('hs').value);
   const Tp=parseFloat(document.getElementById('tp').value);
   const gamma=parseFloat(document.getElementById('gamma').value);
-  const U10=parseFloat(document.getElementById('wind').value);
 
   const m0=buildSpectrum(Hs,Tp,gamma);
-  const Hs_calc=4*Math.sqrt(m0);
   const fp=1/Tp;
   // mean zero crossing period Tz from spectral moments
   const Tz=Tp/1.28; // approximate for JONSWAP
   const lambda=g_acc*Tp*Tp/(2*Math.PI);
   const steep=Hs/lambda;
-  const energy=1025*g_acc*m0/2;
+  const energy=1025*g_acc*m0;
 
   document.getElementById('statHs').textContent=Hs.toFixed(1)+' m';
   document.getElementById('statTz').textContent=Tz.toFixed(1)+' s';
@@ -370,7 +380,7 @@ function jonswap(f, Hs, Tp, gamma){
     const gamma=parseFloat(document.getElementById('gamma').value);
     drawSpectrum(Hs,Tp,gamma);
   }
-}['hs','tp','gamma','wind'].forEach(id=>document.getElementById(id).addEventListener('input',update));
+}['hs','tp','gamma'].forEach(id=>document.getElementById(id).addEventListener('input',update));
 update();
 animate();
 </script>
@@ -401,7 +411,7 @@ animate();
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">有義波高とピーク周期を変更しても波形が変わらないのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">シミュレーターはランダムな位相を用いてフーリエ合成しているため、パラメータ変更後に波形が即座に変化しない場合があります。「再生成」ボタンを押すと新しい乱数で波形が再計算され、変更が反映されます。</div>
+<div class="faq-a">パラメータを変更するとスペクトルが即座に再計算され、新しいランダム位相で波形が再合成されます。同じ設定でも位相の乱数により毎回異なる波形になりますが、有義波高などの統計量は一致します。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">γ係数（ピーク強調係数）を大きくすると何が起こりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -431,6 +441,9 @@ animate();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="ocean-wave.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -478,15 +491,15 @@ animate();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>有義波高（Hs）を0.5～8m範囲で設定し、海洋環境の波のエネルギー強度を指定します</li>
-<li>ピーク周期（Tp）を3～20秒で入力し、JONSWAP波スペクトルの周波数特性を決定します</li>
+<li>有義波高（Hs）を0.5～15mの範囲で設定し、海洋環境の波のエネルギー強度を指定します</li>
+<li>ピーク周期（Tp）を3～25秒で入力し、JONSWAP波スペクトルの周波数特性を決定します</li>
 <li>ピークシャープネス係数（γ）を1～7の範囲で調整し、スペクトルのピークの鋭さを制御します</li>
-<li>風速を0～25m/sで設定して波の発達段階をシミュレートし、フーリエ合成により不規則波形を生成・表示します</li>
+<li>フーリエ合成（80成分・ランダム位相）により不規則波形が自動生成され、リアルタイムに表示されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>北太平洋の冬季荒天を想定：Hs=4.5m、Tp=12秒、γ=3.3、風速18m/sで設定した場合、JONSWAP波スペクトル（f=0.08～0.3Hz）から256個の調和成分をフーリエ合成します。結果として600秒間の波形が可視化され、最大波高約8.2m、平均周期10.8秒の不規則波が再現されます。石油掘削船の動揺設計やFEMの海象荷重入力データとして活用できます。</p>
+<p>北太平洋の冬季荒天を想定：Hs=4.5m、Tp=12秒、γ=3.3で設定した場合、JONSWAP波スペクトル（f≈0.042～0.333Hz）から80個の調和成分をフーリエ合成します。結果として不規則波形がリアルタイムに可視化され、最大波高約8.2m（≈1.8×Hs）、平均ゼロクロス周期約9.4秒の不規則波が再現されます。石油掘削船の動揺設計やFEMの海象荷重入力データとして活用できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -496,6 +509,16 @@ animate();
 <li>洋上風力基礎設計ではHs≧6mの極限波浪時、ピーク周期の長周期成分（Tp≧14秒）が共振を招くため構造固有周期との検証が必要</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

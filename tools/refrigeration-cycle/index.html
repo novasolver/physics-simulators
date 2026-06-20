@@ -39,7 +39,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "蒸気圧縮冷凍サイクル計算ツール",
       "description": "蒸気圧縮冷凍サイクルのP-h線図をリアルタイム可視化。COP・冷凍効果・圧縮仕事を計算。",
       "url": "https://novasolver.jp/tools/refrigeration-cycle.html",
@@ -47,7 +47,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "operatingSystem": "Web Browser",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "keywords": "冷凍サイクル,蒸気圧縮,COP,P-h線図,冷媒,R134a,R410A,R290,冷凍効果",
       "datePublished": "2026-04-08",
       "dateModified": "2026-04-08",
@@ -108,6 +108,27 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 refrigeration loop hero ===== */
+#loopCanvas{border-radius:10px;background:#0a1628;display:block;width:100%;max-width:100%}
+.loop-live{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+.loop-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.loop-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.1}
+.loop-ro .rl{font-size:0.58rem;color:rgba(255,255,255,.6);margin-top:3px;letter-spacing:.02em}
+.loop-ro.accent .rv{color:#ffd54a}
+.loop-ro.cool .rv{color:#4aa3ff}
+.loop-ro.hot .rv{color:#ff6b5a}
+@media(max-width:600px){.loop-live{grid-template-columns:repeat(3,1fr)}}
+.loop-ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.loop-ctl .preset-btn,.loop-ctl .btn{font-family:inherit}
+.loop-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.7rem;color:var(--muted);margin-top:10px}
+.loop-legend span{display:inline-flex;align-items:center;gap:5px}
+.loop-legend i.sw{width:14px;height:14px;border-radius:50%;display:inline-block}
+#loopCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.loop-presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.loop-mode-btn{padding:5px 12px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit}
+.loop-mode-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+@media (prefers-reduced-motion: reduce){.ebar-fill{transition:none}}
+/* end v2 loop hero */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/refrigeration-cycle.html">
@@ -194,10 +215,53 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-snowflake"></i> 冷凍ループ・リアルタイムアニメーション</div>
+      <div class="loop-live">
+        <div class="loop-ro accent"><div class="rv" id="lo_cop">—</div><div class="rl">COP（冷却）</div></div>
+        <div class="loop-ro cool"><div class="rv" id="lo_ql">—</div><div class="rl">Q_L 冷却 [kJ/kg]</div></div>
+        <div class="loop-ro hot"><div class="rv" id="lo_qh">—</div><div class="rl">Q_H 放熱 [kJ/kg]</div></div>
+        <div class="loop-ro"><div class="rv" id="lo_wc">—</div><div class="rl">W圧縮 [kJ/kg]</div></div>
+        <div class="loop-ro"><div class="rv" id="lo_phase">—</div><div class="rl">現在の状態</div></div>
+      </div>
+      <canvas id="loopCanvas" height="360" tabindex="0" role="img" aria-label="蒸気圧縮冷凍サイクルのループアニメーション。冷媒が圧縮機・凝縮器・膨張弁・蒸発器を循環し相変化する様子を表示します。"></canvas>
+      <div class="loop-ctl">
+        <button class="btn" type="button" id="lo_play" onclick="loopToggle()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="loopReset()"><i class="fas fa-rotate-left"></i> リセット</button>
+        <div style="display:flex;gap:6px;margin-left:6px">
+          <button class="loop-mode-btn active" type="button" id="lo_modeCool" onclick="loopSetMode('cool')">冷房</button>
+          <button class="loop-mode-btn" type="button" id="lo_modeHeat" onclick="loopSetMode('heat')">ヒートポンプ</button>
+        </div>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn lo-spd" type="button" data-spd="0.5" onclick="loopSpeed(0.5)">0.5×</button>
+          <button class="preset-btn lo-spd active" type="button" data-spd="1" onclick="loopSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn lo-spd" type="button" data-spd="2" onclick="loopSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="loop-presets">
+        <button class="preset-btn" type="button" onclick="loopPreset('ac')">標準エアコン</button>
+        <button class="preset-btn" type="button" onclick="loopPreset('freezer')">低温フリーザー</button>
+        <button class="preset-btn" type="button" onclick="loopPreset('heatpump')">ヒートポンプ</button>
+        <button class="preset-btn" type="button" onclick="loopPreset('highlift')">高リフト</button>
+      </div>
+      <div class="loop-legend">
+        <span><i class="sw" style="background:#ff6b5a"></i>高温高圧蒸気</span>
+        <span><i class="sw" style="background:#4aa3ff"></i>低温冷媒</span>
+        <span><i class="sw" style="background:#ffd54a"></i>P-h線図上の現在点</span>
+      </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -448,6 +512,294 @@ function update(){
 update();
 </script>
 
+<script>
+/* ===== v2 refrigeration LOOP hero animation (self-contained IIFE) ===== */
+(function(){
+  "use strict";
+  var canvas = document.getElementById('loopCanvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var L = {
+    cop:'COP（冷却）', phaseVap:'低圧蒸気', phaseHot:'高温高圧蒸気', phaseCond:'凝縮（液化中）',
+    phaseLiq:'過冷却液', phaseFlash:'フラッシュ膨張', phaseEvap:'蒸発（吸熱中）',
+    compressor:'圧縮機', condenser:'凝縮器', valve:'膨張弁', evaporator:'蒸発器',
+    coldSpace:'冷却空間', hotSide:'高温側', qlIn:'Q_L 吸熱', qhOut:'Q_H 放熱', work:'W圧縮',
+    play:'<i class="fas fa-play"></i> 再生', pause:'<i class="fas fa-pause"></i> 一時停止'
+  };
+  var PROPS = {
+    'R134a':{A:6.6779,B:1085.0,C:235.0,hg_a:398.0,hg_b:0.95,hf_a:200.0,hf_b:1.15,cp_v:0.95,Tcrit:101.1},
+    'R410A':{A:6.9558,B:1072.0,C:232.0,hg_a:420.0,hg_b:0.82,hf_a:208.0,hf_b:1.30,cp_v:0.85,Tcrit:72.1},
+    'R290':{A:6.7021,B:943.0,C:248.0,hg_a:550.0,hg_b:0.78,hf_a:280.0,hf_b:1.50,cp_v:1.67,Tcrit:96.7}
+  };
+  function satP(ref,T){var r=PROPS[ref];return Math.pow(10,r.A-r.B/(T+r.C));}
+  function hgV(ref,T){var r=PROPS[ref];return r.hg_a+r.hg_b*T;}
+  function hfV(ref,T){var r=PROPS[ref];return r.hf_a+r.hf_b*T;}
+
+  var mode='cool', playing=true, speed=1, animId=null, lastTs=0, phase=0;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function gv(id,def){var e=document.getElementById(id);return e?parseFloat(e.value):def;}
+
+  function computeCycle(){
+    var ref=(document.getElementById('refrigerant')||{}).value||'R134a';
+    var Tevap=gv('tevap',-10), Tcond=gv('tcond',40), eta=gv('eta',80)/100,
+        sc=gv('sc',5), sh=gv('sh',5);
+    var r=PROPS[ref];
+    var h1=hgV(ref,Tevap)+r.cp_v*sh, P1=satP(ref,Tevap);
+    var cp_l=1.3, h3=hfV(ref,Tcond)-cp_l*sc, P2=satP(ref,Tcond);
+    var h4=h3;
+    var k=1.13, T1=Tevap+sh+273.15;
+    var T2s=T1*Math.pow(P2/P1,(k-1)/k)-273.15;
+    var h2s=h1+r.cp_v*(T2s-(Tevap+sh));
+    var h2=h1+(h2s-h1)/eta;
+    var Qe=h1-h4, Wc=h2-h1, Qc=h2-h3;
+    var COP_c=Qe/Wc, COP_h=Qc/Wc;
+    var mdot=1000/Qe;
+    return {ref:ref,Tevap:Tevap,Tcond:Tcond,h1:h1,h2:h2,h3:h3,h4:h4,P1:P1,P2:P2,
+            Qe:Qe,Wc:Wc,Qc:Qc,COP_c:COP_c,COP_h:COP_h,mdot:mdot,T2s:T2s};
+  }
+
+  // Loop geometry: 4 corner nodes of a rectangle (component boxes), path is the perimeter.
+  // segments: 0 evap(4->1 bottom), 1 compressor(1->2 left up), 2 cond(2->3 top), 3 valve(3->4 right down)
+  function layout(W,H){
+    var m=Math.min(W,H);
+    var pad=Math.max(46, m*0.16);
+    return {x0:pad, y0:H-pad-6, x1:W-pad, y1:pad+10};
+  }
+
+  // map phase [0,1) to a point on the rectangular loop and which segment
+  function loopPoint(t,g){
+    // perimeter order (counter-clockwise visually): evaporator bottom (L->R), compressor right?
+    // We'll go: bottom-left(4) -> bottom-right(1) [evaporator]
+    //           bottom-right(1) -> top-right(2)  [compressor]
+    //           top-right(2) -> top-left(3)      [condenser]
+    //           top-left(3) -> bottom-left(4)    [valve]
+    var seg=Math.floor(t*4)%4, f=(t*4)%1;
+    var x,y,s;
+    if(seg===0){ x=g.x0+(g.x1-g.x0)*f; y=g.y0; s=0; }
+    else if(seg===1){ x=g.x1; y=g.y0+(g.y1-g.y0)*f; s=1; }
+    else if(seg===2){ x=g.x1+(g.x0-g.x1)*f; y=g.y1; s=2; }
+    else { x=g.x0; y=g.y1+(g.y0-g.y1)*f; s=3; }
+    return {x:x,y:y,seg:s,f:f};
+  }
+
+  // color of refrigerant by segment/progress: cold blue -> hot red around the loop
+  function segColor(seg,f){
+    if(seg===0) return '#4aa3ff';                 // evaporator: cold, warming
+    if(seg===1) return mix('#7fb6ff','#ff6b5a',f); // compressor: heating up
+    if(seg===2) return mix('#ff6b5a','#9bd1ff',f); // condenser: cooling to liquid
+    return mix('#9bd1ff','#3a7bd5',f);             // valve: cold flash
+  }
+  function mix(a,b,t){
+    function h(c){return [parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];}
+    var ca=h(a),cb=h(b);
+    return 'rgb('+Math.round(ca[0]+(cb[0]-ca[0])*t)+','+Math.round(ca[1]+(cb[1]-ca[1])*t)+','+Math.round(ca[2]+(cb[2]-ca[2])*t)+')';
+  }
+
+  var cssW=0, cssH=0;
+  function resize(){
+    var rect=canvas.parentElement.getBoundingClientRect();
+    cssW=Math.max(280, Math.floor(rect.width-44));
+    cssH=360;
+    var dpr=Math.min(window.devicePixelRatio||1,2.5);
+    canvas.style.width=cssW+'px'; canvas.style.height=cssH+'px';
+    canvas.width=Math.round(cssW*dpr); canvas.height=Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function box(x,y,w,h,fill,label,sub){
+    ctx.fillStyle=fill; ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1.5;
+    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(x-w/2,y-h/2,w,h,8);ctx.fill();ctx.stroke();}
+    else{ctx.fillRect(x-w/2,y-h/2,w,h);ctx.strokeRect(x-w/2,y-h/2,w,h);}
+    ctx.fillStyle='#fff'; ctx.font='bold 12px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText(label,x,y+(sub?-2:4));
+    if(sub){ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='10px Roboto Mono';ctx.fillText(sub,x,y+12);}
+    ctx.textAlign='left';
+  }
+
+  function arrow(x0,y0,x1,y1,color,w){
+    ctx.strokeStyle=color;ctx.lineWidth=w;ctx.fillStyle=color;
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+    var a=Math.atan2(y1-y0,x1-x0),hh=6+w;
+    ctx.beginPath();ctx.moveTo(x1,y1);
+    ctx.lineTo(x1-hh*Math.cos(a-0.4),y1-hh*Math.sin(a-0.4));
+    ctx.lineTo(x1-hh*Math.cos(a+0.4),y1-hh*Math.sin(a+0.4));
+    ctx.closePath();ctx.fill();
+  }
+
+  function phaseInfo(seg,f){
+    if(seg===0) return f<0.85?L.phaseEvap:L.phaseVap;
+    if(seg===1) return L.phaseHot;
+    if(seg===2) return f<0.85?L.phaseCond:L.phaseLiq;
+    return L.phaseFlash;
+  }
+
+  function draw(cyc){
+    resize();
+    var W=cssW,H=cssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+    var g=layout(W,H);
+
+    // pipe loop
+    ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=10; ctx.lineJoin='round';
+    ctx.beginPath();
+    ctx.moveTo(g.x0,g.y0);ctx.lineTo(g.x1,g.y0);ctx.lineTo(g.x1,g.y1);
+    ctx.lineTo(g.x0,g.y1);ctx.closePath();ctx.stroke();
+
+    // cold space (around evaporator, bottom) + hot side (around condenser, top)
+    ctx.fillStyle='rgba(74,163,255,.10)';
+    ctx.fillRect(g.x0-30,g.y0-18,(g.x1-g.x0)+60,46);
+    ctx.fillStyle='rgba(255,107,90,.10)';
+    ctx.fillRect(g.x0-30,g.y1-26,(g.x1-g.x0)+60,46);
+    ctx.fillStyle='rgba(74,163,255,.85)';ctx.font='11px Noto Sans JP';ctx.textAlign='left';
+    ctx.fillText(L.coldSpace,g.x0-26,g.y0+26);
+    ctx.fillStyle='rgba(255,107,90,.85)';ctx.textAlign='right';
+    ctx.fillText(L.hotSide,g.x1+26,g.y1-16);ctx.textAlign='left';
+
+    // heat arrows: Q_L into evaporator (up from below), Q_H out of condenser (up to top)
+    var mx=(g.x0+g.x1)/2;
+    arrow(mx-60,g.y0+34,mx-60,g.y0+8,'#4aa3ff',2.4); // Q_L in
+    ctx.fillStyle='#4aa3ff';ctx.font='10px Roboto Mono';ctx.textAlign='center';
+    ctx.fillText(L.qlIn,mx-60,g.y0+44);
+    arrow(mx+60,g.y1-8,mx+60,g.y1-34,'#ff6b5a',2.4); // Q_H out
+    ctx.fillStyle='#ff6b5a';ctx.fillText(L.qhOut,mx+60,g.y1-38);ctx.textAlign='left';
+
+    // circulating refrigerant dots
+    var N=26;
+    for(var i=0;i<N;i++){
+      var t=((phase + i/N)%1);
+      var p=loopPoint(t,g);
+      var col=segColor(p.seg,p.f);
+      var rad=p.seg===3?2.6:3.4;
+      ctx.beginPath();ctx.arc(p.x,p.y,rad,0,7);ctx.fillStyle=col;ctx.fill();
+    }
+
+    // component boxes at midpoints of each segment
+    var bw=Math.min(118,(g.x1-g.x0)*0.42), bh=34;
+    box((g.x0+g.x1)/2,g.y0, bw,bh,'rgba(74,163,255,.85)',L.evaporator,'4→1');
+    box(g.x1,(g.y0+g.y1)/2, 70,bh,'rgba(255,107,90,.9)',L.compressor,'1→2');
+    box((g.x0+g.x1)/2,g.y1, bw,bh,'rgba(255,107,90,.7)',L.condenser,'2→3');
+    box(g.x0,(g.y0+g.y1)/2, 70,bh,'rgba(155,209,255,.85)',L.valve,'3→4');
+
+    // compressor "running" spinner mark
+    var cx=g.x1, cy=(g.y0+g.y1)/2;
+    ctx.save();ctx.translate(cx,cy-26);ctx.rotate(phase*Math.PI*6);
+    ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(7,0);ctx.moveTo(0,-7);ctx.lineTo(0,7);ctx.stroke();
+    ctx.restore();
+
+    // leading marker (the "head" of the flow) larger, with phase label
+    var head=loopPoint(phase,g);
+    ctx.beginPath();ctx.arc(head.x,head.y,6,0,7);
+    ctx.fillStyle=segColor(head.seg,head.f);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=1.4;ctx.stroke();
+
+    // sync P-h marker on the Chart.js phChart (yellow dot)
+    syncPhMarker(cyc, head.seg, head.f);
+
+    updateReadouts(cyc, head.seg, head.f);
+  }
+
+  // draw a moving yellow point on the existing phChart canvas overlay
+  function syncPhMarker(cyc, seg, f){
+    var ch = null;
+    try{ ch = (typeof chart!=='undefined') ? chart : null; }catch(e){ ch=null; }
+    if(!ch || !ch.scales || !ch.scales.x) return;
+    // current enthalpy & pressure along the cycle path
+    var h, P;
+    if(seg===0){ h=cyc.h4+(cyc.h1-cyc.h4)*f; P=cyc.P1; }
+    else if(seg===1){ h=cyc.h1+(cyc.h2-cyc.h1)*f; P=cyc.P1+(cyc.P2-cyc.P1)*f; }
+    else if(seg===2){ h=cyc.h2+(cyc.h3-cyc.h2)*f; P=cyc.P2; }
+    else { h=cyc.h3; P=cyc.P2+(cyc.P1-cyc.P2)*f; }
+    try{
+      var px=ch.scales.x.getPixelForValue(h);
+      var py=ch.scales.y.getPixelForValue(P);
+      var area=ch.chartArea;
+      if(!area) return;
+      var cc=ch.ctx;
+      ch.draw && ch.draw();
+      cc.save();
+      cc.beginPath();cc.arc(px,py,6,0,7);
+      cc.fillStyle='#ffd54a';cc.fill();
+      cc.strokeStyle='#001F3F';cc.lineWidth=1.5;cc.stroke();
+      cc.restore();
+    }catch(e){}
+  }
+
+  function updateReadouts(cyc, seg, f){
+    var cop = mode==='cool'?cyc.COP_c:cyc.COP_h;
+    set('lo_cop', isFinite(cop)?cop.toFixed(2):'—');
+    set('lo_ql', cyc.Qe.toFixed(1));
+    set('lo_qh', cyc.Qc.toFixed(1));
+    set('lo_wc', cyc.Wc.toFixed(1));
+    set('lo_phase', phaseInfo(seg,f));
+  }
+  function set(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+
+  function frame(ts){
+    if(!playing){animId=null;return;}
+    if(!lastTs)lastTs=ts;
+    var dt=Math.min(0.05,(ts-lastTs)/1000);lastTs=ts;
+    phase=(phase+dt*0.22*speed)%1;
+    draw(computeCycle());
+    animId=requestAnimationFrame(frame);
+  }
+
+  function start(){ if(reduced){draw(computeCycle());return;} playing=true;lastTs=0;
+    var b=document.getElementById('lo_play');if(b)b.innerHTML=L.pause;
+    if(!animId)animId=requestAnimationFrame(frame); }
+  function stop(){ playing=false;if(animId){cancelAnimationFrame(animId);animId=null;}
+    var b=document.getElementById('lo_play');if(b)b.innerHTML=L.play; }
+
+  window.loopToggle=function(){ playing?stop():start(); };
+  window.loopReset=function(){ phase=0; draw(computeCycle()); };
+  window.loopSpeed=function(s){ speed=s;
+    var btns=document.querySelectorAll('.lo-spd');
+    for(var i=0;i<btns.length;i++){var a=parseFloat(btns[i].dataset.spd)===s;
+      btns[i].classList.toggle('active',a);
+      btns[i].style.borderColor=a?'var(--accent)':'';btns[i].style.color=a?'var(--accent)':'';}
+  };
+  window.loopSetMode=function(m){ mode=m;
+    document.getElementById('lo_modeCool').classList.toggle('active',m==='cool');
+    document.getElementById('lo_modeHeat').classList.toggle('active',m==='heat');
+    set('lo_cop', '—'); draw(computeCycle());
+  };
+  window.loopPreset=function(name){
+    var P={ac:{tevap:5,tcond:40,sc:5,sh:5,ref:'R410A'},
+            freezer:{tevap:-30,tcond:35,sc:5,sh:8,ref:'R134a'},
+            heatpump:{tevap:0,tcond:50,sc:5,sh:5,ref:'R410A'},
+            highlift:{tevap:-25,tcond:55,sc:3,sh:6,ref:'R290'}}[name];
+    if(!P)return;
+    setVal('tevap',P.tevap);setVal('tcond',P.tcond);setVal('sc',P.sc);setVal('sh',P.sh);
+    var rs=document.getElementById('refrigerant');if(rs){rs.value=P.ref;}
+    if(name==='heatpump')window.loopSetMode('heat');else window.loopSetMode('cool');
+    if(typeof window.update==='function'){try{window.update();}catch(e){}}
+    draw(computeCycle());
+  };
+  function setVal(id,v){
+    var s=document.getElementById(id);if(s){s.value=v;}
+    var n=document.getElementById('v_'+id);if(n){n.value=v;}
+    var n2=document.getElementById(id+'Num');if(n2){n2.value=v;}
+  }
+
+  // redraw when calculator params change
+  ['refrigerant','tevap','tcond','eta','sc','sh'].forEach(function(id){
+    var e=document.getElementById(id);
+    if(e)e.addEventListener('input',function(){ if(!playing)draw(computeCycle()); });
+  });
+  canvas.addEventListener('keydown',function(e){
+    if(e.key===' '||e.key==='Enter'){e.preventDefault();window.loopToggle();}
+  });
+  window.addEventListener('resize',function(){ draw(computeCycle()); });
+
+  // init
+  draw(computeCycle());
+  if(reduced){ var b=document.getElementById('lo_play');if(b)b.innerHTML=L.play; playing=false; }
+  else start();
+})();
+</script>
+
 <section class="explanation">
   <h2>蒸気圧縮冷凍サイクルとは</h2>
   <div class="chat">
@@ -486,7 +838,7 @@ update();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">このツールで暖房モードのCOPも計算できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">はい、可能です。ツール画面でモードを「暖房」に切り替えると、凝縮器側の熱出力を基準にCOP_暖房 = (h2 - h3) / (h2 - h1) が自動計算されます。冷房モードとの比較にもご利用いただけます。</div>
+    <div class="faq-a">はい。モード切替は不要で、COP（暖房）= (h₂ − h₃) / (h₂ − h₁) は計算結果カードに常時表示され、COP（冷却）と並べて自動更新されます。冷房・暖房を同時に比較できます。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -506,6 +858,9 @@ update();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="refrigeration-cycle.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -547,13 +902,13 @@ update();
 <h3>使い方ガイド</h3>
 <ol>
 <li>冷媒種（R134a、R410A、R290）を選択し、蒸発温度を-10℃～10℃の範囲で設定します</li>
-<li>凝縮温度を30℃～50℃、圧縮機の等エントロピー効率を0.75～0.95の範囲で調整します</li>
-<li>過冷却度（液冷却）を1℃～10℃設定後、シミュレーション実行ボタンをクリックするとP-h線図が自動更新され、COP（冷却）、冷凍効果、圧縮仕事がリアルタイム表示されます</li>
+<li>凝縮温度を20℃～60℃、圧縮機の等エントロピー効率を60～95%の範囲で調整します</li>
+<li>過冷却度（液冷却）を0～15K設定すると、スライダー操作に応じてP-h線図が自動更新され、COP（冷却）、冷凍効果、圧縮仕事がリアルタイム表示されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>R134aを冷媒とした空調システムで、蒸発温度5℃、凝縮温度40℃、圧縮機効率0.85、過冷却度5℃の条件設定時、蒸発器での冷凍効果は約180 kJ/kg、圧縮仕事は約45 kJ/kg、結果としてCOP（冷却）は約4.0となります。冷房負荷10 kWの場合、必要な冷媒質量流量は約0.055 kg/sで、消費電力は約2.5 kWです。</p>
+<p>R134aを冷媒とした空調システムで、蒸発温度5℃、凝縮温度40℃、圧縮機効率85%、過冷却度5K、過熱度5Kの条件設定時、蒸発器での冷凍効果は約168 kJ/kg、圧縮仕事は約52 kJ/kg、結果としてCOP（冷却）は約3.2となります。冷房負荷10 kWの場合、必要な冷媒質量流量は約0.060 kg/sで、消費電力は約3.1 kWです。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -563,6 +918,16 @@ update();
 <li>R290（プロパン）は可燃性のため、充填量規制や圧縮機放熱設計を厳格に確認し、安全基準を遵守してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

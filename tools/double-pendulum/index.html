@@ -46,7 +46,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "二重振り子（カオス）シミュレーター",
       "description": "二重振り子のカオス運動をリアルタイム可視化。RK4積分でラグランジュ方程式を数値解法。2軌道比較でカオス感度を体験。",
       "url": "https://novasolver.jp/tools/double-pendulum.html",
@@ -56,7 +56,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ラグランジュ方程式のRK4数値積分","L1/L2/m1/m2/初期角度のリアルタイム調整","2軌道比較によるカオス感度可視化","エネルギー（運動+ポテンシャル）のリアルタイム表示","軌跡のフェードアウト表示"],
       "keywords": "二重振り子,カオス,ラグランジュ方程式,RK4,非線形力学,物理シミュレーター",
       "datePublished": "2026-04-08",
@@ -137,6 +137,37 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+
+/* ===== v2 chaos upgrades ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.sep .rv{color:#ff7b6b}
+.live-ro.ene .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.energy-wrap{display:flex;gap:12px;align-items:flex-end;margin-top:6px}
+.ebar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+.ebar-track{width:100%;height:96px;background:rgba(0,0,0,.05);border-radius:6px;position:relative;overflow:hidden;border:1px solid var(--border)}
+.ebar-fill{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 5px 5px;transition:height .08s linear}
+.ebar-fill.ke{background:linear-gradient(180deg,#00d4a0,#00b894)}
+.ebar-fill.pe{background:linear-gradient(180deg,#4aa3ff,#007BFF)}
+.ebar-fill.tot{background:linear-gradient(180deg,#ffd54a,#f39c12)}
+.ebar-lbl{font-size:0.72rem;font-weight:600;color:var(--text)}
+.ebar-val{font-family:'Roboto Mono',monospace;font-size:0.7rem;color:var(--muted)}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.chaos-annot{background:rgba(231,76,60,.07);border:1px solid rgba(231,76,60,.25);border-left:3px solid #e74c3c;border-radius:0 8px 8px 0;padding:11px 14px;font-size:0.8rem;line-height:1.6;color:var(--text);margin-top:12px}
+.chaos-annot strong{color:#e74c3c}
+.speed-btn.active{border-color:var(--accent);color:var(--accent)}
+#pendCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{transition:none}
+  .ebar-fill{transition:none}
+}
+/* end v2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/double-pendulum.html">
@@ -167,327 +198,377 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 <div class="main">
   <div class="panel">
-    <div class="panel-title">パラメータ設定</div>
+    <div class="panel-title">プリセット</div>
 
     <div class="param-group">
-      <div class="param-label"><span class="param-name">長さ L₁</span><div class="num-wrap"><input type="number" class="num-input" id="L1Num" value="1.0" min="0.1" max="2.0" step="0.05" oninput="syncFromNum('L1','L1Num')"><span class="num-unit">m</span></div></div>
-      <input type="range" id="L1" min="0.1" max="2.0" step="0.05" value="1.0" oninput="syncToNum('L1','L1Num')">
+      <div class="param-label"><span class="param-name">L₁</span><div class="num-wrap"><input type="number" class="num-input" id="L1Num" value="1.0" min="0.1" max="2.0" step="0.05" oninput="syncFromNum('L1','L1Num')"><span class="num-unit">m</span></div></div>
+      <input type="range" id="L1" min="0.1" max="2.0" step="0.05" value="1.0" aria-label="L1">
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">長さ L₂</span><div class="num-wrap"><input type="number" class="num-input" id="L2Num" value="1.0" min="0.1" max="2.0" step="0.05" oninput="syncFromNum('L2','L2Num')"><span class="num-unit">m</span></div></div>
-      <input type="range" id="L2" min="0.1" max="2.0" step="0.05" value="1.0" oninput="syncToNum('L2','L2Num')">
+      <div class="param-label"><span class="param-name">L₂</span><div class="num-wrap"><input type="number" class="num-input" id="L2Num" value="1.0" min="0.1" max="2.0" step="0.05" oninput="syncFromNum('L2','L2Num')"><span class="num-unit">m</span></div></div>
+      <input type="range" id="L2" min="0.1" max="2.0" step="0.05" value="1.0" aria-label="L2">
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">質量 m₁</span><div class="num-wrap"><input type="number" class="num-input" id="m1Num" value="1.0" min="0.1" max="5.0" step="0.1" oninput="syncFromNum('m1','m1Num')"><span class="num-unit">kg</span></div></div>
-      <input type="range" id="m1" min="0.1" max="5.0" step="0.1" value="1.0" oninput="syncToNum('m1','m1Num')">
+      <div class="param-label"><span class="param-name">m₁</span><div class="num-wrap"><input type="number" class="num-input" id="m1Num" value="1.0" min="0.1" max="5.0" step="0.1" oninput="syncFromNum('m1','m1Num')"><span class="num-unit">kg</span></div></div>
+      <input type="range" id="m1" min="0.1" max="5.0" step="0.1" value="1.0" aria-label="m1">
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">質量 m₂</span><div class="num-wrap"><input type="number" class="num-input" id="m2Num" value="1.0" min="0.1" max="5.0" step="0.1" oninput="syncFromNum('m2','m2Num')"><span class="num-unit">kg</span></div></div>
-      <input type="range" id="m2" min="0.1" max="5.0" step="0.1" value="1.0" oninput="syncToNum('m2','m2Num')">
+      <div class="param-label"><span class="param-name">m₂</span><div class="num-wrap"><input type="number" class="num-input" id="m2Num" value="1.0" min="0.1" max="5.0" step="0.1" oninput="syncFromNum('m2','m2Num')"><span class="num-unit">kg</span></div></div>
+      <input type="range" id="m2" min="0.1" max="5.0" step="0.1" value="1.0" aria-label="m2">
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">初期角度 θ₁</span><div class="num-wrap"><input type="number" class="num-input" id="th1Num" value="45" min="0" max="180" step="1" oninput="syncFromNum('th1','th1Num')"><span class="num-unit">°</span></div></div>
-      <input type="range" id="th1" min="0" max="180" step="1" value="45" oninput="syncToNum('th1','th1Num')">
+      <div class="param-label"><span class="param-name">θ₁</span><div class="num-wrap"><input type="number" class="num-input" id="th1Num" value="120" min="0" max="180" step="1" oninput="syncFromNum('th1','th1Num')"><span class="num-unit">°</span></div></div>
+      <input type="range" id="th1" min="0" max="180" step="1" value="120" aria-label="theta1">
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">初期角度 θ₂</span><div class="num-wrap"><input type="number" class="num-input" id="th2Num" value="45" min="0" max="180" step="1" oninput="syncFromNum('th2','th2Num')"><span class="num-unit">°</span></div></div>
-      <input type="range" id="th2" min="0" max="180" step="1" value="45" oninput="syncToNum('th2','th2Num')">
+      <div class="param-label"><span class="param-name">θ₂</span><div class="num-wrap"><input type="number" class="num-input" id="th2Num" value="120" min="0" max="180" step="1" oninput="syncFromNum('th2','th2Num')"><span class="num-unit">°</span></div></div>
+      <input type="range" id="th2" min="0" max="180" step="1" value="120" aria-label="theta2">
     </div>
     <div class="param-group">
       <div class="param-label"><span class="param-name">減衰（空気抵抗）</span><div class="num-wrap"><input type="number" class="num-input" id="dampNum" value="0" min="0" max="0.5" step="0.01" oninput="syncFromNum('damp','dampNum')"><span class="num-unit"></span></div></div>
-      <input type="range" id="damp" min="0" max="0.5" step="0.01" value="0" oninput="syncToNum('damp','dampNum')">
+      <input type="range" id="damp" min="0" max="0.5" step="0.01" value="0" aria-label="damping">
     </div>
 
     <div class="divider"></div>
     <div class="panel-title">プリセット</div>
     <div class="btn-group">
-      <button class="preset-btn active" onclick="setPreset('chaos',this)">🌀 カオス</button>
-      <button class="preset-btn" onclick="setPreset('regular',this)">⬆️ 規則的</button>
-      <button class="preset-btn" onclick="setPreset('sym',this)">⚖️ 対称</button>
+      <button class="preset-btn active" type="button" onclick="setPreset('chaos',this)">🌀 カオス</button>
+      <button class="preset-btn" type="button" onclick="setPreset('regular',this)">⬆️ 規則的</button>
+      <button class="preset-btn" type="button" onclick="setPreset('sym',this)">⚖️ 対称</button>
     </div>
 
     <div class="divider"></div>
-    <div class="panel-title">エネルギー & 制御</div>
-<div style="text-align:center;margin-bottom:10px;" id="chaosBadge">
+    <div class="panel-title">制御</div>
+    <div style="text-align:center;margin-bottom:10px;" id="chaosBadge">
       <span class="chaos-badge high">カオス域（大角度）</span>
     </div>
-    <div class="btn-group">
-      <button class="btn" onclick="resetSim()"><i class="fas fa-redo"></i> リセット</button>
-      <button class="btn green" id="compareBtn" onclick="toggleCompare()"><i class="fas fa-code-branch"></i> 2軌道比較</button>
+    <div class="play-row">
+      <button class="btn" type="button" id="playBtn" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+      <button class="btn secondary" type="button" onclick="resetSim()"><i class="fas fa-redo"></i> リセット</button>
+      <div style="display:flex;gap:4px;margin-left:auto">
+        <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+        <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+        <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+      </div>
     </div>
-
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-    <div class="stat-cards">
-      <div class="stat-card">
-        <div class="sv" id="eKin">—</div>
-        <div class="sl">運動エネルギー (J)</div>
-      </div>
-      <div class="stat-card">
-        <div class="sv" id="ePot">—</div>
-        <div class="sl">ポテンシャル (J)</div>
-      </div>
-      <div class="stat-card">
-        <div class="sv" id="eTotal">—</div>
-        <div class="sl">全エネルギー (J)</div>
-      </div>
-      <div class="stat-card">
-        <div class="sv" id="trajLen">0</div>
-        <div class="sl">軌跡点数</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（リアルタイム）</div>
+      <div class="live-readouts">
+        <div class="live-ro"><div class="rv" id="roTh1">—</div><div class="rl">θ₁ [°]</div></div>
+        <div class="live-ro"><div class="rv" id="roTh2">—</div><div class="rl">θ₂ [°]</div></div>
+        <div class="live-ro"><div class="rv" id="roW1">—</div><div class="rl">ω₁ [rad/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roW2">—</div><div class="rl">ω₂ [rad/s]</div></div>
+        <div class="live-ro ene"><div class="rv" id="roE">—</div><div class="rl">全エネルギー [J]</div></div>
+        <div class="live-ro sep"><div class="rv" id="roSep">—</div><div class="rl">分離 Δ [m]</div></div>
       </div>
     </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 振り子（実線＝本体・薄い影＝感度ゴースト）</div>
+      <canvas id="pendCanvas" tabindex="0" role="img" aria-label="二重振り子のカオスアニメーション。本体の振り子と、初期角度をわずかにずらした感度ゴーストが描かれ、時間とともに分離します。"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#00B4D8"></i>軌跡A</span>
+        <span><i class="swatch" style="background:#e74c3c"></i>軌跡B</span>
+        <span><i class="swatch" style="background:#007BFF"></i>振り子A</span>
+        <span><i class="swatch" style="background:rgba(231,76,60,.5)"></i>感度ゴースト（双子）</span>
+      </div>
+      <div class="hint-text">青 = 振り子A（本体）　|　赤い影 = 振り子B（θ₂を +0.001 rad だけずらした双子）。最初は重なり、やがて指数的に分離します。</div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 振り子</div><canvas id="pendCanvas"></canvas></div>
-    <div class="hint-text">青 = 振り子1（メイン） &nbsp;|&nbsp; 赤 = 振り子2（θ₁+0.01° ずれ、2軌道比較時）</div>
-  
-<div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+    <div class="chaos-annot" id="chaosAnnot"><strong>決定論なのに予測不能。</strong>2本の振り子は完全に同じ方程式に従い、初期角度の差はわずか 0.001 rad（約0.06°）。それでも上の「分離 Δ」がほぼ指数関数的に増大し、数秒〜十数秒で軌道は完全に別物になります。これがカオス＝初期条件への鋭敏な依存性（バタフライ効果）です。</div>
 
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-bolt"></i> エネルギー収支（KE / PE / 合計）</div>
+      <div class="energy-wrap">
+        <div class="ebar-col">
+          <div class="ebar-track"><div class="ebar-fill ke" id="barKE" style="height:0%"></div></div>
+          <div class="ebar-lbl" style="color:#00b894">運動 KE</div><div class="ebar-val" id="valKE">— J</div>
+        </div>
+        <div class="ebar-col">
+          <div class="ebar-track"><div class="ebar-fill pe" id="barPE" style="height:0%"></div></div>
+          <div class="ebar-lbl" style="color:#007BFF">位置 PE</div><div class="ebar-val" id="valPE">— J</div>
+        </div>
+        <div class="ebar-col">
+          <div class="ebar-track"><div class="ebar-fill tot" id="barTOT" style="height:0%"></div></div>
+          <div class="ebar-lbl" style="color:#f39c12">合計 E</div><div class="ebar-val" id="valTOT">— J</div>
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:10px" id="energyNote">減衰=0 では合計エネルギーは一定（保存）。KEとPEが互いに移り変わるだけです。</div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
       <p>$L = T - V$</p>
-      <p style="font-size:0.78rem;margin-top:4px;">$T$：運動エネルギー、$V$：重力ポテンシャル</p>
-      <p style="font-size:0.78rem;margin-top:4px;">連成ODE：$\ddot{\theta}_1, \ddot{\theta}_2$ をRK4で積分</p>
-    
-</div>
-</div>
+      <p style="font-size:0.8rem;margin-top:4px;">$T$：運動エネルギー、$V$：重力ポテンシャル</p>
+      <p style="font-size:0.8rem;margin-top:4px;">連成ODE：$\ddot{\theta}_1, \ddot{\theta}_2$ をRK4で積分</p>
+      <p style="font-size:0.8rem;margin-top:6px;">分離 $\Delta(t)$ は初期にほぼ $\Delta(t)\approx\Delta_0\,e^{\lambda t}$（$\lambda$＝最大リャプノフ指数 &gt; 0）で増大します。</p>
+    </div>
+  </div>
 </div>
 
 <script>
-
+"use strict";
 (function(){
 const G = 9.81;
-let L1=1,L2=1,m1=1,m2=1,th1_0=45*Math.PI/180,th2_0=45*Math.PI/180;
+let L1=1, L2=1, m1=1, m2=1;
 let damping = 0;
-let compareMode = false;
+let speedMult = 1;
+let playing = true;
+const GHOST_DTH = 0.001; // rad offset on theta2 for the twin
 
 // State: [th1, w1, th2, w2]
-
-function deriv(s, L1, L2, m1, m2) {
-  const [a1, w1, a2, w2] = s;
+function deriv(s){
+  const a1=s[0], w1=s[1], a2=s[2], w2=s[3];
   const da = a1 - a2;
   const sinDA = Math.sin(da), cosDA = Math.cos(da);
   const M = m1 + m2;
   const D = 2*m1 + m2 - m2*Math.cos(2*da);
   const num1 = -G*(2*m1+m2)*Math.sin(a1) - m2*G*Math.sin(a1-2*a2) - 2*sinDA*m2*(w2*w2*L2 + w1*w1*L1*cosDA);
-  const da1 = num1 / (L1*D) - damping*w1;
+  const da1 = num1/(L1*D) - damping*w1;
   const num2 = 2*sinDA*(M*w1*w1*L1 + G*M*Math.cos(a1) + m2*w2*w2*L2*cosDA);
-  const da2 = num2 / (L2*D) - damping*w2;
+  const da2 = num2/(L2*D) - damping*w2;
   return [w1, da1, w2, da2];
-}function rk4(s, dt, L1, L2, m1, m2){
-  const k1 = deriv(s, L1, L2, m1, m2);
-  const s2 = s.map((v,i)=>v+k1[i]*dt/2);
-  const k2 = deriv(s2, L1, L2, m1, m2);
-  const s3 = s.map((v,i)=>v+k2[i]*dt/2);
-  const k3 = deriv(s3, L1, L2, m1, m2);
-  const s4 = s.map((v,i)=>v+k3[i]*dt);
-  const k4 = deriv(s4, L1, L2, m1, m2);
+}
+function rk4(s, dt){
+  const k1=deriv(s);
+  const s2=s.map((v,i)=>v+k1[i]*dt/2); const k2=deriv(s2);
+  const s3=s.map((v,i)=>v+k2[i]*dt/2); const k3=deriv(s3);
+  const s4=s.map((v,i)=>v+k3[i]*dt);   const k4=deriv(s4);
   return s.map((v,i)=>v+(k1[i]+2*k2[i]+2*k3[i]+k4[i])*dt/6);
 }
 
-let state1 = [th1_0, 0, th2_0, 0];
-let state2 = [th1_0 + 0.0001, 0, th2_0, 0];
-const MAX_TRAIL = 600;
-let trail1 = [], trail2 = [];
+let th1_0=120*Math.PI/180, th2_0=120*Math.PI/180;
+let state1=[th1_0,0,th2_0,0];
+let state2=[th1_0,0,th2_0+GHOST_DTH,0];
+const MAX_TRAIL=700;
+let trail1=[], trail2=[];
 
-const canvas = document.getElementById('pendCanvas');
-const ctx = canvas.getContext('2d');
+const el=id=>document.getElementById(id);
+const canvas=el('pendCanvas');
+const ctx=canvas.getContext('2d');
+let cssW=0, cssH=0;
 
-function resize() {
+function resize(){
   const w = canvas.parentElement.clientWidth;
-  var __novaW = w;
-  var __novaH = Math.max(320, Math.min(520, Math.round(w * 0.65)));
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) {
-    __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-    __novaCtx.fillStyle = '#020d1a';
-    __novaCtx.fillRect(0, 0, __novaW, __novaH);
-  }
-}resize();
+  cssW = w;
+  cssH = Math.max(320, Math.min(520, Math.round(w*0.65)));
+  const dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  canvas.style.width=cssW+'px'; canvas.style.height=cssH+'px';
+  canvas.width=Math.round(cssW*dpr); canvas.height=Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle='#020d1a'; ctx.fillRect(0,0,cssW,cssH);
+}
+resize();
 window.addEventListener('resize', resize);
 
-function pct(id){
-  const el = document.getElementById(id);
-  el.style.setProperty('--pct', (el.value - el.min) / (el.max - el.min) * 100 + '%');
-}function resetSim(){
-  th1_0 = parseFloat(document.getElementById('th1').value) * Math.PI / 180;
-  th2_0 = parseFloat(document.getElementById('th2').value) * Math.PI / 180;
-  state1 = [th1_0, 0, th2_0, 0];
-  state2 = [th1_0 + 0.0001, 0, th2_0, 0];
-  trail1 = []; trail2 = [];
-}function bindSlider(id, label, unit, setter){
-  const el = document.getElementById(id);
-  el.addEventListener('input', () => {
-    const v = parseFloat(el.value);
-    var _lbl=document.getElementById(label);if(_lbl)_lbl.textContent = (id==='th1'||id==='th2') ? v+'°' : v.toFixed(id==='L1'||id==='L2'?1:1)+' '+unit;
-    var _ni=document.getElementById(id+'Num');if(_ni)_ni.value=v;
-    setter(v);
+function pct(id){ const e=el(id); e.style.setProperty('--pct',(e.value-e.min)/(e.max-e.min)*100+'%'); }
+
+function readParams(){
+  L1=parseFloat(el('L1').value); L2=parseFloat(el('L2').value);
+  m1=parseFloat(el('m1').value); m2=parseFloat(el('m2').value);
+  th1_0=parseFloat(el('th1').value)*Math.PI/180;
+  th2_0=parseFloat(el('th2').value)*Math.PI/180;
+}
+function resetSim(){
+  readParams();
+  state1=[th1_0,0,th2_0,0];
+  state2=[th1_0,0,th2_0+GHOST_DTH,0];
+  trail1=[]; trail2=[];
+  ctx.fillStyle='#020d1a'; ctx.fillRect(0,0,cssW,cssH);
+  updateChaosBadge();
+}
+window.resetSim=resetSim;
+
+function bindSlider(id){
+  const e=el(id);
+  e.addEventListener('input', ()=>{
+    const v=parseFloat(e.value);
+    const ni=el(id+'Num'); if(ni) ni.value=v;
     pct(id);
     resetSim();
-    updateChaosBadge();
   });
   pct(id);
-}bindSlider('L1','L1Val','m', v => L1=v);
-bindSlider('L2','L2Val','m', v => L2=v);
-bindSlider('m1','m1Val','kg', v => m1=v);
-bindSlider('m2','m2Val','kg', v => m2=v);
-bindSlider('th1','th1Val','', v =>{ th1_0=v*Math.PI/180; });
-bindSlider('th2','th2Val','', v =>{ th2_0=v*Math.PI/180; });
+}
+['L1','L2','m1','m2','th1','th2'].forEach(bindSlider);
 
-// Damping slider (special handling - no reset)
-
-document.getElementById('damp').addEventListener('input', function(){
-  damping = parseFloat(this.value);
-  var _dn=document.getElementById('dampNum');if(_dn)_dn.value=damping.toFixed(2);
+el('damp').addEventListener('input', function(){
+  damping=parseFloat(this.value);
+  const dn=el('dampNum'); if(dn) dn.value=damping.toFixed(2);
   pct('damp');
+  el('energyNote').innerHTML = damping>0 ? "減衰&gt;0 では摩擦でエネルギーが散逸し、合計が徐々に減少します。" : "減衰=0 では合計エネルギーは一定（保存）。KEとPEが互いに移り変わるだけです。";
 });
 pct('damp');
 
+window.syncFromNum = function(rangeId, numId){
+  const r=el(rangeId), n=el(numId);
+  if(!r||!n) return;
+  let v=parseFloat(n.value);
+  if(isNaN(v)) return;
+  v=Math.max(parseFloat(r.min), Math.min(parseFloat(r.max), v));
+  r.value=v;
+  if(rangeId==='damp'){ damping=v; pct('damp'); el('energyNote').innerHTML = damping>0 ? "減衰&gt;0 では摩擦でエネルギーが散逸し、合計が徐々に減少します。" : "減衰=0 では合計エネルギーは一定（保存）。KEとPEが互いに移り変わるだけです。"; }
+  else { pct(rangeId); resetSim(); }
+};
+
 function updateChaosBadge(){
-  const maxA = Math.max(Math.abs(parseFloat(document.getElementById('th1').value)),
-                        Math.abs(parseFloat(document.getElementById('th2').value)));
-  const badge = document.getElementById('chaosBadge');
-  if (maxA > 60) badge.innerHTML = '<span class="chaos-badge high">カオス域（大角度）</span>';
-  else badge.innerHTML = '<span class="chaos-badge low">準規則域（小角度）</span>';
-}window.setPreset = function(name, btn){
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const p = { chaos:{L1:1,L2:1,m1:1,m2:1,th1:120,th2:120,damp:0}, regular:{L1:1,L2:1,m1:2,m2:0.5,th1:20,th2:20,damp:0.05}, sym:{L1:1,L2:1,m1:1,m2:1,th1:90,th2:90,damp:0} }[name];
-  damping=p.damp; document.getElementById('damp').value=p.damp; pct('damp'); L1=p.L1; L2=p.L2; m1=p.m1; m2=p.m2;
-  ['L1','L2','m1','m2'].forEach(k =>{ document.getElementById(k).value=p[k]; pct(k); });
-  document.getElementById('th1').value=p.th1; pct('th1'); var _t1n=document.getElementById('th1Num');if(_t1n)_t1n.value=p.th1;
-  document.getElementById('th2').value=p.th2; pct('th2'); var _t2n=document.getElementById('th2Num');if(_t2n)_t2n.value=p.th2;
-  var _l1n=document.getElementById('L1Num');if(_l1n)_l1n.value=p.L1;
-  var _l2n=document.getElementById('L2Num');if(_l2n)_l2n.value=p.L2;
-  var _m1n=document.getElementById('m1Num');if(_m1n)_m1n.value=p.m1;
-  var _m2n=document.getElementById('m2Num');if(_m2n)_m2n.value=p.m2;
-  th1_0=p.th1*Math.PI/180; th2_0=p.th2*Math.PI/180;
-  resetSim(); updateChaosBadge();
-};
-
-window.resetSim = resetSim;
-
-window.toggleCompare = function(){
-  compareMode = !compareMode;
-  const btn = document.getElementById('compareBtn');
-  if (compareMode) {
-    btn.style.background = '#e74c3c';
-    btn.textContent = '🔴 比較中（停止）';
-    trail2 = [];
-    state2 = [state1[0] + 0.0001, state1[1], state1[2], state1[3]];
-  }else{
-    btn.style.background = '';
-    btn.innerHTML = '<i class="fas fa-code-branch"></i> 2軌道比較';
-    trail2 = [];
-  }
-};
-
-function energy(s){
-  const [a1, w1, a2, w2] = s;
-  const x1 = L1 * Math.sin(a1), y1 = -L1 * Math.cos(a1);
-  const x2 = x1 + L2 * Math.sin(a2), y2 = y1 - L2 * Math.cos(a2);
-  const vx1 = L1*w1*Math.cos(a1), vy1 = L1*w1*Math.sin(a1);
-  const vx2 = vx1+L2*w2*Math.cos(a2), vy2 = vy1+L2*w2*Math.sin(a2);
-  const KE = 0.5*m1*(vx1*vx1+vy1*vy1) + 0.5*m2*(vx2*vx2+vy2*vy2);
-  const PE = G*(m1*y1 + m2*y2);
-  return { KE, PE, total: KE+PE };
-}const DT = 0.008;
-const STEPS_PER_FRAME = 4;
-
-function pos(s, scale, ox, oy){
-  const x1 = ox + L1 * scale * Math.sin(s[0]);
-  const y1 = oy + L1 * scale * Math.cos(s[0]);
-  const x2 = x1 + L2 * scale * Math.sin(s[2]);
-  const y2 = y1 + L2 * scale * Math.cos(s[2]);
-  return {x1,y1,x2,y2};
-}function draw(){
-  requestAnimationFrame(draw);
-  for (let i = 0; i < STEPS_PER_FRAME; i++) {
-    state1 = rk4(state1, DT, L1, L2, m1, m2);
-    if (compareMode) state2 = rk4(state2, DT, L1, L2, m1, m2);
-  }
-
-  const W = __novaCanvasCssW(canvas), H = __novaCanvasCssH(canvas);
-  const maxL = L1 + L2;
-  const scale = Math.min(W, H) * 0.36 / maxL;
-  const ox = W/2, oy = H*0.42;
-
-  const p1 = pos(state1, scale, ox, oy);
-  trail1.push({x: p1.x2, y: p1.y2});
-  if (trail1.length > MAX_TRAIL) trail1.shift();
-  if (compareMode){
-    const p2 = pos(state2, scale, ox, oy);
-    trail2.push({x: p2.x2, y: p2.y2});
-    if (trail2.length > MAX_TRAIL) trail2.shift();
-  }// Clear with fade
-  ctx.fillStyle = 'rgba(2,13,26,0.3)';
-  ctx.fillRect(0, 0, W, H);
-
-  // Trail 1
-  if (trail1.length > 1){
-    for (let i = 1; i < trail1.length; i++) {
-      const a = i / trail1.length;
-      ctx.strokeStyle = `rgba(0,180,216,${(a*0.7).toFixed(2)})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(trail1[i-1].x, trail1[i-1].y); ctx.lineTo(trail1[i].x, trail1[i].y); ctx.stroke();
-    }
-  }// Trail 2
-  if (compareMode && trail2.length > 1){
-    for (let i = 1; i < trail2.length; i++) {
-      const a = i / trail2.length;
-      ctx.strokeStyle = `rgba(231,76,60,${(a*0.7).toFixed(2)})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(trail2[i-1].x, trail2[i-1].y); ctx.lineTo(trail2[i].x, trail2[i].y); ctx.stroke();
-    }
-  }// Draw pendulum 1
-  ctx.strokeStyle = '#007BFF'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(p1.x1, p1.y1); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(p1.x1, p1.y1); ctx.lineTo(p1.x2, p1.y2); ctx.stroke();
-  ctx.fillStyle = '#007BFF'; ctx.beginPath(); ctx.arc(ox,oy,5,0,Math.PI*2); ctx.fill();
-  const r1 = Math.max(6, m1*6); const r2 = Math.max(6, m2*6);
-  ctx.fillStyle = '#007BFF'; ctx.beginPath(); ctx.arc(p1.x1,p1.y1,r1,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#00B4D8'; ctx.beginPath(); ctx.arc(p1.x2,p1.y2,r2,0,Math.PI*2); ctx.fill();
-
-  // Draw pendulum 2 (compare)
-  if (compareMode){
-    const p2 = pos(state2, scale, ox, oy);
-    ctx.strokeStyle = 'rgba(231,76,60,0.7)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(p2.x1, p2.y1); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(p2.x1, p2.y1); ctx.lineTo(p2.x2, p2.y2); ctx.stroke();
-    ctx.fillStyle = 'rgba(231,76,60,0.8)';
-    ctx.beginPath(); ctx.arc(p2.x1,p2.y1,r1*0.8,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(p2.x2,p2.y2,r2*0.8,0,Math.PI*2); ctx.fill();
-  }
-
-  // Energy display
-  const en = energy(state1);
-  document.getElementById('eKin').textContent = en.KE.toFixed(2);
-  document.getElementById('ePot').textContent = en.PE.toFixed(2);
-  document.getElementById('eTotal').textContent = en.total.toFixed(2);
-  document.getElementById('trajLen').textContent = trail1.length;
+  const maxA=Math.max(Math.abs(parseFloat(el('th1').value)), Math.abs(parseFloat(el('th2').value)));
+  const b=el('chaosBadge');
+  b.innerHTML = maxA>60 ? '<span class="chaos-badge high">カオス域（大角度）</span>' : '<span class="chaos-badge low">準規則域（小角度）</span>';
 }
 
+window.setPreset=function(name, btn){
+  document.querySelectorAll('.preset-btn').forEach(b=>{ if(b.dataset.speed===undefined) b.classList.remove('active'); });
+  if(btn) btn.classList.add('active');
+  const p={ chaos:{L1:1,L2:1,m1:1,m2:1,th1:120,th2:120,damp:0},
+            regular:{L1:1,L2:1,m1:2,m2:0.5,th1:20,th2:20,damp:0.05},
+            sym:{L1:1,L2:1,m1:1,m2:1,th1:90,th2:90,damp:0} }[name];
+  ['L1','L2','m1','m2','th1','th2','damp'].forEach(k=>{
+    el(k).value=p[k]; pct(k);
+    const ni=el(k+'Num'); if(ni) ni.value=p[k];
+  });
+  damping=p.damp;
+  el('energyNote').innerHTML = damping>0 ? "減衰&gt;0 では摩擦でエネルギーが散逸し、合計が徐々に減少します。" : "減衰=0 では合計エネルギーは一定（保存）。KEとPEが互いに移り変わるだけです。";
+  resetSim();
+};
+
+window.setSpeed=function(v){
+  speedMult=v;
+  document.querySelectorAll('.speed-btn').forEach(b=>b.classList.toggle('active', parseFloat(b.dataset.speed)===v));
+};
+
+window.togglePlay=function(){
+  playing=!playing;
+  el('playBtn').innerHTML = playing ? "<i class=\"fas fa-pause\"></i> 一時停止" : '<i class="fas fa-play"></i> ' + "再生";
+};
+
+canvas.addEventListener('keydown', e=>{
+  if(e.key===' '||e.key==='Enter'){ e.preventDefault(); togglePlay(); }
+});
+
+function energy(s){
+  const a1=s[0], w1=s[1], a2=s[2], w2=s[3];
+  const y1=-L1*Math.cos(a1);
+  const y2=y1 - L2*Math.cos(a2);
+  const vx1=L1*w1*Math.cos(a1), vy1=L1*w1*Math.sin(a1);
+  const vx2=vx1+L2*w2*Math.cos(a2), vy2=vy1+L2*w2*Math.sin(a2);
+  const KE=0.5*m1*(vx1*vx1+vy1*vy1)+0.5*m2*(vx2*vx2+vy2*vy2);
+  const PE=G*(m1*y1+m2*y2);
+  return {KE, PE, total:KE+PE};
+}
+
+const DT=0.005;
+const BASE_STEPS=4;
+
+function pos(s, scale, ox, oy){
+  const x1=ox+L1*scale*Math.sin(s[0]);
+  const y1=oy+L1*scale*Math.cos(s[0]);
+  const x2=x1+L2*scale*Math.sin(s[2]);
+  const y2=y1+L2*scale*Math.cos(s[2]);
+  return {x1,y1,x2,y2};
+}
+
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function draw(){
+  requestAnimationFrame(draw);
+  const W=cssW, H=cssH;
+  const maxL=L1+L2;
+  const scale=Math.min(W,H)*0.36/maxL;
+  const ox=W/2, oy=H*0.42;
+
+  if(playing){
+    let steps=Math.round(BASE_STEPS*speedMult);
+    if(reduceMotion) steps=Math.max(1, Math.round(steps/2));
+    for(let i=0;i<steps;i++){
+      state1=rk4(state1,DT);
+      state2=rk4(state2,DT);
+    }
+    const p1=pos(state1,scale,ox,oy);
+    const p2=pos(state2,scale,ox,oy);
+    trail1.push({x:p1.x2,y:p1.y2}); if(trail1.length>MAX_TRAIL) trail1.shift();
+    trail2.push({x:p2.x2,y:p2.y2}); if(trail2.length>MAX_TRAIL) trail2.shift();
+  }
+
+  // fade clear
+  ctx.fillStyle='rgba(2,13,26,0.30)';
+  ctx.fillRect(0,0,W,H);
+
+  // ghost (twin) trail B - faint red
+  if(trail2.length>1){
+    for(let i=1;i<trail2.length;i++){
+      const a=i/trail2.length;
+      ctx.strokeStyle='rgba(231,76,60,'+(a*0.6).toFixed(2)+')';
+      ctx.lineWidth=1.4;
+      ctx.beginPath(); ctx.moveTo(trail2[i-1].x,trail2[i-1].y); ctx.lineTo(trail2[i].x,trail2[i].y); ctx.stroke();
+    }
+  }
+  // main trail A - cyan
+  if(trail1.length>1){
+    for(let i=1;i<trail1.length;i++){
+      const a=i/trail1.length;
+      ctx.strokeStyle='rgba(0,180,216,'+(a*0.8).toFixed(2)+')';
+      ctx.lineWidth=1.8;
+      ctx.beginPath(); ctx.moveTo(trail1[i-1].x,trail1[i-1].y); ctx.lineTo(trail1[i].x,trail1[i].y); ctx.stroke();
+    }
+  }
+
+  const p1=pos(state1,scale,ox,oy);
+  const p2=pos(state2,scale,ox,oy);
+  const r1=Math.max(6,m1*5), r2=Math.max(6,m2*5);
+
+  // ghost twin (faint)
+  ctx.strokeStyle='rgba(231,76,60,0.5)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(p2.x1,p2.y1); ctx.lineTo(p2.x2,p2.y2); ctx.stroke();
+  ctx.fillStyle='rgba(231,76,60,0.55)';
+  ctx.beginPath(); ctx.arc(p2.x1,p2.y1,r1*0.8,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(p2.x2,p2.y2,r2*0.8,0,7); ctx.fill();
+
+  // main pendulum
+  ctx.strokeStyle='#5aa9ff'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(p1.x1,p1.y1); ctx.lineTo(p1.x2,p1.y2); ctx.stroke();
+  ctx.fillStyle='#cfe6ff'; ctx.beginPath(); ctx.arc(ox,oy,4,0,7); ctx.fill();
+  ctx.fillStyle='#007BFF'; ctx.beginPath(); ctx.arc(p1.x1,p1.y1,r1,0,7); ctx.fill();
+  ctx.fillStyle='#00B4D8'; ctx.beginPath(); ctx.arc(p1.x2,p1.y2,r2,0,7); ctx.fill();
+
+  // separation line between the two tips (when visible)
+  const sepPx=Math.hypot(p1.x2-p2.x2, p1.y2-p2.y2);
+  if(sepPx>6){
+    ctx.strokeStyle='rgba(255,196,0,0.5)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(p1.x2,p1.y2); ctx.lineTo(p2.x2,p2.y2); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // readouts
+  const norm=a=>{ let d=((a+Math.PI)%(2*Math.PI)); if(d<0)d+=2*Math.PI; return (d-Math.PI)*180/Math.PI; };
+  el('roTh1').textContent=norm(state1[0]).toFixed(1);
+  el('roTh2').textContent=norm(state1[2]).toFixed(1);
+  el('roW1').textContent=state1[1].toFixed(2);
+  el('roW2').textContent=state1[3].toFixed(2);
+  const en=energy(state1);
+  el('roE').textContent=en.total.toFixed(2);
+
+  // physical separation between the two lower tips (metres)
+  const x1a=L1*Math.sin(state1[0])+L2*Math.sin(state1[2]);
+  const y1a=-L1*Math.cos(state1[0])-L2*Math.cos(state1[2]);
+  const x1b=L1*Math.sin(state2[0])+L2*Math.sin(state2[2]);
+  const y1b=-L1*Math.cos(state2[0])-L2*Math.cos(state2[2]);
+  const sepM=Math.hypot(x1a-x1b, y1a-y1b);
+  el('roSep').textContent=sepM<0.01 ? sepM.toExponential(1) : sepM.toFixed(3);
+
+  // energy bars (scaled to a reference: g*(m1+m2)*(L1+L2))
+  const eRef=Math.max(G*(m1+m2)*(L1+L2), 1e-6);
+  const keP=Math.min(100, en.KE/eRef*100);
+  const peP=Math.min(100, Math.max(0,(en.PE+eRef)/(2*eRef))*100);
+  const totP=Math.min(100, Math.max(0,(en.total+eRef)/(2*eRef))*100);
+  el('barKE').style.height=keP+'%';
+  el('barPE').style.height=peP+'%';
+  el('barTOT').style.height=totP+'%';
+  el('valKE').textContent=en.KE.toFixed(1)+' J';
+  el('valPE').textContent=en.PE.toFixed(1)+' J';
+  el('valTOT').textContent=en.total.toFixed(1)+' J';
+}
+
+resetSim();
 updateChaosBadge();
 draw();
-})();
-
-(function(){
-  var __novaRedrawPending=false;
-  function __novaCall(fn){try{if(typeof fn==='function'&&fn.length===0)fn();}catch(e){}}
-  function __novaRefreshCharts(){try{if(typeof Chart!=='undefined'&&Chart.getChart){document.querySelectorAll('canvas').forEach(function(c){var ch=Chart.getChart(c);if(ch){try{ch.resize();}catch(e){}try{ch.update('none');}catch(e){}}});}}catch(e){}}
-  function __novaRedraw(){__novaRedrawPending=false;__novaCall(typeof resize==='function'?resize:null);__novaCall(typeof resizeCanvas==='function'?resizeCanvas:null);__novaCall(typeof initCanvas==='function'?initCanvas:null);__novaCall(typeof compute==='function'?compute:null);__novaCall(typeof update==='function'?update:null);__novaCall(typeof render==='function'?render:null);__novaCall(typeof draw==='function'?draw:null);__novaCall(typeof drawOrbit==='function'?drawOrbit:null);__novaCall(typeof drawBearing==='function'?drawBearing:null);__novaCall(typeof drawPhasor==='function'?drawPhasor:null);__novaCall(typeof drawSpectrum==='function'?drawSpectrum:null);__novaCall(typeof drawShell==='function'?drawShell:null);__novaCall(typeof drawPStress==='function'?drawPStress:null);__novaCall(typeof drawTSF==='function'?drawTSF:null);__novaCall(typeof drawCircuit==='function'?drawCircuit:null);__novaCall(typeof drawCircuitDiagram==='function'?drawCircuitDiagram:null);__novaCall(typeof drawScheme==='function'?drawScheme:null);__novaCall(typeof updateChart==='function'?updateChart:null);__novaCall(typeof updateCharts==='function'?updateCharts:null);__novaRefreshCharts();}
-  function __novaSchedule(ms){setTimeout(__novaRedraw,ms||0);}
-  [0,120,420,900,1400].forEach(__novaSchedule);
-  window.addEventListener('load',function(){[0,180,520,1000,1600].forEach(__novaSchedule);});
-  window.addEventListener('resize',function(){__novaSchedule(80);});
-  document.addEventListener('visibilitychange',function(){__novaSchedule(120);});
 })();
 </script>
 
@@ -498,7 +579,7 @@ draw();
       <div class="bub">二重振り子って、単なる振り子が2つ繋がっただけですよね？なんで「カオス」って言われるほど複雑な動きをするんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大まかに言うと、2つの振り子の動きが互いに強く影響し合う「非線形」の連成振動だからだよ。例えば、上の振り子（L₁）がちょっと揺れると、それが下の振り子（L₂）に伝わって大きく揺れ、その揺れがまた上にフィードバックされる。このシミュレーターで、初期角度θ₂をほんの0.1度だけ変えて「2軌道比較」ボタンを押して確認してみて。一瞬は同じ動きをしても、すぐに大きく異なる軌道になってしまうよ。これがカオスの「初期値敏感性」だ。</div>
+      <div class="bub">大まかに言うと、2つの振り子の動きが互いに強く影響し合う「非線形」の連成振動だからだよ。例えば、上の振り子（L₁）がちょっと揺れると、それが下の振り子（L₂）に伝わって大きく揺れ、その揺れがまた上にフィードバックされる。このシミュレーターで「2軌道比較」ボタンを押すと、初期角度θ₁をほんの10⁻⁴ rad（約0.006°）だけずらした2本目の軌道が描かれる。一瞬は同じ動きをしても、すぐに大きく異なる軌道になってしまうよ。これがカオスの「初期値敏感性」だ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">え、そうなんですか！でも、その複雑な動きをコンピューターはどうやって計算してるんですか？物理の授業で習う運動方程式とは違うんですか？</div>

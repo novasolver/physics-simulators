@@ -124,14 +124,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "斜面安定解析・安全率計算（簡易ビショップ法）",
       "description": "簡易ビショップ法による斜面安定解析。斜面高さ・傾斜角・粘着力・内部摩擦角・単位体積重量・地下水位を設定し、安全率FSと円弧すべり面をリアルタイム計算・可視化。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/slope-stability.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -291,7 +291,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="sN" min="5" max="15" step="1" value="10" oninput="syncToNum('sN','vN');updateSlider(this,'vN',0,'');compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4274214591?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274214591.09._SCMZZZZZZ_.jpg" alt="土質力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">土質力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -350,7 +358,7 @@ function syncWt(){
   el.max = H * 1.2;
   const v = Math.min(parseFloat(el.value), el.max);
   el.value = v;
-  document.getElementById('vWt').value = v.toFixed(1) + ' m';
+  document.getElementById('vWt').value = v.toFixed(1);
   const min = parseFloat(el.min), max = parseFloat(el.max);
   el.style.setProperty('--pct', ((v - min) / (max - min) * 100).toFixed(1) + '%');
 }function getParams(){
@@ -403,7 +411,7 @@ function syncWt(){
       // Slice base angle
       const alpha = Math.atan2(xMid - cx, cy - yBase); // sign convention
       // Water pressure
-      const h_w = Math.max(0, Math.min(h_slice, ySurf - wt));
+      const h_w = Math.max(0, Math.min(h_slice, (ySurf - wt) - yBase));
       const u = 9.81 * h_w;
       const ma = Math.cos(alpha) + Math.sin(alpha) * Math.tan(phi) / FS;
       if (Math.abs(ma) < 1e-10) continue;
@@ -447,21 +455,26 @@ function compute(){
   const R0 = Math.sqrt(cx0 * cx0 + cy0 * cy0) * 0.95;
 
   const fs0 = bishopFS(cx0, cy0, R0, p);
+  const best = findBestCircle(p);
+  const hasBest = Number.isFinite(best.bestFS);
+  const cxBest = hasBest ? best.bestCx : cx0;
+  const cyBest = hasBest ? best.bestCy : cy0;
+  const RBest = hasBest ? best.bestR : R0;
 
-  // Sweep R
+  // Sweep R around the displayed circle center.
   const RArr = [], fsArr = [];
   for (let i = 0; i < 30; i++){
-    const Ri = R0 * (0.7 + 0.9 * i / 29);
-    const fsi = bishopFS(cx0, cy0, Ri, p);
+    const Ri = RBest * (0.7 + 0.9 * i / 29);
+    const fsi = bishopFS(cxBest, cyBest, Ri, p);
     if (fsi !== null) { RArr.push(Ri); fsArr.push(fsi); }
   }const minFS = fsArr.length > 0 ? Math.min(...fsArr) : null;
 
-  const fsDisplay = fs0 !== null ? fs0 : minFS;
+  const fsDisplay = hasBest ? best.bestFS : (fs0 !== null ? fs0 : minFS);
   document.getElementById('statFS').textContent = fsDisplay !== null ? fsDisplay.toFixed(3) : '—';
   document.getElementById('statFSmin').textContent = minFS !== null ? minFS.toFixed(3) : '—';
-  document.getElementById('statCx').textContent = cx0.toFixed(1);
-  document.getElementById('statCy').textContent = cy0.toFixed(1);
-  document.getElementById('statR').textContent = R0.toFixed(1);
+  document.getElementById('statCx').textContent = cxBest.toFixed(1);
+  document.getElementById('statCy').textContent = cyBest.toFixed(1);
+  document.getElementById('statR').textContent = RBest.toFixed(1);
 
   // Color code FS card
   const card = document.getElementById('cardFS');
@@ -471,7 +484,7 @@ function compute(){
     else if (fsDisplay >= 1.5) card.classList.add('safe');
   }
 
-  drawSlope(p, cx0, cy0, R0, fs0);
+  drawSlope(p, cxBest, cyBest, RBest, fsDisplay);
   drawChartFS(RArr, fsArr);
 }function drawSlope(p, cx, cy, R, fs){
   const canvas = document.getElementById('slopeCanvas');
@@ -736,6 +749,9 @@ window.addEventListener('resize', compute);
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="slope-stability.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -784,14 +800,14 @@ window.addEventListener('resize', compute);
 <ol>
 <li>斜面高さ（m）と斜面角度（度）を入力し、地層構成と地下水位を設定します</li>
 <li>土質定数として粘着力 c（kPa）と内部摩擦角φ（度）を砂質土・粘性土の区分に応じて入力します</li>
-<li>「解析実行」ボタンで簡易ビショップ法による円弧すべり面の自動探索を開始し、リアルタイムで各スライスの法線応力・せん断応力を計算します</li>
+<li>入力変更に合わせて簡易ビショップ法による円弧すべり面の自動探索を行い、安全率と臨界円弧をリアルタイムで更新します</li>
 <li>収束判定（|FS_{i+1}−FS_i|<10^-5）を満たした時点で最小安全率と臨界円弧中心座標が出力されます</li>
 <li>間隙水圧を考慮した有効応力解析により、飽和土層での安定性評価が可能です</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>高さ15m、勾配35度の砂質土斜面（γ=18.5kN/m³、c=5kPa、φ=32度、地下水位-3m）を解析した場合、円弧中心（x=8.2m、y=12.5m）、半径R=18.3mの臨界すべり面において安全率FS=1.24が得られます。スライス分割数20で計算すると、下部スライスの有効垂直応力は約120kPa、間隙水圧比r_u=0.3を考慮した補正後のFS値は1.18に低下します</p>
+<p>高さ15m、勾配35度の砂質土斜面（γ=18.5kN/m³、c=5kPa、φ=32度、地下水位深さ3m）を解析した場合、固定後の自動探索では円弧中心（x=8.6m、y=27.0m）、半径R=30.6mの臨界すべり面で安全率FS=2.494が得られます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -802,6 +818,16 @@ window.addEventListener('resize', compute);
 <li>表層崩壊リスク（深さ2m未満）は本ツールで過評価される傾向があり、浅いすべり面は別途簡易法で検証してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4274214591?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274214591.09._SCMZZZZZZ_.jpg" alt="土質力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">土質力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

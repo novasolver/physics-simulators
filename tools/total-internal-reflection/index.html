@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "全反射シミュレーター",
       "description": "媒質1から媒質2への屈折で、入射角が臨界角を超えると起こる全反射と、境界面にしみ出すエバネッセント波の透過深さをリアルタイムに計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/total-internal-reflection.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Snellの法則による屈折角の計算","臨界角と全反射判定","エバネッセント波の透過深さの可視化","屈折率と波長を変えての対話的学習"],
       "keywords": "全反射,臨界角,エバネッセント波,Snellの法則,屈折率,光ファイバー,ATR分光,透過深さ",
       "datePublished": "2026-05-16",
@@ -100,10 +100,31 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#cv{ background:#0a1929; border-radius:8px; display:block; width:100%; cursor:crosshair; touch-action:none; }
+#cv:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
 .warn-box{ background:rgba(231,76,60,.08); border:1px solid rgba(231,76,60,.35); color:#c0392b; border-radius:8px; padding:8px 12px; font-size:0.82rem; margin-top:8px; display:none; }
 .warn-box.show{ display:block; }
+/* ===== v2 additions ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.15;word-break:break-word}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.regime-pill{display:inline-block;font-weight:700;font-size:.8rem;padding:4px 12px;border-radius:20px;border:1px solid var(--border)}
+.regime-pill.refract{background:rgba(231,76,60,.1);color:#c0392b;border-color:rgba(231,76,60,.35)}
+.regime-pill.crit{background:rgba(243,156,18,.12);color:#b9770e;border-color:rgba(243,156,18,.4)}
+.regime-pill.tir{background:rgba(255,209,102,.18);color:#9a7400;border-color:rgba(255,209,102,.5)}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:4px 10px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s;color:var(--text)}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-lbl{font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+@media (prefers-reduced-motion: reduce){ .preset-btn{transition:none} }
 </style>
 </head>
 <body>
@@ -132,6 +153,24 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 <div class="main">
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div style="margin-bottom:12px;">
+      <div class="preset-lbl">材料プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setMaterial('glass-air')">ガラス→空気</button>
+        <button type="button" class="preset-btn" onclick="setMaterial('water-air')">水→空気</button>
+        <button type="button" class="preset-btn" onclick="setMaterial('diamond-air')">ダイヤ→空気</button>
+        <button type="button" class="preset-btn" onclick="setMaterial('fiber')">ファイバー コア／クラッド</button>
+      </div>
+      <div class="preset-lbl" style="margin-top:8px">シナリオ</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setScenario('below')">臨界角未満→屈折</button>
+        <button type="button" class="preset-btn" onclick="setScenario('at')">臨界角ちょうど</button>
+        <button type="button" class="preset-btn" onclick="setScenario('tir')">全反射→エバネッセント</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
 
     <div class="param-group">
       <div class="param-label">
@@ -168,28 +207,48 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 入射角を掃引</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-pause"></i> 波を一時停止</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <div id="warnBox" class="warn-box">n_1 ≤ n_2 の場合、全反射は起こりません。n_1 を n_2 より大きくしてください。</div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値（ガラス n_1=1.50 / 空気 n_2=1.00 / λ_0=633 nm の HeNe レーザー）で θ_c ≈ 41.81°、θ_1=45° で全反射、d_p ≈ 285 nm になります。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-      <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statThetaC">—</div><div class="sl">臨界角 θ_c</div></div>
-        <div class="stat-card"><div class="sv" id="statState">—</div><div class="sl">状態</div></div>
-        <div class="stat-card"><div class="sv" id="statDp">—</div><div class="sl">エバネッセント透過深さ d_p</div></div>
-        <div class="stat-card"><div class="sv" id="statThetaT">—</div><div class="sl">屈折角 θ_2（θ&lt;θ_c のときのみ）</div></div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roTheta1">45.0°</div><div class="rl">入射角 θ_1</div></div>
+        <div class="live-ro"><div class="rv" id="roTheta2">—</div><div class="rl">屈折角 θ_2</div></div>
+        <div class="live-ro"><div class="rv" id="roThetaC">41.81°</div><div class="rl">臨界角 θ_c</div></div>
+        <div class="live-ro"><div class="rv" id="roDp">285 nm</div><div class="rl">透過深さ d_p</div></div>
+        <div class="live-ro"><div class="rv" id="roR">—</div><div class="rl">反射率 R</div></div>
+        <div class="live-ro"><div class="rv" id="roT">—</div><div class="rl">透過率 T</div></div>
+        <div class="live-ro"><div class="rv" id="roN1">1.50</div><div class="rl">媒質1 n_1</div></div>
+        <div class="live-ro"><div class="rv" id="roN2">1.00</div><div class="rl">媒質2 n_2</div></div>
       </div>
+      <div style="text-align:center;margin-top:4px"><span class="regime-pill tir" id="regimePill">全反射 (TIR)</span></div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-water"></i> 境界面と光線</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">青＝入射光／緑＝反射光／赤＝屈折光（TIR 時は表示しない）／黄色破線＝エバネッセント波の減衰曲線</p>
+      <div class="chart-title"><i class="fas fa-water"></i> 境界面と光線（ドラッグで入射角を操作）</div>
+      <canvas id="cv" width="600" height="400" tabindex="0" role="img" aria-label="全反射シミュレーション。境界面の入射光・反射光・屈折光と、全反射時のエバネッセント波を表示します。光線をドラッグして入射角を変えられます。"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#3aa7ff"></i>入射光</span>
+        <span><i class="swatch" style="background:#27ae60"></i>反射光</span>
+        <span><i class="swatch" style="background:#e74c3c"></i>屈折光（TIRで消失）</span>
+        <span><i class="swatch" style="background:#FFD166"></i>エバネッセント場</span>
+      </div>
+      <p class="canvas-hint">境界面の上側でドラッグ、または ← / → キーで入射角を調整。臨界角を境に屈折光が消える瞬間を観察してください。</p>
     </div>
 
     <div class="chart-card">
@@ -209,23 +268,34 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Total Internal Reflection Simulator ==========
+"use strict";
+// ========== Total Internal Reflection Simulator (v2) ==========
+var L = {
+  incident: '入射光', reflected: '反射光', refracted: '屈折光',
+  evan: 'エバネッセント波', med1: '媒質1', med2: '媒質2',
+  pause: '<i class="fas fa-pause"></i> 波を一時停止', play: '<i class="fas fa-play"></i> 波を再生',
+  regRefract: '屈折（部分反射）', regCrit: '臨界角ちょうど', regTir: '全反射 (TIR)',
+  thetaC: 'θ_c', critHere: 'θ_2 → 90° で消失'
+};
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d');
-var playing = false;
+var playing = true;
 var animId = null;
+var phase = 0;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var dragging = false;
+var lastInfo = null;
+
+function elv(id){ return document.getElementById(id); }
+function num(id){ return parseFloat(elv(id).value); }
 
 function getParams() {
-  var n1 = parseFloat(document.getElementById('slN1').value);
-  var n2 = parseFloat(document.getElementById('slN2').value);
-  var th = parseFloat(document.getElementById('slTheta').value);
-  var lam = parseFloat(document.getElementById('slLambda').value);
-  return { n1: n1, n2: n2, theta: th, lambda: lam };
+  return { n1: num('slN1'), n2: num('slN2'), theta: num('slTheta'), lambda: num('slLambda') };
 }
 
 function resizeCanvas() {
   var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var h = Math.round(w * 0.6);
+  var h = Math.round(w * 0.62);
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   cv.style.width = w + 'px';
   cv.style.height = h + 'px';
@@ -236,111 +306,63 @@ function resizeCanvas() {
   cv.dataset.cssH = String(h);
 }
 
-function drawScene(p, info) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var cx = W * 0.5, cy = H * 0.5;
-  // medium fills
-  ctx.fillStyle = 'rgba(0,123,255,0.10)';
-  ctx.fillRect(0, 0, W, cy);
-  ctx.fillStyle = 'rgba(0,180,216,0.05)';
-  ctx.fillRect(0, cy, W, H - cy);
-  // medium labels
-  ctx.fillStyle = '#9ec5e8';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('媒質 1  n_1 = ' + p.n1.toFixed(2), 10, 18);
-  ctx.fillText('媒質 2  n_2 = ' + p.n2.toFixed(2), 10, cy + 16);
-  // interface line
-  ctx.strokeStyle = '#6c8aa6';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
-  // normal (dashed vertical)
-  ctx.strokeStyle = 'rgba(143,184,224,0.55)';
-  ctx.setLineDash([5, 4]);
-  ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke();
-  ctx.setLineDash([]);
-
-  var th1 = p.theta * Math.PI / 180;
-  var rayLen = Math.min(W, H) * 0.40;
-
-  // incident ray (from upper-left toward origin at interface)
-  var ix = cx - rayLen * Math.sin(th1), iy = cy - rayLen * Math.cos(th1);
-  drawArrow(ix, iy, cx, cy, '#3aa7ff', 3, '入射 θ_1=' + p.theta.toFixed(1) + '°', 'left');
-
-  // reflected ray (upper-right)
-  var rx = cx + rayLen * Math.sin(th1), ry = cy - rayLen * Math.cos(th1);
-  drawArrow(cx, cy, rx, ry, '#27ae60', 3, '反射', 'right');
-
-  // refracted ray (lower) or evanescent
-  if (info.state === 'refract') {
-    var th2 = info.theta2 * Math.PI / 180;
-    var tx = cx + rayLen * Math.sin(th2), ty = cy + rayLen * Math.cos(th2);
-    drawArrow(cx, cy, tx, ty, '#e74c3c', 3, '屈折 θ_2=' + info.theta2.toFixed(1) + '°', 'right');
-  } else {
-    // evanescent decay (yellow dashed exponential)
-    var dp = info.dp; // m
-    if (isFinite(dp) && dp > 0) {
-      // scale dp to pixels: use canvas region of (H - cy) for ~5*dp depth
-      var depthPx = Math.min(H - cy - 10, (H - cy) * 0.9);
-      var scale = depthPx / Math.max(5 * dp, 1e-12); // px per meter
-      ctx.strokeStyle = '#FFD166';
-      ctx.setLineDash([4, 3]);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      var first = true;
-      var amp0 = (H - cy) * 0.35;
-      for (var s = 0; s <= 80; s++) {
-        var z = (s / 80) * depthPx / scale; // depth in meters
-        var amp = amp0 * Math.exp(-z / Math.max(dp, 1e-12));
-        var px = cx + amp * Math.cos(s * 0.6);
-        var py = cy + z * scale;
-        if (first) { ctx.moveTo(px, py); first = false; } else { ctx.lineTo(px, py); }
-      }
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // label
-      ctx.fillStyle = '#FFD166';
-      ctx.font = '12px "Roboto Mono",monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText('エバネッセント波', cx + 14, cy + 22);
-      ctx.fillText('d_p = ' + (dp * 1e9).toFixed(0) + ' nm', cx + 14, cy + 40);
-    }
-    // TIR badge
-    ctx.fillStyle = 'rgba(255,209,102,0.18)';
-    ctx.fillRect(W - 130, 8, 122, 22);
-    ctx.fillStyle = '#FFD166';
-    ctx.font = 'bold 12px "Roboto Mono",monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('全反射 (TIR)', W - 69, 24);
-  }
-
-  // critical angle marker bottom-right
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  if (info.thetaC !== null) ctx.fillText('θ_c = ' + info.thetaC.toFixed(2) + '°', W - 10, H - 10);
-  else ctx.fillText('θ_c: n/a', W - 10, H - 10);
+// Fresnel (unpolarized average of s & p) reflectance for n1 -> n2 below critical angle
+function fresnelR(n1, n2, th1) {
+  var s1 = Math.sin(th1), c1 = Math.cos(th1);
+  var sinT2 = (n1 / n2) * s1;
+  if (sinT2 >= 1) return 1; // TIR
+  var c2 = Math.sqrt(1 - sinT2 * sinT2);
+  var rs = (n1 * c1 - n2 * c2) / (n1 * c1 + n2 * c2);
+  var rp = (n2 * c1 - n1 * c2) / (n2 * c1 + n1 * c2);
+  return 0.5 * (rs * rs + rp * rp);
 }
 
-function drawArrow(x0, y0, x1, y1, color, width, label, side) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = width;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-  // arrow head
-  var ang = Math.atan2(y1 - y0, x1 - x0);
-  var L = 10;
+function analyze(p) {
+  var th1 = p.theta * Math.PI / 180;
+  var info = { state: 'refract', thetaC: null, theta2: null, dp: null, R: null, T: null, th1: th1 };
+  if (p.n1 > p.n2) {
+    var thcRad = Math.asin(p.n2 / p.n1);
+    info.thetaC = thcRad * 180 / Math.PI;
+    var nearCrit = Math.abs(p.theta - info.thetaC) < 0.35;
+    if (th1 >= thcRad - 1e-9) {
+      info.state = nearCrit ? 'crit' : 'tir';
+      var arg = p.n1 * p.n1 * Math.sin(th1) * Math.sin(th1) - p.n2 * p.n2;
+      if (arg > 1e-12) info.dp = (p.lambda * 1e-9) / (2 * Math.PI * Math.sqrt(arg));
+      info.R = 1; info.T = 0;
+      if (info.state === 'crit') {
+        var s2c = Math.min(1, (p.n1 / p.n2) * Math.sin(th1));
+        info.theta2 = Math.asin(s2c) * 180 / Math.PI; // ~90
+      }
+    } else {
+      var sinT2 = Math.max(-1, Math.min(1, (p.n1 / p.n2) * Math.sin(th1)));
+      info.theta2 = Math.asin(sinT2) * 180 / Math.PI;
+      info.R = fresnelR(p.n1, p.n2, th1);
+      info.T = 1 - info.R;
+      if (nearCrit) info.state = 'crit';
+    }
+  } else {
+    var sinT2b = (p.n1 / p.n2) * Math.sin(th1);
+    if (Math.abs(sinT2b) <= 1) {
+      info.theta2 = Math.asin(sinT2b) * 180 / Math.PI;
+      info.R = fresnelR(p.n1, p.n2, th1);
+      info.T = 1 - info.R;
+    }
+  }
+  return info;
+}
+
+function drawArrow(x0, y0, x1, y1, color, width, label, side, alpha) {
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  var ang = Math.atan2(y1 - y0, x1 - x0), Lh = 11;
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
-  ctx.lineTo(x1 - L * Math.cos(ang - 0.4), y1 - L * Math.sin(ang - 0.4));
-  ctx.lineTo(x1 - L * Math.cos(ang + 0.4), y1 - L * Math.sin(ang + 0.4));
-  ctx.closePath();
-  ctx.fill();
-  // label near the start of the arrow
+  ctx.lineTo(x1 - Lh * Math.cos(ang - 0.4), y1 - Lh * Math.sin(ang - 0.4));
+  ctx.lineTo(x1 - Lh * Math.cos(ang + 0.4), y1 - Lh * Math.sin(ang + 0.4));
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
   if (label) {
     ctx.fillStyle = color;
     ctx.font = '11px "Roboto Mono",monospace';
@@ -351,90 +373,244 @@ function drawArrow(x0, y0, x1, y1, color, width, label, side) {
   }
 }
 
+// animated wavefront ticks along a ray
+function drawWavefronts(x0, y0, x1, y1, color, alpha) {
+  var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
+  if (len < 1) return;
+  var ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+  var spacing = 16, half = 5;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.globalAlpha = alpha;
+  var off = (phase * 9) % spacing;
+  for (var d = off; d < len - 4; d += spacing) {
+    var mx = x0 + ux * d, my = y0 + uy * d;
+    ctx.beginPath();
+    ctx.moveTo(mx - nx * half, my - ny * half);
+    ctx.lineTo(mx + nx * half, my + ny * half);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawScene(p, info) {
+  var W = parseFloat(cv.dataset.cssW) || 600, H = parseFloat(cv.dataset.cssH) || 372;
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
+  var cx = W * 0.5, cy = H * 0.5;
+  // medium fills (denser on top)
+  ctx.fillStyle = 'rgba(0,123,255,0.12)'; ctx.fillRect(0, 0, W, cy);
+  ctx.fillStyle = 'rgba(0,180,216,0.05)'; ctx.fillRect(0, cy, W, H - cy);
+
+  var th1 = info.th1;
+  var rayLen = Math.min(W, H) * 0.42;
+
+  // ABOVE critical: evanescent shaded field in medium 2 (draw before rays)
+  if ((info.state === 'tir' || info.state === 'crit') && info.dp && isFinite(info.dp)) {
+    var depthPx = Math.min(H - cy - 6, (H - cy) * 0.92);
+    var scale = depthPx / Math.max(5 * info.dp, 1e-12); // px per metre, show ~5 d_p
+    // shaded exponential band
+    var bands = 48;
+    for (var bi = 0; bi < bands; bi++) {
+      var z0 = (bi / bands) * depthPx / scale;
+      var a = Math.exp(-z0 / Math.max(info.dp, 1e-15));
+      ctx.fillStyle = 'rgba(255,209,102,' + (0.30 * a).toFixed(3) + ')';
+      ctx.fillRect(0, cy + bi / bands * depthPx, W, depthPx / bands + 1);
+    }
+    // animated decaying oscillation curve (alive)
+    ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 2; ctx.globalAlpha = reduceMotion ? 0.9 : 1;
+    ctx.beginPath();
+    var amp0 = (H - cy) * 0.34, first = true;
+    for (var s = 0; s <= 90; s++) {
+      var z = (s / 90) * depthPx / scale;
+      var amp = amp0 * Math.exp(-z / Math.max(info.dp, 1e-15));
+      var px = cx + amp * Math.cos(s * 0.55 - phase * 2.2);
+      var py = cy + z * scale;
+      if (first) { ctx.moveTo(px, py); first = false; } else { ctx.lineTo(px, py); }
+    }
+    ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(255,209,102,0.5)'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, cy + info.dp * scale); ctx.lineTo(W, cy + info.dp * scale); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#FFD166'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+    ctx.fillText('d_p = ' + (info.dp * 1e9).toFixed(0) + ' nm', cx + 14, cy + info.dp * scale + 14);
+    ctx.fillText(L.evan, cx + 14, cy + 18);
+  }
+
+  // interface line
+  ctx.strokeStyle = '#8fb8e0'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
+  // normal (dashed)
+  ctx.strokeStyle = 'rgba(143,184,224,0.55)'; ctx.setLineDash([5, 4]);
+  ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke(); ctx.setLineDash([]);
+
+  // critical-angle reference ray (on the angle scale, in medium 1, faint)
+  if (info.thetaC !== null) {
+    var thc = info.thetaC * Math.PI / 180;
+    var ax = cx - rayLen * Math.sin(thc), ay = cy - rayLen * Math.cos(thc);
+    ctx.strokeStyle = 'rgba(243,156,18,0.45)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ax, ay); ctx.stroke(); ctx.setLineDash([]);
+    // arc + label
+    ctx.strokeStyle = 'rgba(243,156,18,0.6)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, rayLen * 0.55, -Math.PI / 2 - thc, -Math.PI / 2, false); ctx.stroke();
+    ctx.fillStyle = '#f0b34a'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'right';
+    ctx.fillText(L.thetaC + ' = ' + info.thetaC.toFixed(1) + '°', ax - 4, ay - 2);
+  }
+
+  // incident ray + wavefronts
+  var ix = cx - rayLen * Math.sin(th1), iy = cy - rayLen * Math.cos(th1);
+  drawArrow(ix, iy, cx, cy, '#3aa7ff', 3, L.incident + ' θ_1=' + p.theta.toFixed(1) + '°', 'left');
+  if (!reduceMotion) drawWavefronts(ix, iy, cx, cy, '#9ed2ff', 0.5);
+
+  // reflected ray (Fresnel-weighted width/alpha)
+  var Rval = info.R == null ? 1 : info.R;
+  var rx = cx + rayLen * Math.sin(th1), ry = cy - rayLen * Math.cos(th1);
+  drawArrow(cx, cy, rx, ry, '#27ae60', 1.5 + 2.5 * Rval, L.reflected, 'right', 0.35 + 0.65 * Rval);
+  if (!reduceMotion) drawWavefronts(cx, cy, rx, ry, '#7be0a4', 0.4 * (0.4 + 0.6 * Rval));
+
+  // refracted ray (only below critical; intensity ~ T). At critical it lies along surface.
+  if (info.state === 'refract' || info.state === 'crit') {
+    if (info.theta2 !== null) {
+      var th2 = info.theta2 * Math.PI / 180;
+      var Tval = info.T == null ? 0 : info.T;
+      var tx = cx + rayLen * Math.sin(th2), ty = cy + rayLen * Math.cos(th2);
+      var alongSurface = info.state === 'crit' && info.thetaC !== null;
+      var col = '#e74c3c';
+      drawArrow(cx, cy, tx, ty, col, 1.5 + 2.5 * Math.max(Tval, 0.12),
+        L.refracted + ' θ_2=' + info.theta2.toFixed(1) + '°', 'right', 0.35 + 0.65 * Math.max(Tval, 0.15));
+      if (!reduceMotion && Tval > 0.02) drawWavefronts(cx, cy, tx, ty, '#f5a097', 0.4 * (0.4 + 0.6 * Tval));
+      if (alongSurface) {
+        ctx.fillStyle = '#f0b34a'; ctx.font = 'bold 11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+        ctx.fillText(L.critHere, cx, cy - 6);
+      }
+    }
+  }
+
+  // medium labels
+  ctx.fillStyle = '#9ec5e8'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText(L.med1 + '  n_1 = ' + p.n1.toFixed(2), 10, 18);
+  ctx.fillText(L.med2 + '  n_2 = ' + p.n2.toFixed(2), 10, H - 10);
+
+  // regime badge top-right
+  var badge = info.state === 'tir' ? L.regTir : (info.state === 'crit' ? L.regCrit : L.regRefract);
+  ctx.font = 'bold 12px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  var bw = ctx.measureText(badge).width + 18;
+  ctx.fillStyle = info.state === 'refract' ? 'rgba(231,76,60,0.20)' : 'rgba(255,209,102,0.20)';
+  ctx.fillRect(W - bw - 8, 8, bw, 22);
+  ctx.fillStyle = info.state === 'refract' ? '#ff8a7a' : '#FFD166';
+  ctx.fillText(badge, W - bw / 2 - 8, 24);
+}
+
+function refreshReadouts(p, info) {
+  elv('roTheta1').textContent = p.theta.toFixed(1) + '°';
+  elv('roTheta2').textContent = (info.theta2 !== null && info.state !== 'tir') ? info.theta2.toFixed(1) + '°' : '—';
+  elv('roThetaC').textContent = info.thetaC !== null ? info.thetaC.toFixed(2) + '°' : '—';
+  elv('roDp').textContent = (info.dp && isFinite(info.dp)) ? (info.dp * 1e9).toFixed(0) + ' nm' : '—';
+  elv('roR').textContent = info.R == null ? '—' : (info.R * 100).toFixed(1) + '%';
+  elv('roT').textContent = info.T == null ? '—' : (info.T * 100).toFixed(1) + '%';
+  elv('roN1').textContent = p.n1.toFixed(2);
+  elv('roN2').textContent = p.n2.toFixed(2);
+  var pill = elv('regimePill');
+  if (info.state === 'tir') { pill.className = 'regime-pill tir'; pill.textContent = L.regTir; }
+  else if (info.state === 'crit') { pill.className = 'regime-pill crit'; pill.textContent = L.regCrit; }
+  else { pill.className = 'regime-pill refract'; pill.textContent = L.regRefract; }
+}
+
 function compute() {
   var p = getParams();
   if (!isFinite(p.n1) || !isFinite(p.n2) || !isFinite(p.theta) || !isFinite(p.lambda)) return;
-  var warn = document.getElementById('warnBox');
-  var th1Rad = p.theta * Math.PI / 180;
-  var info = { state: 'refract', thetaC: null, theta2: null, dp: null };
-  if (p.n1 > p.n2) {
-    var thcRad = Math.asin(p.n2 / p.n1);
-    info.thetaC = thcRad * 180 / Math.PI;
-    warn.classList.remove('show');
-    if (th1Rad >= thcRad) {
-      info.state = 'tir';
-      var arg = p.n1 * p.n1 * Math.sin(th1Rad) * Math.sin(th1Rad) - p.n2 * p.n2;
-      if (arg > 0) {
-        var lam0_m = p.lambda * 1e-9;
-        info.dp = lam0_m / (2 * Math.PI * Math.sqrt(arg));
-      }
-    } else {
-      // normal refraction
-      var sinT2 = (p.n1 / p.n2) * Math.sin(th1Rad);
-      sinT2 = Math.max(-1, Math.min(1, sinT2));
-      info.theta2 = Math.asin(sinT2) * 180 / Math.PI;
-    }
-  } else {
-    warn.classList.add('show');
-    // no critical angle; always refract
-    var sinT2b = (p.n1 / p.n2) * Math.sin(th1Rad);
-    if (Math.abs(sinT2b) <= 1) {
-      info.theta2 = Math.asin(sinT2b) * 180 / Math.PI;
-    } else {
-      // can't happen for n1<=n2 with valid angle, but guard
-      info.state = 'tir';
-    }
-  }
-  // stats
-  document.getElementById('statThetaC').textContent = info.thetaC !== null ? info.thetaC.toFixed(2) + ' °' : '—';
-  document.getElementById('statState').textContent = info.state === 'tir' ? '全反射' : '通常屈折';
-  document.getElementById('statDp').textContent = (info.state === 'tir' && info.dp) ? (info.dp * 1e9).toFixed(0) + ' nm' : '—';
-  document.getElementById('statThetaT').textContent = (info.state === 'refract' && info.theta2 !== null) ? info.theta2.toFixed(2) + ' °' : '—';
+  elv('warnBox').classList.toggle('show', !(p.n1 > p.n2));
+  var info = analyze(p);
+  lastInfo = info;
+  refreshReadouts(p, info);
   drawScene(p, info);
 }
 
-function animationStep() {
-  if (!playing) return;
-  var sl = document.getElementById('slTheta');
-  var v = parseFloat(sl.value) + 0.5;
-  if (v > 89) v = 0;
-  sl.value = v;
-  updateSlider(sl, 'slThetaVal', 1, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
+function loop() {
+  if (!playing) { animId = null; return; }
+  phase += 0.06;
+  if (lastInfo) drawScene(getParams(), lastInfo);
+  animId = requestAnimationFrame(loop);
 }
 
 function togglePlay() {
   playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> 入射角を掃引';
-    if (animId) cancelAnimationFrame(animId);
-  }
+  elv('playBtn').innerHTML = playing ? L.pause : L.play;
+  if (playing && !animId) animId = requestAnimationFrame(loop);
+}
+
+function setTheta(v) {
+  v = Math.max(0, Math.min(89, v));
+  elv('slTheta').value = v;
+  syncToNum('slTheta', 'slThetaVal'); updateSlider(elv('slTheta'), 'slThetaVal', 1, '');
+  compute();
+}
+
+// --- drag the incident ray angle ---
+function angleFromPointer(ev) {
+  var rect = cv.getBoundingClientRect();
+  var W = parseFloat(cv.dataset.cssW) || rect.width, H = parseFloat(cv.dataset.cssH) || rect.height;
+  var clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+  var clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+  var x = (clientX - rect.left) - W * 0.5;
+  var y = (clientY - rect.top) - H * 0.5;
+  // measured from normal (vertical). Use upper half (incident side).
+  var ang = Math.atan2(Math.abs(x), Math.abs(y)) * 180 / Math.PI;
+  return Math.max(0, Math.min(89, ang));
+}
+function onDown(ev) { dragging = true; setTheta(angleFromPointer(ev)); ev.preventDefault(); }
+function onMove(ev) { if (dragging) { setTheta(angleFromPointer(ev)); ev.preventDefault(); } }
+function onUp() { dragging = false; }
+cv.addEventListener('mousedown', onDown);
+window.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onUp);
+cv.addEventListener('touchstart', onDown, { passive: false });
+cv.addEventListener('touchmove', onMove, { passive: false });
+window.addEventListener('touchend', onUp);
+cv.addEventListener('keydown', function (e) {
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { setTheta(num('slTheta') - 1); e.preventDefault(); }
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { setTheta(num('slTheta') + 1); e.preventDefault(); }
+  else if (e.key === ' ' || e.key === 'Enter') { togglePlay(); e.preventDefault(); }
+});
+
+function applyVals(d) {
+  Object.keys(d).forEach(function (id) { elv(id).value = d[id]; });
+  updateSlider(elv('slN1'), 'slN1Val', 2, ''); syncToNum('slN1', 'slN1Val');
+  updateSlider(elv('slN2'), 'slN2Val', 2, ''); syncToNum('slN2', 'slN2Val');
+  updateSlider(elv('slTheta'), 'slThetaVal', 1, ''); syncToNum('slTheta', 'slThetaVal');
+  updateSlider(elv('slLambda'), 'slLambdaVal', 0, ''); syncToNum('slLambda', 'slLambdaVal');
+  compute();
+}
+
+function setMaterial(which) {
+  var m = {
+    'glass-air': { slN1: 1.50, slN2: 1.00 },
+    'water-air': { slN1: 1.33, slN2: 1.00 },
+    'diamond-air': { slN1: 2.42, slN2: 1.00 },
+    'fiber': { slN1: 1.48, slN2: 1.46 }
+  }[which];
+  if (!m) return;
+  m.slTheta = num('slTheta'); m.slLambda = num('slLambda');
+  applyVals(m);
+}
+
+function setScenario(which) {
+  var p = getParams();
+  var thc = p.n1 > p.n2 ? Math.asin(p.n2 / p.n1) * 180 / Math.PI : 45;
+  var d = { slN1: p.n1, slN2: p.n2, slLambda: p.lambda };
+  if (which === 'below') { d.slN1 = 1.50; d.slN2 = 1.00; d.slTheta = 30; }
+  else if (which === 'at') { d.slN1 = 1.50; d.slN2 = 1.00; d.slTheta = 41.8; }
+  else if (which === 'tir') { d.slN1 = 1.50; d.slN2 = 1.00; d.slTheta = 60; }
+  applyVals(d);
 }
 
 function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> 入射角を掃引';
-  var defs = { slN1: 1.50, slN2: 1.00, slTheta: 45, slLambda: 633 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slN1'), 'slN1Val', 2, '');
-  updateSlider(document.getElementById('slN2'), 'slN2Val', 2, '');
-  updateSlider(document.getElementById('slTheta'), 'slThetaVal', 1, '');
-  updateSlider(document.getElementById('slLambda'), 'slLambdaVal', 0, '');
-  compute();
+  applyVals({ slN1: 1.50, slN2: 1.00, slTheta: 45, slLambda: 633 });
+  if (!playing) togglePlay();
 }
 
 window.addEventListener('resize', function () { resizeCanvas(); compute(); });
 
 resizeCanvas();
 compute();
+if (!reduceMotion) { animId = requestAnimationFrame(loop); }
+else { playing = false; elv('playBtn').innerHTML = L.play; }
 </script>
 
 <section class="explanation">
@@ -502,6 +678,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="total-internal-reflection.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -543,12 +722,12 @@ compute();
 <ol>
 <li>第1媒質と第2媒質の屈折率をスライダーで設定します。例えば光学ガラス（n₁=1.5）から空気（n₂=1.0）への入射を想定してください。</li>
 <li>入射角θをスライダーで変化させ、臨界角θ_c＝arcsin(n₂/n₁)に接近させます。石英ガラスの場合、n₁=1.46、n₂=1.0のとき臨界角は約43.2°です。</li>
-<li>入射角が臨界角を超えると全反射が発生し、エバネッセント波の透過深さd_p＝λ/（4π√(sin²θ-sin²θ_c)）が減少します。波長λを調整してエバネッセント振動の空間減衰を観察してください。</li>
+<li>入射角が臨界角を超えると全反射が発生し、エバネッセント波の透過深さd_p＝λ_0/（2π√(n₁²sin²θ_1-n₂²)）が減少します。波長λを調整してエバネッセント振動の空間減衰を観察してください。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>光ファイバーのコア（n₁=1.48、石英系コア）からクラッド（n₂=1.46）への境界を考えます。入射角50°、波長λ=1550nm（光通信波長）のとき、臨界角θ_c=arcsin(1.46/1.48)≒79.2°です。入射角50°＜79.2°のため全反射は発生せず通常の屈折が生じます。一方、入射角85°に変更すると全反射が発生し、エバネッセント深さはd_p≒230nmになります。このエバネッセント波がファイバー結合器の動作原理を支配します。</p>
+<p>光ファイバーのコア（n₁=1.48、石英系コア）からクラッド（n₂=1.46）への境界を考えます。入射角50°、波長λ=1550nm（光通信波長）のとき、臨界角θ_c=arcsin(1.46/1.48)≒80.57°です。入射角50°＜80.57°のため全反射は発生せず通常の屈折が生じます。一方、入射角85°に変更すると全反射が発生し、エバネッセント深さはd_p≒1201nmになります。このエバネッセント波がファイバー結合器の動作原理を支配します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -558,6 +737,16 @@ compute();
 <li>プリズムの臨界角測定実験では、環境温度変化で屈折率が0.0001程度変動するため、温度制御下（±0.5°C）で行い、複数回計測して平均値を採用してください。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

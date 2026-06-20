@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "波の反射・透過シミュレーター",
       "description": "音波・弾性波（P波・SH波）の界面反射・透過を計算。インピーダンス比・入射角で反射係数・透過係数をリアルタイム可視化。",
       "url": "https://novasolver.jp/tools/wave-reflection.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["音波・P波・SH波の反射・透過計算", "インピーダンス比と入射角のリアルタイム変更", "全反射臨界角の自動計算と可視化"],
       "keywords": "波の反射,透過係数,反射係数,音響インピーダンス,全反射,臨界角,弾性波,非破壊検査,CAE",
       "datePublished": "2026-04-09",
@@ -130,6 +130,33 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 wave-reflection ===== */
+canvas#waveCanvas{background:#0a1628;display:block;width:100%;border-radius:8px;}
+canvas:focus-visible{outline:2px solid var(--accent2,#00B4D8);outline-offset:2px;}
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center;}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.1;}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em;}
+.live-ro.accent .rv{color:#ffd54a;}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr);}}
+.mode-row{display:flex;gap:6px;flex-wrap:wrap;}
+.mode-btn,.pulse-btn{flex:1;min-width:64px;padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.78rem;font-family:inherit;cursor:pointer;transition:all .2s;}
+.mode-btn.active,.pulse-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-family:inherit;font-weight:600;transition:background .2s;}
+.btn:hover{background:#0056b3;}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+.btn.secondary:hover{background:var(--border);}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;}
+.preset-btn{padding:4px 10px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s;}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent);}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px;}
+.legend span{display:inline-flex;align-items:center;gap:5px;}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block;}
+@media (prefers-reduced-motion: reduce){.preset-btn,.mode-btn,.btn{transition:none;}}
+/* end v2 additions */
+
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/wave-reflection.html">
@@ -161,8 +188,54 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   <div class="panel">
     <div class="panel-title">パラメータ設定</div>
 
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button class="preset-btn" type="button" onclick="setPreset('fixed')">固定端→反転</button>
+        <button class="preset-btn" type="button" onclick="setPreset('free')">自由端→同位相</button>
+        <button class="preset-btn" type="button" onclick="setPreset('lightheavy')">軽→重い弦</button>
+        <button class="preset-btn" type="button" onclick="setPreset('heavylight')">重→軽い弦</button>
+        <button class="preset-btn" type="button" onclick="setPreset('matched')">整合→反射なし</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="param-group">
-      <div class="param-label"><span class="param-name">波の種類</span></div>
+      <div class="param-label"><span class="param-name">境界の種類</span></div>
+      <div class="mode-row">
+        <button class="mode-btn active" type="button" data-mode="fixed" onclick="setMode('fixed')">固定端</button>
+        <button class="mode-btn" type="button" data-mode="free" onclick="setMode('free')">自由端</button>
+        <button class="mode-btn" type="button" data-mode="impedance" onclick="setMode('impedance')">インピーダンス境界</button>
+      </div>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">波の形態</span></div>
+      <div class="mode-row">
+        <button class="pulse-btn active" type="button" data-pulse="pulse" onclick="setPulseMode(true)">パルス</button>
+        <button class="pulse-btn" type="button" data-pulse="continuous" onclick="setPulseMode(false)">連続波</button>
+      </div>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <label class="param-name" for="amp">振幅 A</label>
+        <span class="param-value"><span id="ampv">0.7</span></span>
+      </div>
+      <input type="range" id="amp" min="0.2" max="1" step="0.05" value="0.7" oninput="update()" aria-label="振幅">
+    </div>
+    <div class="param-group">
+      <div class="param-label">
+        <label class="param-name" for="freq">周波数 f</label>
+        <span class="param-value"><span id="freqv">1.00</span> kHz</span>
+      </div>
+      <input type="range" id="freq" min="0.2" max="3" step="0.05" value="1" oninput="update()" aria-label="周波数">
+    </div>
+
+    <div class="divider"></div>
+    <div class="param-title-row panel-title">波の種類</div>
+    <div class="param-group">
       <select id="waveType" onchange="update()">
         <option value="acoustic">音波（流体）</option>
         <option value="pwave">弾性P波（固体）</option>
@@ -175,98 +248,107 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">インピーダンス Z₁</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="z1Val" value="1.5" min="0.1" max="50" step="0.1" oninput="syncFromNum('z1','z1Val')"><span class="num-unit">MRayl</span></div>
+        <label class="param-name" for="z1">インピーダンス Z₁</label>
+        <span class="param-value"><span id="z1v">1.5</span></span>
       </div>
-      <input type="range" id="z1" min="0.1" max="50" step="0.1" value="1.5" oninput="syncToNum('z1','z1Val');update()">
+      <input type="range" id="z1" min="0.5" max="10" step="0.1" value="1.5" oninput="update()" aria-label="インピーダンス Z1">
     </div>
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">波速 c₁</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="c1Val" value="1500" min="100" max="8000" step="50" oninput="syncFromNum('c1','c1Val')"><span class="num-unit">m/s</span></div>
+        <label class="param-name" for="c1">波速 c₁</label>
+        <span class="param-value"><span id="c1v">1500</span> m/s</span>
       </div>
-      <input type="range" id="c1" min="100" max="8000" step="50" value="1500" oninput="syncToNum('c1','c1Val');update()">
+      <input type="range" id="c1" min="500" max="6000" step="50" value="1500" oninput="update()" aria-label="波速 c1">
     </div>
 
+    <div id="medium2Controls">
     <div class="divider"></div>
     <div class="panel-title">媒質2（透過側）</div>
 
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">インピーダンス Z₂</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="z2Val" value="45" min="0.1" max="50" step="0.1" oninput="syncFromNum('z2','z2Val')"><span class="num-unit">MRayl</span></div>
+        <label class="param-name" for="z2">インピーダンス Z₂</label>
+        <span class="param-value"><span id="z2v">3.0</span></span>
       </div>
-      <input type="range" id="z2" min="0.1" max="50" step="0.1" value="45" oninput="syncToNum('z2','z2Val');update()">
+      <input type="range" id="z2" min="0.5" max="10" step="0.1" value="3" oninput="update()" aria-label="インピーダンス Z2">
     </div>
     <div class="param-group">
       <div class="param-label">
-        <span class="param-name">波速 c₂</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="c2Val" value="5900" min="100" max="8000" step="50" oninput="syncFromNum('c2','c2Val')"><span class="num-unit">m/s</span></div>
+        <label class="param-name" for="c2">波速 c₂</label>
+        <span class="param-value"><span id="c2v">3000</span> m/s</span>
       </div>
-      <input type="range" id="c2" min="100" max="8000" step="50" value="5900" oninput="syncToNum('c2','c2Val');update()">
+      <input type="range" id="c2" min="500" max="6000" step="50" value="3000" oninput="update()" aria-label="波速 c2">
     </div>
+    </div>
+
+    <div id="alertBox" class="alert-box" style="display:none">⚠ 全反射発生！ θᵢ ≥ θcr</div>
 
     <div class="divider"></div>
 
-    <div class="param-group">
-      <div class="param-label">
-        <span class="param-name">入射角 θᵢ</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="thetaVal" value="0" min="0" max="89" step="1" oninput="syncFromNum('theta','thetaVal')"><span class="num-unit">°</span></div>
-      </div>
-      <input type="range" id="theta" min="0" max="89" step="1" value="0" oninput="syncToNum('theta','thetaVal');update()">
-    </div>
-
-    <div id="alertBox" class="alert-box">⚠ 全反射発生！ θᵢ ≥ θcr</div>
-
-    <div class="divider"></div>
-
-
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-    <div class="stat-cards">
-      <div class="stat-card">
-        <div class="sv" id="rVal">—</div>
-        <div class="sl">反射係数 R</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro"><div class="rv" id="roZ1">1.50</div><div class="rl">Z₁</div></div>
+        <div class="live-ro"><div class="rv" id="roZ2">∞</div><div class="rl">Z₂</div></div>
+        <div class="live-ro accent"><div class="rv" id="roR">-1.000</div><div class="rl">反射係数 r</div></div>
+        <div class="live-ro"><div class="rv" id="roT">0.000</div><div class="rl">透過係数 t</div></div>
+        <div class="live-ro"><div class="rv" id="roPhase">π</div><div class="rl">位相シフト Δφ</div></div>
+        <div class="live-ro"><div class="rv" id="roRpow">100.0%</div><div class="rl">反射エネルギー R²</div></div>
+        <div class="live-ro"><div class="rv" id="roTpow">0.0%</div><div class="rl">透過エネルギー T</div></div>
+        <div class="live-ro"><div class="rv" id="roLam1">1.50</div><div class="rl">波長 λ₁ [m]</div></div>
+        <div class="live-ro"><div class="rv" id="roLam2">—</div><div class="rl">波長 λ₂ [m]</div></div>
+        <div class="live-ro"><div class="rv" id="roEnd">固定端</div><div class="rl">境界の種類</div></div>
       </div>
-      <div class="stat-card">
-        <div class="sv" id="tVal">—</div>
-        <div class="sl">透過係数 T</div>
-      </div>
-      <div class="stat-card">
-        <div class="sv" id="rpVal">—</div>
-        <div class="sl">反射エネルギー R²</div>
-      </div>
-      <div class="stat-card">
-        <div class="sv" id="tpVal">—</div>
-        <div class="sl">透過エネルギー</div>
-      </div>
-      <div class="stat-card">
-        <div class="sv" id="modeVal">-</div>
-        <div class="sl">mode / angle</div>
-      </div>
-    </div>
     </div>
 
     <div class="tab-bar">
-      <button class="tab active" onclick="setTab('chart')">R・T vs 入射角</button>
-      <button class="tab" onclick="setTab('wave')">波の模式図</button>
+      <button class="tab active" onclick="setTab('wave')">波のアニメーション</button>
+      <button class="tab" onclick="setTab('chart')">R・T vs 入射角</button>
     </div>
-    <div class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 可視化</div><canvas class="ux-chartjs-canvas" id="chartCanvas" height="420"></canvas></div>
-      <canvas id="waveCanvas" height="420" style="display:none"></canvas>
+
+    <div class="chart-card" id="waveCard"><div class="chart-title"><i class="fas fa-water"></i> 反射・透過アニメーション</div>
+      <canvas id="waveCanvas" height="360" tabindex="0" role="img" aria-label="波が境界で反射・透過する様子のアニメーション。固定端では反転、自由端では同位相で反射します。"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" onclick="resetSim()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+          <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#00B4D8"></i>波形（入射＋反射／透過）</span>
+        <span><i class="swatch" style="background:#e74c3c"></i>固定端（反転）</span>
+        <span><i class="swatch" style="background:#2ecc71"></i>自由端（同位相）</span>
+        <span><i class="swatch" style="background:#f39c12"></i>インピーダンス境界</span>
+      </div>
     </div>
-  
+
+    <div class="chart-card" id="chartCard" style="display:none"><div class="chart-title"><i class="fas fa-chart-line"></i> 反射・透過エネルギー vs 入射角</div><canvas class="ux-chartjs-canvas" id="chartCanvas" height="360"></canvas></div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      垂直入射：<br>
-      $R = \dfrac{Z_2 - Z_1}{Z_2 + Z_1}$，$T = \dfrac{2Z_2}{Z_2 + Z_1}$<br><br>
-      スネルの法則：<br>
-      $\dfrac{\sin\theta_t}{c_2}= \dfrac{\sin\theta_i}{c_1}$<br><br>
-      臨界角（$c_2 \gt  c_1$ のとき）：<br>
-      $\theta_{cr}= \arcsin\!\left(\dfrac{c_1}{c_2}\right)$
-    
+      弦・界面の振幅係数（インピーダンス境界）：<br>
+      $r = \dfrac{Z_1 - Z_2}{Z_1 + Z_2}$，$t = \dfrac{2Z_1}{Z_1 + Z_2}$<br><br>
+      固定端／密な媒質（$Z_2\to\infty$）：$r=-1$（位相反転 $\pi$）<br>
+      自由端／疎な媒質（$Z_2\to 0$）：$r=+1$（同位相）<br>
+      整合 $Z_1=Z_2$：$r=0$（反射なし）<br><br>
+      エネルギー：$R = r^2$，$T_{power} = 1 - R$<br><br>
+      スネルの法則：$\dfrac{\sin\theta_t}{c_2}= \dfrac{\sin\theta_i}{c_1}$、
+      臨界角（$c_2 \gt  c_1$）：$\theta_{cr}= \arcsin\!\left(\dfrac{c_1}{c_2}\right)$<br>
+      <span style="font-size:.8rem;color:var(--muted)">検証：$Z_1{=}1,Z_2{=}3 \Rightarrow r{=}-0.5,\ t{=}0.5,\ R{=}25\%,\ T{=}75\%$</span>
+
 </div>
 </div>
 </div>
@@ -274,220 +356,395 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
-let currentTab = 'chart';
-let myChart = null;
-
-function setTab(tab) {
-  currentTab = tab;
-  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active', ['chart','wave'][i]===tab));
-  document.getElementById('chartCanvas').style.display = tab==='chart' ? 'block' : 'none';
-  document.getElementById('waveCanvas').style.display = tab==='wave' ? 'block' : 'none';
-  update();
-}function setPct(el){
-  const v = (el.value - el.min) / (el.max - el.min) * 100;
-  el.style.setProperty('--pct', v + '%');
-}function update(){
-  const z1 = parseFloat(document.getElementById('z1').value);
-  const z2 = parseFloat(document.getElementById('z2').value);
-  const c1 = parseFloat(document.getElementById('c1').value);
-  const c2 = parseFloat(document.getElementById('c2').value);
-  const theta = parseFloat(document.getElementById('theta').value);
-  const waveType = document.getElementById('waveType').value;
-
-  document.getElementById('z1Val').value = z1.toFixed(2) + ' MRayl';
-  document.getElementById('z2Val').value = z2.toFixed(2) + ' MRayl';
-  document.getElementById('c1Val').value = c1.toFixed(0);
-  document.getElementById('c2Val').value = c2.toFixed(0);
-  document.getElementById('thetaVal').value = theta.toFixed(0);
-
-  ['z1','z2','c1','c2','theta'].forEach(id=>{
-    const el = document.getElementById(id);
-    setPct(el);
-  });
-
-  // Critical angle
-  let tcrDeg = null;
-  if (c2 > c1){
-    tcrDeg = Math.asin(c1/c2) * 180/Math.PI;
-    (document.getElementById('tcrVal') || {}).textContent = tcrDeg.toFixed(1) + '°';
-  }else{
-    (document.getElementById('tcrVal') || {}).textContent = 'N/A';
-  }// Snell's law for current angle
-  const thetaRad = theta * Math.PI / 180;
-  const sinT = Math.sin(thetaRad) * c2 / c1;
-  const totalReflection = sinT >= 1.0;
-  let thetatDeg = null;
-  if (!totalReflection){
-    thetatDeg = Math.asin(sinT) * 180 / Math.PI;
-    (document.getElementById('ttVal') || {}).textContent = thetatDeg.toFixed(1) + '°';
-  }else{
-    (document.getElementById('ttVal') || {}).textContent = '全反射';
-  }// Reflection / transmission
-  let R, T, Rp, Tp;
-  if (totalReflection){
-    R = 1.0; T = 0.0; Rp = 1.0; Tp = 0.0;
-  }else{
-    // For normal incidence or SH wave (no mode conversion)
-    R = (z2 - z1) / (z2 + z1);
-    T = 2*z2 / (z2 + z1);
-    Rp = R*R;
-    Tp = 1 - Rp;
-  }
-
-  document.getElementById('rVal').textContent = R.toFixed(4);
-  document.getElementById('tVal').textContent = totalReflection ? '0' : T.toFixed(4);
-  document.getElementById('rpVal').textContent = (Rp*100).toFixed(1) + '%';
-  document.getElementById('tpVal').textContent = (Tp*100).toFixed(1) + '%';
-  const modeNames = { acoustic: 'Acoustic', pwave: 'P-wave', shwave: 'SH-wave' };
-  document.getElementById('modeVal').textContent = (modeNames[waveType] || waveType) + ' / ' + theta.toFixed(0) + ' deg';
-
-  const alertBox = document.getElementById('alertBox');
-  alertBox.classList.toggle('show', totalReflection);
-
-  if (currentTab === 'chart') drawChart(z1, z2, c1, c2, tcrDeg);
-  else drawWave(theta, thetatDeg, totalReflection);
-}function drawChart(z1, z2, c1, c2, tcrDeg){
-  const angles = [];
-  const rData = [];
-  const tData = [];
-
-  for (let a = 0; a <= 89; a++) {
-    angles.push(a);
-    const sinT = Math.sin(a*Math.PI/180) * c2/c1;
-    if (sinT >= 1) {
-      rData.push(1.0);
-      tData.push(0.0);
-    }else{
-      const R = Math.abs((z2-z1)/(z2+z1));
-      const Rp = R*R;
-      rData.push(Rp);
-      tData.push(1-Rp);
-    }
-  }
-
-  const ctx = document.getElementById('chartCanvas').getContext('2d');
-  if (myChart) myChart.destroy();
-
-  const datasets = [
-    { label: '反射エネルギー R²', data: rData, borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,.12)', fill:true, tension:0.3, pointRadius:0, borderWidth:2 },{ label: '透過エネルギー 1−R²', data: tData, borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,.1)', fill:true, tension:0.3, pointRadius:0, borderWidth:2 }];
-
-  // vertical line at critical angle
-  const annotations ={};
-  if (tcrDeg !== null){
-    annotations.critLine = {
-      type: 'line', xMin: tcrDeg, xMax: tcrDeg,
-      borderColor: 'rgba(255,200,0,0.8)', borderWidth: 2, borderDash: [6,3],
-      label: { content: 'θcr=' + tcrDeg.toFixed(1) + '°', display: true, position: 'start', color: '#e6a817', font: {size:11} }
-    };
-  }myChart = new Chart(ctx,{
-    type: 'line',
-    data: { labels: angles, datasets },
-    options:{
-      responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
-      interaction: { mode:'index', intersect:false },
-      plugins:{
-        legend: { position:'top', labels:{font:{size:11}} },
-        tooltip:{ callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.parsed.y*100).toFixed(1) + '%' } }
-      },
-      scales:{
-        x: { title:{display:true,text:'入射角 θᵢ (°)'}, min:0, max:89 },
-        y:{ title:{display:true,text:'エネルギー比'}, min:0, max:1, ticks:{callback:v=>(v*100).toFixed(0)+'%'} }
-      }
-    }
-  });
-}function drawWave(thetaI, thetaT, totalRef){
-  const canvas = document.getElementById('waveCanvas');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  ctx.clearRect(0,0,W,H);
-
-  // Background
-  ctx.fillStyle = '#020d1a';
-  ctx.fillRect(0,0,W,H);
-
-  // Interface line
-  const iy = H/2;
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([8,4]);
-  ctx.beginPath(); ctx.moveTo(0,iy); ctx.lineTo(W,iy); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Medium labels
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.font = '13px Roboto Mono, monospace';
-  ctx.fillText('媒質1 (Z₁, c₁)', 12, iy - 20);
-  ctx.fillText('媒質2 (Z₂, c₂)', 12, iy + 36);
-
-  // Interface point
-  const ix = W/2;
-  const len = Math.min(W, H) * 0.28;
-
-  function drawArrow(x0,y0,x1,y1,color,label,lx,ly) {
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
-    const dx=x1-x0, dy=y1-y0, d=Math.sqrt(dx*dx+dy*dy);
-    const ux=dx/d, uy=dy/d;
-    const hs=10;
-    ctx.beginPath();
-    ctx.moveTo(x1,y1);
-    ctx.lineTo(x1-ux*hs+uy*hs*0.5, y1-uy*hs-ux*hs*0.5);
-    ctx.lineTo(x1-ux*hs-uy*hs*0.5, y1-uy*hs+ux*hs*0.5);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = color;
-    ctx.font = 'bold 12px Noto Sans JP, sans-serif';
-    ctx.fillText(label, lx, ly);
-  }const tiRad = thetaI * Math.PI/180;
-  // Incident: coming from upper-left
-  drawArrow(ix - Math.sin(tiRad)*len, iy - Math.cos(tiRad)*len, ix, iy,
-    '#00B4D8', '入射波', ix - Math.sin(tiRad)*len - 36, iy - Math.cos(tiRad)*len - 8);
-
-  // Reflected: going upper-right
-  drawArrow(ix, iy, ix + Math.sin(tiRad)*len, iy - Math.cos(tiRad)*len,
-    '#e74c3c', '反射波', ix + Math.sin(tiRad)*len + 4, iy - Math.cos(tiRad)*len - 8);
-
-  // Angle annotations
-  if (thetaI > 0){
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4,3]);
-    ctx.beginPath(); ctx.moveTo(ix, iy-50); ctx.lineTo(ix, iy+50); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#fff';
-    ctx.font = '11px Roboto Mono';
-    ctx.fillText('θᵢ=' + thetaI.toFixed(0)+'°', ix-Math.sin(tiRad)*24-10, iy-Math.cos(tiRad)*24);
-  }if (!totalRef && thetaT !== null){
-    const ttRad = thetaT * Math.PI/180;
-    drawArrow(ix, iy, ix + Math.sin(ttRad)*len, iy + Math.cos(ttRad)*len,
-      '#00b894', '透過波', ix + Math.sin(ttRad)*len + 4, iy + Math.cos(ttRad)*len + 14);
-    if (thetaI > 0) {
-      ctx.fillStyle = '#aaa';
-      ctx.font = '11px Roboto Mono';
-      ctx.fillText('θₜ='+thetaT.toFixed(0)+'°', ix+Math.sin(ttRad)*24+4, iy+Math.cos(ttRad)*24);
-    }
-  }else if (totalRef){
-    ctx.fillStyle = '#e74c3c';
-    ctx.font = 'bold 14px Noto Sans JP';
-    ctx.fillText('全反射', W/2+20, iy+40);
-  }
-}// Init
-
-window.addEventListener('load', () =>{
-  // set canvas size
-  const wc = document.getElementById('waveCanvas');
-  wc.width = wc.parentElement.offsetWidth;
-  wc.height = 420;
-  update();
-});
-window.addEventListener('resize', ()=>{
-  const wc = document.getElementById('waveCanvas');
-  wc.width = wc.parentElement.offsetWidth;
-  if(currentTab==='wave') update();
-});
+window.WR_L10N = {
+  medium1:'媒質1', medium2:'媒質2', fixedWall:'固定端（壁）', freeEnd:'自由端',
+  endFixed:'固定端', endFree:'自由端', endImpedance:'インピーダンス境界',
+  annInvert:'反射波＝反転（位相 π）', annUpright:'反射波＝同位相', annTransmit:'透過波',
+  legRefl:'反射エネルギー R²', legTrans:'透過エネルギー 1−R²',
+  axisAngle:'入射角 θᵢ (°)', axisEnergy:'エネルギー比', play:'再生', pause:'一時停止'
+};
 </script>
+<script>
+"use strict";
+/* ===== Wave Reflection / Transmission v2 engine =====
+   waveCanvas: animated 1D string. Incident wave travels right, hits a boundary
+   at x=xb. Reflected wave (inverted for fixed/dense, upright for free/light)
+   travels left in medium 1; transmitted wave travels right in medium 2 with a
+   different speed/wavelength. chartCanvas: Chart.js R/T vs incident angle.        */
 
+const L10N = window.WR_L10N || {};
+function T(k){ return (L10N[k] !== undefined) ? L10N[k] : k; }
+
+const waveCanvas = document.getElementById('waveCanvas');
+const wctx = waveCanvas.getContext('2d');
+
+let myChart = null;
+let currentTab = 'wave';
+let mode = 'fixed';          // 'fixed' | 'free' | 'impedance'
+let pulseMode = true;        // true=pulse, false=continuous
+let playing = false;
+let animId = null;
+let speedMult = 1;
+let simTime = 0;             // animation time in seconds
+let lastTs = 0;
+
+function el(id){ return document.getElementById(id); }
+function getNum(id){ const e = el(id); return e ? parseFloat(e.value) : 0; }
+function setText(id, v){ const e = el(id); if (e) e.textContent = v; }
+
+function updateSlider(id){
+  const e = el(id); if (!e) return;
+  const min = parseFloat(e.min), max = parseFloat(e.max);
+  const pct = ((parseFloat(e.value) - min) / (max - min)) * 100;
+  e.style.setProperty('--pct', pct + '%');
+}
+
+/* ----- impedance / coefficients ----- */
+function physics(){
+  let z1 = getNum('z1'), z2 = getNum('z2');
+  if (mode === 'fixed') z2 = 1e6;        // fixed end ~ infinite impedance
+  if (mode === 'free') z2 = 1e-6;        // free end ~ zero impedance
+  const c1 = getNum('c1'), c2 = getNum('c2');
+  // amplitude reflection coefficient (string convention): r=(Z1-Z2)/(Z1+Z2)
+  const r = (z1 - z2) / (z1 + z2);
+  // amplitude transmission coefficient: t = 2*Z1/(Z1+Z2)
+  const t = 2 * z1 / (z1 + z2);
+  const R = r * r;                       // power reflected
+  const Tp = 1 - R;                      // power transmitted (energy conservation)
+  const phase = r < 0 ? Math.PI : 0;     // pi flip when reflecting off denser/fixed
+  return { z1, z2, c1, c2, r, t, R, Tp, phase };
+}
+
+/* ----- pulse / wave shape ----- */
+function gaussian(x, mu, sig){ const d = (x - mu) / sig; return Math.exp(-0.5 * d * d); }
+
+function syncLabels(){
+  const ids = ['z1','z2','c1','c2','freq','amp'];
+  ids.forEach(id=>{ if (el(id)) updateSlider(id); });
+  if (el('z1v')) setText('z1v', getNum('z1').toFixed(1));
+  if (el('z2v')) setText('z2v', getNum('z2').toFixed(1));
+  if (el('c1v')) setText('c1v', getNum('c1').toFixed(0));
+  if (el('c2v')) setText('c2v', getNum('c2').toFixed(0));
+  if (el('freqv')) setText('freqv', getNum('freq').toFixed(2));
+  if (el('ampv')) setText('ampv', getNum('amp').toFixed(2));
+}
+
+/* ----- readouts ----- */
+function updateReadouts(){
+  const p = physics();
+  setText('roZ1', p.z1.toFixed(2));
+  setText('roZ2', mode === 'fixed' ? '∞' : (mode === 'free' ? '0' : p.z2.toFixed(2)));
+  setText('roR', p.r.toFixed(3));
+  setText('roT', p.t.toFixed(3));
+  setText('roRpow', (p.R * 100).toFixed(1) + '%');
+  setText('roTpow', (p.Tp * 100).toFixed(1) + '%');
+  setText('roPhase', p.phase === 0 ? '0' : 'π');
+  const lam1 = p.c1 / Math.max(getNum('freq') * 1000, 1e-6);
+  const lam2 = p.c2 / Math.max(getNum('freq') * 1000, 1e-6);
+  setText('roLam1', lam1.toFixed(2));
+  setText('roLam2', mode === 'impedance' ? lam2.toFixed(2) : '—');
+  let endTxt = T('endImpedance');
+  if (mode === 'fixed') endTxt = T('endFixed');
+  else if (mode === 'free') endTxt = T('endFree');
+  setText('roEnd', endTxt);
+  // also feed legacy result cards if present
+  setText('rVal', p.r.toFixed(4));
+  setText('tVal', p.t.toFixed(4));
+  setText('rpVal', (p.R * 100).toFixed(1) + '%');
+  setText('tpVal', (p.Tp * 100).toFixed(1) + '%');
+  setText('modeVal', endTxt);
+}
+
+/* ===== HiDPI sizing ===== */
+let cssW = 0, cssH = 0;
+function resizeWaveCanvas(){
+  const parent = waveCanvas.parentElement;
+  const rect = parent.getBoundingClientRect();
+  cssW = Math.max(300, Math.floor(rect.width - 28));
+  cssH = 360;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  waveCanvas.style.width = cssW + 'px';
+  waveCanvas.style.height = cssH + 'px';
+  waveCanvas.width = Math.round(cssW * dpr);
+  waveCanvas.height = Math.round(cssH * dpr);
+  wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+/* ===== draw the animated string ===== */
+function drawWave(){
+  resizeWaveCanvas();
+  const W = cssW, H = cssH;
+  const p = physics();
+  wctx.clearRect(0, 0, W, H);
+
+  const xb = W * 0.5;                 // boundary x
+  const midY = H * 0.46;
+  const amp = getNum('amp') * (H * 0.18);
+
+  // shaded media
+  wctx.fillStyle = '#0a1628';
+  wctx.fillRect(0, 0, W, H);
+  wctx.fillStyle = 'rgba(0,123,255,0.10)';
+  wctx.fillRect(0, 0, xb, H);
+  wctx.fillStyle = mode === 'fixed' ? 'rgba(231,76,60,0.16)'
+                 : mode === 'free' ? 'rgba(46,204,113,0.13)'
+                 : 'rgba(243,156,18,0.13)';
+  wctx.fillRect(xb, 0, W - xb, H);
+
+  // medium labels
+  wctx.font = '12px Roboto Mono, monospace';
+  wctx.textAlign = 'left';
+  wctx.fillStyle = 'rgba(255,255,255,0.55)';
+  wctx.fillText(T('medium1') + ' (Z₁=' + p.z1.toFixed(1) + ', c₁=' + p.c1.toFixed(0) + ')', 10, 20);
+  wctx.textAlign = 'right';
+  let m2lab = T('medium2');
+  if (mode === 'fixed') m2lab = T('fixedWall');
+  else if (mode === 'free') m2lab = T('freeEnd');
+  else m2lab = T('medium2') + ' (Z₂=' + p.z2.toFixed(1) + ', c₂=' + p.c2.toFixed(0) + ')';
+  wctx.fillText(m2lab, W - 10, 20);
+  wctx.textAlign = 'left';
+
+  // baseline + boundary
+  wctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  wctx.lineWidth = 1;
+  wctx.beginPath(); wctx.moveTo(0, midY); wctx.lineTo(W, midY); wctx.stroke();
+
+  wctx.strokeStyle = mode === 'fixed' ? 'rgba(231,76,60,0.9)'
+                   : mode === 'free' ? 'rgba(46,204,113,0.9)'
+                   : 'rgba(243,156,18,0.9)';
+  wctx.lineWidth = mode === 'free' ? 2 : 3;
+  if (mode === 'free') wctx.setLineDash([6, 4]);
+  wctx.beginPath(); wctx.moveTo(xb, 12); wctx.lineTo(xb, H - 12); wctx.stroke();
+  wctx.setLineDash([]);
+
+  // wave geometry (px per unit length); choose a comfortable on-screen wavelength
+  const lam1px = 90;                 // px wavelength in medium 1
+  const ratio = p.c2 / p.c1;         // medium-2 wavelength scales with speed
+  const lam2px = lam1px * ratio;
+  const k1 = 2 * Math.PI / lam1px;
+  const k2 = 2 * Math.PI / lam2px;
+  const v1 = lam1px * 0.9;           // px/sec phase speed in medium 1
+  const v2 = v1 * ratio;
+  const phase = simTime * v1 * k1;   // omega*t
+
+  const rAmp = p.r;                  // signed amplitude reflection
+  const tAmp = (mode === 'impedance') ? p.t * (p.c1 / p.c2 > 1 ? 1 : 1) : 0;
+
+  function displ(x){
+    // medium 1: incident (moving +x) + reflected (moving -x, mirrored at xb)
+    if (x <= xb){
+      let y = 0;
+      if (pulseMode){
+        const sig = 26;
+        const pulseCenter = (simTime * v1) % (W * 3) - W * 0.4;
+        // incident pulse position
+        const xi = pulseCenter;
+        y += gaussian(x, xi, sig);
+        // reflected pulse: appears after the incident reaches xb, mirrored about xb
+        const xr = 2 * xb - pulseCenter;
+        if (pulseCenter > xb) y += rAmp * gaussian(x, xr, sig);
+      } else {
+        // incident
+        y += Math.sin(k1 * x - phase);
+        // reflected (sign + direction)
+        y += rAmp * Math.sin(k1 * (2 * xb - x) - phase);
+      }
+      return y;
+    }
+    // medium 2: transmitted wave only (impedance mode)
+    if (mode === 'impedance'){
+      if (pulseMode){
+        const sig = 26 * ratio;
+        const pulseCenter = (simTime * v1) % (W * 3) - W * 0.4;
+        if (pulseCenter > xb){
+          const xt = xb + (pulseCenter - xb) * ratio;
+          return p.t * gaussian(x, xt, sig);
+        }
+        return 0;
+      }
+      return tAmp * Math.sin(k2 * (x - xb) - phase + k1 * xb);
+    }
+    return 0;
+  }
+
+  // draw incident+reflected (medium1) and transmitted (medium2) as one string
+  wctx.lineWidth = 2.6;
+  wctx.strokeStyle = '#00B4D8';
+  wctx.beginPath();
+  for (let x = 0; x <= W; x += 2){
+    const y = midY - displ(x) * amp;
+    if (x === 0) wctx.moveTo(x, y); else wctx.lineTo(x, y);
+  }
+  wctx.stroke();
+
+  // colored overlay: reflected portion tint near boundary (legend handled below)
+  // annotation of phase behaviour
+  wctx.font = 'bold 12px Noto Sans JP, sans-serif';
+  wctx.textAlign = 'center';
+  if (mode === 'fixed'){
+    wctx.fillStyle = '#ff6b6b';
+    wctx.fillText(T('annInvert'), xb * 0.5, H - 16);
+  } else if (mode === 'free'){
+    wctx.fillStyle = '#2ecc71';
+    wctx.fillText(T('annUpright'), xb * 0.5, H - 16);
+  } else {
+    wctx.fillStyle = p.r < 0 ? '#ff6b6b' : '#ffd54a';
+    wctx.fillText((p.r < 0 ? T('annInvert') : T('annUpright')) +
+      '  r=' + p.r.toFixed(2), xb * 0.5, H - 16);
+    wctx.fillStyle = '#ffd54a';
+    wctx.fillText(T('annTransmit') + '  t=' + p.t.toFixed(2), xb + (W - xb) * 0.5, H - 16);
+  }
+  wctx.textAlign = 'left';
+
+  // r / phase badge top-right of medium 1
+  wctx.font = '11px Roboto Mono, monospace';
+  wctx.fillStyle = 'rgba(255,255,255,0.8)';
+  wctx.textAlign = 'right';
+  wctx.fillText('r=' + p.r.toFixed(2) + '  Δφ=' + (p.phase === 0 ? '0' : 'π'), xb - 8, 38);
+  wctx.textAlign = 'left';
+}
+
+/* ===== Chart.js: R/T power vs incident angle ===== */
+function drawChart(){
+  const cv = el('chartCanvas');
+  if (!cv || typeof Chart === 'undefined') return;
+  const c1 = getNum('c1'), c2 = getNum('c2');
+  const p = physics();
+  const angles = [], rData = [], tData = [];
+  let tcrDeg = (c2 > c1) ? Math.asin(c1 / c2) * 180 / Math.PI : null;
+  for (let a = 0; a <= 89; a++){
+    angles.push(a);
+    const sinT = Math.sin(a * Math.PI / 180) * c2 / c1;
+    if (sinT >= 1){ rData.push(1); tData.push(0); }
+    else { rData.push(p.R); tData.push(1 - p.R); }
+  }
+  const ctx = cv.getContext('2d');
+  if (myChart) myChart.destroy();
+  const ann = {};
+  if (tcrDeg !== null){
+    ann.crit = { type:'line', xMin:tcrDeg, xMax:tcrDeg, borderColor:'rgba(255,200,0,0.8)',
+      borderWidth:2, borderDash:[6,3],
+      label:{ content:'θcr='+tcrDeg.toFixed(1)+'°', display:true, position:'start', color:'#e6a817', font:{size:11} } };
+  }
+  myChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels:angles, datasets:[
+      { label:T('legRefl'), data:rData, borderColor:'#e74c3c', backgroundColor:'rgba(231,76,60,.12)', fill:true, tension:0.3, pointRadius:0, borderWidth:2 },
+      { label:T('legTrans'), data:tData, borderColor:'#007BFF', backgroundColor:'rgba(0,123,255,.1)', fill:true, tension:0.3, pointRadius:0, borderWidth:2 }
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false, resizeDelay:100, animation:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ position:'top', labels:{font:{size:11}} },
+        annotation:{ annotations:ann },
+        tooltip:{ callbacks:{ label: c => c.dataset.label + ': ' + (c.parsed.y*100).toFixed(1) + '%' } } },
+      scales:{ x:{ title:{display:true,text:T('axisAngle')}, min:0, max:89 },
+        y:{ title:{display:true,text:T('axisEnergy')}, min:0, max:1, ticks:{callback:v=>(v*100).toFixed(0)+'%'} } }
+    }
+  });
+}
+
+/* ===== tabs ===== */
+function setTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active', ['wave','chart'][i]===tab));
+  const wc = el('waveCard'), cc = el('chartCard');
+  if (wc) wc.style.display = tab === 'wave' ? '' : 'none';
+  if (cc) cc.style.display = tab === 'chart' ? '' : 'none';
+  if (tab === 'chart') drawChart(); else drawWave();
+}
+
+/* ===== animation loop ===== */
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function loop(ts){
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  simTime += dt * speedMult;
+  drawWave();
+  animId = requestAnimationFrame(loop);
+}
+function startPlay(){
+  if (reduceMotion){ drawWave(); return; }
+  playing = true; lastTs = 0;
+  const b = el('btnPlay'); if (b) b.innerHTML = '<i class="fas fa-pause"></i> ' + T('pause');
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing = false;
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+  const b = el('btnPlay'); if (b) b.innerHTML = '<i class="fas fa-play"></i> ' + T('play');
+}
+function togglePlay(){ playing ? stopPlay() : startPlay(); }
+function resetSim(){ simTime = 0; drawWave(); }
+
+function setSpeed(s){
+  speedMult = s;
+  document.querySelectorAll('.speed-btn').forEach(b=>{
+    const a = parseFloat(b.dataset.speed) === s;
+    b.classList.toggle('active', a);
+    b.style.borderColor = a ? 'var(--accent)' : '';
+    b.style.color = a ? 'var(--accent)' : '';
+  });
+}
+
+function setMode(m){
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode === m));
+  // show/hide medium-2 controls for fixed/free
+  const m2 = el('medium2Controls');
+  if (m2) m2.style.display = (m === 'impedance') ? '' : 'none';
+  update();
+}
+function setPulseMode(isPulse){
+  pulseMode = isPulse;
+  document.querySelectorAll('.pulse-btn').forEach(b=>b.classList.toggle('active', (b.dataset.pulse === 'pulse') === isPulse));
+  update();
+}
+
+function setPreset(name){
+  const P = {
+    fixed:     { mode:'fixed' },
+    free:      { mode:'free' },
+    lightheavy:{ mode:'impedance', z1:1, z2:3, c1:2000, c2:1200 },
+    heavylight:{ mode:'impedance', z1:3, z2:1, c1:1200, c2:2000 },
+    matched:   { mode:'impedance', z1:2, z2:2, c1:1500, c2:1500 }
+  }[name];
+  if (!P) return;
+  if (P.z1 !== undefined && el('z1')) el('z1').value = P.z1;
+  if (P.z2 !== undefined && el('z2')) el('z2').value = P.z2;
+  if (P.c1 !== undefined && el('c1')) el('c1').value = P.c1;
+  if (P.c2 !== undefined && el('c2')) el('c2').value = P.c2;
+  setMode(P.mode);
+}
+
+/* ===== master update ===== */
+function update(){
+  syncLabels();
+  updateReadouts();
+  if (currentTab === 'chart') drawChart(); else drawWave();
+}
+
+/* legacy compatibility: number-input sync helpers used by old inline handlers */
+function syncFromNum(rangeId, numId){ const r=el(rangeId),n=el(numId); if(r&&n){ r.value=n.value; update(); } }
+function syncToNum(rangeId, numId){ const r=el(rangeId),n=el(numId); if(r&&n){ n.value=r.value; } }
+
+window.addEventListener('resize', ()=>{ if (currentTab==='chart') drawChart(); else drawWave(); });
+window.addEventListener('load', ()=>{
+  syncLabels();
+  updateReadouts();
+  setMode('fixed');
+  drawWave();
+  if (!reduceMotion) startPlay();
+});
+if (waveCanvas){
+  waveCanvas.addEventListener('keydown', e=>{
+    if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); togglePlay(); }
+  });
+}
+
+</script>
 <section class="explanation">
   <h2>波の反射・透過シミュレーターとは</h2>
   <div class="chat">
@@ -546,6 +803,9 @@ window.addEventListener('resize', ()=>{
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="wave-reflection.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -607,16 +867,26 @@ window.addEventListener('resize', ()=>{
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>鋼鉄(Z1=4.7×10⁷ kg/m²s)と水(Z2=1.5×10⁶ kg/m²s)の境界で30°入射の場合、反射係数R≈-0.94、反射エネルギー≈88%となり、ほぼ全反射状態です。一方、水(Z1=1.5×10⁶)とアクリル樹脂(Z2=3.3×10⁶)では反射係数R≈-0.38、透過エネルギー≈76%で大部分が透過します。臨界角はarcsin(Z1/Z2)で決定されます。</p>
+<p>鋼鉄(Z1=4.7×10⁷ kg/m²s)と水(Z2=1.5×10⁶ kg/m²s)の界面では、垂直入射の反射係数R=(Z2−Z1)/(Z2+Z1)≈-0.94、反射エネルギーR²≈88%となり、ほぼ全反射状態です。一方、水(Z1=1.5×10⁶)とアクリル樹脂(Z2=3.3×10⁶)ではR≈+0.38、反射エネルギーR²≈14%で透過エネルギーは約86%と大部分が透過します。全反射の臨界角は速度比で θcr=arcsin(c₁/c₂)（c₁<c₂のとき）として決まります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
 <li>超音波厚さ計(UTG)で鋼板厚さ測定時、鋼-空気境界のインピーダンス比が約10⁴倍のため、ウェッジ剤や接触液(Z≈2.0×10⁶ kg/m²s)を必須で使用</li>
 <li>地震波の弾性波トモグラフィでは、岩盤層間のインピーダンス差が大きいほど反射波が強くなり、屈折波検出精度が低下するため入射角の最適化が重要</li>
-<li>NDT検査で入射角45°以上では全反射が発生しやすくなり、透過波検出が困難になるため、設計時に媒質のZ値差を確認</li>
+<li>NDT検査で全反射が起こるのは c₁<c₂ かつ入射角が臨界角 θcr=arcsin(c₁/c₂) 以上のときだけ。透過波検出が困難になる角度域は媒質の速度比で決まるので、設計時に c₁・c₂ の大小と θcr を確認</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -95,7 +95,13 @@ details.theory-box[open]>summary h3,details.theory-box[open]>summary h4{margin-b
 details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
-
+/* v2 animation */
+#boilCanvas{width:100%;height:auto;background:#06141f;border-radius:8px;display:block}
+.v2-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:.72rem;color:var(--muted)}
+.v2-legend span{display:inline-flex;align-items:center;gap:5px}
+.v2-legend i.dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.v2-hctrack{margin-top:6px}
+@media(prefers-reduced-motion:reduce){#boilCanvas{outline:1px dashed var(--border)}}
 </style>
 
 <link rel="alternate" hreflang="ja" href="https://novasolver.jp/tools/boiling-heat-transfer.html">
@@ -124,14 +130,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "沸騰熱伝達計算機",
       "description": "Nukiyama曲線（沸騰曲線）をリアルタイム描画。表面過熱度ΔTeを入力して核沸騰・遷移沸騰・膜沸騰レジームを自動判定。Rohsenow相関による熱流束・熱伝達率・CHF・ライデンフロスト点を計算。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/boiling-heat-transfer.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -140,7 +146,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         "Rohsenow相関による核沸騰熱流束計算",
         "臨界熱流束（CHF）とライデンフロスト点の表示",
         "水（1atm）・加圧水・R134a の流体選択",
-        "プール沸騰・流動沸騰の切り替え"
+        "プール沸騰相関のリアルタイム計算"
       ],
       "keywords": "沸騰熱伝達,核沸騰,膜沸騰,臨界熱流束,CHF,Rohsenow,Nukiyama曲線,ライデンフロスト,熱伝達率"
     },{
@@ -219,7 +225,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="param-label">
         <span class="param-name">流体選択</span>
       </div>
-      <select id="fluidSel" onchange="compute()">
+      <select id="fluidSel" onchange="recompute()">
         <option value="water1atm">水（1 atm, 100°C飽和）</option>
         <option value="water10atm">加圧水（10 atm, 180°C飽和）</option>
         <option value="r134a">R134a（1 atm, -26°C飽和）</option>
@@ -230,12 +236,13 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="param-label">
         <span class="param-name">加熱面・流体組合せ (C<sub>sf</sub>)</span>
       </div>
-      <select id="csfSel" onchange="compute()">
-        <option value="0.013">銅-水（Csf=0.013）</option>
-        <option value="0.006">ステンレス-水（Csf=0.006）</option>
+      <select id="csfSel" onchange="recompute()">
+        <option value="0.013">銅-水（Csf=0.013, よく濡れる）</option>
+        <option value="0.006">ステンレス-水（Csf=0.006, 活発）</option>
         <option value="0.015">真鍮-水（Csf=0.015）</option>
-        <option value="0.020">ニッケル-水（Csf=0.020）</option>
+        <option value="0.020">ニッケル-水（Csf=0.020, 不活発）</option>
       </select>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:3px;">小さいCsf＝核生成サイトが多く活発＝同じΔTでhが高い</div>
     </div>
 
     <div class="divider"></div>
@@ -243,51 +250,52 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">表面過熱度 ΔT<sub>e</sub></span>
-        <div class="num-wrap"><input type="number" class="num-input" id="dteVal" value="10" min="0.1" max="300" step="0.1" oninput="syncFromNum('dte','dteVal')"><span class="num-unit">K</span></div>
+        <div class="num-wrap"><input type="number" class="num-input" id="dteVal" value="12" min="1" max="30" step="0.5" oninput="syncFromNum('dte','dteVal');recompute()"><span class="num-unit">K</span></div>
       </div>
-      <input type="range" id="dte" min="0.1" max="300" step="0.1" value="10" oninput="syncToNum('dte','dteVal');updateSlider(this,'dteVal',1,'K');compute()">
-      <div style="font-size:0.72rem;color:var(--muted);margin-top:3px;">T_s − T_sat（加熱面と飽和温度の差）</div>
+      <input type="range" id="dte" min="1" max="30" step="0.5" value="12" oninput="syncToNum('dte','dteVal');updateSlider(this,'dteVal',1,'K');recompute()">
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:3px;">T_s − T_sat。過熱度が上がると核生成サイト密度・離脱頻度が増えhが急上昇</div>
     </div>
 
     <div class="divider"></div>
 
     <div class="param-group">
-      <div class="param-label">
-        <span class="param-name">沸騰モード</span>
-      </div>
-      <div class="btn-group">
-        <button class="toggle-btn active" id="btnPool" onclick="setMode('pool')"><i class="fas fa-water"></i> プール沸騰</button>
-        <button class="toggle-btn" id="btnFlow" onclick="setMode('flow')"><i class="fas fa-tint"></i> 流動沸騰</button>
-      </div>
-    </div>
-
-    <div id="flowParams" style="display:none;">
-      <div class="param-group">
-        <div class="param-label">
-          <span class="param-name">流速 u (m/s)</span>
-          <div class="num-wrap"><input type="number" class="num-input" id="uVal" value="1" min="0.1" max="10" step="0.1" oninput="syncFromNum('uFlow','uVal')"><span class="num-unit">m/s</span></div>
-        </div>
-        <input type="range" id="uFlow" min="0.1" max="10" step="0.1" value="1" oninput="syncToNum('uFlow','uVal');updateSlider(this,'uVal',1,'m/s');compute()">
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="param-group">
-      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット（熱流束）</div>
       <div class="preset-row">
-        <button class="preset-btn" onclick="setPreset('nucleate')">核沸騰領域</button>
-        <button class="preset-btn" onclick="setPreset('chf')">CHF付近</button>
-        <button class="preset-btn" onclick="setPreset('film')">膜沸騰領域</button>
+        <button class="preset-btn" onclick="setPreset('low')">低（ΔT=6K）</button>
+        <button class="preset-btn" onclick="setPreset('mid')">中（ΔT=15K）</button>
+        <button class="preset-btn" onclick="setPreset('high')">高（ΔT=25K）</button>
       </div>
     </div>
 
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="btn-group">
+        <button class="btn" id="btnPlay" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" onclick="resetSim()"><i class="fas fa-undo"></i> 最初から</button>
+      </div>
+    </div>
+
+    <div class="param-group">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">オーバーレイ</div>
+      <label class="toggle-btn active" id="ovFlow" onclick="toggleOv('flow',this)"><i class="fas fa-arrow-up"></i> 熱流矢印</label>
+      <label class="toggle-btn active" id="ovLabel" onclick="toggleOv('label',this)"><i class="fas fa-tag"></i> 気泡サイクル注釈</label>
+    </div>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
 <div class="viz-panel">
 <div style="background:var(--card);border-radius:10px;padding:12px 16px;border:1px solid var(--border);margin-bottom:16px;display:flex;align-items:center;gap:12px;">
-      <span style="font-size:0.82rem;font-weight:600;color:var(--muted);">現在レジーム：</span>
+      <span style="font-size:0.82rem;font-weight:600;color:var(--muted);">沸騰レジーム：</span>
       <span id="regimeBadge" class="regime-badge regime-nucleate">核沸騰</span>
     </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -301,264 +309,372 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="sl">熱伝達率 h [kW/m²K]</div>
       </div>
       <div class="stat-card">
-        <div class="sv" id="statCHF">—</div>
-        <div class="sl">CHF [MW/m²]</div>
+        <div class="sv" id="statDte">—</div>
+        <div class="sl">壁面過熱度 ΔTe [K]</div>
       </div>
       <div class="stat-card">
-        <div class="sv" id="statLeid">—</div>
-        <div class="sl">ライデンフロスト ΔT [K]</div>
+        <div class="sv" id="statDb">—</div>
+        <div class="sl">気泡離脱径 Db [mm]</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statN">—</div>
+        <div class="sl">核生成サイト密度 [1/cm²]</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statFreq">—</div>
+        <div class="sl">離脱頻度 f [Hz]</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statJa">—</div>
+        <div class="sl">ヤコブ数 Ja</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statCHF">—</div>
+        <div class="sl">CHF [MW/m²]</div>
       </div>
     </div>
     </div>
 
-      <div class="charts">
-        <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 沸騰</div><canvas class="ux-chartjs-canvas" id="boilingChart"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-fire"></i> 気泡核沸騰アニメーション（リアルタイム）</div>
+        <canvas id="boilCanvas" width="720" height="430" role="img" aria-label="加熱面の核生成サイトで気泡が発生・成長・離脱し潜熱を運び去る様子と熱伝達率hの応答を示すアニメーション"></canvas>
+        <div class="v2-legend">
+          <span><i class="dot" style="background:#ffce54"></i> 核生成中</span>
+          <span><i class="dot" style="background:#7fd8ff"></i> 成長中の気泡</span>
+          <span><i class="dot" style="background:#cfe8ff"></i> 離脱・上昇（潜熱輸送）</span>
+          <span><i class="dot" style="background:#ff7b54"></i> 熱流 q''</span>
+        </div>
       </div>
-    
+
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> h vs ΔTe（動作点）</div>
+        <canvas id="hCurve" class="ux-chartjs-canvas"></canvas>
+      </div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
         <p>核沸騰熱流束（Rohsenow, 1952）：</p>
         $$q''=\mu_l h_{fg}\left[\frac{g(\rho_l-\rho_v)}{\sigma}\right]^{1/2}\left[\frac{c_{pl}\Delta T_e}{C_{sf}h_{fg}\mathrm{Pr}^n}\right]^3$$
-        <p style="margin-top:8px;">臨界熱流束（Zuber相関）：$q''_{max}=0.131\,h_{fg}\rho_v\left[\dfrac{\sigma g(\rho_l-\rho_v)}{\rho_v^2}\right]^{1/4}$</p>
-        <p style="margin-top:6px;">膜沸騰（Bromley相関）：$h_{film}=0.62\left[\dfrac{k_v^3\rho_v(\rho_l-\rho_v)g h_{fg}}{\mu_v D\Delta T_e}\right]^{1/4}$</p>
-      
+        <p style="margin-top:6px;">熱伝達率：$h=q''/\Delta T_e$（核沸騰では $q''\propto\Delta T_e^{3}$ なので $h\propto\Delta T_e^{2}$ で急増）</p>
+        <p style="margin-top:6px;">気泡離脱径（Fritz）：$D_b=0.0208\,\beta\sqrt{\dfrac{\sigma}{g(\rho_l-\rho_v)}}$、離脱頻度 $f$ は $f\,D_b\approx0.59\left[\dfrac{\sigma g(\rho_l-\rho_v)}{\rho_l^2}\right]^{1/4}$</p>
+        <p style="margin-top:6px;">ヤコブ数（過熱の指標）：$\mathrm{Ja}=\dfrac{\rho_l c_{pl}\Delta T_e}{\rho_v h_{fg}}$。臨界熱流束（Zuber）：$q''_{max}=0.131\,h_{fg}\rho_v\left[\dfrac{\sigma g(\rho_l-\rho_v)}{\rho_v^2}\right]^{1/4}$</p>
+        <p style="margin-top:6px;color:var(--muted);font-size:.82rem;">サイト密度 N は離脱フラックスと潜熱輸送のバランス $q''\sim N\,f\,(\tfrac{\pi}{6}D_b^3\rho_v h_{fg})$ から逆算（潜熱輸送＋微小液膜蒸発の代表値）。</p>
+
 </div>
 </div>
   </div>
 
 
 <script>
-
-// Fluid properties
-
-const FLUIDS ={
-  water1atm: {
-    name: '水 1atm', Tsat: 100, rho_l: 958, rho_v: 0.60, mu_l: 2.82e-4,
-    cp_l: 4216, k_l: 0.680, sigma: 0.0589, hfg: 2257e3, Pr_l: 1.76, n: 1.0,
-    chf_factor: 1.0, leid_dte: 65
-  },
-  water10atm:{
-    name: '水 10atm', Tsat: 180, rho_l: 887, rho_v: 5.16, mu_l: 1.53e-4,
-    cp_l: 4267, k_l: 0.674, sigma: 0.0427, hfg: 2015e3, Pr_l: 0.97, n: 1.0,
-    chf_factor: 1.6, leid_dte: 55
-  },
-  r134a:{
-    name: 'R134a', Tsat: -26, rho_l: 1374, rho_v: 5.25, mu_l: 3.0e-4,
-    cp_l: 1328, k_l: 0.092, sigma: 0.0155, hfg: 197e3, Pr_l: 4.3, n: 1.7,
-    chf_factor: 0.25, leid_dte: 40
-  }
+// ===== Boiling heat transfer v2 — bubble dynamics & heat-transfer coefficient =====
+const G = 9.81;
+const FLUIDS = {
+  water1atm:  { name:'水 1atm',   Tsat:100, rho_l:958,  rho_v:0.60, mu_l:2.82e-4, cp_l:4216, k_l:0.680, sigma:0.0589, hfg:2257e3, Pr_l:1.76, n:1.0, beta:45, col:'#7fd8ff' },
+  water10atm: { name:'水 10atm',  Tsat:180, rho_l:887,  rho_v:5.16, mu_l:1.53e-4, cp_l:4267, k_l:0.674, sigma:0.0427, hfg:2015e3, Pr_l:0.97, n:1.0, beta:45, col:'#9be8c9' },
+  r134a:      { name:'R134a',     Tsat:-26, rho_l:1374, rho_v:5.25, mu_l:3.0e-4,  cp_l:1328, k_l:0.092, sigma:0.0155, hfg:197e3,  Pr_l:4.3,  n:1.7, beta:35, col:'#c9b8ff' }
 };
 
-let boilingMode = 'pool';
+let playing = true;
 let chart = null;
+const overlays = { flow:true, label:true };
 
-function setMode(m){
-  boilingMode = m;
-  document.getElementById('btnPool').classList.toggle('active', m === 'pool');
-  document.getElementById('btnFlow').classList.toggle('active', m === 'flow');
-  document.getElementById('flowParams').style.display = m === 'flow' ? 'block' : 'none';
-  compute();
-}function setPreset(p){
-  const sl = document.getElementById('dte');
-  if (p === 'nucleate') { sl.value = 10; }else if (p === 'chf'){ sl.value = 30; }else if (p === 'film'){ sl.value = 120; }
-  updateSlider(sl, 'dteVal', 1, 'K');
-  compute();
-}function getFluid(){
-  return FLUIDS[document.getElementById('fluidSel').value];
-}function computeQnucleate(f, dte, Csf){
-  // Rohsenow correlation
-  const g = 9.81;
-  const term1 = f.mu_l * f.hfg;
-  const term2 = Math.pow(g * (f.rho_l - f.rho_v) / f.sigma, 0.5);
-  const term3 = Math.pow(f.cp_l * dte / (Csf * f.hfg * Math.pow(f.Pr_l, f.n)), 3);
-  return term1 * term2 * term3;
-}function computeCHF(f){
-  const g = 9.81;
-  return 0.131 * f.hfg * f.rho_v * Math.pow(f.sigma * g * (f.rho_l - f.rho_v) / (f.rho_v * f.rho_v), 0.25);
-}function computeQfilm(f, dte){
-  // Bromley correlation (approximate, horizontal cylinder D=0.01m)
-  const g = 9.81;
-  const D = 0.01;
-  const k_v = 0.025;
-  const mu_v = 1.2e-5;
-  const hfg_prime = f.hfg * 1.05;
-  const h = 0.62 * Math.pow(k_v * k_v * k_v * f.rho_v * (f.rho_l - f.rho_v) * g * hfg_prime / (mu_v * D * dte), 0.25);
-  return h * dte;
-}function computeBoilingCurve(f, Csf){
-  const g = 9.81;
-  const qchf = computeCHF(f);
-  const leid_dte = f.leid_dte;
-  // Leidenfrost q
-  const q_leid = computeQfilm(f, leid_dte);
-  const pts = [];
-  // Free convection region: ΔTe = 0.1 to ~5 K
-  for (let dte = 0.1; dte <= 5; dte += 0.2) {
-    const h_conv = 500; // approximate natural convection
-    pts.push({ dte, q: h_conv * dte, regime: 'conv' });
-  }// Nucleate boiling: ~5 to CHF onset ~30 K
-  // Find ΔTe at CHF
-  let dte_chf = 5;
-  for (let dt = 1; dt <= 60; dt += 0.5){
-    if (computeQnucleate(f, dt, Csf) >= qchf) { dte_chf = dt; break; }
-  }for (let dte = 5; dte <= dte_chf; dte += 0.5){
-    pts.push({ dte, q: computeQnucleate(f, dte, Csf), regime: 'nucleate' });
-  }// Transition: ΔTe from dte_chf to leid_dte
-  for (let i = 0; i <= 20; i++){
-    const dte = dte_chf + (leid_dte - dte_chf) * i / 20;
-    const frac = i / 20;
-    const q = qchf * (1 - frac) + q_leid * frac;
-    pts.push({ dte, q, regime: 'transition' });
-  }// Film boiling: leid_dte to 300 K
-  for (let dte = leid_dte; dte <= 300; dte += 5){
-    pts.push({ dte, q: computeQfilm(f, dte), regime: 'film' });
-  }return{ pts, qchf, dte_chf, q_leid, leid_dte };
-}function identifyRegime(dte, dte_chf, leid_dte){
-  if (dte < 5) return 'conv';
-  if (dte <= dte_chf) return 'nucleate';
-  if (dte <= leid_dte) return 'transition';
-  return 'film';
-}function compute(){
-  const f = getFluid();
-  const Csf = parseFloat(document.getElementById('csfSel').value);
-  const dte = parseFloat(document.getElementById('dte').value);
-  const g = 9.81;
-  const curve = computeBoilingCurve(f, Csf);
-  const { qchf, dte_chf, q_leid, leid_dte }= curve;
+function getFluid(){ return FLUIDS[document.getElementById('fluidSel').value]; }
+function getCsf(){ return parseFloat(document.getElementById('csfSel').value); }
+function getDte(){ return parseFloat(document.getElementById('dte').value); }
 
-  const regime = identifyRegime(dte, dte_chf, leid_dte);
-  let q_current;
-  if (regime === 'conv'){ q_current = 500 * dte; }else if (regime === 'nucleate'){ q_current = computeQnucleate(f, dte, Csf); }else if (regime === 'transition'){
-    const frac = (dte - dte_chf) / (leid_dte - dte_chf);
-    q_current = qchf * (1 - frac) + q_leid * frac;
-  }else{ q_current = computeQfilm(f, dte); }const h_current = dte > 0 ? q_current / dte : 0;
+function computeQnucleate(f, dte, Csf){
+  const t2 = Math.pow(G*(f.rho_l-f.rho_v)/f.sigma, 0.5);
+  const t3 = Math.pow(f.cp_l*dte/(Csf*f.hfg*Math.pow(f.Pr_l, f.n)), 3);
+  return f.mu_l*f.hfg*t2*t3;
+}
+function computeCHF(f){
+  return 0.131*f.hfg*f.rho_v*Math.pow(f.sigma*G*(f.rho_l-f.rho_v)/(f.rho_v*f.rho_v), 0.25);
+}
+function bubbleParams(f){
+  const Db = 0.0208*f.beta*Math.sqrt(f.sigma/(G*(f.rho_l-f.rho_v)));   // Fritz departure diameter [m]
+  const fDb = 0.59*Math.pow(f.sigma*G*(f.rho_l-f.rho_v)/(f.rho_l*f.rho_l), 0.25);
+  return { Db, freq: fDb/Db };                                          // departure frequency [Hz]
+}
+// Snapshot of physics at current settings
+let P = {};
+function physics(){
+  const f = getFluid(), Csf = getCsf(), dte = getDte();
+  const q = computeQnucleate(f, dte, Csf);
+  const h = q/dte;
+  const chf = computeCHF(f);
+  const { Db, freq } = bubbleParams(f);
+  const qBub = (Math.PI/6)*Math.pow(Db,3)*f.rho_v*f.hfg;               // latent heat per departing bubble [J]
+  const N = q/(freq*qBub);                                              // implied site density [sites/m^2]
+  const Ja = f.rho_l*f.cp_l*dte/(f.rho_v*f.hfg);
+  const overChf = q >= chf*0.92;
+  return { f, Csf, dte, q, h, chf, Db, freq, N, Ja, qBub, overChf };
+}
 
-  // Update stat cards
-  document.getElementById('statQ').textContent = (q_current / 1000).toFixed(1);
-  document.getElementById('statH').textContent = (h_current / 1000).toFixed(2);
-  document.getElementById('statCHF').textContent = (qchf / 1e6).toFixed(3);
-  document.getElementById('statLeid').textContent = leid_dte.toFixed(0) + ' K';
+function recompute(){
+  P = physics();
+  document.getElementById('statQ').textContent  = (P.q/1000).toFixed(1);
+  document.getElementById('statH').textContent  = (P.h/1000).toFixed(2);
+  document.getElementById('statDte').textContent= P.dte.toFixed(1);
+  document.getElementById('statDb').textContent = (P.Db*1000).toFixed(2);
+  document.getElementById('statN').textContent  = (P.N/1e4).toFixed(0);   // per cm^2
+  document.getElementById('statFreq').textContent= P.freq.toFixed(0);
+  document.getElementById('statJa').textContent = P.Ja.toFixed(0);
+  document.getElementById('statCHF').textContent= (P.chf/1e6).toFixed(3);
 
-  // Regime badge
   const badge = document.getElementById('regimeBadge');
-  const regimeMap ={
-    conv: ['自然対流', 'regime-conv'],
-    nucleate: ['核沸騰', 'regime-nucleate'],
-    transition: ['遷移沸騰', 'regime-transition'],
-    film: ['膜沸騰', 'regime-film']
-  };
-  badge.className = 'regime-badge ' + regimeMap[regime][1];
-  badge.textContent = regimeMap[regime][0];
+  if (P.overChf){ badge.className='regime-badge regime-chf'; badge.textContent='CHF接近（バーンアウト危険）'; }
+  else if (P.dte < 4){ badge.className='regime-badge regime-conv'; badge.textContent='自然対流寄り'; }
+  else { badge.className='regime-badge regime-nucleate'; badge.textContent='核沸騰'; }
 
-  // Chart
-  drawChart(curve.pts, dte, q_current, qchf, dte_chf, leid_dte, q_leid);
-}function drawChart(pts, dte_cur, q_cur, qchf, dte_chf, leid_dte, q_leid){
-  const convPts = pts.filter(p => p.regime === 'conv').map(p => ({ x: p.dte, y: p.q / 1000 }));
-  const nucPts = pts.filter(p => p.regime === 'nucleate').map(p => ({ x: p.dte, y: p.q / 1000 }));
-  const transPts = pts.filter(p => p.regime === 'transition').map(p => ({ x: p.dte, y: p.q / 1000 }));
-  const filmPts = pts.filter(p => p.regime === 'film').map(p => ({ x: p.dte, y: p.q / 1000 }));
+  rebuildSites();
+  drawCurve();
+}
 
-  const datasets = [{ label: '自然対流', data: convPts, borderColor: '#95a5a6', backgroundColor: 'transparent', pointRadius: 0,showLine:true, borderWidth: 2.5, tension: 0.3 },{ label: '核沸騰', data: nucPts, borderColor: '#00b894', backgroundColor: 'transparent', pointRadius: 0,showLine:true, borderWidth: 2.5, tension: 0.3 },{ label: '遷移沸騰', data: transPts, borderColor: '#fdcb6e', backgroundColor: 'transparent', pointRadius: 0,showLine:true, borderWidth: 2.5, tension: 0.3, borderDash: [5,3] },{ label: '膜沸騰', data: filmPts, borderColor: '#74b9ff', backgroundColor: 'transparent', pointRadius: 0,showLine:true, borderWidth: 2.5, tension: 0.3 },{
-      label: '動作点',
-      data: [{ x: dte_cur, y: q_cur / 1000 }],
-      borderColor: '#e17055',
-      backgroundColor: '#e17055',
-      pointRadius: 8,
-      pointHoverRadius: 10,
-      showLine: false,
-      borderWidth: 2
-    },{
-      label: 'CHF',
-      data: [{ x: dte_chf, y: qchf / 1000 }],
-      borderColor: '#d63031',
-      backgroundColor: '#d63031',
-      pointRadius: 7,
-      pointStyle: 'triangle',
-      showLine: false
-    },{
-      label: 'ライデンフロスト',
-      data: [{ x: leid_dte, y: q_leid / 1000 }],
-      borderColor: '#6c5ce7',
-      backgroundColor: '#6c5ce7',
-      pointRadius: 7,
-      pointStyle: 'rectRot',
-      showLine: false
-    }];
-
-  if (chart){
-    chart.data.datasets = datasets;
-    chart.update('none');
-    return;
-  }const ctx = document.getElementById('boilingChart').getContext('2d');
-  chart = new Chart(ctx,{
-    type: 'scatter',
-    data: { datasets },
+// ---- h vs dTe operating-point curve ----
+function drawCurve(){
+  const f = getFluid(), Csf = getCsf();
+  const pts = [];
+  for (let dt=1; dt<=30; dt+=0.5){
+    pts.push({ x: dt, y: computeQnucleate(f, dt, Csf)/dt/1000 });
+  }
+  const op = [{ x: P.dte, y: P.h/1000 }];
+  const ds = [
+    { label:'h(ΔTe)', data:pts, borderColor:'#00b894', backgroundColor:'transparent', pointRadius:0, showLine:true, borderWidth:2.5, tension:0.3 },
+    { label:'動作点', data:op, borderColor:'#e17055', backgroundColor:'#e17055', pointRadius:8, pointHoverRadius:10, showLine:false }
+  ];
+  if (chart){ chart.data.datasets = ds; chart.update('none'); return; }
+  const ctx = document.getElementById('hCurve').getContext('2d');
+  chart = new Chart(ctx, {
+    type:'scatter', data:{ datasets: ds },
     options:{
-      responsive: true,
-      maintainAspectRatio:false,resizeDelay:100,animation: false,
-      scales: {
-        x: {
-          type: 'logarithmic',
-          title: { display: true, text: '表面過熱度 ΔTe [K]', color: '#6c757d', font: { size: 12 } },
-          min: 0.1, max: 300,
-          grid:{ color: 'rgba(0,0,0,.07)' },
-          ticks:{ color: '#6c757d' }
-        , ticks:{callback:function(v){return v.toExponential(0);},maxTicksLimit:8}},
-        y:{
-          type: 'logarithmic',
-          title: { display: true, text: "熱流束 q'' [kW/m²]", color: '#6c757d', font: { size: 12 } },
-          min: 0.1, max: 20000,
-          grid:{ color: 'rgba(0,0,0,.07)' },
-          ticks:{ color: '#6c757d' }
-        , ticks:{callback:function(v){return v.toExponential(0);},maxTicksLimit:8}}
+      responsive:true, maintainAspectRatio:false, resizeDelay:100, animation:false,
+      scales:{
+        x:{ type:'linear', title:{ display:true, text:'表面過熱度 ΔTe [K]', color:'#6c757d', font:{size:12} }, min:1, max:30, grid:{ color:'rgba(0,0,0,.07)' }, ticks:{ color:'#6c757d' } },
+        y:{ type:'logarithmic', title:{ display:true, text:'熱伝達率 h [kW/m²K]', color:'#6c757d', font:{size:12} }, grid:{ color:'rgba(0,0,0,.07)' }, ticks:{ color:'#6c757d' } }
       },
       plugins:{
-        legend: { position: 'top', labels: { font: { size: 11 }, padding: 12, usePointStyle: true } },
-        tooltip:{
-          callbacks: {
-            label: ctx => `${ctx.dataset.label}: ΔTe=${ctx.parsed.x.toFixed(1)}K, q''=${ctx.parsed.y.toFixed(1)} kW/m²`
-          }
-        }
+        legend:{ position:'top', labels:{ font:{size:11}, padding:12, usePointStyle:true } },
+        tooltip:{ callbacks:{ label: c => `${c.dataset.label}: ΔTe=${c.parsed.x.toFixed(1)}K, h=${c.parsed.y.toFixed(2)} kW/m²K` } }
       }
     }
   });
-}// Init
+}
 
+// ================= Canvas bubble animation =================
+const cv = document.getElementById('boilCanvas');
+const cx = cv.getContext('2d');
+let CW = 720, CH = 430, dpr = 1;
+const SURF_H = 46;                 // heater band height in CSS px (measured from bottom)
+let sites = [];                    // nucleation sites on the surface
+let risers = [];                   // departed bubbles rising through the liquid
+let arrows = [];                   // ascending heat-flow markers
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+function resizeCanvas(){
+  const cssW = cv.clientWidth || 720;
+  const cssH = Math.round(cssW * 430/720);
+  dpr = window.devicePixelRatio || 1;
+  const needW = Math.round(cssW*dpr), needH = Math.round(cssH*dpr);
+  if (cv.width !== needW || cv.height !== needH){
+    cv.width = needW; cv.height = needH;
+  }
+  CW = cssW; CH = cssH;
+  cx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+// Map physical site density to a visible number of sites; departure radius from Db (visual scale)
+function rebuildSites(){
+  const Nsafe = isFinite(P.N) ? Math.max(P.N, 1e4) : 1e4;
+  const Dbsafe = isFinite(P.Db) ? P.Db : 0;
+  let nVis = Math.round(6 + 40*Math.min(1, Math.log10(Nsafe/1e4)/2.6));
+  if (!isFinite(nVis)) nVis = 3;
+  nVis = Math.max(3, Math.min(46, nVis));
+  const baseR = Math.max(2, 5 + 22*(Dbsafe*1000)/2.4); // visual departure radius in px (~Db)
+  const surfY = CH - SURF_H;
+  const newSites = [];
+  for (let i=0;i<nVis;i++){
+    const x = (i+0.5)/nVis*CW + (Math.random()-0.5)*(CW/nVis)*0.5;
+    const old = sites[i];
+    newSites.push({
+      x, y: surfY-2,
+      r: 0,
+      rmax: baseR*(0.75+Math.random()*0.5),
+      growth: 0.6+Math.random()*0.6,
+      phase: old ? old.phase : Math.random(),     // 0..1 within its cycle
+    });
+  }
+  sites = newSites;
+}
+
+function spawnRiser(s){
+  risers.push({ x:s.x, y:s.y - s.rmax*0.6, r:s.rmax, vy: -(0.7+Math.random()*0.8), wob: Math.random()*6.28 });
+  if (overlays.flow) arrows.push({ x:s.x, y:CH-SURF_H, life:1 });
+}
+
+let last = performance.now();
+function step(now){
+  const dt = Math.min(40, now-last)/16.67;   // ~frames
+  last = now;
+  if (playing && !reduceMotion){
+    // cycle rate scales with departure frequency; visual cadence
+    const cyc = 0.012*Math.max(6, P.freq);
+    for (const s of sites){
+      s.phase += cyc*dt*(0.7+0.6*Math.random()*0);
+      // keep phase within [0,1): wrap forward, and guard against any
+      // non-finite / negative drift so the growth pow() never sees a
+      // negative base (Math.pow(negative, 0.7) -> NaN).
+      if (!isFinite(s.phase)) s.phase = 0;
+      while (s.phase >= 1){ s.phase -= 1; spawnRiser(s); }
+      if (s.phase < 0) s.phase = 0;
+      // growth profile: bubble swells then departs near phase 1
+      const grow = Math.pow(Math.min(1, Math.max(0, s.phase*1.05)), 0.7);
+      s.r = (isFinite(s.rmax) ? s.rmax : 0) * (isFinite(grow) ? grow : 0);
+    }
+    const surfTop = CH-SURF_H;
+    for (const b of risers){ b.y += b.vy*dt; b.wob += 0.08*dt; b.x += Math.sin(b.wob)*0.4; b.r *= 0.999; }
+    risers = risers.filter(b => b.y + b.r > 6);
+    for (const a of arrows){ a.y -= 1.6*dt; a.life -= 0.012*dt; }
+    arrows = arrows.filter(a => a.life>0 && a.y> -10);
+  }
+  draw();
+  requestAnimationFrame(step);
+}
+
+function draw(){
+  const f = P.f || getFluid();
+  cx.clearRect(0,0,CW,CH);
+  // liquid background gradient
+  const lg = cx.createLinearGradient(0,0,0,CH);
+  lg.addColorStop(0,'#0a2233'); lg.addColorStop(1,'#0e3047');
+  cx.fillStyle = lg; cx.fillRect(0,0,CW,CH);
+
+  const surfY = CH - SURF_H;
+  // rising bubbles (behind)
+  for (const b of risers){
+    if (!(isFinite(b.x) && isFinite(b.y) && isFinite(b.r))) continue;
+    const br = Math.max(0.5, b.r);
+    cx.beginPath(); cx.arc(b.x, b.y, br, 0, 6.2832);
+    cx.fillStyle = 'rgba(207,232,255,0.5)'; cx.fill();
+    cx.strokeStyle = 'rgba(207,232,255,0.8)'; cx.lineWidth=1; cx.stroke();
+    cx.beginPath(); cx.arc(b.x-br*0.3, b.y-br*0.3, br*0.25, 0, 6.2832);
+    cx.fillStyle='rgba(255,255,255,0.6)'; cx.fill();
+  }
+  // heat-flow arrows
+  if (overlays.flow){
+    for (const a of arrows){
+      cx.strokeStyle = `rgba(255,123,84,${Math.max(0,a.life)})`; cx.lineWidth=2;
+      cx.beginPath(); cx.moveTo(a.x, a.y+8); cx.lineTo(a.x, a.y-6); cx.stroke();
+      cx.beginPath(); cx.moveTo(a.x-3,a.y-2); cx.lineTo(a.x,a.y-8); cx.lineTo(a.x+3,a.y-2); cx.closePath();
+      cx.fillStyle=`rgba(255,123,84,${Math.max(0,a.life)})`; cx.fill();
+    }
+  }
+  // heated surface band (hotter = more orange as dTe rises)
+  const heat = Math.min(1, (P.dte||10)/30);
+  const sg = cx.createLinearGradient(0,surfY,0,CH);
+  sg.addColorStop(0, `rgb(${180+60*heat|0},${90-50*heat|0},${40})`);
+  sg.addColorStop(1, `rgb(${120+80*heat|0},${40-30*heat|0},${20})`);
+  cx.fillStyle = sg; cx.fillRect(0,surfY,CW,SURF_H);
+  cx.fillStyle='rgba(255,220,180,0.9)'; cx.fillRect(0,surfY-2,CW,2);
+
+  // nucleating / growing bubbles on sites
+  for (const s of sites){
+    // NaN-safe guard: `NaN < 0.6` is false, so an explicit finite check is
+    // required or a non-finite radius/coord would reach createRadialGradient.
+    if (!(isFinite(s.x) && isFinite(s.y) && isFinite(s.r) && s.r >= 0.6)) continue;
+    const sr = Math.max(0.5, s.r);
+    const departing = s.phase > 0.8;
+    const grad = cx.createRadialGradient(s.x-sr*0.3, s.y-sr*0.3, 1, s.x, s.y-sr*0.4, sr*1.2);
+    grad.addColorStop(0,'#ffffff');
+    grad.addColorStop(1, departing ? 'rgba(207,232,255,0.85)' : (f.col||'#7fd8ff'));
+    cx.beginPath(); cx.arc(s.x, s.y - sr*0.45, sr, 0, 6.2832);
+    cx.fillStyle = grad; cx.fill();
+    // nucleation core glow
+    if (s.r < s.rmax*0.4){
+      cx.beginPath(); cx.arc(s.x, s.y, 2.5, 0, 6.2832);
+      cx.fillStyle='#ffce54'; cx.fill();
+    }
+  }
+
+  // labels / annotations
+  cx.font = '12px Noto Sans JP, sans-serif';
+  cx.fillStyle = 'rgba(255,255,255,.85)';
+  cx.textAlign='left';
+  cx.fillText('加熱面 T_s = T_sat + ΔTe', 10, surfY + SURF_H*0.55);
+  cx.textAlign='right';
+  cx.fillText(`h = ${(P.h/1000).toFixed(1)} kW/m²K`, CW-10, 22);
+  cx.fillText(`q'' = ${(P.q/1000).toFixed(0)} kW/m²`, CW-10, 40);
+
+  if (overlays.label){
+    cx.textAlign='left'; cx.fillStyle='rgba(255,255,255,.6)'; cx.font='11px Noto Sans JP, sans-serif';
+    cx.fillText('① 核生成 → ② 成長 → ③ 離脱・潜熱輸送', 10, 18);
+    cx.fillText(`サイト密度 ${ (P.N/1e4).toFixed(0) } /cm²　離脱 ${P.freq.toFixed(0)} Hz`, 10, 34);
+  }
+  if (reduceMotion){
+    cx.textAlign='center'; cx.fillStyle='rgba(255,255,255,.5)';
+    cx.fillText('（アニメーション無効：prefers-reduced-motion）', CW/2, CH/2);
+  }
+}
+
+function togglePlay(){
+  playing = !playing;
+  const b = document.getElementById('btnPlay');
+  b.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+}
+function resetSim(){
+  risers = []; arrows = [];
+  for (const s of sites){ s.phase = Math.random()*0.3; s.r = 0; }
+  if (!playing) draw();
+}
+function setPreset(p){
+  const sl = document.getElementById('dte');
+  if (p==='low') sl.value = 6;
+  else if (p==='mid') sl.value = 15;
+  else if (p==='high') sl.value = 25;
+  updateSlider(sl,'dteVal',1,'K'); syncToNum('dte','dteVal'); recompute();
+}
+function toggleOv(key, el){
+  overlays[key] = !overlays[key];
+  el.classList.toggle('active', overlays[key]);
+  if (!playing) draw();
+}
+
+// init
+window.addEventListener('resize', ()=>{ resizeCanvas(); });
 document.querySelectorAll('input[type=range]').forEach(el =>{
-  const idMap = { dte: ['dteVal', 1, 'K'], uFlow: ['uVal', 1, 'm/s'] };
-  const m = idMap[el.id];
-  if (m) updateSlider(el, m[0], m[1], m[2]);
+  const idMap = { dte: ['dteVal', 1, 'K'] };
+  const m = idMap[el.id]; if (m) updateSlider(el, m[0], m[1], m[2]);
 });
-compute();
+resizeCanvas();
+recompute();
+requestAnimationFrame(step);
 </script>
 
 <section class="explanation">
   <h2>沸騰熱伝達計算機とは</h2>
   <div class="chat">
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">このシミュレーターで描かれてる「ヌキヤマ曲線」って何ですか？ グラフの形がすごく特徴的ですね。</div>
+      <div class="bub">アニメーションで加熱面からプツプツ気泡が出てますね。これが「核沸騰」なんですか？ 何が起きてるんでしょう？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大まかに言うと、加熱面の温度を上げていった時に、熱の伝わり方がどう変わるかを示した地図みたいなものだよ。左側の急上昇する領域が「核沸騰」で、熱伝達が最高に良い。ピークが「臨界熱流束（CHF）」で、それを超えると右側の「遷移沸騰」「膜沸騰」に移って熱伝達が悪化する。実際に上の「表面過熱度ΔT」のスライダーを動かしてみると、今どのモードにいるか色で表示されるよ。</div>
+      <div class="bub">そう、それが核沸騰のしくみそのものだよ。加熱面の小さな傷やくぼみ（核生成サイト）で気泡が生まれて、ふくらんで、ある大きさ（離脱径 Db）になると浮力で離脱して上昇していく。これを①核生成→②成長→③離脱の「気泡サイクル」と呼ぶんだ。離脱した気泡は内部に蒸気（潜熱）を抱えて運び去る。さらに気泡が液体をかき混ぜるので、加熱面が冷たい液で次々と洗われる。だから核沸騰は熱伝達率 h が桁違いに高い。右上に出てる h と q'' の数字に注目してね。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">え、熱伝達が悪化する領域があるんですか？ 温度を上げるほど熱は伝わりやすくなると思ってました。核沸騰と膜沸騰って何が違うんですか？</div>
+      <div class="bub">過熱度ΔTのスライダーを上げると、気泡の数も h の数字も一気に増えますね！ なぜそんなに効くんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">そこが沸騰の面白いところなんだ。核沸騰は、加熱面の小さな傷（核生成サイト）から次々と気泡が生まれては離れていく状態。気泡が動き回ることで液体がかき混ぜられて、熱が猛烈に奪われる。例えばCPUの水冷はこの領域を狙って設計する。一方、膜沸騰は温度が高すぎて加熱面全体が蒸気の膜で覆われてしまう状態。蒸気は熱を伝えにくいから、熱がこもってしまう。フライパンに水滴を落とした時に、水滴が玉になって転がる「ライデンフロスト現象」がまさにそれだね。ツールで「流体」を水から有機溶媒に変えてみると、曲線の形やCHFの値が大きく変わるのがわかるよ。</div>
+      <div class="bub">いい観察だ。過熱度が上がると、活性化する核生成サイトの密度が増え、しかも各サイトの離脱頻度（1秒あたり何個気泡を出すか）も上がる。サイト密度×頻度×1個あたりの潜熱、で運ばれる熱が決まるから、効果が掛け算で効く。Rohsenow相関だと核沸騰は $q''\propto\Delta T_e^3$、つまり $h=q''/\Delta T_e\propto\Delta T_e^2$ で急上昇する。だから「中」プリセットから「高」に上げるだけで h が何倍にも跳ね上がる。ただし上げ続けると気泡が合体して蒸気膜になり、CHF（臨界熱流束）を超えると一気に熱が伝わらなくなる——バッジが赤くなったら危険信号だよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">なるほど！「加熱面・流体組合せ」でCの値を選ぶのはなぜですか？ あと、計算に使われてる「Rohsenow相関」って何を計算してるんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">良いところに気が付いたね。Cの値は「加熱面の材質と表面状態」と「流体の組み合わせ」で決まる実験定数で、気泡が生まれやすさを表している。例えば磨かれた銅面と水の組み合わせと、ざらざらのステンレス面とエタノールの組み合わせでは値が大きく異なる。この値が変わると、核沸騰の曲線の傾きが変わるんだ。Rohsenow相関は、君が今設定したΔT（表面過熱度）から、核沸騰領域の熱流束 $q''$ を予測するための半経験式だ。シミュレーターはこの式を使ってリアルタイムでグラフを描いている。パラメータをいじりながら、CHF（ピーク）やライデンフロスト点（右端）の値がどう変わるか観察してみて。</div>
+      <div class="bub">良いところに気が付いたね。Csfは「加熱面の材質と表面状態」と「流体の組み合わせ」で決まる実験定数で、気泡の生まれやすさ（核生成サイトの活発さ）を表している。Csfが小さいほどサイトが多く活発で、同じΔTでも気泡がたくさん出て h が高くなる。アニメで「銅-水(0.013)」から「ニッケル-水(0.020)」に変えると、サイト密度と h の数字が下がるのが見えるはずだ。計算の中身はRohsenow相関で、君が設定したΔTから核沸騰熱流束 $q''$ を出し、$h=q''/\Delta T_e$ を求めている。右の「h vs ΔTe」グラフの赤い動作点も一緒に動くから、効果を見比べてみて。</div>
     </div>
 
   </div>
 <h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
-    <button class="faq-q" onclick="toggleFaq(this)">Nukiyama曲線の各領域（核沸騰・遷移沸騰・膜沸騰）はどのように自動判定されますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">過熱度（ΔT_e）の値に基づき判定します。核沸騰は低過熱度、遷移沸騰は臨界熱流束（CHF）からライデンフロスト点の間、膜沸騰はそれ以上の過熱度と定義されます。グラフ上で色分け表示されるため、視覚的に確認できます。</div>
+    <button class="faq-q" onclick="toggleFaq(this)">アニメーションの気泡の数や大きさは何を表していますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+    <div class="faq-a">気泡が湧き出す点の数は核生成サイト密度（過熱度Csfから推定）を、気泡の最大サイズはFritz式による離脱径Dbを、湧き出すテンポは離脱頻度fを反映しています。これらの積が潜熱輸送量＝熱流束q''に対応します。過熱度ΔTeを上げるとサイト密度と頻度がともに増え、熱伝達率hが急上昇する様子が視覚的に確認できます。バッジが赤（CHF接近）になると気泡が密集し、膜沸騰への移行が近いことを示します。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">Rohsenow相関の係数C_sfや指数nはどのように設定すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -588,6 +704,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="boiling-heat-transfer.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -635,23 +754,33 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>過熱度ΔT(K)を入力欄「dteVal」に設定します。核沸騰域は5～30K、遷移沸騰域は30～100K、膜沸騰域は100K以上が目安です</li>
-<li>流速u(m/s)を「uVal」に入力します。強制対流沸騰の場合は0.5～3.0m/sの範囲が一般的です</li>
-<li>「計算実行」ボタンで熱流束q''、熱伝達率h、CHF限界値、ライデンフロスト点ΔTが自動計算されNukiyama曲線上にプロット表示されます</li>
+<li>過熱度ΔTe(K)スライダーまたはプリセット（低/中/高）を動かすと、アニメーションの核生成サイト数・気泡の大きさ・離脱テンポが即座に変化します。核沸騰域は概ね4～30Kが対象です</li>
+<li>流体と「加熱面・流体組合せ(Csf)」を変えると、同じ過熱度でもサイト密度・離脱径Db・熱伝達率hがどう変わるか比較できます</li>
+<li>右の「h vs ΔTe」グラフの赤い動作点と、上部のq''・h・ΔTe・Db・サイト密度・離脱頻度・ヤコブ数Ja・CHFのライブ数値で物理量を確認できます。再生/一時停止/最初からで観察を制御できます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>飽和水(100℃、1気圧)が銅面上で核沸騰する場合、ΔT=15K、流速u=1.2m/sでの計算：Rohsenow相関式(Csf=0.013、n=1.0)によりq''≈850kW/m²、h≈57kW/m²K、CHF≈1.26MW/m²と算出されます。同条件でΔT=120Kに増加させると膜沸騰に遷移し、q''は低下してライデンフロスト点ΔT≈180Kに達します</p>
+<p>飽和水(100℃、1気圧)が銅面上で核沸騰する場合、ΔTe=15K、Rohsenow相関式(Csf=0.013、n=1.0)によりq''≈466.8kW/m²、h≈31.1kW/m²Kと算出されます（CHF≈1.111MW/m²）。このときFritz式の気泡離脱径Db≈2.34mm、離脱頻度f≈39Hz、ヤコブ数Ja≈45で、潜熱輸送バランスから核生成サイト密度はおよそ130/cm²（≈1.3×10⁶/m²）と逆算されます。ΔTe=8Kに下げるとq''≈71kW/m²・h≈8.9kW/m²Kまで落ち、サイト密度も約20/cm²に減ってアニメの気泡がまばらになります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
 <li>原子力炉燃料棒設計ではCHF(Critical Heat Flux)≈2.5～3.0MW/m²が安全限界であり、沸騰限界に対して1.3倍以上の裕度を設けます</li>
-<li>強制対流沸騰では流速増加によりCHFが向上するため、ポンプ設計と連動させてチャネル内流速0.5m/s以上を確保します</li>
+<li>流動沸騰やポンプ設計は本簡易モデルの対象外です。必要な場合は専用の強制対流沸騰相関で別途評価してください</li>
 <li>異なる材質(アルミニウムCsf=0.009、ステンレスCsf=0.008)では同一過熱度でも熱流束が10～20%変動するため、表面処理状態の確認が必須です</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

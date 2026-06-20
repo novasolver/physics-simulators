@@ -51,12 +51,34 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .verdict.ok{background:rgba(0,184,148,.1);border:1px solid rgba(0,184,148,.4);color:#0a8a6a}
 .verdict.warn{background:rgba(225,112,85,.1);border:1px solid rgba(225,112,85,.45);color:#c0563a}
 .verdict.ng{background:rgba(214,48,49,.1);border:1px solid rgba(214,48,49,.45);color:#c0392b}
+/* ===== v2 live readouts / controls ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:.6rem;color:rgba(255,255,255,.62);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+.live-ro.green .rv{color:#46e0b0}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.speed-wrap{display:flex;gap:4px;margin-left:auto}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+.scrub-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.scrub-row input[type=range]{flex:1}
+.scrub-time{font-family:'Roboto Mono',monospace;font-size:.78rem;color:var(--accent);min-width:108px;text-align:right}
+#bpCanvas:focus-visible{outline:2px solid var(--accent2,#00B4D8);outline-offset:2px}
+.inverse-box{margin-top:12px;padding:12px 14px;border-radius:8px;background:rgba(0,180,216,.06);border:1px solid rgba(0,180,216,.22)}
+.inverse-box .ib-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.inverse-box input[type=number]{width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit}
+.inverse-out{font-family:'Roboto Mono',monospace;font-weight:700;color:var(--accent)}
+@media (prefers-reduced-motion: reduce){.ebar-fill{transition:none}}
 </style>
 <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "弾道振り子シミュレーター",
       "description": "弾道振り子の振り上がり高さ・振れ角・衝突直後の速度・衝突で失われたエネルギーを計算。弾丸の質量と初速、ブロック質量、振り子の長さを変えて、非弾性衝突の運動量保存と振り上げのエネルギー保存を直感的に学べる無料シミュレーターです。",
       "url": "https://novasolver.jp/tools/ballistic-pendulum.html",
@@ -66,7 +88,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["非弾性衝突後の共通速度を運動量保存から計算","エネルギー保存による振り上がり高さと振れ角の算出","衝突前後の運動エネルギーとエネルギー損失の比較","弾丸初速に対する振り上がり高さのグラフ","振り子質量に対する振れ角のグラフ"],
       "keywords": "弾道振り子,運動量保存,非弾性衝突,エネルギー保存,弾丸初速,古典力学,衝突",
       "inLanguage": "ja"
@@ -130,6 +152,17 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div style="margin-bottom:12px">
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">プリセット</div>
+      <div class="preset-row" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="preset-btn" type="button" onclick="bpPreset('light')">軽く速い弾</button>
+        <button class="preset-btn" type="button" onclick="bpPreset('heavy')">重く遅い弾</button>
+        <button class="preset-btn" type="button" onclick="bpPreset('textbook')">教科書の標準</button>
+        <button class="preset-btn" type="button" onclick="bpPreset('measure')">角度から初速</button>
+      </div>
+    </div>
+    <div class="divider"></div>
+
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">弾丸の質量 m</span>
@@ -167,6 +200,15 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="param-desc">支点からブロック重心までの長さ</div>
       <input type="range" id="plRange" min="0.3" max="3" step="0.1" value="1.0" oninput="syncToNum('plRange','plNum');pct(this);compute()">
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right: visualization -->
@@ -186,8 +228,51 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-bullseye"></i> 弾道振り子のアニメーション</div>
-      <canvas id="bpCanvas"></canvas>
-      <p class="canvas-hint">弾丸が水平にブロックへ撃ち込まれ、一体となったブロックが振れ角 θ まで振り上がり、また戻ります。第1段階は運動量保存、第2段階はエネルギー保存です。</p>
+
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roPhase">—</div><div class="rl">現在の段階</div></div>
+        <div class="live-ro"><div class="rv" id="roV">0.00</div><div class="rl">速度 (m/s)</div></div>
+        <div class="live-ro green"><div class="rv" id="roP">0.00</div><div class="rl">運動量 p (kg·m/s)</div></div>
+        <div class="live-ro"><div class="rv" id="roKE">0.0</div><div class="rl">運動エネルギー (J)</div></div>
+      </div>
+
+      <canvas id="bpCanvas" tabindex="0" role="img" aria-label="弾道振り子のアニメーション。弾丸がブロックに撃ち込まれて非弾性衝突し、一体となって振り上がる様子と、速度・運動量・エネルギーを表示します。"></canvas>
+
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="bpToggle()"><i class="fas fa-play"></i> 再生</button>
+        <button class="btn secondary" type="button" id="btnReplay" onclick="bpReplay()"><i class="fas fa-rotate-left"></i> 撃ち直し</button>
+        <div class="speed-wrap">
+          <button class="preset-btn speed-btn" type="button" data-speed="0.25" onclick="bpSetSpeed(0.25)">0.25×</button>
+          <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="bpSetSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="bpSetSpeed(2)">2×</button>
+        </div>
+      </div>
+
+      <div class="scrub-row">
+        <span style="font-size:.72rem;color:var(--muted)"><i class="fas fa-clock"></i></span>
+        <input type="range" id="bpScrub" min="0" max="1000" step="1" value="0" oninput="bpOnScrub()" aria-label="タイムスクラバー">
+        <span class="scrub-time" id="bpScrubLbl">弾道前</span>
+      </div>
+
+      <div class="legend">
+        <span><i class="swatch" style="background:#ffd24b"></i>弾丸 v_b</span>
+        <span><i class="swatch" style="background:#46e0b0"></i>衝突後 V</span>
+        <span><i class="swatch" style="background:#4aa3ff"></i>位置エネルギー PE</span>
+        <span><i class="swatch" style="background:#e17055"></i>失われたKE</span>
+      </div>
+
+      <p class="canvas-hint">弾丸が水平にブロックへ撃ち込まれて一体化し（運動量保存・KEは損失）、振れ角 θ まで振り上がります（エネルギー保存）。上のバーで衝突前後のKEと失われた割合、振り上げ中のKE↔PEの交換が見えます。</p>
+
+      <div class="inverse-box">
+        <div style="font-size:.78rem;font-weight:600;color:var(--accent);margin-bottom:6px"><i class="fas fa-rotate-left"></i> 逆算モード：測った振れ角から弾丸初速を求める</div>
+        <div class="ib-row">
+          <span style="font-size:.82rem">測定した振れ角 θ</span>
+          <input type="number" id="invTheta" value="11" min="0.1" max="120" step="0.1" oninput="bpInverse()">
+          <span style="font-size:.82rem">° →</span>
+          <span class="inverse-out" id="invOut">v_b = — m/s</span>
+        </div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:6px">現在の m・M・L を用い、h=L(1−cosθ)、V=√(2gh)、v_b=(m+M)V/m で逆算します。</div>
+      </div>
     </div>
 
     <div class="chart-card">
@@ -284,17 +369,20 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 </section>
 
 
+
+
+
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
 <li>弾丸質量(bmNum)と振り子質量(pmNum)を設定します。例えば弾丸10gと振り子500gの組み合わせなど。</li>
-<li>弾丸の初速(vbRange)と振り子の腕長(plRange)を入力します。初速800m/sの場合、運動量保存則から衝突直後の速度が自動計算されます。</li>
+<li>弾丸の初速(vbRange)と振り子の腕長(plRange)を入力します。初速300m/sの場合、運動量保存則から衝突直後の速度が自動計算されます。</li>
 <li>シミュレーション実行ボタンを押すと、非弾性衝突後の速度、振り上がり高さ、振れ角が画面にリアルタイム表示されます。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>弾丸質量10g(0.01kg)が800m/s、振り子質量500g(0.5kg)に衝突した場合：運動量保存則により(0.01×800)/(0.01+0.5)=15.7m/s。この速度で振り子が振り上がると、腕長0.5m時に高さ12.6mm、振れ角14.3度に達します。衝突前の運動エネルギー3200Jから、衝突後の運動エネルギーは61.6Jとなり、3138J(98%)が熱音響に変換されます。</p>
+<p>既定値で弾丸質量10g(0.01kg)が300m/s、振り子質量5kg、腕長1.0mに衝突した場合：運動量保存則により共通速度は(0.01×300)/(0.01+5)=0.599m/s。エネルギー保存から振り上がり高さは h=v²/2g=18.3mm、振れ角は θ=arccos(1−h/L)=10.97度に達します。衝突前の運動エネルギー450Jから、衝突後は0.90Jとなり、449.1J(99.8%)が熱と変形に変換されます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -304,6 +392,65 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 <li>腕長が1mを超える場合、重力による加速度補正(g=9.81m/s²)の影響が顕著になるため、実験値との誤差確認を必須とします。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
+<!-- codex-static-related-tools:start -->
+<section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="ballistic-pendulum.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
+ <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+  <a class="related-tool-card" href="/tools/simple-pendulum.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-atom"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">単振り子シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">単振り子シミュレーターは、近い設計条件と主要指標を軸に現在値と変化傾向を短く追うためのページです。</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/impulse-momentum.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-atom"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">衝撃・運動量シミュレーター（1D/2D衝突）</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">衝撃・運動量シミュレーターで、1D/2D衝突を視覚的に理解。弾性・非弾性衝突をリアルタイムアニメーションで再現し、反発係数による運動量保存とエネルギー損失の違いを体感できます。衝撃力...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/momentum-conservation.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-atom"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">運動量保存則・衝突 シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">近い設計条件と主要指標に関する隣接ツールへ移る前に、支配的な条件と指標の関係をつかむ構成です。</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/newtons-cradle.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-atom"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">ニュートンのゆりかご シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">近い設計条件と主要指標の初期検討に向けて、代表条件と主要指標の関係を同じ画面で読み取れます。</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/wave-2d.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-atom"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">2次元波動干渉シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">複数の点波源による2次元波動干渉パターンをリアルタイム可視化。波長・周波数・位相・減衰を調整し、ヤングの二重スリット・フェーズドアレイの原理を体験。音波・水面波・光学の干渉現象をイン...</span>
+    </span>
+  </a>
+  <a class="related-tool-card" href="/tools/wave-reflection.html" style="display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(15,23,42,.04)">
+    <span style="width:34px;height:34px;border-radius:8px;background:#e6f2ff;color:#007BFF;display:grid;place-items:center;flex:0 0 auto"><i class="fas fa-atom"></i></span>
+    <span style="display:grid;gap:4px;min-width:0">
+      <strong style="font-size:.9rem;line-height:1.35;color:#102033">波の反射・透過シミュレーター</strong>
+      <span style="font-size:.75rem;line-height:1.45;color:#5f6b7a">音波・弾性波（P波・SH波）の界面反射・透過を計算。インピーダンス比・入射角スライダーで反射係数・透過係数をリアルタイム可視化。全反射臨界角も自動計算。CAE・非破壊検査の基礎理論を...</span>
+    </span>
+  </a>
+ </div>
+</section>
+<!-- codex-static-related-tools:end -->
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -448,200 +595,346 @@ function compute(){
   BP.m = bulletKg;
 }
 
-// ===== Ballistic pendulum animation =====
+// ===== Ballistic pendulum animation (v2 playback) =====
+const BP_TXT = {
+  phaseFly:'飛翔', phaseImpact:'衝突', phaseSwing:'振り上げ', phaseBack:'振り戻り', phaseRest:'静止',
+  stage1:'第1段階：非弾性衝突（運動量保存・KE損失）',
+  stage2:'第2段階：振り上げ（エネルギー保存）',
+  swingBack:'振り戻り', rest:'発射待ち',
+  momHere:'← ここで運動量保存', enHere:'← ここでエネルギー保存',
+  bullet:'弾丸 v_b', block:'ブロック M=', combined:'一体化 V=',
+  keBefore:'衝突前KE', keAfter:'衝突後KE', loss:'損失', keLost:'KEの',
+  scrubFly:'弾道前', play:'<i class="fas fa-play"></i> 再生', pause:'<i class="fas fa-pause"></i> 一時停止',
+  hint:'「発射」を押すと弾が飛びます'
+};
 (function(){
   const cv = document.getElementById('bpCanvas');
   const ctx = cv.getContext('2d');
-  let phase = 0;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const CH = 270;
+  let cssW = 0;
+  // timeline (seconds): fly 0..0.9, impact flash 0.9..1.05, swing up 1.05..2.05, hold 2.05..2.35, swing back 2.35..3.35
+  const T_FLY=0.9, T_IMP=1.05, T_UP=2.05, T_HOLD=2.35, T_END=3.35;
+  let simT = reduce ? T_UP : 0;
+  let playing = false, animId = null, lastTs = 0, speed = 1;
+
+  function el(id){ return document.getElementById(id); }
 
   function resize(){
-    const dpr = window.devicePixelRatio||1;
+    const dpr = Math.min(window.devicePixelRatio||1, 2.5);
     const w = cv.parentElement.getBoundingClientRect().width;
-    if(Math.abs(cv.width-w*dpr)>2 || cv.height!==270*dpr){
-      cv.width = w*dpr; cv.height = 270*dpr; cv.style.height='270px';
+    cssW = Math.max(260, Math.floor(w));
+    if(cv.width!==Math.round(cssW*dpr) || cv.height!==Math.round(CH*dpr)){
+      cv.width = Math.round(cssW*dpr); cv.height = Math.round(CH*dpr);
+      cv.style.height = CH+'px';
     }
     ctx.setTransform(dpr,0,0,dpr,0,0);
   }
 
-  function frame(){
+  // phase descriptor for a given time
+  function phaseAt(t){
+    if(t < T_FLY)  return {k:'fly',  prog:t/T_FLY};
+    if(t < T_IMP)  return {k:'impact',prog:(t-T_FLY)/(T_IMP-T_FLY)};
+    if(t < T_UP)   return {k:'up',   prog:(t-T_IMP)/(T_UP-T_IMP)};
+    if(t < T_HOLD) return {k:'hold', prog:1};
+    return {k:'back', prog:(t-T_HOLD)/(T_END-T_HOLD)};
+  }
+
+  function setReadouts(ph){
+    const mTot = BP.m + BP.M;
+    let phaseLbl, velo, mom, ke;
+    if(ph.k==='fly'){
+      phaseLbl = BP_TXT.phaseFly;
+      velo = parseFloat(el('vbRange').value);
+      mom = BP.m * velo;
+      ke = 0.5*BP.m*velo*velo;
+    }else if(ph.k==='impact'){
+      phaseLbl = BP_TXT.phaseImpact;
+      velo = BP.v; mom = mTot*BP.v; ke = 0.5*mTot*BP.v*BP.v;
+    }else{
+      phaseLbl = (ph.k==='back') ? BP_TXT.phaseBack : (ph.k==='hold'?BP_TXT.phaseSwing:BP_TXT.phaseSwing);
+      // current swing fraction → velocity from energy conservation
+      let frac;
+      if(ph.k==='up') frac = 0.5-0.5*Math.cos(ph.prog*Math.PI);
+      else if(ph.k==='hold') frac = 1;
+      else frac = 1-(0.5-0.5*Math.cos(ph.prog*Math.PI));
+      const hc = BP.h*frac;                       // current height
+      const vcur = Math.sqrt(Math.max(0, BP.v*BP.v - 2*9.81*hc));
+      velo = vcur; mom = mTot*vcur; ke = 0.5*mTot*vcur*vcur;
+    }
+    el('roPhase').textContent = phaseLbl;
+    el('roV').textContent = velo.toFixed(2);
+    el('roP').textContent = mom.toFixed(3);
+    el('roKE').textContent = ke.toFixed(2);
+  }
+
+  function draw(){
     resize();
-    const W = cv.width/(window.devicePixelRatio||1);
-    const H = 270;
+    const W = cssW, H = CH;
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle = '#020d1a';
     ctx.fillRect(0,0,W,H);
 
-    // ----- cycle phases -----
-    // 0.00-0.30 bullet flies in | 0.30-0.62 swing up | 0.62-0.94 swing back | 0.94-1.0 pause
-    let swing;          // 0..1 fraction of full angle
-    let bulletProg;     // 0..1 bullet travel toward block
-    let showBullet = true;
-    if(phase < 0.30){
-      bulletProg = phase / 0.30;
-      swing = 0;
-    }else if(phase < 0.62){
-      bulletProg = 1;
-      swing = (phase - 0.30) / 0.32;
-      showBullet = false;
-    }else if(phase < 0.94){
-      bulletProg = 1;
-      swing = 1 - (phase - 0.62) / 0.32;
-      showBullet = false;
-    }else{
-      bulletProg = 1;
-      swing = 0;
-      showBullet = false;
-    }
-    swing = Math.max(0, Math.min(1, swing));
-    // ease the swing for a pendulum-like motion
-    const ease = 0.5 - 0.5*Math.cos(swing*Math.PI);
-    const ang = BP.theta * ease;     // current swing angle (rad)
+    const ph = phaseAt(simT);
+    // swing fraction 0..1 of full angle BP.theta
+    let frac = 0, showBullet = true, impactFlash = 0;
+    if(ph.k==='fly'){ frac = 0; }
+    else if(ph.k==='impact'){ frac = 0; showBullet = false; impactFlash = 1 - ph.prog; }
+    else if(ph.k==='up'){ frac = 0.5-0.5*Math.cos(ph.prog*Math.PI); showBullet=false; }
+    else if(ph.k==='hold'){ frac = 1; showBullet=false; }
+    else { frac = 1-(0.5-0.5*Math.cos(ph.prog*Math.PI)); showBullet=false; }
+    const ang = BP.theta * frac;
 
     // ----- geometry -----
     const pivotX = W*0.46, pivotY = 44;
-    const ropePx = 150;              // cord length in pixels
-    const blockW = 56, blockH = 64;
-
-    // block centre at angle 'ang' from vertical
+    const ropePx = 150, blockW = 56, blockH = 64;
     const bx = pivotX + ropePx*Math.sin(ang);
     const by = pivotY + ropePx*Math.cos(ang);
+    const restBlockY = pivotY + ropePx;
 
-    // ----- ceiling / pivot mount -----
+    // ceiling mount
     ctx.fillStyle = 'rgba(0,180,216,.16)';
     ctx.fillRect(pivotX-70, 8, 140, 14);
-    ctx.strokeStyle = 'rgba(0,180,216,.55)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(0,180,216,.55)'; ctx.lineWidth = 1;
     for(let xx=pivotX-66; xx<pivotX+70; xx+=12){
       ctx.beginPath(); ctx.moveTo(xx,8); ctx.lineTo(xx-8,22); ctx.stroke();
     }
     ctx.strokeRect(pivotX-70, 8, 140, 14);
-    // pivot dot
     ctx.fillStyle = '#cfe8f5';
     ctx.beginPath(); ctx.arc(pivotX, pivotY, 4, 0, Math.PI*2); ctx.fill();
 
-    // ----- rest reference (dashed vertical) -----
+    // rest reference
     ctx.strokeStyle = 'rgba(255,255,255,.18)';
     ctx.setLineDash([5,4]);
     ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(pivotX, pivotY+ropePx+blockH/2); ctx.stroke();
     ctx.setLineDash([]);
 
-    // ----- swing arc + angle label -----
+    // swing arc + max-angle label
     if(BP.theta > 0.002){
-      ctx.strokeStyle = 'rgba(0,180,216,.55)';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(0,180,216,.55)'; ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(pivotX, pivotY, ropePx*0.62, Math.PI/2, Math.PI/2 + BP.theta);
       ctx.stroke();
       ctx.fillStyle = 'rgba(120,200,230,.95)';
-      ctx.font = '11px Roboto Mono, monospace';
-      ctx.textAlign = 'left';
+      ctx.font = '11px Roboto Mono, monospace'; ctx.textAlign = 'left';
       const labX = pivotX + ropePx*0.70*Math.sin(BP.theta*0.5);
       const labY = pivotY + ropePx*0.70*Math.cos(BP.theta*0.5);
       ctx.fillText('θ='+(BP.theta*180/Math.PI).toFixed(1)+'°', labX+4, labY);
     }
 
-    // ----- cord -----
-    ctx.strokeStyle = 'rgba(210,225,240,.85)';
-    ctx.lineWidth = 1.6;
+    // cord
+    ctx.strokeStyle = 'rgba(210,225,240,.85)'; ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(bx, by); ctx.stroke();
 
-    // ----- swing height indicator -----
-    const restBlockY = pivotY + ropePx;       // block-centre y at rest
+    // swing-height indicator
     if(ang > 0.002){
-      ctx.strokeStyle = 'rgba(255,210,120,.8)';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(255,210,120,.8)'; ctx.lineWidth = 1.5;
       ctx.setLineDash([3,3]);
-      // horizontal at current block height
       ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(W-46, by); ctx.stroke();
-      // horizontal at rest height
       ctx.beginPath(); ctx.moveTo(pivotX, restBlockY); ctx.lineTo(W-46, restBlockY); ctx.stroke();
-      // vertical span
       ctx.beginPath(); ctx.moveTo(W-52, by); ctx.lineTo(W-52, restBlockY); ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(255,210,120,.95)';
-      ctx.font = '10px Roboto Mono, monospace';
-      ctx.textAlign = 'right';
-      ctx.fillText('h='+(BP.h*1000).toFixed(0)+'mm', W-56, (by+restBlockY)/2+3);
+      ctx.font = '10px Roboto Mono, monospace'; ctx.textAlign = 'right';
+      ctx.fillText('h='+(BP.h*frac*1000).toFixed(0)+'mm', W-56, (by+restBlockY)/2+3);
     }
 
-    // ----- block (with embedded bullet after impact) -----
+    // block
     ctx.save();
-    ctx.translate(bx, by);
-    ctx.rotate(ang);
-    // block body
+    ctx.translate(bx, by); ctx.rotate(ang);
     ctx.fillStyle = 'rgba(150,120,90,.92)';
-    ctx.strokeStyle = 'rgba(210,180,140,.95)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(210,180,140,.95)'; ctx.lineWidth = 1.5;
     ctx.fillRect(-blockW/2, -blockH/2, blockW, blockH);
     ctx.strokeRect(-blockW/2, -blockH/2, blockW, blockH);
-    // wood grain
-    ctx.strokeStyle = 'rgba(110,85,60,.7)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(110,85,60,.7)'; ctx.lineWidth = 1;
     for(let gy=-blockH/2+12; gy<blockH/2; gy+=14){
       ctx.beginPath(); ctx.moveTo(-blockW/2+4, gy); ctx.lineTo(blockW/2-4, gy); ctx.stroke();
     }
-    // embedded bullet (visible once impact happened)
-    if(!showBullet || bulletProg>=1){
+    if(!showBullet){
       ctx.fillStyle = '#ffd24b';
-      ctx.beginPath();
-      ctx.arc(-blockW/2+12, 0, 5, 0, Math.PI*2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(-blockW/2+12, 0, 5, 0, Math.PI*2); ctx.fill();
     }
     ctx.restore();
 
-    // block label
-    ctx.fillStyle = 'rgba(230,210,180,.95)';
-    ctx.font = '10px Roboto Mono, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('ブロック M='+BP.M.toFixed(1)+'kg', bx, by+blockH/2+16);
+    // impact flash
+    if(impactFlash > 0){
+      ctx.fillStyle = 'rgba(255,180,60,'+(impactFlash*0.55).toFixed(3)+')';
+      ctx.beginPath(); ctx.arc(bx-blockW/2+8, by, 10+22*(1-impactFlash), 0, Math.PI*2); ctx.fill();
+    }
 
-    // ----- flying bullet (stage 1) -----
+    // block label + combined velocity during swing
+    ctx.fillStyle = 'rgba(230,210,180,.95)';
+    ctx.font = '10px Roboto Mono, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(BP_TXT.block+BP.M.toFixed(1)+'kg', bx, by+blockH/2+16);
+
+    // flying bullet (stage 1)
     if(showBullet){
       const startX = 24;
       const targetX = bx - blockW/2 - 6;
-      const bX = startX + (targetX - startX)*bulletProg;
+      const bX = startX + (targetX - startX)*ph.prog;
       const bY = restBlockY;
-      // motion trail
-      ctx.strokeStyle = 'rgba(255,210,120,.35)';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255,210,120,.35)'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(startX, bY); ctx.lineTo(bX, bY); ctx.stroke();
-      // bullet body
       ctx.fillStyle = '#ffd24b';
-      ctx.beginPath();
-      ctx.ellipse(bX, bY, 9, 4.5, 0, 0, Math.PI*2);
-      ctx.fill();
-      // velocity arrow
-      ctx.strokeStyle = '#ffd24b';
-      ctx.fillStyle = '#ffd24b';
-      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(bX, bY, 9, 4.5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#ffd24b'; ctx.fillStyle = '#ffd24b'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(bX+12, bY); ctx.lineTo(bX+30, bY); ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(bX+30, bY); ctx.lineTo(bX+22, bY-4); ctx.lineTo(bX+22, bY+4);
+      ctx.beginPath(); ctx.moveTo(bX+30, bY); ctx.lineTo(bX+22, bY-4); ctx.lineTo(bX+22, bY+4);
       ctx.closePath(); ctx.fill();
-      ctx.font = '10px Roboto Mono, monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText('弾丸 v_b', startX, bY-12);
+      ctx.font = '10px Roboto Mono, monospace'; ctx.textAlign = 'left';
+      ctx.fillText(BP_TXT.bullet+' = '+parseFloat(el('vbRange').value).toFixed(0)+' m/s', startX, bY-12);
     }
 
-    // ----- stage / status label (top-left) -----
-    ctx.textAlign = 'left';
-    let stext, scol;
-    if(phase < 0.30){      stext = '第1段階：非弾性衝突（運動量保存）'; scol = '#ffd24b'; }
-    else if(phase < 0.62){ stext = '第2段階：振り上げ（エネルギー保存）'; scol = '#00b894'; }
-    else if(phase < 0.94){ stext = '振り戻り'; scol = '#7fc7e0'; }
-    else{                  stext = '次のショット待ち'; scol = 'rgba(255,255,255,.5)'; }
-    ctx.fillStyle = scol;
-    ctx.font = 'bold 11px Roboto Mono, monospace';
-    ctx.fillText(stext, 14, H-30);
-    ctx.fillStyle = 'rgba(255,255,255,.5)';
-    ctx.font = '10px Roboto Mono, monospace';
-    ctx.fillText('衝突直後の速度 v='+BP.v.toFixed(2)+' m/s   損失率 '+BP.frac.toFixed(1)+'%', 14, H-14);
+    // ----- KE-loss / energy bars (top-left mini panel) -----
+    const panelX = 12, panelY = 10, barW = 96, barH = 9;
+    const keB = 0.5*BP.m*Math.pow(parseFloat(el('vbRange').value),2);
+    const keA = 0.5*(BP.m+BP.M)*BP.v*BP.v;
+    ctx.textAlign = 'left'; ctx.font = '9px Roboto Mono, monospace';
+    // KE before
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.fillText(BP_TXT.keBefore, panelX, panelY+8);
+    ctx.fillStyle = 'rgba(255,255,255,.14)';
+    ctx.fillRect(panelX, panelY+12, barW, barH);
+    ctx.fillStyle = '#ffd24b';
+    ctx.fillRect(panelX, panelY+12, barW, barH);
+    // KE after (tiny) + lost
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.fillText(BP_TXT.keAfter+' ('+BP.frac.toFixed(1)+'% '+BP_TXT.loss+')', panelX, panelY+34);
+    ctx.fillStyle = 'rgba(255,255,255,.14)';
+    ctx.fillRect(panelX, panelY+38, barW, barH);
+    const keFrac = keB>0 ? Math.max(0.01, keA/keB) : 0;
+    ctx.fillStyle = '#46e0b0';
+    ctx.fillRect(panelX, panelY+38, barW*keFrac, barH);
+    ctx.fillStyle = '#e17055';
+    ctx.fillRect(panelX+barW*keFrac, panelY+38, barW*(1-keFrac), barH);
 
-    phase += 0.0045;
-    if(phase>=1) phase = 0;
-    requestAnimationFrame(frame);
+    // ----- swing energy bars (KE<->PE) shown during swing -----
+    if(ph.k==='up' || ph.k==='hold' || ph.k==='back'){
+      const peFrac = frac;                 // PE share of post-impact energy
+      const keFr = Math.max(0, 1-frac);
+      const ebX = W-150, ebY = 62, ebW = 130, ebH = 10;
+      ctx.textAlign='left'; ctx.font='9px Roboto Mono, monospace';
+      ctx.fillStyle='rgba(70,224,176,.9)'; ctx.fillText('KE', ebX, ebY-2);
+      ctx.fillStyle='rgba(255,255,255,.14)'; ctx.fillRect(ebX, ebY, ebW, ebH);
+      ctx.fillStyle='#46e0b0'; ctx.fillRect(ebX, ebY, ebW*keFr, ebH);
+      ctx.fillStyle='rgba(74,163,255,.9)'; ctx.fillText('PE', ebX, ebY+24);
+      ctx.fillStyle='rgba(255,255,255,.14)'; ctx.fillRect(ebX, ebY+26, ebW, ebH);
+      ctx.fillStyle='#4aa3ff'; ctx.fillRect(ebX, ebY+26, ebW*peFrac, ebH);
+    }
+
+    // ----- annotation (momentum here / energy here) -----
+    ctx.font = 'bold 11px Roboto Mono, monospace'; ctx.textAlign = 'left';
+    let stext, scol, anno='';
+    if(ph.k==='fly' || ph.k==='impact'){ stext = BP_TXT.stage1; scol = '#ffd24b'; anno = BP_TXT.momHere; }
+    else if(ph.k==='up' || ph.k==='hold'){ stext = BP_TXT.stage2; scol = '#46e0b0'; anno = BP_TXT.enHere; }
+    else { stext = BP_TXT.swingBack; scol = '#7fc7e0'; anno = BP_TXT.enHere; }
+    ctx.fillStyle = scol;
+    ctx.fillText(stext, 14, H-30);
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '10px Roboto Mono, monospace';
+    ctx.fillText('V='+BP.v.toFixed(2)+' m/s   p='+((BP.m+BP.M)*BP.v).toFixed(3)+' kg·m/s', 14, H-14);
+    // annotation near block
+    ctx.fillStyle = scol; ctx.font = 'bold 10px Roboto Mono, monospace'; ctx.textAlign='left';
+    ctx.fillText(anno, Math.min(bx+blockW/2+6, W-130), by-blockH/2);
+
+    setReadouts(ph);
+    // scrubber sync
+    el('bpScrub').value = String(Math.round(simT/T_END*1000));
+    el('bpScrubLbl').textContent = simT<0.02 ? BP_TXT.scrubFly : ('t='+simT.toFixed(2)+'s');
   }
-  frame();
+
+  function loop(ts){
+    if(!playing){ animId = null; return; }
+    if(!lastTs) lastTs = ts;
+    const dt = Math.min(0.05, (ts-lastTs)/1000); lastTs = ts;
+    simT += dt*speed;
+    if(simT >= T_END){ simT = T_END; draw(); stop(); return; }
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+  function start(){
+    if(reduce){ draw(); return; }
+    if(simT >= T_END) simT = 0;
+    playing = true; lastTs = 0;
+    el('btnPlay').innerHTML = BP_TXT.pause;
+    if(!animId) animId = requestAnimationFrame(loop);
+  }
+  function stop(){
+    playing = false;
+    if(animId){ cancelAnimationFrame(animId); animId = null; }
+    el('btnPlay').innerHTML = BP_TXT.play;
+  }
+  // expose controls
+  window.bpToggle = function(){ playing ? stop() : start(); };
+  window.bpReplay = function(){ simT = 0; draw(); start(); };
+  window.bpSetSpeed = function(s){
+    speed = s;
+    document.querySelectorAll('.speed-btn').forEach(function(b){
+      const a = parseFloat(b.dataset.speed)===s;
+      b.classList.toggle('active', a);
+      b.style.borderColor = a ? 'var(--accent)' : '';
+      b.style.color = a ? 'var(--accent)' : '';
+    });
+  };
+  window.bpOnScrub = function(){
+    stop();
+    simT = parseFloat(el('bpScrub').value)/1000*T_END;
+    draw();
+  };
+  window.bpRedraw = function(){ draw(); };
+
+  cv.addEventListener('keydown', function(e){
+    if(e.key===' ' || e.key==='Enter'){ e.preventDefault(); window.bpToggle(); }
+  });
+  window.addEventListener('resize', function(){ draw(); });
+
+  // first paint
+  compute();
+  draw();
+  if(!reduce){ start(); }
+})();
+
+// ===== inverse mode: measured angle -> bullet speed =====
+function bpInverse(){
+  const theta = parseFloat(document.getElementById('invTheta').value) * Math.PI/180;
+  const m = parseFloat(document.getElementById('bmRange').value)/1000; // kg
+  const M = parseFloat(document.getElementById('pmRange').value);      // kg
+  const L = parseFloat(document.getElementById('plRange').value);      // m
+  const h = L*(1-Math.cos(theta));
+  const V = Math.sqrt(2*9.81*h);
+  const vb = (m+M)*V/m;
+  document.getElementById('invOut').textContent = 'v_b = '+(isFinite(vb)?vb.toFixed(1):'—')+' m/s';
+}
+
+// ===== presets =====
+function bpPreset(name){
+  const P = {
+    light:    {bm:5,  pm:3.0, vb:600, pl:1.0},
+    heavy:    {bm:50, pm:8.0, vb:120, pl:1.2},
+    textbook: {bm:10, pm:5.0, vb:300, pl:1.0},
+    measure:  {bm:10, pm:2.0, vb:300, pl:1.0}
+  }[name];
+  if(!P) return;
+  const set = function(rId,nId,val){
+    document.getElementById(rId).value = val;
+    var n = document.getElementById(nId); if(n) n.value = val;
+    pct(document.getElementById(rId));
+  };
+  set('bmRange','bmNum',P.bm);
+  set('pmRange','pmNum',P.pm);
+  set('vbRange','vbNum',P.vb);
+  set('plRange','plNum',P.pl);
+  compute();
+  if(window.bpReplay) window.bpReplay();
+}
+
+// recompute + redraw whenever a slider changes (augment existing compute via wrapper)
+(function(){
+  const _compute = compute;
+  window.compute = function(){
+    _compute();
+    if(window.bpRedraw) window.bpRedraw();
+    if(document.getElementById('invTheta')) bpInverse();
+  };
 })();
 
 // ===== init =====
@@ -649,6 +942,7 @@ function compute(){
   pct(document.getElementById(id));
 });
 compute();
+bpInverse();
 </script>
 
 <script src="/assets/sidebar-inject.v9.js" defer></script>

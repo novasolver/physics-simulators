@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "平面トラスFEMソルバー",
       "description": "直接剛性法による2次元ピン結合トラスの有限要素解析。部材力・変位・支点反力をリアルタイム計算・可視化。5種類のトラス構成から選択可能。",
       "url": "https://novasolver.jp/tools/fem-truss.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["直接剛性法によるFEM計算","プラット・ウォーレン・カンチレバー等5種プリセット","引張（赤）・圧縮（青）カラーマッピング","変形形状リアルタイム可視化","節点変位・支点反力の数値出力"],
       "keywords": "トラス,有限要素法,FEM,直接剛性法,構造解析,平面トラス,CAE",
       "datePublished": "2026-04-07",
@@ -252,7 +252,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="legend-item"><div class="legend-dot" style="background:#2980b9"></div>圧縮（−）</div>
       <div class="legend-item"><div class="legend-dot" style="background:#888"></div>ゼロ力</div>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz Panel -->
@@ -297,601 +305,498 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
+(function(){
+"use strict";
+
+// ============================================================
+//  Plane Truss FEM Solver — V2 (Direct Stiffness Method)
+//  Animated "load being applied": ghost (undeformed) -> deformed,
+//  members color-coded by axial force (red=tension, blue=compression),
+//  live numbers updated every frame. HiDPI + prefers-reduced-motion.
+// ============================================================
+
+// ---- localized labels (scale note prefix) ----
+var LANG = (document.documentElement.lang || 'en').toLowerCase();
+var SCALE_PREFIX = LANG.indexOf('ja') === 0 ? '変形倍率: '
+                 : LANG.indexOf('zh') === 0 ? '放大系数: '
+                 : 'Scale: ';
 
 // ===========================
-// TRUSS PRESETS
+// TRUSS PRESETS  (5 configurations; coords in meters)
+// nodes[i]=[x,y]; members[k]=[i,j];
+// supports: pin fixes x&y, roller fixes y only. Loads applied per loadDir.
 // ===========================
-// Each preset: { nodes: [[x,y],...], members: [[i,j],...], supports: [{node, type:'pin'|'roller'},...], loads: [{node, which:'bottom'|'all'|'tip'}] }// Coordinates in meters. Loads applied based on loadDir setting.
-
-const PRESETS ={
+var PRESETS = {
   pratt: {
-    name: 'プラットトラス（5パネル）',
-    // 6 bottom chord nodes (y=0), 6 top chord nodes (y=3), 5 panels of width 3m each
     nodes: [
-      [0,0],[3,0],[6,0],[9,0],[12,0],[15,0],  // 0-5 bottom
-      [0,3],[3,3],[6,3],[9,3],[12,3],[15,3]   // 6-11 top
+      [0,0],[3,0],[6,0],[9,0],[12,0],[15,0],
+      [0,3],[3,3],[6,3],[9,3],[12,3],[15,3]
     ],
     members: [
-      // Bottom chord
       [0,1],[1,2],[2,3],[3,4],[4,5],
-      // Top chord
       [6,7],[7,8],[8,9],[9,10],[10,11],
-      // Verticals
       [0,6],[1,7],[2,8],[3,9],[4,10],[5,11],
-      // Diagonals (Pratt: diagonals in tension under vertical load)
       [1,6],[2,7],[3,8],[4,9],[5,10]
     ],
-    supports: [
-      {node:0, type:'pin'},{node:5, type:'roller'}
-    ],
-    loadNodes: [1,2,3,4],  // bottom chord inner nodes
-    loadType: 'bottom'
+    supports: [{node:0,type:'pin'},{node:5,type:'roller'}],
+    loadNodes: [1,2,3,4]
   },
-  warren:{
-    name: 'ウォーレントラス（4パネル）',
-    // 5 bottom nodes, 4 top nodes (between panels), 4 panels
+  warren: {
     nodes: [
-      [0,0],[4,0],[8,0],[12,0],[16,0],    // 0-4 bottom
-      [2,3],[6,3],[10,3],[14,3],          // 5-8 top
+      [0,0],[4,0],[8,0],[12,0],[16,0],
+      [2,3],[6,3],[10,3],[14,3]
     ],
     members: [
-      // Bottom chord
       [0,1],[1,2],[2,3],[3,4],
-      // Top chord
       [5,6],[6,7],[7,8],
-      // Diagonals (Warren)
       [0,5],[1,5],[1,6],[2,6],[2,7],[3,7],[3,8],[4,8]
     ],
-    supports: [
-      {node:0, type:'pin'},{node:4, type:'roller'}
-    ],
-    loadNodes: [1,2,3],
-    loadType: 'bottom'
+    supports: [{node:0,type:'pin'},{node:4,type:'roller'}],
+    loadNodes: [1,2,3]
   },
-  cantilever:{
-    name: 'カンチレバートラス',
-    // Fixed at left wall (nodes 0 and 3), free end at right
+  cantilever: {
     nodes: [
-      [0,0],[3,0],[6,0],[9,0],   // 0-3 bottom
-      [0,3],[3,3],[6,3]          // 4-6 top
+      [0,0],[3,0],[6,0],[9,0],
+      [0,3],[3,3],[6,3]
     ],
     members: [
-      // Bottom chord
       [0,1],[1,2],[2,3],
-      // Top chord
       [4,5],[5,6],
-      // Verticals
       [0,4],[1,5],[2,6],
-      // Diagonals
       [1,4],[2,5],[3,6]
     ],
-    supports: [
-      {node:0, type:'pin'},{node:4, type:'pin'}
-    ],
-    loadNodes: [3],
-    loadType: 'tip'
+    supports: [{node:0,type:'pin'},{node:4,type:'pin'}],
+    loadNodes: [3]
   },
-  ktruss:{
-    name: 'K型トラス',
-    // 3 panels, K-bracing (mid-points on verticals)
+  ktruss: {
     nodes: [
-      [0,0],[4,0],[8,0],[12,0],      // 0-3 bottom chord
-      [0,4],[4,4],[8,4],[12,4],      // 4-7 top chord
-      [4,2],[8,2]                    // 8-9 mid-height nodes (K-brace junction)
+      [0,0],[4,0],[8,0],[12,0],
+      [0,4],[4,4],[8,4],[12,4],
+      [4,2],[8,2]
     ],
     members: [
-      // Bottom chord
       [0,1],[1,2],[2,3],
-      // Top chord
       [4,5],[5,6],[6,7],
-      // Verticals (split at mid)
       [0,4],[1,8],[8,5],[2,9],[9,6],[3,7],
-      // K diagonals
       [1,4],[8,4],[8,6],[2,5],[9,5],[9,7]
     ],
-    supports: [
-      {node:0, type:'pin'},{node:3, type:'roller'}
-    ],
-    loadNodes: [1,2],
-    loadType: 'bottom'
+    supports: [{node:0,type:'pin'},{node:3,type:'roller'}],
+    loadNodes: [1,2]
   },
-  simple:{
-    name: '単純トラス（3部材）',
-    nodes: [
-      [0,0],[4,0],[2,3]  // 0=left pin, 1=right roller, 2=top apex
-    ],
-    members: [
-      [0,2],[1,2],[0,1]
-    ],
-    supports: [
-      {node:0, type:'pin'},{node:1, type:'roller'}
-    ],
-    loadNodes: [2],
-    loadType: 'tip'
+  simple: {
+    nodes: [[0,0],[4,0],[2,3]],
+    members: [[0,2],[1,2],[0,1]],
+    supports: [{node:0,type:'pin'},{node:1,type:'roller'}],
+    loadNodes: [2]
   }
 };
 
+function gid(id){ return document.getElementById(id); }
+function numVal(id, fallback){ var e=gid(id); var v=e?parseFloat(e.value):NaN; return isFinite(v)?v:fallback; }
+
 // ===========================
-// FEM SOLVER
+// LINEAR ALGEBRA — Gaussian elimination w/ partial pivoting
 // ===========================
+function gaussianElimination(A, b){
+  var n = A.length;
+  var M = A.map(function(row,i){ var r=Array.prototype.slice.call(row); r.push(b[i]); return r; });
+  for (var col=0; col<n; col++){
+    var maxRow=col, maxVal=Math.abs(M[col][col]);
+    for (var row=col+1; row<n; row++){
+      if (Math.abs(M[row][col])>maxVal){ maxVal=Math.abs(M[row][col]); maxRow=row; }
+    }
+    if (maxVal < 1e-30) return null;
+    var tmp=M[col]; M[col]=M[maxRow]; M[maxRow]=tmp;
+    var pivot=M[col][col];
+    for (var r2=0; r2<n; r2++){
+      if (r2===col) continue;
+      var factor=M[r2][col]/pivot;
+      for (var c2=col; c2<=n; c2++){ M[r2][c2]-=factor*M[col][c2]; }
+    }
+  }
+  var x=new Float64Array(n);
+  for (var i=0;i<n;i++){ x[i]=M[i][n]/M[i][i]; }
+  return x;
+}
 
-function solveTruss(nodes, members, supports, loadVec){
-  const n = nodes.length;
-  const ndof = 2 * n;
-  // E in Pa, A in m^2
-  const E = parseFloat(document.getElementById('eSlider').value) * 1e9;
-  const A = parseFloat(document.getElementById('aSlider').value) * 1e-4;
+// ===========================
+// FEM SOLVER (Direct Stiffness Method)
+//   K u = f ;  member axial force N = (AE/L)(c*Dux + s*Duy)  (+ tension)
+// ===========================
+function solveTruss(nodes, members, supports, loadVec, E, A){
+  var n = nodes.length;
+  var ndof = 2*n;
+  var K = [];
+  for (var d0=0; d0<ndof; d0++) K.push(new Float64Array(ndof));
 
-  // Build global stiffness matrix
-  const K = Array.from({length: ndof}, () => new Float64Array(ndof));
-
-  const memberData = [];
-  for (let m = 0; m < members.length; m++){
-    const [i, j] = members[m];
-    const xi = nodes[i][0], yi = nodes[i][1];
-    const xj = nodes[j][0], yj = nodes[j][1];
-    const dx = xj - xi, dy = yj - yi;
-    const L = Math.sqrt(dx*dx + dy*dy);
-    const c = dx/L, s = dy/L;
-    const k = (A * E) / L;
-
-    memberData.push({i, j, L, c, s, k});
-
-    // Local stiffness contribution to global K
-    // DOFs: [2i, 2i+1, 2j, 2j+1]
-    const dofs = [2*i, 2*i+1, 2*j, 2*j+1];
-    const ke = [
+  var memberData = [];
+  for (var m=0; m<members.length; m++){
+    var i=members[m][0], j=members[m][1];
+    var dx=nodes[j][0]-nodes[i][0], dy=nodes[j][1]-nodes[i][1];
+    var L=Math.sqrt(dx*dx+dy*dy);
+    var c=dx/L, s=dy/L;
+    var k=(A*E)/L;
+    memberData.push({i:i,j:j,L:L,c:c,s:s});
+    var dofs=[2*i,2*i+1,2*j,2*j+1];
+    var ke=[
       [ c*c,  c*s, -c*c, -c*s],
       [ c*s,  s*s, -c*s, -s*s],
       [-c*c, -c*s,  c*c,  c*s],
       [-c*s, -s*s,  c*s,  s*s]
     ];
-    for (let a = 0; a < 4; a++){
-      for (let b = 0; b < 4; b++) {
-        K[dofs[a]][dofs[b]] += k * ke[a][b];
-      }
-    }
-  }// Apply boundary conditions: identify fixed DOFs
-  const fixedDofs = new Set();
-  for (const sup of supports){
-    const nd = sup.node;
-    if (sup.type === 'pin') {
-      fixedDofs.add(2*nd);
-      fixedDofs.add(2*nd+1);
-    }else if (sup.type === 'roller'){
-      // roller: fix y only (vertical reaction)
-      fixedDofs.add(2*nd+1);
-    }
-  }// Free DOFs
-  const freeDofs = [];
-  for (let d = 0; d < ndof; d++){
-    if (!fixedDofs.has(d)) freeDofs.push(d);
-  }const nf = freeDofs.length;
+    for (var a=0;a<4;a++) for (var b=0;b<4;b++) K[dofs[a]][dofs[b]] += k*ke[a][b];
+  }
 
-  // Extract reduced system K_ff * u_f = f_f
-  const Kff = Array.from({length: nf}, () => new Float64Array(nf));
-  const ff = new Float64Array(nf);
+  var fixedDofs = new Set();
+  for (var sp=0; sp<supports.length; sp++){
+    var nd=supports[sp].node;
+    if (supports[sp].type==='pin'){ fixedDofs.add(2*nd); fixedDofs.add(2*nd+1); }
+    else { fixedDofs.add(2*nd+1); }
+  }
+  var freeDofs=[];
+  for (var dd=0; dd<ndof; dd++){ if (!fixedDofs.has(dd)) freeDofs.push(dd); }
+  var nf=freeDofs.length;
 
-  for (let a = 0; a < nf; a++){
-    ff[a] = loadVec[freeDofs[a]];
-    for (let b = 0; b < nf; b++) {
-      Kff[a][b] = K[freeDofs[a]][freeDofs[b]];
-    }
-  }// Solve using Gaussian elimination with partial pivoting
-  const uf = gaussianElimination(Kff, ff);
+  var Kff=[]; for (var q=0;q<nf;q++) Kff.push(new Float64Array(nf));
+  var ff=new Float64Array(nf);
+  for (var a2=0;a2<nf;a2++){
+    ff[a2]=loadVec[freeDofs[a2]];
+    for (var b2=0;b2<nf;b2++){ Kff[a2][b2]=K[freeDofs[a2]][freeDofs[b2]]; }
+  }
+  var uf=gaussianElimination(Kff, ff);
   if (!uf) return null;
 
-  // Full displacement vector
-  const u = new Float64Array(ndof);
-  for (let a = 0; a < nf; a++){
-    u[freeDofs[a]] = uf[a];
-  }// Compute member forces
-  const forces = [];
-  for (const md of memberData){
-    const {i, j, L, c, s, k} = md;
-    // elongation = c*(uj_x - ui_x) + s*(uj_y - ui_y)
-    const elong = c*(u[2*j] - u[2*i]) + s*(u[2*j+1] - u[2*i+1]);
-    forces.push(A * E / L * elong);  // N (positive = tension)
-  }// Compute reactions: R = K*u - f (at fixed DOFs)
-  const reactions ={};
-  for (const d of fixedDofs){
-    let r = 0;
-    for (let dd = 0; dd < ndof; dd++) {
-      r += K[d][dd] * u[dd];
-    }
-    r -= loadVec[d];
-    reactions[d] = r;
-  }return{ u, forces, reactions, memberData, fixedDofs };
-}// Gaussian elimination with partial pivoting
+  var u=new Float64Array(ndof);
+  for (var a3=0;a3<nf;a3++){ u[freeDofs[a3]]=uf[a3]; }
 
-function gaussianElimination(A, b){
-  const n = A.length;
-  // Augmented matrix
-  const M = A.map((row, i) => { const r = Array.from(row); r.push(b[i]); return r; });
-
-  for (let col = 0; col < n; col++){
-    // Find pivot
-    let maxRow = col;
-    let maxVal = Math.abs(M[col][col]);
-    for (let row = col+1; row < n; row++) {
-      if (Math.abs(M[row][col]) > maxVal) {
-        maxVal = Math.abs(M[row][col]);
-        maxRow = row;
-      }
-    }if (maxVal < 1e-30) return null; // singular
-
-    // Swap
-    [M[col], M[maxRow]] = [M[maxRow], M[col]];
-
-    // Eliminate
-    const pivot = M[col][col];
-    for (let row = 0; row < n; row++){
-      if (row === col) continue;
-      const factor = M[row][col] / pivot;
-      for (let c = col; c <= n; c++) {
-        M[row][c] -= factor * M[col][c];
-      }
-    }
-  }// Extract solution
-  const x = new Float64Array(n);
-  for (let i = 0; i < n; i++){
-    x[i] = M[i][n] / M[i][i];
+  var forces=[];
+  for (var md=0; md<memberData.length; md++){
+    var mm=memberData[md];
+    var elong = mm.c*(u[2*mm.j]-u[2*mm.i]) + mm.s*(u[2*mm.j+1]-u[2*mm.i+1]);
+    forces.push(A*E/mm.L*elong);
   }
-  return x;
-}// ===========================
-// LOAD VECTOR BUILDER
-// ===========================
+  var reactions={};
+  fixedDofs.forEach(function(dft){
+    var r=0;
+    for (var z=0; z<ndof; z++){ r += K[dft][z]*u[z]; }
+    r -= loadVec[dft];
+    reactions[dft]=r;
+  });
 
-function buildLoadVector(nodes, loadNodes, P){
-  const ndof = 2 * nodes.length;
-  const f = new Float64Array(ndof);
-  const dir = document.getElementById('loadDir').value;
+  return { u:u, forces:forces, reactions:reactions, memberData:memberData, fixedDofs:fixedDofs };
+}
 
-  for (const nd of loadNodes) {
-    if (dir === 'down') {
-      f[2*nd+1] -= P;
-    }else if (dir === 'horizontal'){
-      f[2*nd] += P;
-    }else{ // diagonal
-      f[2*nd]   -= P / Math.SQRT2;
-      f[2*nd+1] -= P / Math.SQRT2;
-    }
+function buildLoadVector(nodes, loadNodes, P, dir){
+  var ndof=2*nodes.length;
+  var f=new Float64Array(ndof);
+  for (var t=0;t<loadNodes.length;t++){
+    var nd=loadNodes[t];
+    if (dir==='down'){ f[2*nd+1]-=P; }
+    else if (dir==='horizontal'){ f[2*nd]+=P; }
+    else { f[2*nd]-=P/Math.SQRT2; f[2*nd+1]-=P/Math.SQRT2; }
   }
   return f;
-}// ===========================
-// MAIN SOLVE & DRAW
-// ===========================
-
-let lastResult = null;
-let currentPreset = null;
-
-function onPresetChange(){
-  solve();
-}function solve(){
-  const presetKey = document.getElementById('presetSel').value;
-  const preset = PRESETS[presetKey];
-  currentPreset = preset;
-
-  const P = parseFloat(document.getElementById('pSlider').value) * 1000; // kN -> N
-  const f = buildLoadVector(preset.nodes, preset.loadNodes, P);
-
-  const result = solveTruss(preset.nodes, preset.members, preset.supports, f);
-  lastResult = result;
-
-  if (result) {
-    // Max displacement in mm
-    let maxD = 0;
-    for (let i = 0; i < result.u.length; i++) maxD = Math.max(maxD, Math.abs(result.u[i]));
-    document.getElementById('maxDisp').textContent = (maxD*1000).toFixed(3);
-
-    // Max tension / compression
-    let maxT = 0, maxC = 0;
-    for (const f of result.forces) {
-      if (f > 0) maxT = Math.max(maxT, f);
-      else maxC = Math.max(maxC, -f);
-    }
-    document.getElementById('maxTension').textContent = (maxT/1000).toFixed(2);
-    document.getElementById('maxCompress').textContent = (maxC/1000).toFixed(2);
-    document.getElementById('numDof').textContent = result.u.length - result.fixedDofs.size;
-  }else{
-    document.getElementById('maxDisp').textContent = 'エラー';
-    document.getElementById('maxTension').textContent = '—';
-    document.getElementById('maxCompress').textContent = '—';
-  }
-
-  drawTruss();
 }
 
 // ===========================
-// CANVAS DRAWING
+// STATE
 // ===========================
+var canvas=gid('trussCanvas');
+var ctx=canvas?canvas.getContext('2d'):null;
+var currentPreset=null;
+var lastResult=null;       // full solved result (final state)
+var animProg=1;            // 0..1 load-application progress
+var animId=null, animStart=0;
+var cssW=0, cssH=0;
+var reduceMotion=false;
+try { reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
 
-function drawTruss() {
-  const canvas = document.getElementById('trussCanvas');
-  const ctx = canvas.getContext('2d');
+function recompute(){
+  var presetKey=gid('presetSel').value;
+  currentPreset=PRESETS[presetKey];
+  var E=numVal('eSlider',200)*1e9;     // GPa -> Pa
+  var A=numVal('aSlider',10)*1e-4;     // cm^2 -> m^2
+  var P=numVal('pSlider',50)*1000;     // kN -> N
+  var dir=gid('loadDir').value;
+  var f=buildLoadVector(currentPreset.nodes, currentPreset.loadNodes, P, dir);
+  lastResult=solveTruss(currentPreset.nodes, currentPreset.members, currentPreset.supports, f, E, A);
+}
 
-  // Resize canvas to parent
-  const wrap = canvas.parentElement;
-  const W = wrap.clientWidth || 600;
-  const H = Math.round(W * 0.55);
-  var __novaW = W;
-  var __novaH = H;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  canvas.style.height = H + 'px';
+// public: re-solve + animate the load application
+function solve(){
+  recompute();
+  if (reduceMotion){ animProg=1; drawTruss(); return; }
+  animProg=0; animStart=0;
+  if (animId) cancelAnimationFrame(animId);
+  animId=requestAnimationFrame(animLoop);
+}
 
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#0a0f1a';
-  ctx.fillRect(0, 0, W, H);
+function animLoop(ts){
+  if (!animStart) animStart=ts;
+  var elapsed=(ts-animStart)/1000;
+  var dur=0.9;
+  var p=Math.min(elapsed/dur,1);
+  animProg=1-Math.pow(1-p,3);        // ease-out cubic
+  drawTruss();
+  if (p<1){ animId=requestAnimationFrame(animLoop); }
+  else { animProg=1; animId=null; drawTruss(); }
+}
 
-  if (!currentPreset) return;
+// ===========================
+// LIVE STAT NUMBERS (every frame, scaled by animProg)
+// ===========================
+function updateStats(prog){
+  if (!lastResult){
+    gid('maxDisp').textContent='—'; gid('maxTension').textContent='—';
+    gid('maxCompress').textContent='—'; gid('numDof').textContent='—';
+    return;
+  }
+  var u=lastResult.u, forces=lastResult.forces;
+  var maxD=0;
+  for (var i=0;i<u.length;i++){ var a=Math.abs(u[i]); if (a>maxD) maxD=a; }
+  var maxT=0,maxC=0;
+  for (var k=0;k<forces.length;k++){
+    var Fv=forces[k];
+    if (Fv>0){ if (Fv>maxT) maxT=Fv; } else { if (-Fv>maxC) maxC=-Fv; }
+  }
+  gid('maxDisp').textContent=(maxD*1000*prog).toFixed(3);
+  gid('maxTension').textContent=(maxT/1000*prog).toFixed(2);
+  gid('maxCompress').textContent=(maxC/1000*prog).toFixed(2);
+  gid('numDof').textContent=String(u.length - lastResult.fixedDofs.size);
+}
 
-  const preset = currentPreset;
-  const nodes = preset.nodes;
-  const members = preset.members;
-  const scale = parseFloat(document.getElementById('scaleSlider').value);
+// ===========================
+// HiDPI CANVAS
+// ===========================
+function resizeCanvas(){
+  var wrap=canvas.parentElement;
+  cssW=Math.max(280, wrap.clientWidth||600);
+  cssH=Math.round(cssW*0.58);
+  var dpr=Math.min(window.devicePixelRatio||1, 2.5);
+  canvas.style.width=cssW+'px';
+  canvas.style.height=cssH+'px';
+  canvas.width=Math.round(cssW*dpr);
+  canvas.height=Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
 
-  // Compute bounding box of original nodes
-  let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
-  for (const [x,y] of nodes) {
-    xmin = Math.min(xmin,x); xmax = Math.max(xmax,x);
-    ymin = Math.min(ymin,y); ymax = Math.max(ymax,y);
-  }// Compute displaced nodes for bounding box
-  let dxmin = xmin, dxmax = xmax, dymin = ymin, dymax = ymax;
-  if (lastResult){
-    const u = lastResult.u;
-    for (let i = 0; i < nodes.length; i++) {
-      const dx = nodes[i][0] + u[2*i]*scale;
-      const dy = nodes[i][1] + u[2*i+1]*scale;
-      dxmin = Math.min(dxmin,dx); dxmax = Math.max(dxmax,dx);
-      dymin = Math.min(dymin,dy); dymax = Math.max(dymax,dy);
-    }
-  }const margin = 60;
-  const bbW = dxmax - dxmin || 1;
-  const bbH = dymax - dymin || 1;
-  const scX = (W - 2*margin) / bbW;
-  const scY = (H - 2*margin) / bbH;
-  const sc = Math.min(scX, scY);
-  const offX = margin + (W - 2*margin - bbW*sc)/2 - dxmin*sc;
-  const offY = H - margin - (H - 2*margin - bbH*sc)/2 + dymin*sc;
+function forceColor(t, tension){
+  if (tension){
+    var r=Math.round(120+135*t), g=Math.round(70-50*t), b=Math.round(70-50*t);
+    return 'rgb('+r+','+g+','+b+')';
+  } else {
+    var r2=Math.round(30-10*t), g2=Math.round(110+40*t), b2=Math.round(190+60*t);
+    return 'rgb('+r2+','+g2+','+b2+')';
+  }
+}
 
-  function toScreen(wx, wy){
-    return [offX + wx*sc, offY - wy*sc];
-  }// ---- Draw undeformed (gray) ----
-  const showUndeformed = document.getElementById('showUndeformed').checked;
-  if (showUndeformed){
-    ctx.save();
-    ctx.strokeStyle = 'rgba(150,160,180,0.25)';
-    ctx.lineWidth = 1.5;
-    for (const [i,j] of members) {
-      const [x1,y1] = toScreen(nodes[i][0], nodes[i][1]);
-      const [x2,y2] = toScreen(nodes[j][0], nodes[j][1]);
-      ctx.beginPath();
-      ctx.moveTo(x1,y1);
-      ctx.lineTo(x2,y2);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }// ---- Draw deformed (colored) ----
-  const showDeformed = document.getElementById('showDeformed').checked;
-  if (showDeformed && lastResult){
-    const u = lastResult.u;
-    const forces = lastResult.forces;
-    const memberData = lastResult.memberData;
-
-    // Find max force for normalization
-    let maxF = 0;
-    for (const f of forces) maxF = Math.max(maxF, Math.abs(f));
-    if (maxF === 0) maxF = 1;
-
-    for (let m = 0; m < members.length; m++) {
-      const [i,j] = members[m];
-      const xi = nodes[i][0] + u[2*i]*scale;
-      const yi = nodes[i][1] + u[2*i+1]*scale;
-      const xj = nodes[j][0] + u[2*j]*scale;
-      const yj = nodes[j][1] + u[2*j+1]*scale;
-      const [x1,y1] = toScreen(xi,yi);
-      const [x2,y2] = toScreen(xj,yj);
-
-      const F = forces[m];
-      const t = Math.min(Math.abs(F)/maxF, 1);
-      let color;
-      if (F > 1e-3*maxF) {
-        // tension: red
-        const r = Math.round(80 + 175*t);
-        const g = Math.round(60 - 40*t);
-        const b = Math.round(60 - 40*t);
-        color = `rgb(${r},${g},${b})`;
-      }else if (F < -1e-3*maxF){
-        // compression: blue
-        const r = Math.round(30 - 10*t);
-        const g = Math.round(100 + 30*t);
-        const b = Math.round(180 + 70*t);
-        color = `rgb(${r},${g},${b})`;
-      }else{
-        color = '#778';
-      }ctx.save();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2.5 + t*2;
-      ctx.beginPath();
-      ctx.moveTo(x1,y1);
-      ctx.lineTo(x2,y2);
-      ctx.stroke();
-      ctx.restore();
-
-      // Member force labels
-      const showForces = document.getElementById('showForces').checked;
-      if (showForces){
-        const mx = (x1+x2)/2, my = (y1+y2)/2;
-        const fkN = (F/1000).toFixed(1);
-        ctx.save();
-        ctx.font = `bold 9px 'Roboto Mono', monospace`;
-        ctx.fillStyle = F > 0 ? '#ff8c8c' : (F < 0 ? '#64b5f6' : '#aaa');
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = 'rgba(10,15,26,0.7)';
-        ctx.fillRect(mx-18, my-7, 36, 14);
-        ctx.fillStyle = F > 0 ? '#ff8c8c' : (F < 0 ? '#64b5f6' : '#aaa');
-        ctx.fillText(fkN, mx, my);
-        ctx.restore();
-      }
-    }// Draw deformed nodes
-    for (let i = 0; i < nodes.length; i++){
-      const xi = nodes[i][0] + u[2*i]*scale;
-      const yi = nodes[i][1] + u[2*i+1]*scale;
-      const [sx,sy] = toScreen(xi,yi);
-      ctx.save();
-      ctx.fillStyle = '#e0e8ff';
-      ctx.beginPath();
-      ctx.arc(sx, sy, 3.5, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    }// Draw load arrows on load nodes
-    const P_N = parseFloat(document.getElementById('pSlider').value) * 1000;
-    const dir = document.getElementById('loadDir').value;
-    for (const nd of currentPreset.loadNodes){
-      const xi = nodes[nd][0] + u[2*nd]*scale;
-      const yi = nodes[nd][1] + u[2*nd+1]*scale;
-      const [sx,sy] = toScreen(xi,yi);
-      drawArrow(ctx, sx, sy, dir, 28, '#FFD700');
-    }
-
-  }else if (!showDeformed){
-    // Still draw original nodes
-    for (let i = 0; i < nodes.length; i++) {
-      const [sx,sy] = toScreen(nodes[i][0], nodes[i][1]);
-      ctx.save();
-      ctx.fillStyle = '#e0e8ff';
-      ctx.beginPath();
-      ctx.arc(sx, sy, 3.5, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }// ---- Draw supports ----
-  for (const sup of preset.supports){
-    const nd = sup.node;
-    const [sx,sy] = toScreen(nodes[nd][0], nodes[nd][1]);
-    drawSupport(ctx, sx, sy, sup.type);
-  }// ---- Reactions ----
-  const showReactions = document.getElementById('showReactions').checked;
-  if (showReactions && lastResult){
-    for (const sup of preset.supports) {
-      const nd = sup.node;
-      const [sx,sy] = toScreen(nodes[nd][0], nodes[nd][1]);
-      const rx = (lastResult.reactions[2*nd] || 0);
-      const ry = (lastResult.reactions[2*nd+1] || 0);
-      const r = Math.sqrt(rx*rx+ry*ry);
-      if (r > 1) {
-        ctx.save();
-        ctx.font = '9px Roboto Mono, monospace';
-        ctx.fillStyle = '#a0e080';
-        ctx.textAlign = 'center';
-        ctx.fillText(`R=${(r/1000).toFixed(1)}kN`, sx, sy+28);
-        ctx.restore();
-      }
-    }
-  }// Scale note
-  document.getElementById('scaleNote').textContent = `変形倍率: ${scale}×`;
-}function drawArrow(ctx, x, y, dir, len, color){
-  let dx = 0, dy = 0;
-  if (dir === 'down') { dx = 0; dy = len; }else if (dir === 'horizontal'){ dx = -len; dy = 0; }else{ dx = -len*0.707; dy = len*0.707; }
-
-  const sx = x - dx, sy = y - dy; // arrow start
-  const ex = x, ey = y;           // arrow end (tip at node)
-
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2;
+function drawArrow(x0,y0,x1,y1,color,w){
+  ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w;
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+  var ang=Math.atan2(y1-y0,x1-x0), h=7+w;
   ctx.beginPath();
-  ctx.moveTo(sx, sy);
-  ctx.lineTo(ex, ey);
-  ctx.stroke();
+  ctx.moveTo(x1,y1);
+  ctx.lineTo(x1-h*Math.cos(ang-0.4), y1-h*Math.sin(ang-0.4));
+  ctx.lineTo(x1-h*Math.cos(ang+0.4), y1-h*Math.sin(ang+0.4));
+  ctx.closePath(); ctx.fill();
+}
 
-  // Arrowhead
-  const angle = Math.atan2(ey-sy, ex-sx);
-  ctx.beginPath();
-  ctx.moveTo(ex, ey);
-  ctx.lineTo(ex - 8*Math.cos(angle-0.4), ey - 8*Math.sin(angle-0.4));
-  ctx.lineTo(ex - 8*Math.cos(angle+0.4), ey - 8*Math.sin(angle+0.4));
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}function drawSupport(ctx, sx, sy, type){
+function drawSupport(sx,sy,type){
   ctx.save();
-  if (type === 'pin') {
-    // Triangle
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx-10, sy+16);
-    ctx.lineTo(sx+10, sy+16);
-    ctx.closePath();
-    ctx.fillStyle = '#5dade2';
-    ctx.fill();
-    ctx.strokeStyle = '#85c1e9';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    // Ground line
-    ctx.beginPath();
-    ctx.moveTo(sx-14,sy+18);
-    ctx.lineTo(sx+14,sy+18);
-    ctx.strokeStyle = '#5dade2';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }else{
-    // Roller: triangle + circle
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx-10, sy+14);
-    ctx.lineTo(sx+10, sy+14);
-    ctx.closePath();
-    ctx.fillStyle = '#2ecc71';
-    ctx.fill();
-    ctx.strokeStyle = '#58d68d';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    // Roller circles
-    for (let rr = -8; rr <= 8; rr += 8) {
-      ctx.beginPath();
-      ctx.arc(sx+rr, sy+18, 3, 0, Math.PI*2);
-      ctx.fillStyle = '#58d68d';
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.moveTo(sx-14, sy+22);
-    ctx.lineTo(sx+14, sy+22);
-    ctx.strokeStyle = '#58d68d';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+  if (type==='pin'){
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx-10,sy+16); ctx.lineTo(sx+10,sy+16); ctx.closePath();
+    ctx.fillStyle='#5dade2'; ctx.fill(); ctx.strokeStyle='#85c1e9'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx-14,sy+18); ctx.lineTo(sx+14,sy+18); ctx.strokeStyle='#5dade2'; ctx.lineWidth=2; ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx-10,sy+14); ctx.lineTo(sx+10,sy+14); ctx.closePath();
+    ctx.fillStyle='#2ecc71'; ctx.fill(); ctx.strokeStyle='#58d68d'; ctx.lineWidth=1.5; ctx.stroke();
+    for (var rr=-8; rr<=8; rr+=8){ ctx.beginPath(); ctx.arc(sx+rr,sy+18,3,0,Math.PI*2); ctx.fillStyle='#58d68d'; ctx.fill(); }
+    ctx.beginPath(); ctx.moveTo(sx-14,sy+22); ctx.lineTo(sx+14,sy+22); ctx.strokeStyle='#58d68d'; ctx.lineWidth=2; ctx.stroke();
   }
   ctx.restore();
-}// Slider update helper
+}
 
-// Init all sliders
+// ===========================
+// DRAW
+// ===========================
+function drawTruss(){
+  if (!ctx) return;
+  resizeCanvas();
+  var W=cssW, H=cssH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0a0f1a'; ctx.fillRect(0,0,W,H);
 
-function initSliders(){
-  document.querySelectorAll('input[type=range]').forEach(el => {
-    const pct = ((el.value - el.min) / (el.max - el.min)) * 100;
-    el.style.setProperty('--pct', pct + '%');
-  });
-}// Responsive: redraw on resize
+  if (!currentPreset){ updateStats(0); return; }
 
-let resizeTimer;
-window.addEventListener('resize', () =>{
+  var nodes=currentPreset.nodes, members=currentPreset.members;
+  var scale=numVal('scaleSlider',100);
+  var prog=animProg;
+  var u=lastResult?lastResult.u:null;
+  var forces=lastResult?lastResult.forces:null;
+
+  function disp(i){
+    if (!u) return [nodes[i][0], nodes[i][1]];
+    return [nodes[i][0]+u[2*i]*scale*prog, nodes[i][1]+u[2*i+1]*scale*prog];
+  }
+
+  // bounding box over undeformed + fully-deformed (stable view)
+  var xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
+  for (var n0=0;n0<nodes.length;n0++){
+    var x0=nodes[n0][0], y0=nodes[n0][1];
+    if (x0<xmin)xmin=x0; if(x0>xmax)xmax=x0; if(y0<ymin)ymin=y0; if(y0>ymax)ymax=y0;
+    if (u){
+      var dxF=nodes[n0][0]+u[2*n0]*scale, dyF=nodes[n0][1]+u[2*n0+1]*scale;
+      if (dxF<xmin)xmin=dxF; if(dxF>xmax)xmax=dxF; if(dyF<ymin)ymin=dyF; if(dyF>ymax)ymax=dyF;
+    }
+  }
+  var margin=58;
+  var bbW=(xmax-xmin)||1, bbH=(ymax-ymin)||1;
+  var sc=Math.min((W-2*margin)/bbW,(H-2*margin)/bbH);
+  var offX=margin+(W-2*margin-bbW*sc)/2 - xmin*sc;
+  var offY=H-margin-(H-2*margin-bbH*sc)/2 + ymin*sc;
+  function toScreen(wx,wy){ return [offX+wx*sc, offY-wy*sc]; }
+
+  // ---- undeformed ghost (dashed) ----
+  if (gid('showUndeformed').checked){
+    ctx.save();
+    ctx.strokeStyle='rgba(150,160,180,0.28)';
+    ctx.setLineDash([5,4]); ctx.lineWidth=1.4;
+    for (var g=0; g<members.length; g++){
+      var gi=members[g][0], gj=members[g][1];
+      var p1=toScreen(nodes[gi][0],nodes[gi][1]);
+      var p2=toScreen(nodes[gj][0],nodes[gj][1]);
+      ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---- deformed (color-coded members) ----
+  var showDef=gid('showDeformed').checked;
+  var showForces=gid('showForces').checked;
+  if (showDef && lastResult){
+    var maxF=0;
+    for (var ff0=0; ff0<forces.length; ff0++){ var af=Math.abs(forces[ff0]); if (af>maxF) maxF=af; }
+    if (maxF===0) maxF=1;
+
+    for (var m=0;m<members.length;m++){
+      var mi=members[m][0], mj=members[m][1];
+      var a=disp(mi), b=disp(mj);
+      var s1=toScreen(a[0],a[1]), s2=toScreen(b[0],b[1]);
+      var F=forces[m]*prog;
+      var t=Math.min(Math.abs(F)/maxF,1);
+      var col;
+      if (F > 1e-3*maxF){ col=forceColor(t,true); }
+      else if (F < -1e-3*maxF){ col=forceColor(t,false); }
+      else { col='#6b7280'; }
+      ctx.save();
+      ctx.strokeStyle=col; ctx.lineCap='round';
+      ctx.lineWidth=2.2 + t*4.2;
+      ctx.beginPath(); ctx.moveTo(s1[0],s1[1]); ctx.lineTo(s2[0],s2[1]); ctx.stroke();
+      ctx.restore();
+
+      if (showForces && prog>0.6){
+        var mx=(s1[0]+s2[0])/2, my=(s1[1]+s2[1])/2;
+        var lbl=(F/1000).toFixed(1);
+        ctx.save();
+        ctx.font="bold 9px 'Roboto Mono', monospace";
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillStyle='rgba(10,15,26,0.72)';
+        var lw=ctx.measureText(lbl).width+8;
+        ctx.fillRect(mx-lw/2, my-7, lw, 14);
+        ctx.fillStyle = F>0 ? '#ff9a9a' : (F<0 ? '#7ec4ff' : '#9aa');
+        ctx.fillText(lbl, mx, my);
+        ctx.restore();
+      }
+    }
+
+    for (var nn=0; nn<nodes.length; nn++){
+      var dp=disp(nn), ds=toScreen(dp[0],dp[1]);
+      ctx.save(); ctx.fillStyle='#e0e8ff';
+      ctx.beginPath(); ctx.arc(ds[0],ds[1],3.4,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+
+    // load arrows (grow with progress)
+    var dir=gid('loadDir').value;
+    var alen=14 + 20*prog;
+    for (var ln=0; ln<currentPreset.loadNodes.length; ln++){
+      var nd=currentPreset.loadNodes[ln];
+      var lp=disp(nd), ls=toScreen(lp[0],lp[1]);
+      var ax=0, ay=0;
+      if (dir==='down'){ ax=0; ay=alen; }
+      else if (dir==='horizontal'){ ax=alen; ay=0; }
+      else { ax=-alen*0.707; ay=alen*0.707; }
+      drawArrow(ls[0]-ax, ls[1]-ay, ls[0], ls[1], '#FFD700', 2);
+    }
+  } else {
+    for (var nu=0; nu<nodes.length; nu++){
+      var su=toScreen(nodes[nu][0],nodes[nu][1]);
+      ctx.save(); ctx.fillStyle='#e0e8ff';
+      ctx.beginPath(); ctx.arc(su[0],su[1],3.4,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+  }
+
+  // ---- supports (at original node positions) ----
+  for (var sup=0; sup<currentPreset.supports.length; sup++){
+    var snd=currentPreset.supports[sup].node;
+    var sp0=toScreen(nodes[snd][0],nodes[snd][1]);
+    drawSupport(sp0[0],sp0[1],currentPreset.supports[sup].type);
+  }
+
+  // ---- reactions ----
+  if (gid('showReactions').checked && lastResult){
+    for (var sr=0; sr<currentPreset.supports.length; sr++){
+      var rnd=currentPreset.supports[sr].node;
+      var rs=toScreen(nodes[rnd][0],nodes[rnd][1]);
+      var rx=(lastResult.reactions[2*rnd]||0), ry=(lastResult.reactions[2*rnd+1]||0);
+      var rmag=Math.sqrt(rx*rx+ry*ry)*prog;
+      if (rmag>1){
+        ctx.save();
+        ctx.font='9px "Roboto Mono", monospace'; ctx.fillStyle='#a0e080'; ctx.textAlign='center';
+        ctx.fillText('R='+(rmag/1000).toFixed(1)+'kN', rs[0], rs[1]+30);
+        ctx.restore();
+      }
+    }
+  }
+
+  var sn=gid('scaleNote'); if (sn) sn.textContent=SCALE_PREFIX+scale+'×';
+
+  updateStats(prog);
+}
+
+// ===========================
+// PUBLIC HOOKS (inline HTML handlers) + INIT
+// ===========================
+function onPresetChange(){ solve(); }
+
+window.solve=solve;
+window.drawTruss=drawTruss;
+window.onPresetChange=onPresetChange;
+
+var resizeTimer;
+window.addEventListener('resize', function(){
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(drawTruss, 100);
+  resizeTimer=setTimeout(function(){ drawTruss(); }, 100);
 });
 
-// Init
-initSliders();
-solve();
+function init(){
+  if (typeof initSliders==='function'){ try{ initSliders(); }catch(e){} }
+  else {
+    var rs=document.querySelectorAll('input[type=range]');
+    for (var i=0;i<rs.length;i++){
+      var el=rs[i];
+      var pct=((el.value-el.min)/(el.max-el.min))*100;
+      el.style.setProperty('--pct', pct+'%');
+    }
+  }
+  recompute();
+  if (reduceMotion){ animProg=1; drawTruss(); }
+  else { solve(); }
+}
+
+if (document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); }
+else { init(); }
+
+})();
 </script>
 
 <section class="explanation">
@@ -907,7 +812,7 @@ solve();
       <div class="bub">なるほど！「部材力」の色が青と赤になってますが、これは引張と圧縮ということですか？現場でどっちが問題になりやすいんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">その通り。青が引張（引っ張られてる）、赤が圧縮（押しつぶされてる）だ。実務では圧縮部材の「座屈」が大きな問題になることが多いね。例えば鉄塔の細長い部材が圧縮を受けると、ポキッと折れる危険がある。シミュレーターで「断面積 A」を小さくしてみると、圧縮部材の変形が急に大きくなるのが確認できるよ。</div>
+      <div class="bub">その通り。赤が引張（引っ張られてる）、青が圧縮（押しつぶされてる）だ。実務では圧縮部材の「座屈」が大きな問題になることが多いね。例えば鉄塔の細長い部材が圧縮を受けると、ポキッと折れる危険がある。シミュレーターで「断面積 A」を小さくしてみると、圧縮部材の変形が急に大きくなるのが確認できるよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">「直接剛性法」って聞くと難しそうですが、このツールではどういう計算を裏でやってるんですか？</div>
@@ -920,7 +825,7 @@ solve();
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">解析結果の部材力が正の値と負の値で表示されますが、何を意味しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">正の値は部材が引張力を受けていること、負の値は圧縮力を受けていることを示します。図上では青（引張）と赤（圧縮）で色分けされるため、どの部材にどの向きの力が作用しているか一目で確認できます。</div>
+    <div class="faq-a">正の値は部材が引張力を受けていること、負の値は圧縮力を受けていることを示します。図上では赤（引張）と青（圧縮）で色分けされるため、どの部材にどの向きの力が作用しているか一目で確認できます。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">プリセットのトラス形状以外に、自分で節点や部材を追加して自由にモデルを作れますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -928,11 +833,11 @@ solve();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">支点条件はどのように設定すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">各プリセット形状には標準的な固定支点とピン支点が初期設定されています。画面上の支点アイコンをクリックすると、x方向・y方向の拘束を個別にON/OFFでき、ローラー支持や固定支持に変更可能です。</div>
+    <div class="faq-a">各プリセット形状にはピン支点（x・y両方向拘束、▲）とローラー支点（y方向のみ拘束、△）があらかじめ設定されています。現バージョンでは支点条件の編集はできず、トラス形式の切り替えで支持パターンが変わります。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">解析結果の変形形状が極端に大きく表示されるのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">変形は視認性を高めるために実際の変位を拡大表示しています。画面右下の「変形倍率」スライダーで倍率を0.1倍〜10倍まで調整できるので、実際の変形量と比較したい場合は倍率を下げてご確認ください。</div>
+    <div class="faq-a">変形は視認性を高めるために実際の変位を拡大表示しています。左パネルの「変形倍率」スライダーで倍率を1倍〜1000倍（既定値100倍）の範囲で調整できます。実際の変形量はmm単位の「最大変位」表示でご確認ください。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -952,6 +857,9 @@ solve();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fem-truss.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -1008,24 +916,34 @@ solve();
 <ol>
 <li>ヤング係数(E)、断面積(A)、荷重(P)をそれぞれのスライダーまたは数値入力で設定します</li>
 <li>スケール倍率を調整して変形の可視化程度を決定します(実際の変形は微小なため倍率を高めることを推奨)</li>
-<li>「解析実行」ボタンをクリックすると直接剛性法により全節点の変位と全部材の軸力が計算されます</li>
+<li>パラメータを変更すると直接剛性法により全節点の変位と全部材の軸力が自動で再計算されます</li>
 <li>結果パネルに最大変位[mm]、最大引張力[kN]、最大圧縮力[kN]、自由度数が表示されます</li>
 <li>変形図(赤線)と応力図(色分け)をリアルタイムで確認できます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>鋼製単層トラス橋梁を解析する場合:E=200GPa、部材断面積A=500mm²、中央節点に鉛直荷重P=50kNを作用させたとき、スパン6mの単純トラスでは中央部の変位が約3.2mm、上弦材の最大圧縮力が約35kN、下弦材の最大引張力が約35kNとなります。自由度数は典型的な8節点トラスで12となります。</p>
+<p>「単純トラス（3部材）」プリセット（スパン4m・高さ3m）で E=200GPa、断面積A=5cm²（500mm²）、頂点節点に鉛直荷重P=50kNを作用させると、最大変位は約1.52mm、斜材の最大圧縮力は約30.0kN、下弦材の引張力は約16.7kN、自由度数は3となります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
 <li>ヤング係数はSS400鋼は200GPa、アルミA2017は72GPaなど材料により大きく異なるため誤入力に注意してください</li>
 <li>部材が圧縮支配の場合は座屈検定が別途必要であり、本ソルバーは軸力のみで安全性判定はできません</li>
-<li>スケール倍率を1倍(実スケール)で解析するとトラス構造の微小変形は見えないため、可視化時は10~50倍の倍率推奨です</li>
+<li>スケール倍率を1倍(実スケール)にするとトラス構造の微小変形は見えないため、可視化時は100倍前後（既定値100倍）の倍率推奨です</li>
 <li>ピン結合を前提としているため、半剛接合部材やモーメント伝達がある場合は結果が実現象と大きく異なります</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

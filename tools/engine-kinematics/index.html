@@ -42,7 +42,7 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
+  "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
   "name": "エンジン機構解析 シミュレーター — クランク-スライダー・ピストン変位/速度/加速度・多気筒 | NovaSolver Project",
   "description": "エンジン機構解析シミュレーターで、クランク-スライダー機構の動きを可視化。ピストンの変位・速度・加速度を無料で計算できます。4気筒やV6など主要エンジンのプリセット付き。運動グラフとアニメーションで直感的に解析。オンライン計算機NovaSolverで、設計・学習をサポートします。",
   "url": "https://novasolver.jp/tools/engine-kinematics.html",
@@ -50,7 +50,7 @@
   "publisher": {
     "@type": "Organization",
     "name": "NovaSolver",
-    "url": "https://novasolver.jp/"
+    "url": "https://novasolver.jp/","sameAs":["https://github.com/novasolver"]
   },
   "applicationCategory": "EngineeringApplication",
   "operatingSystem": "Web Browser",
@@ -221,7 +221,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </select>
     </div>
     <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px;font-family:'Roboto Mono',monospace;" id="elapsedWrap">経過: <span id="elapsedTime">0.000</span> s &nbsp;|&nbsp; <span id="elapsedRevs">0.00</span> rev</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="機械力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">機械力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -276,16 +284,7 @@ function clearSnapshots(){
   updateSnapUI();
   if (eCurrentTab === 'disp') compute();
 }function updateSnapUI(){
-  const cnt = document.getElementById('snapCount') || document.getElementById('snapshotCount');
-  const clrBtn = document.getElementById('clearBtn');
-  if (!cnt) return;
-  if (snapshots.length === 0) {
-    cnt.textContent = '';
-    if(clrBtn)clrBtn.style.display='none';
-  }else{
-    cnt.innerHTML = snapshots.map((s, i) => '<span style="color:' + SNAP_COLORS[i] + ';font-weight:700">&#9632;</span>').join(' ') + ' ' + snapshots.length + '/5';
-    if(clrBtn)clrBtn.style.display='';
-  }
+  // Snapshot controls are not present on this page.
 }/* --- Playback controls --- */
 function setSpeed(v){
   animSpeed = parseFloat(v) || 1;
@@ -368,6 +367,7 @@ function updateLambda(el){
   const newL = r / lam;
   const rodEl = document.getElementById('rodL');
   rodEl.value = Math.min(300, Math.max(60, newL));
+  syncToNum('rodL','rodLNum');
   const mn2 = parseFloat(rodEl.min), mx2 = parseFloat(rodEl.max);
   rodEl.style.setProperty('--pct', ((parseFloat(rodEl.value) - mn2) / (mx2 - mn2) * 100) + '%');
   compute();
@@ -382,12 +382,16 @@ function updateLambda(el){
   document.getElementById('crankR').value = s.r;
   document.getElementById('rodL').value = s.l;
   document.getElementById('engRpm').value = s.n;
+  syncToNum('crankR','crankRNum');
+  syncToNum('rodL','rodLNum');
+  syncToNum('engRpm','engRpmNum');
   updateSlider(document.getElementById('crankR'));
   updateSlider(document.getElementById('rodL'));
   updateSlider(document.getElementById('engRpm'));
   const lam = s.r / s.l;
   const lEl = document.getElementById('lambdaRat');
   lEl.value = lam.toFixed(3);
+  syncToNum('lambdaRat','lambdaRatNum');
   const mn = parseFloat(lEl.min), mx = parseFloat(lEl.max);
   lEl.style.setProperty('--pct', ((lam - mn) / (mx - mn) * 100) + '%');
   compute();
@@ -403,13 +407,23 @@ function pistonKin(theta, r, l, omega){
   const sinT = Math.sin(theta), cosT = Math.cos(theta);
   const sq = Math.sqrt(l * l - r * r * sinT * sinT);
   const x = r * cosT + sq;
-  const dx = -r * omega * (sinT + r * r * sinT * cosT / sq);
+  const dx = -r * omega * (sinT + r * sinT * cosT / sq);
   const sq3 = sq * sq * sq;
-  const ddx = -r * omega * omega * (cosT + r * r * (cosT * cosT - sinT * sinT) / sq + r * r * r * r * sinT * sinT * cosT * cosT / sq3);
+  const ddx = -r * omega * omega * (cosT + r * (cosT * cosT - sinT * sinT) / sq + r * r * r * sinT * sinT * cosT * cosT / sq3);
   return { x, dx, ddx };
 }function compute(){
-  const r = parseFloat(document.getElementById('crankR').value) / 1000;
-  const l = parseFloat(document.getElementById('rodL').value) / 1000;
+  const rEl = document.getElementById('crankR');
+  const rodEl = document.getElementById('rodL');
+  const rMm = parseFloat(rEl.value);
+  let lMm = parseFloat(rodEl.value);
+  if (lMm <= rMm) {
+    lMm = Math.min(parseFloat(rodEl.max), rMm + 1);
+    rodEl.value = lMm;
+    syncToNum('rodL','rodLNum');
+    updateSlider(rodEl);
+  }
+  const r = rMm / 1000;
+  const l = lMm / 1000;
   const n = parseFloat(document.getElementById('engRpm').value);
   const omega = n * 2 * Math.PI / 60;
 
@@ -428,7 +442,7 @@ function pistonKin(theta, r, l, omega){
     if (Math.abs(dx) > vmax){ vmax = Math.abs(dx); thetaVmax = theta * 180 / Math.PI; }
     if (Math.abs(ddx) > amax) amax = Math.abs(ddx);
   }const stroke = 2 * r * 1000;
-  const vmean = 2 * r * n / 60;
+  const vmean = 4 * r * n / 60;
 
   document.getElementById('statVmax').textContent = vmax.toFixed(2);
   document.getElementById('statAmax').textContent = (amax).toFixed(0);
@@ -717,6 +731,9 @@ window.addEventListener('resize', compute);
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="engine-kinematics.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -790,6 +807,16 @@ window.addEventListener('resize', compute);
 <li>温度膨張によるクリアランス変化(アルミ製ピストン：線膨張率23×10⁻⁶/K)を加味すると、実測値は計算値から±2%の誤差が生じます</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="機械力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">機械力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

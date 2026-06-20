@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ファブリー・ペロー干渉計シミュレーター",
       "description": "ミラー間隔・反射率・入射波長・入射角から、ファブリー・ペロー干渉計の自由スペクトル領域・フィネス・FWHM・透過スペクトルをリアルタイムに計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/fabry-perot.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Airy関数による透過スペクトルの計算","自由スペクトル領域FSRとフィネスの算出","共鳴ピークのFWHMとQ値の表示","反射率・ミラー間隔・入射角の影響の可視化"],
       "keywords": "ファブリー・ペロー,干渉計,フィネス,自由スペクトル領域,FSR,FWHM,Airy関数,多重干渉,レーザー共振器,光学",
       "datePublished": "2026-05-16",
@@ -102,6 +102,21 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+#fpvCv{ background:#060f1c; border-radius:8px; display:block; width:100%; }
+#fpvCv:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+.fpv-readouts{ display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:12px; }
+.fpv-ro{ background:linear-gradient(135deg,#0a1628,#102a4c); border:1px solid rgba(0,180,216,.25); border-radius:10px; padding:9px 6px; text-align:center; }
+.fpv-ro .rv{ font-family:'Roboto Mono',monospace; font-size:1.02rem; font-weight:700; color:#fff; line-height:1.1; }
+.fpv-ro .rl{ font-size:0.6rem; color:rgba(255,255,255,.6); margin-top:4px; letter-spacing:.02em; }
+.fpv-ro.accent .rv{ color:#ffd54a; }
+@media(max-width:600px){ .fpv-readouts{ grid-template-columns:repeat(3,1fr); } }
+.fpv-controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+.fpv-sweep{ font-size:0.78rem; color:var(--muted); display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+.fpv-speed{ display:flex; gap:4px; margin-left:auto; }
+.fpv-spd.active{ border-color:var(--accent); color:var(--accent); }
+.fpv-presets{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+.fpv-presets-lbl{ font-size:0.74rem; color:var(--muted); font-weight:600; }
+@media (prefers-reduced-motion: reduce){ .ebar-fill{ transition:none; } }
 </style>
 </head>
 <body>
@@ -169,9 +184,49 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">空気充填（n=1.0）、無損失ミラーを仮定。既定値は緑レーザー（λ=532 nm）です。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-arrows-left-right-to-line"></i> 多重ビーム干渉ヒーロー — 共鳴透過の可視化</div>
+      <div class="fpv-readouts">
+        <div class="fpv-ro accent"><div class="rv" id="fpvRoT">—</div><div class="rl">現在透過率 T</div></div>
+        <div class="fpv-ro"><div class="rv" id="fpvRoFin">—</div><div class="rl">フィネス ℱ</div></div>
+        <div class="fpv-ro"><div class="rv" id="fpvRoFSR">—</div><div class="rl">FSR</div></div>
+        <div class="fpv-ro"><div class="rv" id="fpvRoFWHM">—</div><div class="rl">FWHM</div></div>
+        <div class="fpv-ro"><div class="rv" id="fpvRoM">—</div><div class="rl">共鳴次数 m</div></div>
+        <div class="fpv-ro"><div class="rv" id="fpvRoTpk">—</div><div class="rl">ピーク透過 T_max</div></div>
+      </div>
+      <canvas id="fpvCv" tabindex="0" role="img" aria-label="ファブリー・ペロー共振器内で光が多重反射し、共鳴時に鋭く透過する様子と、Airy透過スペクトルのアニメーション。"></canvas>
+      <div class="fpv-controls">
+        <button class="btn" type="button" id="fpvPlay" onclick="fpvToggle()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary" type="button" id="fpvReset" onclick="fpvResetAnim()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <label class="fpv-sweep"><input type="checkbox" id="fpvSweep" checked onchange="fpvOnSweep()"> 周波数を自動掃引</label>
+        <div class="fpv-speed">
+          <button class="preset-btn fpv-spd" type="button" data-spd="0.5" onclick="fpvSetSpeed(0.5)">0.5×</button>
+          <button class="preset-btn fpv-spd active" type="button" data-spd="1" onclick="fpvSetSpeed(1)">1×</button>
+          <button class="preset-btn fpv-spd" type="button" data-spd="2" onclick="fpvSetSpeed(2)">2×</button>
+        </div>
+      </div>
+      <div class="fpv-presets">
+        <span class="fpv-presets-lbl">プリセット：</span>
+        <button class="preset-btn" type="button" onclick="fpvPreset('low')">低フィネス R=0.5</button>
+        <button class="preset-btn" type="button" onclick="fpvPreset('high')">高フィネス R=0.95</button>
+        <button class="preset-btn" type="button" onclick="fpvPreset('laser')">レーザー共振器</button>
+        <button class="preset-btn" type="button" onclick="fpvPreset('wide')">広FSR（小d）</button>
+      </div>
+      <p class="canvas-hint">上段＝2枚ミラー間の多重反射と、共鳴時に強め合って透過する光（明るいほど透過大）／下段＝Airy透過スペクトル T(ν)、白線＝掃引中の周波数。反射率Rを上げるとピークが鋭くなります（高フィネス）。</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -437,6 +492,331 @@ resizeCanvas();
 compute();
 </script>
 
+<script>
+/* ===== Fabry-Perot multiple-beam interference HERO animation (isolated IIFE) ===== */
+(function(){
+  "use strict";
+  var FPV_T = {
+    play:'再生', pause:'一時停止',
+    incident:'入射光', transmitted:'透過光',
+    specAxis:'周波数 ν（FSR単位、ピーク＝共鳴）'
+  };
+  var cv = document.getElementById('fpvCv');
+  if(!cv) return;
+  var ctx = cv.getContext('2d');
+  var C = 2.998e8;          // speed of light (m/s)
+  var NREF = 1.0;           // refractive index (air)
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var fpvPlaying = !reduced;
+  var fpvSpeed = 1;
+  var fpvSweepOn = true;
+  var fpvDetune = 0;        // sweep position in units of FSR (0..1 wraps)
+  var fpvLastTs = 0;
+  var fpvAnim = null;
+  var fpvCssW = 0, fpvCssH = 0;
+
+  function $(id){ return document.getElementById(id); }
+  function num(id){ return parseFloat($(id).value); }
+
+  // read shared calculator params
+  function fpvParams(){
+    var d = num('slD') * 1e-3;             // mm -> m
+    var R = num('slR');
+    var lam = num('slLambda') * 1e-9;      // nm -> m
+    var th = num('slTheta') * Math.PI/180;
+    var cosT = Math.cos(th);
+    var fsr = C / (2*NREF*d*cosT);         // Hz
+    var finesse = Math.PI*Math.sqrt(R)/(1-R);
+    var fwhm = fsr/finesse;
+    var Fcoef = 4*R/Math.pow(1-R,2);       // coefficient of finesse
+    var fc = C/lam;                        // optical frequency
+    var mOrder = Math.round(2*NREF*d*cosT/lam); // resonance order at lambda
+    return { d:d, R:R, lam:lam, th:th, cosT:cosT, fsr:fsr, finesse:finesse,
+             fwhm:fwhm, Fcoef:Fcoef, fc:fc, mOrder:mOrder };
+  }
+
+  // Airy transmittance as function of detuning (in units of FSR): phase = 2*pi*x
+  function fpvAiry(xFrac, Fcoef){
+    var s = Math.sin(Math.PI*xFrac);
+    return 1/(1 + Fcoef*s*s);
+  }
+
+  function fpvFmtFreq(hz){
+    if(!isFinite(hz)) return '∞';
+    var a = Math.abs(hz);
+    if(a>=1e12) return (hz/1e12).toFixed(2)+' THz';
+    if(a>=1e9)  return (hz/1e9).toFixed(1)+' GHz';
+    if(a>=1e6)  return (hz/1e6).toFixed(1)+' MHz';
+    if(a>=1e3)  return (hz/1e3).toFixed(1)+' kHz';
+    return hz.toFixed(0)+' Hz';
+  }
+
+  function fpvResize(){
+    var host = cv.parentElement;
+    var w = Math.max(280, Math.floor((host.clientWidth||600) - 40));
+    var h = Math.round(Math.max(300, Math.min(w*0.62, 440)));
+    var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    fpvCssW = w; fpvCssH = h;
+    cv.style.width = w+'px';
+    cv.style.height = h+'px';
+    cv.width = Math.round(w*dpr);
+    cv.height = Math.round(h*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function fpvDraw(){
+    var p = fpvParams();
+    var W = fpvCssW, H = fpvCssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#060f1c';
+    ctx.fillRect(0,0,W,H);
+
+    // ---- layout: top = cavity, bottom = spectrum ----
+    var splitY = Math.round(H*0.54);
+    var capRel = Math.max(0, Math.min(0.999, p.R)); // clamp
+
+    // current transmission at swept detune
+    var Tcur = fpvAiry(fpvDetune, p.Fcoef);
+    var Tmax = 1.0; // lossless peak
+
+    /* ===================== TOP: cavity multiple reflections ===================== */
+    var cavTop = 14, cavBot = splitY - 14;
+    var mL = Math.round(W*0.24);   // left mirror x
+    var mR = Math.round(W*0.74);   // right mirror x
+    var beamY = Math.round((cavTop+cavBot)/2);
+
+    // mirror visual thickness grows with reflectivity
+    var mw = 5 + capRel*9;
+
+    // incident beam from far left
+    ctx.strokeStyle = 'rgba(120,200,255,0.9)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(8, beamY); ctx.lineTo(mL, beamY); ctx.stroke();
+    // small arrow head
+    ctx.fillStyle = 'rgba(120,200,255,0.9)';
+    ctx.beginPath(); ctx.moveTo(mL-2,beamY); ctx.lineTo(mL-12,beamY-5); ctx.lineTo(mL-12,beamY+5); ctx.closePath(); ctx.fill();
+
+    // animated photon packet phase (visual only)
+    var packetPhase = (fpvDetune*Math.PI*2);
+
+    // number of visible internal bounces scales with effective round-trips ~ finesse
+    var bounces = Math.max(3, Math.min(26, Math.round(p.finesse/2.5)+3));
+    var gap = mR - mL;
+
+    // draw internal bounce path (zig-zag) with decaying intensity per bounce
+    // intensity of k-th transmitted beam ~ R^k ; brightness on resonance accumulates
+    var amp = 1;
+    for(var k=0;k<bounces;k++){
+      var frac = k/bounces;
+      var alpha = Math.pow(capRel, k)* (0.35+0.65*Tcur*0.0+0.0);
+      // base visibility independent of T so the bouncing is always visible
+      var vis = Math.pow(capRel, k);
+      var yA = (k%2===0)? beamY-Math.min(28, gap*0.05) : beamY+Math.min(28, gap*0.05);
+      var yB = (k%2===0)? beamY+Math.min(28, gap*0.05) : beamY-Math.min(28, gap*0.05);
+      ctx.strokeStyle = 'rgba(0,200,255,'+(0.12+0.7*vis).toFixed(3)+')';
+      ctx.lineWidth = 1.4+1.6*vis;
+      ctx.beginPath();
+      ctx.moveTo(mL+mw, yA);
+      ctx.lineTo(mR-mw, yB);
+      ctx.stroke();
+
+      // partial transmission out the right side at each bounce -> builds the output
+      // amplitude of this partial wave; phase difference 2*pi*detune per round trip
+      var xt = mR + 18 + frac*(W-mR-30);
+      var trAmp = vis;
+      // phase of this beam relative to first
+      var beamPhase = packetPhase * k;
+      var phasorY = beamY - Math.sin(beamPhase)*0; // kept straight for clarity
+      ctx.strokeStyle = 'rgba(255,210,90,'+(0.10+0.65*trAmp).toFixed(3)+')';
+      ctx.lineWidth = 1+2.2*trAmp;
+      ctx.beginPath();
+      ctx.moveTo(mR+mw, (k%2===0)?yB:yA);
+      ctx.lineTo(Math.min(W-6,mR+mw+14), beamY);
+      ctx.stroke();
+      amp *= capRel;
+    }
+
+    // resulting transmitted beam: brightness = current transmission
+    var outGrad = ctx.createLinearGradient(mR, beamY, W, beamY);
+    var oa = (0.15+0.85*Tcur);
+    outGrad.addColorStop(0,'rgba(255,225,120,'+oa.toFixed(3)+')');
+    outGrad.addColorStop(1,'rgba(255,170,40,'+(oa*0.6).toFixed(3)+')');
+    ctx.strokeStyle = outGrad;
+    ctx.lineWidth = 2 + 7*Tcur;
+    ctx.beginPath(); ctx.moveTo(mR+mw, beamY); ctx.lineTo(W-6, beamY); ctx.stroke();
+    // glow when near resonance
+    if(Tcur>0.6){
+      ctx.save();
+      ctx.globalAlpha = (Tcur-0.6)/0.4*0.6;
+      ctx.fillStyle = 'rgba(255,230,140,1)';
+      ctx.beginPath(); ctx.arc(W-14, beamY, 6+8*Tcur, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+
+    // mirrors (draw on top)
+    ctx.fillStyle = 'rgba(180,225,255,0.92)';
+    ctx.fillRect(mL-mw, cavTop, mw*2, cavBot-cavTop);
+    ctx.fillRect(mR-mw, cavTop, mw*2, cavBot-cavTop);
+    ctx.strokeStyle = 'rgba(120,180,230,0.7)'; ctx.lineWidth=1;
+    ctx.strokeRect(mL-mw, cavTop, mw*2, cavBot-cavTop);
+    ctx.strokeRect(mR-mw, cavTop, mw*2, cavBot-cavTop);
+
+    // labels
+    ctx.fillStyle = 'rgba(200,225,255,0.85)';
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('R='+capRel.toFixed(3), mL, cavBot+12);
+    ctx.fillText('R='+capRel.toFixed(3), mR, cavBot+12);
+    ctx.fillText('d='+(p.d*1e3).toFixed(2)+' mm,  n='+NREF.toFixed(1), (mL+mR)/2, cavTop+12);
+    ctx.textAlign='left';
+    ctx.fillStyle='rgba(120,200,255,0.9)';
+    ctx.fillText(FPV_T.incident, 10, beamY-8);
+    ctx.textAlign='right';
+    ctx.fillStyle='rgba(255,210,90,0.95)';
+    ctx.fillText(FPV_T.transmitted, W-8, beamY-8);
+    ctx.textAlign='left';
+
+    /* ===================== BOTTOM: Airy transmission spectrum ===================== */
+    var gx0 = 56, gx1 = W-14, gy0 = H-26, gy1 = splitY+24;
+    var gw = gx1-gx0, gh = gy0-gy1;
+
+    // axes
+    ctx.strokeStyle = 'rgba(143,184,224,0.45)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(gx0,gy0); ctx.lineTo(gx1,gy0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gx0,gy1); ctx.lineTo(gx0,gy0); ctx.stroke();
+    // T=1 line
+    ctx.strokeStyle='rgba(143,184,224,0.2)'; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(gx0,gy1); ctx.lineTo(gx1,gy1); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // show 3 FSR worth (x from -0.5 to 2.5 FSR), peaks at integer FSR
+    var xLo = -0.5, xHi = 2.5;
+    function sx(xf){ return gx0 + (xf-xLo)/(xHi-xLo)*gw; }
+    function sy(t){ return gy0 - t*gh; }
+
+    // FWHM band around the resonance nearest the sweep (peak at x=1)
+    var halfW = 0.5/Math.max(p.finesse,1e-6); // FWHM in FSR units = 1/finesse
+    ctx.fillStyle='rgba(255,209,102,0.16)';
+    ctx.fillRect(sx(1-halfW), gy1, Math.max(2, sx(1+halfW)-sx(1-halfW)), gh);
+
+    // Airy curve
+    ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2;
+    ctx.beginPath();
+    var N = Math.max(400, gw*2|0);
+    for(var i=0;i<=N;i++){
+      var xf = xLo + (xHi-xLo)*i/N;
+      var T = fpvAiry(xf, p.Fcoef);
+      var X = sx(xf), Y = sy(T);
+      if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+
+    // FSR arrow between peak at x=1 and x=2
+    var yArr = gy1+12;
+    ctx.strokeStyle='#FFD166'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(sx(1),yArr); ctx.lineTo(sx(2),yArr); ctx.stroke();
+    ctx.fillStyle='#FFD166';
+    ctx.beginPath(); ctx.moveTo(sx(1),yArr); ctx.lineTo(sx(1)+6,yArr-4); ctx.lineTo(sx(1)+6,yArr+4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(sx(2),yArr); ctx.lineTo(sx(2)-6,yArr-4); ctx.lineTo(sx(2)-6,yArr+4); ctx.closePath(); ctx.fill();
+    ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('FSR', (sx(1)+sx(2))/2, yArr-4);
+
+    // swept frequency marker (wraps within one FSR, mapped onto x in [-0.5,2.5])
+    var markX = 1 + fpvDetune; // sweep around the central resonance (x:1 -> 2)
+    if(markX>xHi) markX -= (xHi-xLo);
+    var Tm = fpvAiry(markX, p.Fcoef);
+    ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(sx(markX),gy1); ctx.lineTo(sx(markX),gy0); ctx.stroke();
+    ctx.beginPath(); ctx.arc(sx(markX), sy(Tm), 4.5, 0, 7);
+    ctx.fillStyle='#fff'; ctx.fill();
+
+    // axis labels
+    ctx.fillStyle='#cfe3f7'; ctx.font='10px "Roboto Mono",monospace';
+    ctx.textAlign='left'; ctx.fillText('T=1', gx0+4, gy1+10);
+    ctx.fillText('T=0', gx0+4, gy0-4);
+    ctx.textAlign='center';
+    ctx.fillText(FPV_T.specAxis, (gx0+gx1)/2, H-6);
+
+    // sync readouts
+    $('fpvRoT').textContent   = Tcur.toFixed(3);
+    $('fpvRoFin').textContent = p.finesse.toFixed(1);
+    $('fpvRoFSR').textContent = fpvFmtFreq(p.fsr);
+    $('fpvRoFWHM').textContent= fpvFmtFreq(p.fwhm);
+    $('fpvRoM').textContent   = String(p.mOrder);
+    $('fpvRoTpk').textContent = Tmax.toFixed(2);
+  }
+
+  function fpvLoop(ts){
+    if(!fpvPlaying){ fpvAnim=null; return; }
+    if(!fpvLastTs) fpvLastTs = ts;
+    var dt = Math.min(0.05,(ts-fpvLastTs)/1000);
+    fpvLastTs = ts;
+    if(fpvSweepOn){
+      fpvDetune += dt*0.45*fpvSpeed; // sweeps one FSR every ~2.2s
+      if(fpvDetune>1) fpvDetune -= 1;
+    }
+    fpvDraw();
+    fpvAnim = requestAnimationFrame(fpvLoop);
+  }
+
+  window.fpvToggle = function(){
+    fpvPlaying = !fpvPlaying;
+    $('fpvPlay').innerHTML = fpvPlaying
+      ? '<i class="fas fa-pause"></i> '+FPV_T.pause
+      : '<i class="fas fa-play"></i> '+FPV_T.play;
+    if(fpvPlaying){ fpvLastTs=0; if(!fpvAnim) fpvAnim=requestAnimationFrame(fpvLoop); }
+    else if(fpvAnim){ cancelAnimationFrame(fpvAnim); fpvAnim=null; }
+  };
+  window.fpvResetAnim = function(){ fpvDetune=0; fpvDraw(); };
+  window.fpvOnSweep = function(){ fpvSweepOn = $('fpvSweep').checked; };
+  window.fpvSetSpeed = function(s){
+    fpvSpeed = s;
+    var btns = document.querySelectorAll('.fpv-spd');
+    for(var i=0;i<btns.length;i++){
+      btns[i].classList.toggle('active', parseFloat(btns[i].dataset.spd)===s);
+    }
+  };
+  window.fpvPreset = function(name){
+    var P = {
+      low:   { slD:1.00, slR:0.500, slLambda:532, slTheta:0 },
+      high:  { slD:1.00, slR:0.950, slLambda:532, slTheta:0 },
+      laser: { slD:300,  slR:0.990, slLambda:1064, slTheta:0 },
+      wide:  { slD:0.05, slR:0.900, slLambda:633, slTheta:0 }
+    }[name];
+    if(!P) return;
+    Object.keys(P).forEach(function(id){
+      var e=$(id); if(e){ e.value=P[id]; }
+    });
+    // resync the calculator's number boxes + recompute if helpers exist
+    if(typeof updateSlider==='function'){
+      updateSlider($('slD'),'slDVal',2,'');
+      updateSlider($('slR'),'slRVal',3,'');
+      updateSlider($('slLambda'),'slLambdaVal',0,'');
+      updateSlider($('slTheta'),'slThetaVal',1,'');
+    }
+    if(typeof compute==='function') compute();
+    fpvDraw();
+  };
+
+  // keyboard: space toggles
+  cv.addEventListener('keydown', function(e){
+    if(e.key===' '||e.key==='Enter'){ e.preventDefault(); window.fpvToggle(); }
+  });
+
+  window.addEventListener('resize', function(){ fpvResize(); fpvDraw(); });
+
+  // init
+  fpvResize();
+  fpvDraw();
+  if(reduced){
+    $('fpvPlay').innerHTML = '<i class="fas fa-play"></i> '+FPV_T.play;
+  } else {
+    fpvAnim = requestAnimationFrame(fpvLoop);
+  }
+})();
+</script>
+
 <section class="explanation">
   <h2>ファブリー・ペロー干渉計シミュレーターとは</h2>
   <div class="chat">
@@ -502,6 +882,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fabry-perot.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -555,15 +938,15 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>ファブリー・ペロー干渉計の鏡間距離dをslDで設定します（単位：μm、範囲0.1～100）。光学ガラス製の標準値は10μmです</li>
-<li>両鏡の反射率RをslRで指定します（0.8～0.99推奨）。R=0.95の場合、フィネスF*は約59.6に達します</li>
-<li>測定波長λをslLambdaで入力（400～1600nm）。入射角度θをslThetaで指定すると、等傾干渉パターンの透過スペクトルが描画されます</li>
-<li>計算結果から自由スペクトル領域FSR、フィネスF*、FWHM、Q値を自動算出し、リアルタイム表示します</li>
+<li>ミラー間隔dをスライダーで設定します（単位：mm、範囲0.01〜100）。既定値は1mmです</li>
+<li>ミラー反射率Rを0.100〜0.999の範囲で指定します。R=0.95の場合、フィネスF*は約61.2になります</li>
+<li>入射波長λを400〜1000nmで入力し、入射角度θ（0〜30°）を指定すると、Airy透過スペクトルが描画されます</li>
+<li>自由スペクトル領域FSR、フィネスF*、FWHM、Q値が自動算出され、リアルタイム表示されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>石英ガラス製ファブリー・ペロー干渉計でd=5μm、R=0.90、λ=633nm（He-Neレーザー）、θ=0°の場合：FSR = 633nm/(2×5μm) ≈ 63.3pm、フィネス F* = π√0.90/(1-0.90) ≈ 29.8、FWHM ≈ 2.12pm、Q値 = 633nm/2.12pm ≈ 298,600となります。高精度分光計測ではR=0.98を採用し、フィネスを約155に向上させることで、FWHM≈0.4pmの超狭線幅スペクトルを実現します</p>
+<p>エタロン型ファブリー・ペロー干渉計でd=0.01mm（10μm）、R=0.90、λ=633nm（He-Neレーザー）、θ=0°の場合：FSR = c/(2nd) ≈14.99THz、フィネス F* = π√0.90/(1-0.90) ≈29.8、FWHM = FSR/F* ≈503GHz、Q値 = (c/λ)/FWHM ≈9.4×10²となります。反射率をR=0.98に上げるとフィネスは約155に向上し、FWHMは約96GHzまで狭くなります。波長領域に換算すると FSR_λ = λ²/(2nd) ≈20nm、FWHM_λ ≈0.67nm に相当します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -574,6 +957,16 @@ compute();
 <li>多重反射による干渉効果がフィネス値に影響するため、両鏡の平坦度は波長の1/4以下（633nmで158nm以下）に保つ必要があります</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

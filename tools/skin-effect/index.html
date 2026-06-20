@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "表皮効果 シミュレーター",
       "description": "周波数・電気伝導率・比透磁率・導線半径から、表皮深さ δ と円形導体の AC/DC 抵抗比を実時間で計算し、AC 電流の表面集中現象と高周波抵抗増加の物理を可視化する電磁気学教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/skin-effect.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["表皮深さ δ = 1/√(πfμσ) と AC/DC 抵抗比の同時計算","円形導体断面の電流密度分布と表皮深さ位置の2D可視化","周波数 f・伝導率 σ・比透磁率 μ_r・導線半径 R の独立スライダー","δ vs 周波数の両対数グラフと δ=R 臨界周波数の自動算出"],
       "keywords": "表皮効果,表皮深さ,AC抵抗,高周波,渦電流,銅損,リッツ線,プロキシミティ効果,電磁気学,電力工学,RF工学",
       "datePublished": "2026-05-15",
@@ -103,6 +103,25 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 #conductorCanvas,#freqCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
 .aux-label{ font-size:0.72rem; color:var(--muted); margin-top:-4px; margin-bottom:4px; text-align:right; }
+/* ===== v2 live readouts / controls ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.02rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}.live-ro .rv{font-size:.9rem}}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.preset-btn{padding:4px 10px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.preset-head{font-size:0.72rem;color:var(--muted);margin:8px 0 5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.canvas-hint a{color:var(--accent)}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{transition:none}
+}
+/* end v2 additions */
 </style>
 </head>
 <body>
@@ -132,12 +151,28 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div class="preset-head">材料プリセット</div>
+    <div class="preset-row" id="matPresets">
+      <button type="button" class="preset-btn active" data-mat="copper" onclick="setMaterial('copper')">銅</button>
+      <button type="button" class="preset-btn" data-mat="aluminum" onclick="setMaterial('aluminum')">アルミ</button>
+      <button type="button" class="preset-btn" data-mat="silver" onclick="setMaterial('silver')">銀</button>
+      <button type="button" class="preset-btn" data-mat="iron" onclick="setMaterial('iron')">鉄</button>
+    </div>
+    <div class="preset-head">シナリオ</div>
+    <div class="preset-row" id="scenePresets">
+      <button type="button" class="preset-btn" onclick="setScenario('dc')">DC 均一</button>
+      <button type="button" class="preset-btn" onclick="setScenario('power')">50Hz 電力</button>
+      <button type="button" class="preset-btn active" onclick="setScenario('rf')">1MHz RF 薄皮</button>
+      <button type="button" class="preset-btn" onclick="setScenario('ferro')">強磁性 小δ</button>
+    </div>
+    <div class="divider"></div>
+
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">log₁₀(周波数 f)</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slLogFVal" value="6.0" min="1.7" max="9.0" step="0.1" oninput="syncFromNum('slLogF','slLogFVal')"><span class="num-unit">log Hz</span></div>
       </div>
-      <input type="range" id="slLogF" min="1.7" max="9.0" step="0.1" value="6.0" oninput="syncToNum('slLogF','slLogFVal');updateSlider(this,'slLogFVal',1,'');compute()">
+      <input type="range" id="slLogF" min="1.7" max="9.0" step="0.1" value="6.0" aria-label="周波数 f（対数）" oninput="syncToNum('slLogF','slLogFVal');updateSlider(this,'slLogFVal',1,'');compute()">
       <div class="aux-label" id="fLabel">f = 1.00 MHz</div>
     </div>
 
@@ -146,7 +181,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">電気伝導率 σ</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slSigma_e7Val" value="5.960" min="0.001" max="10.000" step="0.001" oninput="syncFromNum('slSigma_e7','slSigma_e7Val')"><span class="num-unit">×10⁷ S/m</span></div>
       </div>
-      <input type="range" id="slSigma_e7" min="0.001" max="10.000" step="0.001" value="5.960" oninput="syncToNum('slSigma_e7','slSigma_e7Val');updateSlider(this,'slSigma_e7Val',3,'');compute()">
+      <input type="range" id="slSigma_e7" min="0.001" max="10.000" step="0.001" value="5.960" aria-label="電気伝導率 σ" oninput="syncToNum('slSigma_e7','slSigma_e7Val');updateSlider(this,'slSigma_e7Val',3,'');compute()">
     </div>
 
     <div class="param-group">
@@ -154,7 +189,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">比透磁率 μ_r</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slMuRVal" value="1.0" min="1.0" max="10000.0" step="1.0" oninput="syncFromNum('slMuR','slMuRVal')"><span class="num-unit">—</span></div>
       </div>
-      <input type="range" id="slMuR" min="1.0" max="10000.0" step="1.0" value="1.0" oninput="syncToNum('slMuR','slMuRVal');updateSlider(this,'slMuRVal',0,'');compute()">
+      <input type="range" id="slMuR" min="1.0" max="10000.0" step="1.0" value="1.0" aria-label="比透磁率 μ_r" oninput="syncToNum('slMuR','slMuRVal');updateSlider(this,'slMuRVal',0,'');compute()">
     </div>
 
     <div class="param-group">
@@ -162,19 +197,50 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">導線半径 R</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slR_mmVal" value="1.00" min="0.01" max="20.00" step="0.01" oninput="syncFromNum('slR_mm','slR_mmVal')"><span class="num-unit">mm</span></div>
       </div>
-      <input type="range" id="slR_mm" min="0.01" max="20.00" step="0.01" value="1.00" oninput="syncToNum('slR_mm','slR_mmVal');updateSlider(this,'slR_mmVal',2,'');compute()">
+      <input type="range" id="slR_mm" min="0.01" max="20.00" step="0.01" value="1.00" aria-label="導線半径 R" oninput="syncToNum('slR_mm','slR_mmVal');updateSlider(this,'slR_mmVal',2,'');compute()">
     </div>
 
     <div class="divider"></div>
 
-    <div class="btn-group">
+    <div class="play-row">
       <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 周波数スイープ</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+      <div style="display:flex;gap:4px;margin-left:auto">
+        <button type="button" class="preset-btn speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+        <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="setSpeed(1)">1×</button>
+        <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+      </div>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値: f = 1 MHz、σ = 5.96×10⁷ S/m（銅）、μ_r = 1、R = 1.00 mm。透磁率は μ_0 = 4π×10⁻⁷ H/m を使用。本ツールは R ≫ δ の高周波近似 R_ac/R_dc ≈ R/(2δ) を用います。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roF">—</div><div class="rl">周波数 f</div></div>
+        <div class="live-ro accent"><div class="rv" id="roDelta">—</div><div class="rl">表皮深さ δ</div></div>
+        <div class="live-ro"><div class="rv" id="roRac">—</div><div class="rl">R_AC/R_DC</div></div>
+        <div class="live-ro"><div class="rv" id="roArea">—</div><div class="rl">実効面積比</div></div>
+        <div class="live-ro"><div class="rv" id="roPen">—</div><div class="rl">電流浸透 δ/R</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-circle"></i> 導体断面の電流密度（交流アニメーション）</div>
+      <canvas id="conductorCanvas" tabindex="0" role="img" aria-label="円形導体断面の電流密度カラーマップ。交流電流が振動し、周波数が上がると電流が表面の薄い層に集中する様子を表示します。"></canvas>
+      <p class="canvas-hint">円＝半径 R の導体断面／色＝瞬時電流密度（脈動は AC の振動）／破線円＝表皮深さ δ の位置／矢印で R と δ をラベル。δ ≪ R では電流は表面の薄い層に退避し、芯は暗くなります。</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -186,14 +252,8 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-circle"></i> 円形導体断面の電流密度分布</div>
-      <canvas id="conductorCanvas"></canvas>
-      <p class="canvas-hint">円＝半径 R の銅線断面／色＝電流密度 |J| ∝ exp(-(R-r)/δ)（赤＝高密度、青＝低密度）／破線円＝表皮深さ δ の位置／矢印で R と δ をラベル。δ ≪ R では電流は表面の薄い層に集中。</p>
-    </div>
-
-    <div class="chart-card">
       <div class="chart-title"><i class="fas fa-chart-line"></i> 周波数 vs 表皮深さ（両対数）</div>
-      <canvas id="freqCanvas"></canvas>
+      <canvas id="freqCanvas" role="img" aria-label="周波数と表皮深さの両対数グラフ。δ ∝ 1/√f の直線と現在値マーカーを表示します。"></canvas>
       <p class="canvas-hint">横軸＝log₁₀(f) [3〜9]／縦軸＝log₁₀(δ in μm)／橙線＝δ ∝ 1/√f の直線関係／黄丸＝現在の (f, δ)／緑水平線＝導線半径 R／交点が δ=R 臨界周波数 f_R。</p>
     </div>
 
@@ -212,21 +272,41 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Skin Effect (AC current surface concentration) Simulator ==========
+var I18N = {
+  play: '周波数スイープ', pause: '一時停止',
+  annUniform: 'DC 同様：電流はほぼ均一', annThin: 'δ ≪ R：電流は表面の薄皮に集中',
+  annTrans: '遷移域：表面寄りに偏在', lowJ: '低 |J|', highJ: '高 |J|'
+};
+// ========== Skin Effect (AC current surface concentration) Simulator — v2 ==========
+(function(){
+"use strict";
 var conductorCanvas = document.getElementById('conductorCanvas');
 var conductorCtx = conductorCanvas.getContext('2d');
 var freqCanvas = document.getElementById('freqCanvas');
 var freqCtx = freqCanvas.getContext('2d');
+var MU0 = 4 * Math.PI * 1e-7; // H/m
 var playing = false;
 var animId = null;
 var sweepDir = 1;
-var MU0 = 4 * Math.PI * 1e-7; // H/m
+var speedMult = 1;
+var acPhase = 0;          // AC oscillation phase (rad)
+var lastTs = 0;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+var MATERIALS = {
+  copper:   { sigma_e7: 5.960, muR: 1 },
+  aluminum: { sigma_e7: 3.500, muR: 1 },
+  silver:   { sigma_e7: 6.300, muR: 1 },
+  iron:     { sigma_e7: 1.000, muR: 1000 }
+};
+
+function el(id){ return document.getElementById(id); }
 
 function fmtLength(L) {
   if (!isFinite(L) || L <= 0) return '—';
   if (L >= 1) return L.toFixed(2) + ' m';
   if (L >= 1e-3) return (L*1e3).toFixed(2) + ' mm';
-  if (L >= 1e-6) return (L*1e6).toFixed(1) + ' μm';
+  if (L >= 1e-6) return (L*1e6).toFixed(1) + ' µm';
   if (L >= 1e-9) return (L*1e9).toFixed(1) + ' nm';
   return L.toExponential(2) + ' m';
 }
@@ -247,10 +327,10 @@ function fmtRatio(x) {
 }
 
 function getParams() {
-  var logF = parseFloat(document.getElementById('slLogF').value);
-  var sigma_e7 = parseFloat(document.getElementById('slSigma_e7').value);
-  var muR = parseFloat(document.getElementById('slMuR').value);
-  var R_mm = parseFloat(document.getElementById('slR_mm').value);
+  var logF = parseFloat(el('slLogF').value);
+  var sigma_e7 = parseFloat(el('slSigma_e7').value);
+  var muR = parseFloat(el('slMuR').value);
+  var R_mm = parseFloat(el('slR_mm').value);
   var f = Math.pow(10, logF);
   var sigma = sigma_e7 * 1e7;
   var mu = MU0 * muR;
@@ -287,128 +367,8 @@ function resizeCanvases() {
   });
 }
 
-function drawConductor(p, delta) {
-  var ctx = conductorCtx, W = __novaCanvasCssW(conductorCanvas), H = __novaCanvasCssH(conductorCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-
-  // center & radius for display
-  var cx = W / 2;
-  var cy = H / 2;
-  var maxR = Math.min(W, H) * 0.42;
-  var Rdisp = maxR;
-  // Use radial gradient style: sample radius
-  // current density |J| at radial position r from center: |J(r)| = exp(-(R-r)/delta)
-  // We render via concentric rings
-  var nRings = 80;
-  for (var i = nRings; i > 0; i--) {
-    var t = i / nRings; // 1=outer, 0=inner
-    var rDisp = Rdisp * t;
-    // physical depth from surface
-    var rPhys = p.R * t;
-    var depth = p.R - rPhys; // m
-    var Jrel;
-    if (delta > 0 && isFinite(delta)) {
-      Jrel = Math.exp(-depth / delta);
-    } else {
-      Jrel = 1;
-    }
-    // map Jrel [0,1] to color: red (high) -> orange -> yellow -> blue (low)
-    var c = jColor(Jrel);
-    ctx.beginPath();
-    ctx.arc(cx, cy, rDisp, 0, Math.PI * 2);
-    ctx.fillStyle = c;
-    ctx.fill();
-  }
-  // outer border (conductor edge)
-  ctx.strokeStyle = '#cfe3f7';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(cx, cy, Rdisp, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // dashed circle at depth delta (i.e. radius R-delta from center)
-  if (delta > 0 && isFinite(delta) && delta < p.R) {
-    var innerR = Rdisp * (p.R - delta) / p.R;
-    ctx.strokeStyle = '#FFD166';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  } else if (delta >= p.R) {
-    // delta >= R: skin depth larger than conductor — draw an outer phantom
-    ctx.strokeStyle = '#FFD166';
-    ctx.setLineDash([4, 4]);
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, Rdisp * 1.12, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  // arrows / labels: R (horizontal) and delta (small inward)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.fillStyle = '#00B4D8';
-  ctx.lineWidth = 1.5;
-  // arrow for R: from center to right edge
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx + Rdisp, cy);
-  ctx.stroke();
-  // arrowhead
-  drawArrow(ctx, cx + Rdisp, cy, 0);
-  ctx.font = 'bold 13px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('R = ' + (p.R_mm).toFixed(2) + ' mm', cx + Rdisp * 0.5, cy - 8);
-
-  // delta arrow at top, from surface inward by delta (if delta < R)
-  if (delta > 0 && isFinite(delta) && delta < p.R) {
-    var deltaPixels = Rdisp * delta / p.R;
-    var topY = cy - Rdisp;
-    ctx.strokeStyle = '#FFD166';
-    ctx.fillStyle = '#FFD166';
-    ctx.beginPath();
-    ctx.moveTo(cx, topY);
-    ctx.lineTo(cx, topY + deltaPixels);
-    ctx.stroke();
-    drawArrow(ctx, cx, topY + deltaPixels, Math.PI / 2);
-    ctx.textAlign = 'left';
-    ctx.font = 'bold 12px "Roboto Mono",monospace';
-    ctx.fillText('δ = ' + fmtLength(delta), cx + 8, topY + Math.max(14, deltaPixels / 2));
-  }
-
-  // legend / scale bar (color gradient)
-  var legX = 14, legY = H - 22, legW = 130, legH = 10;
-  var grad = ctx.createLinearGradient(legX, 0, legX + legW, 0);
-  grad.addColorStop(0.0, jColor(0.02));
-  grad.addColorStop(0.5, jColor(0.5));
-  grad.addColorStop(1.0, jColor(1.0));
-  ctx.fillStyle = grad;
-  ctx.fillRect(legX, legY, legW, legH);
-  ctx.strokeStyle = 'rgba(207,227,247,0.4)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(legX, legY, legW, legH);
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('低 |J|', legX, legY - 3);
-  ctx.textAlign = 'right';
-  ctx.fillText('高 |J|', legX + legW, legY - 3);
-
-  // header info top-right
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = 'bold 12px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText('f = ' + fmtFreq(p.f), W - 14, 18);
-  ctx.fillText('δ = ' + fmtLength(delta), W - 14, 34);
-}
-
 function jColor(J) {
-  // J in [0,1] -> color
   J = Math.max(0, Math.min(1, J));
-  // interpolate: 0 -> #234e8a (deep blue) ; 0.5 -> #ff8c42 (orange) ; 1 -> #ef4444 (red)
   if (J < 0.5) {
     var t = J / 0.5;
     var r = Math.round(35 + t * (255 - 35));
@@ -438,6 +398,128 @@ function drawArrow(ctx, x, y, angle) {
   ctx.restore();
 }
 
+function drawConductor(p, delta, env) {
+  var ctx = conductorCtx, W = __novaCanvasCssW(conductorCanvas), H = __novaCanvasCssH(conductorCanvas);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+
+  var cx = W / 2;
+  var cy = H / 2;
+  var maxR = Math.min(W, H) * 0.42;
+  var Rdisp = maxR;
+  // AC instantaneous envelope: |cos(phase)| modulates brightness so the current visibly oscillates.
+  var env2 = env;
+  var nRings = 90;
+  for (var i = nRings; i > 0; i--) {
+    var t = i / nRings; // 1=outer, 0=inner
+    var rDisp = Rdisp * t;
+    var rPhys = p.R * t;
+    var depth = p.R - rPhys; // m
+    var Jrel;
+    if (delta > 0 && isFinite(delta)) {
+      Jrel = Math.exp(-depth / delta);
+    } else {
+      Jrel = 1;
+    }
+    Jrel = Jrel * env2;
+    var c = jColor(Jrel);
+    ctx.beginPath();
+    ctx.arc(cx, cy, rDisp, 0, Math.PI * 2);
+    ctx.fillStyle = c;
+    ctx.fill();
+  }
+  // outer border (conductor edge)
+  ctx.strokeStyle = '#cfe3f7';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, Rdisp, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // dashed circle at depth delta (radius R-delta from center)
+  if (delta > 0 && isFinite(delta) && delta < p.R) {
+    var innerR = Rdisp * (p.R - delta) / p.R;
+    ctx.strokeStyle = '#FFD166';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else if (delta >= p.R) {
+    ctx.strokeStyle = '#FFD166';
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Rdisp * 1.12, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // arrow for R: from center to right edge
+  ctx.strokeStyle = '#00B4D8';
+  ctx.fillStyle = '#00B4D8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Rdisp, cy);
+  ctx.stroke();
+  drawArrow(ctx, cx + Rdisp, cy, 0);
+  ctx.font = 'bold 13px "Roboto Mono",monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('R = ' + (p.R_mm).toFixed(2) + ' mm', cx + Rdisp * 0.5, cy - 8);
+
+  // delta arrow at top, from surface inward by delta (if delta < R)
+  if (delta > 0 && isFinite(delta) && delta < p.R) {
+    var deltaPixels = Rdisp * delta / p.R;
+    var topY = cy - Rdisp;
+    ctx.strokeStyle = '#FFD166';
+    ctx.fillStyle = '#FFD166';
+    ctx.beginPath();
+    ctx.moveTo(cx, topY);
+    ctx.lineTo(cx, topY + deltaPixels);
+    ctx.stroke();
+    drawArrow(ctx, cx, topY + deltaPixels, Math.PI / 2);
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 12px "Roboto Mono",monospace';
+    ctx.fillText('δ = ' + fmtLength(delta), cx + 8, topY + Math.max(14, deltaPixels / 2));
+  }
+
+  // integrated annotation: state of crowding
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 12px "Roboto Mono",monospace';
+  var ann, annCol;
+  if (!isFinite(delta) || delta >= p.R * 3) { ann = I18N.annUniform; annCol = '#4ade80'; }
+  else if (delta < p.R * 0.25) { ann = I18N.annThin; annCol = '#ef4444'; }
+  else { ann = I18N.annTrans; annCol = '#FFD166'; }
+  ctx.fillStyle = annCol;
+  ctx.fillText(ann, cx, cy + Rdisp + 18);
+
+  // legend / scale bar
+  var legX = 14, legY = H - 22, legW = 120, legH = 10;
+  var grad = ctx.createLinearGradient(legX, 0, legX + legW, 0);
+  grad.addColorStop(0.0, jColor(0.02));
+  grad.addColorStop(0.5, jColor(0.5));
+  grad.addColorStop(1.0, jColor(1.0));
+  ctx.fillStyle = grad;
+  ctx.fillRect(legX, legY, legW, legH);
+  ctx.strokeStyle = 'rgba(207,227,247,0.4)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(legX, legY, legW, legH);
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = '10px "Roboto Mono",monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(I18N.lowJ, legX, legY - 3);
+  ctx.textAlign = 'right';
+  ctx.fillText(I18N.highJ, legX + legW, legY - 3);
+
+  // header info top
+  ctx.fillStyle = '#cfe3f7';
+  ctx.font = 'bold 12px "Roboto Mono",monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('f = ' + fmtFreq(p.f), W - 14, 18);
+  ctx.fillText('δ = ' + fmtLength(delta), W - 14, 34);
+}
+
 function drawFreq(p, delta, fR) {
   var ctx = freqCtx, W = __novaCanvasCssW(freqCanvas), H = __novaCanvasCssH(freqCanvas);
   ctx.fillStyle = '#0a1929';
@@ -447,25 +529,19 @@ function drawFreq(p, delta, fR) {
   var x0 = mx, x1 = W - 16, y0 = H - my - 6, y1 = my + 4;
   var gw = x1 - x0, gh = y0 - y1;
 
-  var xLogMin = 3, xLogMax = 9; // log10 Hz
-  // y axis: log10(delta in um). Compute range from delta(f) at xLogMin/xLogMax
-  // δ ∝ 1/√f so at xLogMin (lowest f) delta is largest, at xLogMax smallest
-  // sample at endpoints
-  var dLo = skinDepth(Math.pow(10, xLogMin), p.mu, p.sigma); // larger
-  var dHi = skinDepth(Math.pow(10, xLogMax), p.mu, p.sigma); // smaller
-  // include R in y range
+  var xLogMin = 3, xLogMax = 9;
+  var dLo = skinDepth(Math.pow(10, xLogMin), p.mu, p.sigma);
+  var dHi = skinDepth(Math.pow(10, xLogMax), p.mu, p.sigma);
   var yMinUm = Math.max(1e-3, dHi * 1e6) * 0.3;
   var yMaxUm = Math.max(yMinUm * 10, dLo * 1e6, p.R * 1e6) * 3;
   var yLogMin = Math.log10(yMinUm);
   var yLogMax = Math.log10(yMaxUm);
-  // pad
   yLogMin = Math.floor(yLogMin);
   yLogMax = Math.ceil(yLogMax);
 
   function px(logf) { return x0 + (logf - xLogMin) / (xLogMax - xLogMin) * gw; }
   function py(logyUm) { return y0 - (logyUm - yLogMin) / (yLogMax - yLogMin) * gh; }
 
-  // grid + ticks
   ctx.strokeStyle = 'rgba(143,184,224,0.2)';
   ctx.fillStyle = '#8fb8e0';
   ctx.font = '10px "Roboto Mono",monospace';
@@ -496,22 +572,20 @@ function drawFreq(p, delta, fR) {
     else if (ly === 0) lab2 = '1 nm';
     else if (ly === 1) lab2 = '10 nm';
     else if (ly === 2) lab2 = '100 nm';
-    else if (ly === 3) lab2 = '1 μm';
-    else if (ly === 4) lab2 = '10 μm';
-    else if (ly === 5) lab2 = '100 μm';
+    else if (ly === 3) lab2 = '1 µm';
+    else if (ly === 4) lab2 = '10 µm';
+    else if (ly === 5) lab2 = '100 µm';
     else if (ly === 6) lab2 = '1 mm';
     else if (ly === 7) lab2 = '10 mm';
     else if (ly === 8) lab2 = '100 mm';
-    else lab2 = '10^' + ly + ' μm';
+    else lab2 = '10^' + ly + ' µm';
     ctx.fillText(lab2, x0 - 4, yy + 3);
   }
 
-  // axes
   ctx.strokeStyle = 'rgba(143,184,224,0.55)';
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.stroke();
 
-  // R horizontal line (green)
   var Rum = p.R * 1e6;
   if (Rum > 0) {
     var yR = py(Math.log10(Rum));
@@ -528,7 +602,6 @@ function drawFreq(p, delta, fR) {
     }
   }
 
-  // skin depth curve δ(f) = 1/√(π f μ σ)
   ctx.strokeStyle = '#FF8C42';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -548,7 +621,6 @@ function drawFreq(p, delta, fR) {
   }
   ctx.stroke();
 
-  // f_R marker (intersection with R line)
   if (fR > 0 && isFinite(fR)) {
     var lfR = Math.log10(fR);
     if (lfR >= xLogMin && lfR <= xLogMax) {
@@ -566,14 +638,13 @@ function drawFreq(p, delta, fR) {
     }
   }
 
-  // current f marker (yellow)
   if (p.f > 0 && isFinite(p.f) && isFinite(delta) && delta > 0) {
-    var cx = px(p.logF);
-    var cy = py(Math.log10(delta * 1e6));
-    cy = Math.max(y1, Math.min(y0, cy));
-    cx = Math.max(x0, Math.min(x1, cx));
+    var cxm = px(p.logF);
+    var cym = py(Math.log10(delta * 1e6));
+    cym = Math.max(y1, Math.min(y0, cym));
+    cxm = Math.max(x0, Math.min(x1, cxm));
     ctx.beginPath();
-    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    ctx.arc(cxm, cym, 8, 0, Math.PI * 2);
     ctx.fillStyle = '#FFD166';
     ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
     ctx.fill();
@@ -584,11 +655,10 @@ function drawFreq(p, delta, fR) {
     ctx.fillStyle = '#FFD166';
     ctx.font = 'bold 11px "Roboto Mono",monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('δ = ' + fmtLength(delta), Math.min(W - 100, cx + 12), cy - 6);
-    ctx.fillText('f = ' + fmtFreq(p.f), Math.min(W - 100, cx + 12), cy + 10);
+    ctx.fillText('δ = ' + fmtLength(delta), Math.min(W - 100, cxm + 12), cym - 6);
+    ctx.fillText('f = ' + fmtFreq(p.f), Math.min(W - 100, cxm + 12), cym + 10);
   }
 
-  // axis labels
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '11px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
@@ -600,72 +670,170 @@ function drawFreq(p, delta, fR) {
   ctx.restore();
 }
 
+function effectiveAreaRatio(R, delta) {
+  // ratio of (skin-layer area)/(full area) for a circle; clamp to 1 when delta>=R
+  if (!isFinite(delta) || delta <= 0) return 1;
+  if (delta >= R) return 1;
+  var inner = R - delta;
+  return 1 - (inner * inner) / (R * R);
+}
+
+var lastP = null, lastDelta = null, lastFR = null;
+
 function compute() {
   var p = getParams();
   if (!isFinite(p.f) || !isFinite(p.sigma) || !isFinite(p.mu) || !isFinite(p.R)) return;
   var delta = skinDepth(p.f, p.mu, p.sigma);
   var ratio = (isFinite(delta) && p.R > 0) ? delta / p.R : Infinity;
-  var RacRdc = (delta > 0 && isFinite(delta) && p.R > 0) ? p.R / (2 * delta) : 0;
+  var RacRdc = (delta > 0 && isFinite(delta) && p.R > 0) ? Math.max(1, p.R / (2 * delta)) : 1;
   var fR = (p.mu > 0 && p.sigma > 0 && p.R > 0) ? 1 / (Math.PI * p.mu * p.sigma * p.R * p.R) : Infinity;
+  var areaR = effectiveAreaRatio(p.R, delta);
 
-  document.getElementById('statDelta').textContent = fmtLength(delta);
-  document.getElementById('statRatio').textContent = fmtRatio(ratio);
-  document.getElementById('statRacRdc').textContent = fmtRatio(RacRdc);
-  document.getElementById('statFcrit').textContent = fmtFreq(fR);
+  el('statDelta').textContent = fmtLength(delta);
+  el('statRatio').textContent = fmtRatio(ratio);
+  el('statRacRdc').textContent = fmtRatio(RacRdc);
+  el('statFcrit').textContent = fmtFreq(fR);
 
-  // freq label
-  var fLabel = document.getElementById('fLabel');
+  // live readouts
+  if (el('roF')) el('roF').textContent = fmtFreq(p.f);
+  if (el('roDelta')) el('roDelta').textContent = fmtLength(delta);
+  if (el('roRac')) el('roRac').textContent = fmtRatio(RacRdc) + '×';
+  if (el('roArea')) el('roArea').textContent = (areaR * 100).toFixed(areaR < 0.1 ? 1 : 0) + '%';
+  if (el('roPen')) el('roPen').textContent = fmtRatio(ratio);
+
+  var fLabel = el('fLabel');
   if (fLabel) fLabel.textContent = 'f = ' + fmtFreq(p.f);
 
-  drawConductor(p, delta);
+  lastP = p; lastDelta = delta; lastFR = fR;
+  // AC envelope from current phase
+  var env = reduceMotion ? 1 : (0.45 + 0.55 * Math.abs(Math.cos(acPhase)));
+  drawConductor(p, delta, env);
   drawFreq(p, delta, fR);
 }
 
-function animationStep() {
+function animationStep(ts) {
   if (!playing) return;
-  var sl = document.getElementById('slLogF');
+  if (!lastTs) lastTs = ts;
+  var dt = (ts - lastTs) / 1000;
+  lastTs = ts;
+  // AC oscillation (display rate, not real Hz) so the current visibly pulses
+  acPhase += dt * 6 * speedMult;
+  // slow frequency sweep
+  var sl = el('slLogF');
   var cur = parseFloat(sl.value);
   if (!isFinite(cur)) cur = 6.0;
-  cur += sweepDir * 0.03;
+  cur += sweepDir * 0.6 * speedMult * dt;
   if (cur > 9.0) { cur = 9.0; sweepDir = -1; }
   if (cur < 1.7) { cur = 1.7; sweepDir = 1; }
-  sl.value = cur.toFixed(1);
-  updateSlider(sl, 'slLogFVal', 1, '');
+  sl.value = cur.toFixed(2);
+  if (typeof updateSlider === 'function') updateSlider(sl, 'slLogFVal', 1, '');
   compute();
   animId = requestAnimationFrame(animationStep);
 }
 
 function togglePlay() {
   playing = !playing;
-  var btn = document.getElementById('playBtn');
+  var btn = el('playBtn');
   if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    btn.innerHTML = '<i class="fas fa-pause"></i> ' + I18N.pause;
+    lastTs = 0;
     animId = requestAnimationFrame(animationStep);
   } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> 周波数スイープ';
+    btn.innerHTML = '<i class="fas fa-play"></i> ' + I18N.play;
     if (animId) cancelAnimationFrame(animId);
+  }
+}
+
+function setSpeed(s) {
+  speedMult = s;
+  var btns = document.querySelectorAll('.speed-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', parseFloat(btns[i].getAttribute('data-speed')) === s);
+  }
+}
+
+function setMaterial(name) {
+  var m = MATERIALS[name];
+  if (!m) return;
+  el('slSigma_e7').value = m.sigma_e7;
+  el('slMuR').value = m.muR;
+  if (typeof updateSlider === 'function') {
+    updateSlider(el('slSigma_e7'), 'slSigma_e7Val', 3, '');
+    updateSlider(el('slMuR'), 'slMuRVal', 0, '');
+  }
+  var btns = document.querySelectorAll('#matPresets .preset-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', btns[i].getAttribute('data-mat') === name);
+  }
+  compute();
+}
+
+function setScenario(name) {
+  // logF: 1.7=50Hz, 6=1MHz
+  if (name === 'dc') { el('slLogF').value = 1.7; setMaterialSilent('copper'); el('slR_mm').value = 2.00; }
+  else if (name === 'power') { el('slLogF').value = 1.7; setMaterialSilent('copper'); el('slR_mm').value = 10.00; }
+  else if (name === 'rf') { el('slLogF').value = 6.0; setMaterialSilent('copper'); el('slR_mm').value = 1.00; }
+  else if (name === 'ferro') { el('slLogF').value = 4.7; setMaterialSilent('iron'); el('slR_mm').value = 2.00; }
+  if (typeof updateSlider === 'function') {
+    updateSlider(el('slLogF'), 'slLogFVal', 1, '');
+    updateSlider(el('slR_mm'), 'slR_mmVal', 2, '');
+  }
+  // mark scenario active
+  var btns = document.querySelectorAll('#scenePresets .preset-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+  if (typeof event !== 'undefined' && event && event.target && event.target.classList) {
+    event.target.classList.add('active');
+  }
+  compute();
+}
+
+function setMaterialSilent(name) {
+  var m = MATERIALS[name];
+  if (!m) return;
+  el('slSigma_e7').value = m.sigma_e7;
+  el('slMuR').value = m.muR;
+  if (typeof updateSlider === 'function') {
+    updateSlider(el('slSigma_e7'), 'slSigma_e7Val', 3, '');
+    updateSlider(el('slMuR'), 'slMuRVal', 0, '');
+  }
+  var btns = document.querySelectorAll('#matPresets .preset-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', btns[i].getAttribute('data-mat') === name);
   }
 }
 
 function resetParams() {
   playing = false;
   if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> 周波数スイープ';
+  el('playBtn').innerHTML = '<i class="fas fa-play"></i> ' + I18N.play;
+  acPhase = 0;
+  setSpeed(1);
   var defs = { slLogF: 6.0, slSigma_e7: 5.960, slMuR: 1.0, slR_mm: 1.00 };
-  Object.keys(defs).forEach(function(id){
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slLogF'), 'slLogFVal', 1, '');
-  updateSlider(document.getElementById('slSigma_e7'), 'slSigma_e7Val', 3, '');
-  updateSlider(document.getElementById('slMuR'), 'slMuRVal', 0, '');
-  updateSlider(document.getElementById('slR_mm'), 'slR_mmVal', 2, '');
+  Object.keys(defs).forEach(function(id){ el(id).value = defs[id]; });
+  if (typeof updateSlider === 'function') {
+    updateSlider(el('slLogF'), 'slLogFVal', 1, '');
+    updateSlider(el('slSigma_e7'), 'slSigma_e7Val', 3, '');
+    updateSlider(el('slMuR'), 'slMuRVal', 0, '');
+    updateSlider(el('slR_mm'), 'slR_mmVal', 2, '');
+  }
+  setMaterial('copper');
+  var sb = document.querySelectorAll('#scenePresets .preset-btn');
+  for (var i = 0; i < sb.length; i++) sb[i].classList.remove('active');
   compute();
 }
+
+// expose handlers used by inline onclick
+window.togglePlay = togglePlay;
+window.resetParams = resetParams;
+window.setSpeed = setSpeed;
+window.setMaterial = setMaterial;
+window.setScenario = setScenario;
 
 window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
 
 resizeCanvases();
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -739,6 +907,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="skin-effect.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -792,14 +963,14 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>周波数スライダ（slLogF）で 1 Hz～1 GHz の範囲を対数スケールで設定し、対象とする AC 電流の周波数を入力します</li>
+<li>周波数スライダ（slLogF）で 50 Hz～1 GHz の範囲を対数スケールで設定し、対象とする AC 電流の周波数を入力します</li>
 <li>導電率スライダ（slSigma_e7）で材料の電気伝導率を 10⁻⁷～10⁷ S/m の範囲で指定し、銅（5.96×10⁷ S/m）やアルミニウム（3.5×10⁷ S/m）などを選択します</li>
 <li>比透磁率（slMuR）と導体半径（slR_mm）を設定すると、表皮深さ δ、δ/R 比、AC/DC 抵抗比がリアルタイムで計算されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>銅製ケーブル（σ=5.96×10⁷ S/m、μᵣ=1、直径 10 mm）を 100 kHz で駆動した場合、表皮深さ δ = √(2/(ωμ₀μᵣσ)) ≈ 0.206 mm となり、δ/R ≈ 0.041 です。同じケーブルを 1 MHz に上げると δ ≈ 0.065 mm、AC/DC 抵抗比は 8.5 倍に跳ね上がります。100 MHz では δ ≈ 0.0065 mm（δ/R ≈ 0.0013）となり、電流は外周 0.1 mm 層にのみ集中します</p>
+<p>銅製ケーブル（σ=5.96×10⁷ S/m、μᵣ=1、直径 10 mm）を 100 kHz で駆動した場合、表皮深さ δ = √(2/(ωμ₀μᵣσ)) ≈ 0.206 mm となり、δ/R ≈ 0.041 です。同じケーブルを 1 MHz に上げると δ ≈ 0.065 mm、AC/DC 抵抗比は約 38 倍に跳ね上がります。100 MHz では δ ≈ 0.0065 mm（δ/R ≈ 0.0013）となり、電流は外周 0.1 mm 層にのみ集中します</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -809,6 +980,16 @@ compute();
 <li>導電率を低い値に設定すると表皮深さが著しく増大し、低周波数帯でも AC/DC 抵抗比が 1 に近づく現象を確認できます</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

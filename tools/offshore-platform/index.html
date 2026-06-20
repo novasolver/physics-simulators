@@ -118,14 +118,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "海洋構造物・波力・流力計算（モリソン方程式）",
       "description": "モリソン方程式による波力・流力をリアルタイム計算。エアリー波理論による波動場可視化、慣性力・抗力・合力時系列グラフ、転倒モーメント・KC数の自動算出。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/offshore-platform.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -283,7 +283,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="btn-group">
       <button class="btn secondary" onclick="setPreset('mild')"><i class="fas fa-redo"></i> リセット</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right -->
@@ -292,15 +300,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="stat-cards">
       <div class="stat-card">
         <div class="sv" id="statFmax">—</div>
-        <div class="sl">最大波力 [kN]</div>
+        <div class="sl">合力 F (瞬時) [kN]</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="statFI">—</div>
-        <div class="sl">最大慣性力 [kN]</div>
+        <div class="sl">慣性力 (瞬時) [kN]</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="statFD">—</div>
-        <div class="sl">最大抗力 [kN]</div>
+        <div class="sl">抗力 (瞬時) [kN]</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="statMom">—</div>
@@ -334,251 +342,357 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 
 <script>
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var attrW = parseFloat(canvas.getAttribute("width")) || 0;
-  var attrH = parseFloat(canvas.getAttribute("height")) || 0;
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || attrW || canvas.width / dpr || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || attrH || canvas.height / dpr || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  var bw = Math.round(w * dpr);
-  var bh = Math.round(h * dpr);
-  if (canvas.width !== bw || canvas.height !== bh) {
-    canvas.width = bw;
-    canvas.height = bh;
+(function(){
+  "use strict";
+  var DPR_CAP = 2.5;
+  function hiDpi(canvas, cssW, cssH, ctx){
+    var dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+    canvas.setAttribute('data-ux-no-scale', '1');
+    var w = Math.max(1, Math.round(cssW));
+    var h = Math.max(1, Math.round(cssH));
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    var bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+    if (canvas.width !== bw || canvas.height !== bh){ canvas.width = bw; canvas.height = bh; }
+    if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: w, h: h };
   }
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
-}
 
-let chartF = null;
+  var G = 9.81, RHO = 1025;
+  var chartF = null;
+  var animId = null;
+  var startTs = 0;
+  // Cached model state, recomputed on each parameter change.
+  var M = null;
+  var L10N = {
+    surface: '海面（波形）', vel: '水粒子速度 u', force: 'モリソン力',
+    inertia: '慣性力', drag: '抗力', total: '合力 F', phase: '位相',
+    seabed: '海底', reduced: '低モーション表示（静止フレーム）'
+  };
 
-function getWavelength(T, d){
-  const g = 9.81;
-  let L = g * T * T / (2 * Math.PI);
-  for (let i = 0; i < 20; i++) {
-    L = g * T * T / (2 * Math.PI) * Math.tanh(2 * Math.PI * d / L);
-  }
-  return L;
-}function compute(){
-  const H = parseFloat(document.getElementById('slHW').value);
-  const T = parseFloat(document.getElementById('slTW').value);
-  const d = parseFloat(document.getElementById('slD').value);
-  const D = parseFloat(document.getElementById('slDD').value);
-  const Uc = parseFloat(document.getElementById('slUc').value);
-  const Cm = parseFloat(document.getElementById('slCm').value);
-  const Cd = parseFloat(document.getElementById('slCd').value);
-
-  const g = 9.81, rho = 1025;
-  const L = getWavelength(T, d);
-  const k = 2 * Math.PI / L;
-  const omega = 2 * Math.PI / T;
-  const A = D; // per unit length
-  const V = Math.PI * D * D / 4; // per unit length
-
-  // Umax at surface
-  const Umax = (Math.PI * H / T) * Math.cosh(k * d) / Math.sinh(k * d);
-  const KC = Umax * T / D;
-
-  // Force at each depth and integrate over full depth
-  const nz = 50;
-  const dz = d / nz;
-  const nphase = 72;
-  const phases = [];
-  const FI_arr = [], FD_arr = [], FT_arr = [];
-
-  for (let ip = 0; ip < nphase; ip++) {
-    const t = ip / nphase * T;
-    let FI = 0, FD = 0;
-    for (let iz = 0; iz < nz; iz++) {
-      const z = -d + (iz + 0.5) * dz;
-      const depth = z + d;
-      const coshFactor = Math.cosh(k * depth) / Math.sinh(k * d);
-      const u = (Math.PI * H / T) * coshFactor * Math.cos(-omega * t) + Uc;
-      const dudt = (2 * Math.PI * Math.PI * H / (T * T)) * coshFactor * Math.sin(-omega * t);
-      FI += rho * Cm * V * dudt * dz;
-      FD += 0.5 * rho * Cd * A * u * Math.abs(u) * dz;
+  function wavelength(T, d){
+    var L = G * T * T / (2 * Math.PI);
+    for (var i = 0; i < 30; i++){
+      L = G * T * T / (2 * Math.PI) * Math.tanh(2 * Math.PI * d / L);
     }
-    phases.push(ip / nphase * 360);
-    FI_arr.push((FI / 1000).toFixed(1));
-    FD_arr.push((FD / 1000).toFixed(1));
-    FT_arr.push(((FI + FD) / 1000).toFixed(1));
+    return L;
   }
 
-  const FImax = Math.max(...FI_arr.map(Number));
-  const FDmax = Math.max(...FD_arr.map(Number));
-  const FTmax = Math.max(...FT_arr.map(Number));
+  // Per-unit-length Morison force at depth z (z<=0, measured from still surface),
+  // for total fluid velocity = wave orbital velocity + steady current Uc.
+  function memberForce(p, z, t){
+    var depth = z + p.d;
+    if (depth < 0) depth = 0;
+    var cosh = Math.cosh(p.k * depth) / Math.sinh(p.k * p.d);
+    var uw = (Math.PI * p.H / p.T) * cosh * Math.cos(-p.omega * t);
+    var aw = (2 * Math.PI * Math.PI * p.H / (p.T * p.T)) * cosh * Math.sin(-p.omega * t);
+    var u = uw + p.Uc;
+    var V = Math.PI * p.D * p.D / 4;          // displaced volume per unit length
+    var A = p.D;                               // projected area per unit length
+    var fI = RHO * p.Cm * V * aw;              // inertia force (per unit length)
+    var fD = 0.5 * RHO * p.Cd * A * u * Math.abs(u); // drag force (per unit length)
+    return { u: u, fI: fI, fD: fD };
+  }
 
-  // Overturning moment (simplified: force at d/3 from seabed for distributed load)
-  const moment = FTmax * 1000 * d / 3 / 1e6;
+  // Integrate total force (and overturning moment about seabed) over full depth at phase time t.
+  function integrate(p, t){
+    var nz = 60, dz = p.d / nz;
+    var FI = 0, FD = 0, Mtot = 0;
+    for (var iz = 0; iz < nz; iz++){
+      var z = -p.d + (iz + 0.5) * dz;
+      var f = memberForce(p, z, t);
+      var dfI = f.fI * dz, dfD = f.fD * dz;
+      FI += dfI; FD += dfD;
+      Mtot += (dfI + dfD) * (z + p.d);  // lever arm = height above seabed
+    }
+    return { FI: FI, FD: FD, FT: FI + FD, Mtot: Mtot };
+  }
 
-  document.getElementById('statFmax').textContent = FTmax.toFixed(0);
-  document.getElementById('statFI').textContent = FImax.toFixed(0);
-  document.getElementById('statFD').textContent = FDmax.toFixed(0);
-  document.getElementById('statMom').textContent = moment.toFixed(2);
-  document.getElementById('statKC').textContent = KC.toFixed(1);
+  function readParams(){
+    var H = parseFloat(document.getElementById('slHW').value);
+    var T = parseFloat(document.getElementById('slTW').value);
+    var d = parseFloat(document.getElementById('slD').value);
+    var D = parseFloat(document.getElementById('slDD').value);
+    var Uc = parseFloat(document.getElementById('slUc').value);
+    var Cm = parseFloat(document.getElementById('slCm').value);
+    var Cd = parseFloat(document.getElementById('slCd').value);
+    var L = wavelength(T, d);
+    var k = 2 * Math.PI / L;
+    var omega = 2 * Math.PI / T;
+    var Umax = (Math.PI * H / T) * Math.cosh(k * d) / Math.sinh(k * d) + Uc;
+    return { H:H, T:T, d:d, D:D, Uc:Uc, Cm:Cm, Cd:Cd, L:L, k:k, omega:omega, Umax:Umax };
+  }
 
-  // Draw wave kinematics canvas
-  drawKinematics(H, T, d, Uc, k, omega, L);
+  // compute(): recompute peak stats + time-series chart on every parameter change.
+  function compute(){
+    var p = readParams();
+    M = p;
 
-  // Chart
-  const ctx = document.getElementById('chartF').getContext('2d');
-  if (chartF) chartF.destroy();
-  chartF = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: phases.map(p => p.toFixed(0)),
-      datasets: [
-        { label: '合力 F [kN]', data: FT_arr, borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.08)', borderWidth: 2.5, pointRadius: 0, fill: true, tension: 0.3 },{ label: '慣性力 [kN]', data: FI_arr, borderColor: '#00b894', borderWidth: 1.5, pointRadius: 0, borderDash: [5, 3], tension: 0.3 },{ label: '抗力 [kN]', data: FD_arr, borderColor: '#e17055', borderWidth: 1.5, pointRadius: 0, borderDash: [2, 3], tension: 0.3 }
-      ]
-    },
-    options:{
-      responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-      plugins: { legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 14 } } },
-      scales:{
-        x: { title: { display: true, text: '位相 [°]', font: { size: 10 } }, ticks:{ maxTicksLimit: 7 } },
-        y:{ title: { display: true, text: 'F [kN]', font: { size: 10 } } }
+    var nphase = 72;
+    var phases = [], FI_arr = [], FD_arr = [], FT_arr = [];
+    var FImax = 0, FDmax = 0, FTmax = 0, Mmax = 0;
+    for (var ip = 0; ip < nphase; ip++){
+      var t = ip / nphase * p.T;
+      var r = integrate(p, t);
+      phases.push((ip / nphase * 360).toFixed(0));
+      FI_arr.push((r.FI / 1000).toFixed(1));
+      FD_arr.push((r.FD / 1000).toFixed(1));
+      FT_arr.push((r.FT / 1000).toFixed(1));
+      if (Math.abs(r.FI) > FImax) FImax = Math.abs(r.FI);
+      if (Math.abs(r.FD) > FDmax) FDmax = Math.abs(r.FD);
+      if (Math.abs(r.FT) > FTmax) FTmax = Math.abs(r.FT);
+      if (Math.abs(r.Mtot) > Mmax) Mmax = Math.abs(r.Mtot);
+    }
+    p.FImax = FImax / 1000;
+    p.FDmax = FDmax / 1000;
+    p.FTmax = FTmax / 1000;
+    p.Mmax  = Mmax / 1e6;          // MN·m
+    p.KC = p.Umax * p.T / p.D;
+
+    var setMom = document.getElementById('statMom');
+    var setKC = document.getElementById('statKC');
+    if (setMom) setMom.textContent = p.Mmax.toFixed(2);
+    if (setKC) setKC.textContent = p.KC.toFixed(1);
+
+    var ctx = document.getElementById('chartF').getContext('2d');
+    if (chartF) chartF.destroy();
+    chartF = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: phases,
+        datasets: [
+          { label: L10N.total + ' [kN]', data: FT_arr, borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.08)', borderWidth: 2.5, pointRadius: 0, fill: true, tension: 0.3 },
+          { label: L10N.inertia + ' [kN]', data: FI_arr, borderColor: '#00b894', borderWidth: 1.5, pointRadius: 0, borderDash: [5, 3], tension: 0.3 },
+          { label: L10N.drag + ' [kN]', data: FD_arr, borderColor: '#e17055', borderWidth: 1.5, pointRadius: 0, borderDash: [2, 3], tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true, animation: false, maintainAspectRatio: false, resizeDelay: 100,
+        plugins: { legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 14 } } },
+        scales: {
+          x: { title: { display: true, text: L10N.phase + ' [°]', font: { size: 10 } }, ticks: { maxTicksLimit: 7 } },
+          y: { title: { display: true, text: 'F [kN]', font: { size: 10 } } }
+        }
       }
-    }
-  });
-}function drawKinematics(H, T, d, Uc, k, omega, L){
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const rect = canvas.parentElement.getBoundingClientRect();
-  const __novaDims = __novaHiDpiCanvas(canvas, Math.max(320, Math.floor(rect.width - 44)), 280, ctx);
-  const W = __novaDims.w, CanH = __novaDims.h;
+    });
 
-  ctx.fillStyle = '#0a1628';
-  ctx.fillRect(0, 0, W, CanH);
+    if (!animId && !prefersReduced()) startAnim();
+    if (prefersReduced()) drawScene(0);  // static frame
+  }
 
-  const padL = 60, padR = 20, padT = 20, padB = 20;
-  const ph = CanH - padT - padB;
-  const pw = W - padL - padR;
+  function prefersReduced(){
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
 
-  // Sea surface and seabed
-  const surfY = padT + 20;
-  const bedY = padT + ph;
+  // Draw the live wave + structure + force scene at simulation time t (seconds).
+  function drawScene(t){
+    var p = M; if (!p) return;
+    var canvas = document.getElementById('canvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var host = canvas.parentElement.getBoundingClientRect();
+    var cssW = Math.max(320, Math.floor(host.width - 44));
+    var dims = hiDpi(canvas, cssW, 300, ctx);
+    var W = dims.w, Hc = dims.h;
 
-  ctx.fillStyle = 'rgba(0,70,150,0.3)';
-  ctx.fillRect(padL, surfY, pw, bedY - surfY);
+    ctx.clearRect(0, 0, W, Hc);
+    ctx.fillStyle = '#0a1628';
+    ctx.fillRect(0, 0, W, Hc);
 
-  // Seabed
-  ctx.fillStyle = '#3a2a1a';
-  ctx.fillRect(padL, bedY, pw, 20);
-  ctx.fillStyle = 'rgba(255,255,255,0.1)';
-  ctx.fillRect(padL, surfY, pw, 2);
+    var padL = 54, padR = 18, padT = 30, padB = 22;
+    var pw = W - padL - padR;
+    var surfY = padT + 18;
+    var bedY = Hc - padB;
+    var waterH = bedY - surfY;
+    var ampPx = Math.min(16, waterH * 0.12);
 
-  // Structure cylinder
-  const cylX = padL + pw * 0.3;
-  const cylR = 12;
-  ctx.beginPath();
-  ctx.rect(cylX - cylR, surfY, cylR * 2, bedY - surfY);
-  ctx.fillStyle = 'rgba(200,150,50,0.7)';
-  ctx.fill();
-  ctx.strokeStyle = '#f0a030';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+    // Water column
+    ctx.fillStyle = 'rgba(0,70,150,0.30)';
+    ctx.fillRect(padL, surfY, pw, waterH);
+    // Seabed
+    ctx.fillStyle = '#3a2a1a';
+    ctx.fillRect(padL, bedY, pw, padB);
 
-  // Velocity vectors at multiple depths (current phase t=0)
-  const nArrows = 8;
-  const t = 0;
-  let maxU = 0;
-  for (let iz = 0; iz < nArrows; iz++) {
-    const frac = (iz + 0.5) / nArrows;
-    const z = -(1 - frac) * d;
-    const depth = z + d;
-    const coshFactor = Math.cosh(k * depth) / Math.sinh(k * d);
-    const u = (Math.PI * H / T) * coshFactor * Math.cos(-omega * t) + Uc;
-    maxU = Math.max(maxU, Math.abs(u));
-  }for (let iz = 0; iz < nArrows; iz++){
-    const frac = (iz + 0.5) / nArrows;
-    const z = -(1 - frac) * d;
-    const depth = z + d;
-    const coshFactor = Math.cosh(k * depth) / Math.sinh(k * d);
-    const u = (Math.PI * H / T) * coshFactor * Math.cos(-omega * t) + Uc;
-    const vy = surfY + (1 - frac) * (bedY - surfY);
-    const arrowLen = (u / (maxU || 1)) * 80;
-    const ax = cylX + cylR + 15;
-
+    // --- Animated wave surface (Airy) ---
     ctx.beginPath();
-    ctx.moveTo(ax, vy);
-    ctx.lineTo(ax + arrowLen, vy);
-    ctx.strokeStyle = u > 0 ? '#00b4d8' : '#e17055';
+    for (var ix = 0; ix <= pw; ix++){
+      var xphys = ix / pw * p.L * 1.8;
+      var eta = p.H / 2 * Math.cos(p.k * xphys - p.omega * t);
+      var y = surfY - eta / (p.H || 1) * ampPx;
+      if (ix === 0) ctx.moveTo(padL + ix, y); else ctx.lineTo(padL + ix, y);
+    }
+    ctx.lineTo(padL + pw, surfY + waterH);
+    ctx.lineTo(padL, surfY + waterH);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,120,180,0.18)';
+    ctx.fill();
+    ctx.beginPath();
+    for (var ix2 = 0; ix2 <= pw; ix2++){
+      var xphys2 = ix2 / pw * p.L * 1.8;
+      var eta2 = p.H / 2 * Math.cos(p.k * xphys2 - p.omega * t);
+      var y2 = surfY - eta2 / (p.H || 1) * ampPx;
+      if (ix2 === 0) ctx.moveTo(padL + ix2, y2); else ctx.lineTo(padL + ix2, y2);
+    }
+    ctx.strokeStyle = 'rgba(0,180,216,0.9)';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    if (Math.abs(arrowLen) > 5) {
-      const dir = arrowLen > 0 ? 1 : -1;
-      ctx.beginPath();
-      ctx.moveTo(ax + arrowLen, vy);
-      ctx.lineTo(ax + arrowLen - dir * 8, vy - 5);
-      ctx.lineTo(ax + arrowLen - dir * 8, vy + 5);
-      ctx.closePath();
-      ctx.fillStyle = u > 0 ? '#00b4d8' : '#e17055';
-      ctx.fill();
+    // --- Jacket structure: a vertical leg at cylX ---
+    var cylX = padL + pw * 0.32;
+    var cylR = 10;
+    // local surface elevation at the leg
+    var etaLeg = p.H / 2 * Math.cos(p.k * (cylX - padL) / pw * p.L * 1.8 - p.omega * t);
+    var legTopY = surfY - etaLeg / (p.H || 1) * ampPx;
+    ctx.beginPath();
+    ctx.rect(cylX - cylR, legTopY, cylR * 2, bedY - legTopY);
+    ctx.fillStyle = 'rgba(200,150,50,0.65)';
+    ctx.fill();
+    ctx.strokeStyle = '#f0a030';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // diagonal braces (jacket look)
+    ctx.strokeStyle = 'rgba(240,160,48,0.45)';
+    ctx.lineWidth = 1.5;
+    var braceX2 = cylX + cylR + 46;
+    for (var b = 0; b < 3; b++){
+      var y0 = legTopY + (bedY - legTopY) * (b / 3);
+      var y1 = legTopY + (bedY - legTopY) * ((b + 1) / 3);
+      ctx.beginPath(); ctx.moveTo(cylX + cylR, y0); ctx.lineTo(braceX2, y1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cylX + cylR, y1); ctx.lineTo(braceX2, y0); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(240,160,48,0.55)';
+    ctx.beginPath();
+    var legTop2 = surfY - (p.H/2*Math.cos(p.k*(braceX2-padL)/pw*p.L*1.8 - p.omega*t))/(p.H||1)*ampPx;
+    ctx.rect(braceX2 - 4, legTop2, 8, bedY - legTop2);
+    ctx.stroke();
+
+    // --- Water-particle velocity vectors along the leg (live) ---
+    var nArrows = 8;
+    var maxU = 0, arr = [];
+    for (var iz = 0; iz < nArrows; iz++){
+      var frac = (iz + 0.5) / nArrows;
+      var z = -(1 - frac) * p.d;
+      var f = memberForce(p, z, t);
+      arr.push({ frac: frac, u: f.u, fI: f.fI, fD: f.fD });
+      if (Math.abs(f.u) > maxU) maxU = Math.abs(f.u);
+    }
+    var ax = cylX + cylR + 6;
+    for (var ia = 0; ia < nArrows; ia++){
+      var a = arr[ia];
+      var vy = legTopY + (1 - a.frac) * (bedY - legTopY);
+      var al = (a.u / (maxU || 1)) * 42;
+      ctx.beginPath(); ctx.moveTo(ax, vy); ctx.lineTo(ax + al, vy);
+      ctx.strokeStyle = a.u >= 0 ? 'rgba(0,180,216,0.95)' : 'rgba(225,112,85,0.95)';
+      ctx.lineWidth = 2; ctx.stroke();
+      if (Math.abs(al) > 5){
+        var dir = al > 0 ? 1 : -1;
+        ctx.beginPath();
+        ctx.moveTo(ax + al, vy);
+        ctx.lineTo(ax + al - dir * 7, vy - 4);
+        ctx.lineTo(ax + al - dir * 7, vy + 4);
+        ctx.closePath();
+        ctx.fillStyle = a.u >= 0 ? 'rgba(0,180,216,0.95)' : 'rgba(225,112,85,0.95)';
+        ctx.fill();
+      }
     }
 
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = '9px Roboto Mono';
-    ctx.textAlign = 'right';
-    ctx.fillText(u.toFixed(1), ax - 3, vy + 3);
-  }// Surface wave
-  ctx.beginPath();
-  for (let ix = 0; ix < pw; ix++){
-    const x = ix / pw * L * 2;
-    const eta = H / 2 * Math.cos(k * x - omega * t);
-    const y = surfY + eta / (H || 1) * 15;
-    if (ix === 0) ctx.moveTo(padL + ix, y);
-    else ctx.lineTo(padL + ix, y);
+    // --- Live total horizontal force on the leg (big force vector at surface) ---
+    var r = integrate(p, t);
+    var FTkN = r.FT / 1000, FIkN = r.FI / 1000, FDkN = r.FD / 1000;
+    var fScale = 70 / Math.max(1, (p.FTmax || 1));
+    var fpx = FTkN * fScale;
+    var fy = legTopY - 14;
+    if (fy < padT + 6) fy = padT + 6;
+    var fdir = fpx >= 0 ? 1 : -1;
+    ctx.beginPath();
+    ctx.moveTo(cylX, fy);
+    ctx.lineTo(cylX + fpx, fy);
+    ctx.strokeStyle = '#ffd24d';
+    ctx.lineWidth = 4; ctx.stroke();
+    if (Math.abs(fpx) > 6){
+      ctx.beginPath();
+      ctx.moveTo(cylX + fpx, fy);
+      ctx.lineTo(cylX + fpx - fdir * 11, fy - 6);
+      ctx.lineTo(cylX + fpx - fdir * 11, fy + 6);
+      ctx.closePath();
+      ctx.fillStyle = '#ffd24d'; ctx.fill();
+    }
+
+    // Labels
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '11px Roboto Mono'; ctx.textAlign = 'left';
+    ctx.fillText(L10N.total + ' = ' + FTkN.toFixed(0) + ' kN', cylX + 6, fy - 8);
+    ctx.fillStyle = 'rgba(0,180,216,0.85)';
+    ctx.font = '10px Roboto Mono';
+    ctx.fillText(L10N.vel + ' [m/s]', padL + 2, padT + 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = '9px Roboto Mono'; ctx.textAlign = 'right';
+    ctx.fillText('d=' + Math.round(p.d) + 'm', padL + pw - 2, bedY - 4);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,210,77,0.7)';
+    ctx.fillText('KC=' + p.KC.toFixed(1) + (p.KC < 5 ? ' (慣性支配)' : (p.KC > 20 ? ' (抗力支配)' : '')), padL + 2, bedY - 4);
+
+    // --- Live stat-card numbers every frame ---
+    var sFmax = document.getElementById('statFmax');
+    var sFI = document.getElementById('statFI');
+    var sFD = document.getElementById('statFD');
+    if (sFmax) sFmax.textContent = FTkN.toFixed(0);
+    if (sFI) sFI.textContent = FIkN.toFixed(0);
+    if (sFD) sFD.textContent = FDkN.toFixed(0);
   }
-  ctx.strokeStyle = 'rgba(0,180,216,0.8)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
 
-  // Labels
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.font = '10px Roboto Mono';
-  ctx.textAlign = 'center';
-  ctx.fillText('水平速度 u [m/s]  (t=0)', cylX + pw * 0.4, padT + 12);
-  ctx.textAlign = 'left';
-  ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  ctx.font = '9px Roboto Mono';
-  ctx.fillText('d=' + Math.round(parseFloat(document.getElementById('slD').value)) + 'm', padL + 4, bedY - 4);
-}function setPreset(name){
-  const p = {
-    mild:  { H: 3, T: 8, d: 40, D: 0.8, Uc: 0.3, Cm: 2.0, Cd: 0.8 },
-    storm:{ H: 15, T: 14, d: 80, D: 1.2, Uc: 1.5, Cm: 1.8, Cd: 1.0 },
-    deep:{ H: 8, T: 12, d: 200, D: 1.5, Uc: 0.5, Cm: 2.0, Cd: 0.7 }
-  }[name];
-  if (!p) return;
-  const ids = ['slHW','slTW','slD','slDD','slUc','slCm','slCd'];
-  const vals = [p.H, p.T, p.d, p.D, p.Uc, p.Cm, p.Cd];
-  const maps = [['HWVal',1,'m'],['TWVal',1,'s'],['dVal',0,'m'],['DDVal',1,'m'],['UcVal',1,'m/s'],['CmVal',2,''],['CdVal',2,'']];
-  ids.forEach((id, i) =>{
-    document.getElementById(id).value = vals[i];
-    updateSlider(document.getElementById(id), maps[i][0], maps[i][1], maps[i][2]);
+  function loop(ts){
+    if (!startTs) startTs = ts;
+    var t = (ts - startTs) / 1000;
+    drawScene(t);
+    animId = requestAnimationFrame(loop);
+  }
+  function startAnim(){
+    if (animId) return;
+    startTs = 0;
+    animId = requestAnimationFrame(loop);
+  }
+
+  // setPreset(name): apply scenario presets, sync sliders, recompute.
+  function setPreset(name){
+    var p = {
+      mild:  { H: 3, T: 8, d: 40, D: 0.8, Uc: 0.3, Cm: 2.0, Cd: 0.8 },
+      storm: { H: 15, T: 14, d: 80, D: 1.2, Uc: 1.5, Cm: 1.8, Cd: 1.0 },
+      deep:  { H: 8, T: 12, d: 200, D: 1.5, Uc: 0.5, Cm: 2.0, Cd: 0.7 }
+    }[name];
+    if (!p) return;
+    var ids = ['slHW','slTW','slD','slDD','slUc','slCm','slCd'];
+    var vals = [p.H, p.T, p.d, p.D, p.Uc, p.Cm, p.Cd];
+    var maps = [['slHWNum',1,'m'],['slTWNum',1,'s'],['slDNum',0,'m'],['slDDNum',1,'m'],['slUcNum',1,'m/s'],['slCmNum',2,''],['slCdNum',2,'']];
+    ids.forEach(function(id, i){
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.value = vals[i];
+      if (typeof updateSlider === 'function') updateSlider(el, maps[i][0], maps[i][1], maps[i][2]);
+    });
+    compute();
+  }
+
+  // Initialise slider fills.
+  ['slHW','slTW','slD','slDD','slUc','slCm','slCd'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    var m = { slHW:['slHWNum',1,'m'],slTW:['slTWNum',1,'s'],slD:['slDNum',0,'m'],slDD:['slDDNum',1,'m'],slUc:['slUcNum',1,'m/s'],slCm:['slCmNum',2,''],slCd:['slCdNum',2,''] }[id];
+    if (typeof updateSlider === 'function') updateSlider(el, m[0], m[1], m[2]);
   });
-  compute();
-}['slHW','slTW','slD','slDD','slUc','slCm','slCd'].forEach(id =>{
-  const el = document.getElementById(id);
-  if (!el) return;
-  const m = { slHW:['HWVal',1,'m'],slTW:['TWVal',1,'s'],slD:['dVal',0,'m'],slDD:['DDVal',1,'m'],slUc:['UcVal',1,'m/s'],slCm:['CmVal',2,''],slCd:['CdVal',2,''] };
-  const [vid,dec,unit] = m[id];
-  updateSlider(el,vid,dec,unit);
-});
 
-window.addEventListener('resize', compute);
-compute();
+  var rzT = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(rzT);
+    rzT = setTimeout(function(){ if (M && prefersReduced()) drawScene(0); }, 120);
+  });
+
+  // Expose handlers used by inline oninput / onclick attributes.
+  window.compute = compute;
+  window.setPreset = setPreset;
+
+  compute();
+})();
 </script>
 
 <section class="explanation">
@@ -640,6 +754,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="offshore-platform.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -689,7 +806,7 @@ compute();
 <li>波高(H)と周期(T)をスライダーで設定します。例えば沖合構造物の場合、H=3m、T=8sの条件を入力します。</li>
 <li>構造物の直径(D)と水深(d)を指定します。鋼管杭の場合D=1.2m、水深d=15mとします。</li>
 <li>シミュレーター実行時、モリソン方程式に基づき慣性係数Cm=2.0、抗力係数Cd=1.2を適用して、最大波力・慣性力・抗力を自動計算します。</li>
-<li>転倒モーメントはMmax=F×(d/3)で算定され、KC数=ωD²/νTで流力支配領域を判別します。</li>
+<li>転倒モーメントはMmax=F×(d/3)で算定され、KC数=UmaxT/Dで流力支配領域を判別します。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
@@ -705,6 +822,16 @@ compute();
 <li>鋼製杭の腐食減肉D→0.9D補正や、海生生物付着(藻類・フジツボ)によるCd増加(最大1.5倍)も設計段階で盛り込みます。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

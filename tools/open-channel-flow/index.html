@@ -130,14 +130,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "開水路の定常流・マニングの式 シミュレーター",
       "description": "マニングの式を使用した開水路定常流シミュレーター。矩形・台形・円形・三角形断面に対応。流速・流量・径深・フルード数を自動計算し、Q-y曲線をリアルタイム描画。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/open-channel-flow.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -313,9 +313,38 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="slope" min="0.0001" max="0.1" step="0.0001" value="0.001" oninput="syncToNum('slope','slopeNum');updateSlider(this);compute()">
     </div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-water"></i> 流れのアニメーション（マニング流速・フルード流況）</div>
+      <div class="ocf-anim-toolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+        <button type="button" class="btn" id="ocfPlay" aria-label="再生 / 一時停止"><i class="fas fa-pause"></i> 一時停止</button>
+        <button type="button" class="btn secondary" id="ocfReset" aria-label="最初から"><i class="fas fa-rotate-left"></i> リセット</button>
+        <span style="font-size:.72rem;color:var(--muted)">速度</span>
+        <button type="button" class="preset-btn ocf-speed" data-speed="0.5">0.5×</button>
+        <button type="button" class="preset-btn ocf-speed ocf-speed-active" data-speed="1">1×</button>
+        <button type="button" class="preset-btn ocf-speed" data-speed="2">2×</button>
+        <span class="regime-badge regime-sub" id="ocfRegimeBadge" style="margin-left:auto">常流</span>
+      </div>
+      <canvas id="ocfFlowCanvas" height="300" style="border-radius:8px;background:#08111f;display:block;width:100%;max-width:100%" aria-label="開水路を流れる水のリアルタイムアニメーション。水深・流速・勾配・フルード流況を可視化"></canvas>
+      <div class="ocf-readout" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;font-family:'Roboto Mono',monospace">
+        <div><span style="font-size:.62rem;color:var(--muted);display:block">流速 v</span><span id="ocfRoV" style="font-size:.9rem;color:var(--accent);font-weight:700">—</span></div>
+        <div><span style="font-size:.62rem;color:var(--muted);display:block">流量 Q</span><span id="ocfRoQ" style="font-size:.9rem;color:var(--accent);font-weight:700">—</span></div>
+        <div><span style="font-size:.62rem;color:var(--muted);display:block">水深 y</span><span id="ocfRoY" style="font-size:.9rem;color:var(--accent);font-weight:700">—</span></div>
+        <div><span style="font-size:.62rem;color:var(--muted);display:block">フルード Fr</span><span id="ocfRoFr" style="font-size:.9rem;color:var(--accent);font-weight:700">—</span></div>
+      </div>
+      <div class="cae-note" style="margin-top:10px">勾配を急に／粗度を小さくすると水は<strong>速く浅く</strong>流れ、Fr&gt;1 の<strong>射流</strong>（オレンジ）に。緩い勾配では<strong>遅く深い常流</strong>（青）に切り替わります。粒子の速さは実際のマニング流速 v に比例します。</div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -420,6 +449,10 @@ function setN(val){
     regEl.textContent = '限界流';
     regEl.style.color = 'var(--green)';
   }
+
+  const Dh = A / B;
+  window.__ocfState = { v: V, Q: Q, y: y, A: A, P: P, R: R, B: B, n: n, S0: S0, Fr: Fr, Dh: Dh, shape: document.getElementById('shape').value };
+  if (window.__ocfSync) window.__ocfSync();
 
   drawSection(y);
   drawQY(y, n, S0);
@@ -611,6 +644,282 @@ function setN(val){
 window.addEventListener('resize', compute);
 </script>
 
+<script>
+/* ===== v2 hero: open-channel flow animation (IIFE, isolated) ===== */
+(function(){
+  var canvas = document.getElementById('ocfFlowCanvas');
+  if (!canvas) return;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var GRAV = 9.81;
+  var playing = !reduceMotion;
+  var speedMult = 1;
+  var animId = null;
+  var lastTs = 0;
+  var phase = 0;          // surface wave phase
+  var particles = [];
+  var W = 0, H = 0;
+
+  function state(){
+    return window.__ocfState || { v: 1.5, Q: 3, y: 1, A: 2, P: 4, R: 0.5, B: 2, n: 0.013, S0: 0.001, Fr: 0.49, Dh: 1, shape: 'rect' };
+  }
+  function regimeColor(Fr){
+    if (Fr > 1.01) return '#e17055';      // supercritical
+    if (Fr < 0.99) return '#00B4D8';      // subcritical
+    return '#00b894';                      // critical
+  }
+  function regimeLabel(Fr){
+    if (Fr > 1.01) return '射流';
+    if (Fr < 0.99) return '常流';
+    return '限界流';
+  }
+
+  function resize(){
+    var rect = canvas.parentElement.getBoundingClientRect();
+    W = Math.max(200, Math.floor(rect.width - 28));
+    H = 300;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    var c = canvas.getContext('2d');
+    if (c) c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function initParticles(){
+    particles = [];
+    var n = 130;
+    for (var i = 0; i < n; i++){
+      particles.push({ x: Math.random(), d: Math.random(), len: 4 + Math.random() * 10 });
+    }
+  }
+
+  // map a depth fraction (0..1, 0=surface,1=bed) to vertical band; returns y px given water top & bottom
+  function draw(){
+    var c = canvas.getContext('2d');
+    if (!c) return;
+    var s = state();
+    var col = regimeColor(s.Fr);
+
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = '#08111f';
+    c.fillRect(0, 0, W, H);
+
+    var marginX = 8;
+    var bedThick = 14;
+    // bed slope: tilt the channel bed; exaggerate small slopes for visibility
+    var slopeVis = Math.max(-0.5, Math.min(0.5, Math.sqrt(s.S0) * 3.2));
+    var inletBedY = H - 40;
+    var dropPx = slopeVis * (W - 2 * marginX);
+    var outletBedY = inletBedY + dropPx;
+
+    // depth in px: scale so a 1 m depth ~ 70 px, clamp
+    var depthPx = Math.max(8, Math.min(150, s.y * 70));
+
+    function bedY(t){ return inletBedY + dropPx * t; }            // t in 0..1 across width
+    function surfY(t){ return bedY(t) - depthPx; }
+
+    // --- water body (filled polygon) ---
+    c.beginPath();
+    c.moveTo(marginX, surfY(0));
+    var steps = 40;
+    for (var i = 0; i <= steps; i++){
+      var t = i / steps;
+      var x = marginX + t * (W - 2 * marginX);
+      // surface ripple amplitude grows with Froude (faster = rougher)
+      var amp = Math.min(7, 1.5 + s.Fr * 3);
+      var wob = Math.sin(t * 18 - phase * (1 + s.Fr)) * amp + Math.sin(t * 7 + phase * 0.6) * amp * 0.4;
+      c.lineTo(x, surfY(t) + wob);
+    }
+    for (var j = steps; j >= 0; j--){
+      var t2 = j / steps;
+      var x2 = marginX + t2 * (W - 2 * marginX);
+      c.lineTo(x2, bedY(t2));
+    }
+    c.closePath();
+    var grad = c.createLinearGradient(0, surfY(0.5), 0, bedY(0.5));
+    grad.addColorStop(0, col);
+    grad.addColorStop(1, 'rgba(8,30,60,0.85)');
+    c.globalAlpha = 0.5;
+    c.fillStyle = grad;
+    c.fill();
+    c.globalAlpha = 1;
+
+    // surface line
+    c.beginPath();
+    for (var k = 0; k <= steps; k++){
+      var tk = k / steps;
+      var xk = marginX + tk * (W - 2 * marginX);
+      var ampk = Math.min(7, 1.5 + s.Fr * 3);
+      var wobk = Math.sin(tk * 18 - phase * (1 + s.Fr)) * ampk + Math.sin(tk * 7 + phase * 0.6) * ampk * 0.4;
+      if (k === 0) c.moveTo(xk, surfY(tk) + wobk); else c.lineTo(xk, surfY(tk) + wobk);
+    }
+    c.strokeStyle = col;
+    c.lineWidth = 2;
+    c.stroke();
+
+    // --- bed ---
+    c.beginPath();
+    c.moveTo(marginX, bedY(0));
+    c.lineTo(W - marginX, bedY(1));
+    c.lineTo(W - marginX, bedY(1) + bedThick);
+    c.lineTo(marginX, bedY(0) + bedThick);
+    c.closePath();
+    c.fillStyle = '#3a2a1a';
+    c.fill();
+    c.strokeStyle = '#6b5535';
+    c.lineWidth = 2;
+    c.stroke();
+
+    // --- flow particles (streaks) ---
+    // velocity normalized to px/s; faster v => faster streaks
+    var pxPerM = (W - 2 * marginX) / Math.max(2, s.v * 2.2);
+    var vpx = s.v * pxPerM;       // px per second (screen)
+    c.lineCap = 'round';
+    for (var p = 0; p < particles.length; p++){
+      var pt = particles[p];
+      var t3 = pt.x;
+      var x3 = marginX + t3 * (W - 2 * marginX);
+      // depth profile: faster near surface, slower near bed (log-ish) -> visual stratification
+      var depthFrac = pt.d;                      // 0 surface .. 1 bed
+      var yTop = surfY(t3);
+      var yBot = bedY(t3);
+      var py = yTop + depthFrac * (yBot - yTop);
+      var speedFac = 0.45 + 0.55 * (1 - depthFrac);   // surface fastest
+      var streak = pt.len * (0.6 + s.Fr * 0.7) * speedFac;
+      c.beginPath();
+      c.moveTo(x3, py);
+      c.lineTo(Math.min(W - marginX, x3 + streak), py);
+      c.globalAlpha = 0.25 + 0.45 * speedFac;
+      c.strokeStyle = (s.Fr > 1.01) ? '#ffd9c2' : '#cfeeff';
+      c.lineWidth = 1.4;
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+
+    // --- depth arrow & labels ---
+    var midT = 0.5, midX = marginX + midT * (W - 2 * marginX);
+    c.strokeStyle = '#2ecc71';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(midX, surfY(midT));
+    c.lineTo(midX, bedY(midT));
+    c.stroke();
+    c.fillStyle = '#2ecc71';
+    c.font = 'bold 11px Roboto Mono, monospace';
+    c.textAlign = 'left';
+    c.fillText('y=' + s.y.toFixed(2) + 'm', midX + 5, (surfY(midT) + bedY(midT)) / 2);
+
+    // slope label
+    c.fillStyle = '#f39c12';
+    c.textAlign = 'left';
+    c.fillText('S=' + s.S0.toFixed(4), marginX + 4, 18);
+    c.fillStyle = '#9fb3c8';
+    c.fillText('n=' + s.n.toFixed(3), marginX + 4, 34);
+
+    // velocity / regime
+    c.fillStyle = col;
+    c.font = 'bold 13px Roboto Mono, monospace';
+    c.textAlign = 'right';
+    c.fillText('v=' + s.v.toFixed(2) + ' m/s  Fr=' + s.Fr.toFixed(2) + '  ' + regimeLabel(s.Fr), W - marginX - 4, 20);
+
+    // flow direction arrow
+    c.strokeStyle = '#ffffff';
+    c.globalAlpha = 0.5;
+    c.lineWidth = 2;
+    var ay = 50;
+    c.beginPath(); c.moveTo(W - 80, ay); c.lineTo(W - 30, ay);
+    c.lineTo(W - 38, ay - 5); c.moveTo(W - 30, ay); c.lineTo(W - 38, ay + 5);
+    c.stroke();
+    c.globalAlpha = 1;
+  }
+
+  function step(dt){
+    var s = state();
+    phase += dt * (1 + s.Fr) * 2.2 * speedMult;
+    var adv = (s.v / Math.max(2, s.v * 2.2)) * dt * speedMult; // fractional advance across width
+    for (var p = 0; p < particles.length; p++){
+      var pt = particles[p];
+      var speedFac = 0.45 + 0.55 * (1 - pt.d);
+      pt.x += adv * speedFac * 2.0;
+      if (pt.x > 1){ pt.x -= 1; pt.d = Math.random(); }
+    }
+  }
+
+  function loop(ts){
+    if (!playing){ animId = null; return; }
+    if (!lastTs) lastTs = ts;
+    var dt = Math.min(0.05, (ts - lastTs) / 1000);
+    lastTs = ts;
+    step(dt);
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+
+  function start(){
+    if (playing && animId) return;
+    playing = true;
+    lastTs = 0;
+    var btn = document.getElementById('ocfPlay');
+    if (btn) btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    if (!animId) animId = requestAnimationFrame(loop);
+  }
+  function stop(){
+    playing = false;
+    if (animId){ cancelAnimationFrame(animId); animId = null; }
+    var btn = document.getElementById('ocfPlay');
+    if (btn) btn.innerHTML = '<i class="fas fa-play"></i> 再生';
+  }
+
+  // sync readouts + badge when compute() runs
+  window.__ocfSync = function(){
+    var s = state();
+    var set = function(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; };
+    set('ocfRoV', s.v.toFixed(3) + ' m/s');
+    set('ocfRoQ', s.Q.toFixed(3) + ' m³/s');
+    set('ocfRoY', s.y.toFixed(2) + ' m');
+    set('ocfRoFr', s.Fr.toFixed(3));
+    var badge = document.getElementById('ocfRegimeBadge');
+    if (badge){
+      badge.textContent = regimeLabel(s.Fr);
+      badge.className = 'regime-badge ' + (s.Fr > 1.01 ? 'regime-sup' : 'regime-sub');
+    }
+    if (reduceMotion) draw();  // static frame refresh
+  };
+
+  var playBtn = document.getElementById('ocfPlay');
+  if (playBtn) playBtn.addEventListener('click', function(){ playing ? stop() : start(); });
+  var resetBtn = document.getElementById('ocfReset');
+  if (resetBtn) resetBtn.addEventListener('click', function(){ initParticles(); phase = 0; draw(); });
+  Array.prototype.forEach.call(document.querySelectorAll('.ocf-speed'), function(b){
+    b.addEventListener('click', function(){
+      speedMult = parseFloat(b.dataset.speed) || 1;
+      Array.prototype.forEach.call(document.querySelectorAll('.ocf-speed'), function(x){ x.classList.remove('ocf-speed-active'); });
+      b.classList.add('ocf-speed-active');
+    });
+  });
+  window.addEventListener('resize', function(){ resize(); draw(); });
+
+  function boot(){
+    resize();
+    initParticles();
+    if (window.__ocfSync) window.__ocfSync();
+    if (reduceMotion){
+      stop();
+      draw();
+    }else{
+      start();
+    }
+  }
+  if (document.readyState === 'complete') boot();
+  else window.addEventListener('load', boot);
+})();
+</script>
+
+<style>
+.ocf-speed-active{ border-color: var(--accent) !important; color: var(--accent) !important; font-weight: 700; }
+</style>
+
 <section class="explanation">
   <h2>開水路の定常流・マニングの式とは</h2>
   <div class="chat">
@@ -666,6 +975,9 @@ window.addEventListener('resize', compute);
 <p>最後に、<strong>「マニングの式は何でも計算できる」という過信</strong>。この式が成立するのは「等流」という重力と摩擦がバランスした定常状態だけです。実際の河川には橋脚や堰などによる段差や曲がりがあり、そこでは流れが乱れて等流になりません。ツールで算出した値は、そうした局部損失を無視した「おおまかな目安」と捉え、詳細な設計には水面線計算（開水路非等流計算）など別の手法が必要だと覚えておいてください。</p>
 </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="open-channel-flow.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -727,7 +1039,7 @@ window.addEventListener('resize', compute);
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>コンクリート製矩形水路（粗度係数n=0.015）で底幅b=2m、勾配I=0.001（0.1%）、水深y=1.2mの場合、マニングの式V=（1/n）×R^(2/3)×I^(1/2)より、径深R=1.5m、流速V≈1.23m/s、流量Q≈2.95m³/sとなります。フルード数Fr=V/√(gy)≈0.36で常流状態です。</p>
+<p>コンクリート製矩形水路（粗度係数n=0.015）で底幅b=2m、勾配I=0.001（0.1%）、水深y=1.2mの場合、断面積A=2.4m²、潤辺P=4.4m、径深R=A/P≈0.545m。マニングの式V=（1/n）×R^(2/3)×I^(1/2)より流速V≈1.41m/s、流量Q≈3.38m³/sとなります。フルード数Fr=V/√(gy)≈0.41で常流状態です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -738,6 +1050,16 @@ window.addEventListener('resize', compute);
 <li>降雨後の流出量が計画値を大幅に超える場合は、粗度係数の増加や支川からの流入を再検証し、堆積物除去による流通断面確保も併検討してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

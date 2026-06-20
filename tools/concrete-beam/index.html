@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "鉄筋コンクリート梁断面設計計算機",
       "description": "ACI 318に基づくRC梁断面設計計算機。曲げ耐力・せん断耐力・鉄筋比・断面適正判定をリアルタイム計算。",
       "url": "https://novasolver.jp/tools/concrete-beam.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ACI 318準拠","曲げ耐力・せん断耐力計算","鉄筋比チェック（最小・釣合い）","断面図・応力ブロック可視化","引張支配・圧縮支配判定"],
       "keywords": "鉄筋コンクリート梁,RC梁,断面設計,ACI318,曲げ耐力,せん断耐力,鉄筋比",
       "datePublished": "2026-04-08",
@@ -131,6 +131,22 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 load-ramp animation ===== */
+#loadCanvas{width:100%;display:block;border-radius:8px;background:#0a1628;margin-top:6px}
+#loadCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.live-grid{grid-template-columns:repeat(3,1fr)}
+@media(max-width:600px){.live-grid{grid-template-columns:repeat(2,1fr)}}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem;font-family:inherit;font-weight:600;transition:background .2s}
+.btn:hover{background:#0056b3}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+.preset-btn{padding:5px 11px;font-size:.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:10px;border-radius:2px;display:inline-block}
+@media(prefers-reduced-motion:reduce){.btn,.preset-btn{transition:none}}
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/concrete-beam.html">
@@ -235,10 +251,46 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">設計結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4816367659?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816367659.09._SCMZZZZZZ_.jpg" alt="バイオメカニクスの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">バイオメカニクス の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 荷重漸増アニメーション ― 梁のたわみ・ひび割れ・鉄筋降伏</div>
+      <div class="stat-grid live-grid">
+        <div class="stat-card"><div class="sv" id="liveM">—</div><div class="sl">作用モーメント M (kN·m)</div></div>
+        <div class="stat-card"><div class="sv" id="liveSc">—</div><div class="sl">コンクリート応力 σc (MPa)</div></div>
+        <div class="stat-card"><div class="sv" id="liveSs">—</div><div class="sl">鉄筋応力 σs (MPa)</div></div>
+        <div class="stat-card"><div class="sv" id="liveC">—</div><div class="sl">中立軸深さ c (mm)</div></div>
+        <div class="stat-card"><div class="sv" id="liveDef">—</div><div class="sl">中央たわみ δ (mm)</div></div>
+        <div class="stat-card"><div class="sv" id="liveStage">—</div><div class="sl">状態</div></div>
+      </div>
+      <canvas id="loadCanvas" height="300" tabindex="0" role="img" aria-label="RC梁に荷重を漸増させたときのたわみ・ひび割れ・鉄筋降伏のアニメーション"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="cbPlay()"><i class="fas fa-play"></i> 再生</button>
+        <button class="btn secondary" type="button" id="btnReset" onclick="cbReset()"><i class="fas fa-redo"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn" type="button" onclick="cbPreset('balanced')">標準梁</button>
+          <button class="preset-btn" type="button" onclick="cbPreset('under')">少筋</button>
+          <button class="preset-btn" type="button" onclick="cbPreset('over')">過鉄筋</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#5b8def"></i>圧縮ブロック</span>
+        <span><i class="swatch" style="background:#e74c3c"></i>引張鉄筋</span>
+        <span><i class="swatch" style="background:#f39c12"></i>ひび割れ</span>
+        <span><i class="swatch" style="background:#94a3b8"></i>中立軸</span>
+      </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-grid">
       <div class="stat-card"><div class="sv" id="statMn">—</div><div class="sl">φMn 曲げ耐力 (kN·m)</div></div>
@@ -255,8 +307,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 梁</div><canvas id="beamCanvas" height="500"></canvas></div>
-  
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 断面図・等価応力ブロック</div><canvas id="beamCanvas" height="500"></canvas></div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
       $a = \dfrac{A_s f_y}{0.85 f'_c b}$<br>
@@ -269,243 +321,470 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
+(function(){
+"use strict";
 
-function getB()  { return +document.getElementById('sldB').value; }function getH(){ return +document.getElementById('sldH').value; }function getD(){ return +document.getElementById('sldD').value; }function getAs(){ return +document.getElementById('sldAs').value; }function getFc(){ return +document.getElementById('sldFc').value; }function getFy(){ return +document.getElementById('sldFy').value; }function getMu(){ return +document.getElementById('sldMu').value; }function getVu(){ return +document.getElementById('sldVu').value; }function calcAll(){
-  const b = getB(), h = getH(), d = getD(), As = getAs();
-  const fc = getFc(), fy = getFy();
-  const Mu = getMu(), Vu = getVu();
+/* ===== element helpers ===== */
+function el(id){ return document.getElementById(id); }
+function gv(id){ var e=el(id); return e? +e.value : 0; }
+function getB(){ return gv('sldB'); }
+function getH(){ return gv('sldH'); }
+function getD(){ return gv('sldD'); }
+function getAs(){ return gv('sldAs'); }
+function getFc(){ return gv('sldFc'); }
+function getFy(){ return gv('sldFy'); }
+function getMu(){ return gv('sldMu'); }
+function getVu(){ return gv('sldVu'); }
 
-  // ACI 318 equivalent stress block
-  const beta1 = fc <= 28 ? 0.85 : Math.max(0.65, 0.85 - 0.05 * (fc - 28) / 7);
-  const a = (As * fy) / (0.85 * fc * b); // mm
-  const c = a / beta1;
+/* ===== i18n ===== */
+var lang = (document.documentElement.lang || 'ja').toLowerCase();
+var isEN = lang.indexOf('en') === 0;
+var isZH = lang.indexOf('zh') === 0;
+var T = isEN ? {
+  section:'Section view', stress:'Stress block', depth:'d',
+  neutral:'neutral axis', tension:'tension', flex:'Flexure', shear:'Shear', rebar:'rebar', ok:'OK', ng:'NG',
+  elastic:'Elastic (uncracked)', cracked:'Cracked', yield:'Steel yielding', ult:'Mn reached (ultimate)',
+  crackTag:'Cracking Mₑᵣ', yieldTag:'Steel yield', play:'Play', pause:'Pause',
+  applied:'M', tension2:'tension force'
+} : isZH ? {
+  section:'截面图', stress:'应力块', depth:'d',
+  neutral:'中性轴', tension:'拉力', flex:'弯曲', shear:'剪切', rebar:'钢筋', ok:'OK', ng:'NG',
+  elastic:'弹性（未开裂）', cracked:'已开裂', yield:'钢筋屈服', ult:'达到 Mn（极限）',
+  crackTag:'开裂 Mₑᵣ', yieldTag:'钢筋屈服', play:'播放', pause:'暂停',
+  applied:'M', tension2:'拉力'
+} : {
+  section:'断面図', stress:'応力ブロック', depth:'d',
+  neutral:'中立軸', tension:'引張力', flex:'曲げ', shear:'せん断', rebar:'鉄筋', ok:'OK', ng:'NG',
+  elastic:'弾性（未ひび割れ）', cracked:'ひび割れ', yield:'鉄筋降伏', ult:'Mn到達（終局）',
+  crackTag:'ひび割れ Mₑᵣ', yieldTag:'鉄筋降伏', play:'再生', pause:'一時停止',
+  applied:'M', tension2:'引張力'
+};
 
-  // Moment capacity
-  const Mn = As * fy * (d - a / 2) / 1e6; // kN·m
-  const phi_moment = (d - c) / c >= 0.003 ? 0.9 : (d - c) / c >= 0.002 ? 0.65 + ((d-c)/c - 0.002) * (0.9-0.65)/0.001 : 0.65;
-  const phiMn = phi_moment * Mn;
+/* ===== ACI 318 section design (static) ===== */
+function calcAll(){
+  var b=getB(), h=getH(), d=getD(), As=getAs(), fc=getFc(), fy=getFy();
+  var Mu=getMu(), Vu=getVu();
+  var beta1 = fc<=28 ? 0.85 : Math.max(0.65, 0.85 - 0.05*(fc-28)/7);
+  var a = (As*fy)/(0.85*fc*b);              // mm
+  var c = a/beta1;                          // mm
+  var Mn = As*fy*(d-a/2)/1e6;               // kN*m  (nominal)
+  var eps_t = (d-c)/c*0.003;
+  var phi_moment = eps_t>=0.005 ? 0.9 : eps_t<=0.002 ? 0.65 : 0.65 + (eps_t-0.002)*(0.9-0.65)/(0.005-0.002);
+  var phiMn = phi_moment*Mn;
+  var Vc = 0.17*Math.sqrt(fc)*b*d/1000;     // kN
+  var phiVc = 0.75*Vc;
+  var rho = As/(b*d)*100;
+  var rho_b = 0.85*beta1*fc/fy*600/(600+fy)*100;
+  var rho_min = Math.max(0.25*Math.sqrt(fc)/fy, 1.4/fy)*100;
+  var ductClass = eps_t>=0.005 ? (isEN?'Tension-controlled':isZH?'受拉控制':'引張支配')
+                : eps_t>=0.002 ? (isEN?'Transition region':isZH?'过渡区':'遷移領域')
+                : (isEN?'Compression-controlled':isZH?'受压控制':'圧縮支配');
+  return { b:b,h:h,d:d,As:As,fc:fc,fy:fy,beta1:beta1,a:a,c:c,Mn:Mn,phiMn:phiMn,phi_moment:phi_moment,
+           phiVc:phiVc,rho:rho,rho_b:rho_b,rho_min:rho_min,eps_t:eps_t,ductClass:ductClass,
+           Mu:Mu,Vu:Vu,ok_moment:phiMn>=Mu, ok_shear:phiVc>=Vu, ok_min:rho>=rho_min };
+}
 
-  // Shear capacity (Vc only, no stirrups)
-  const Vc = 0.17 * Math.sqrt(fc) * b * d / 1000; // kN
-  const phiVc = 0.75 * Vc;
+/* ===== cracking moment Mcr (gross section, ACI fr=0.62*sqrt(fc)) ===== */
+function crackingMoment(r){
+  var fr = 0.62*Math.sqrt(r.fc);            // MPa
+  var Ig = r.b*Math.pow(r.h,3)/12;          // mm^4
+  var yt = r.h/2;                           // mm
+  return fr*Ig/yt/1e6;                      // kN*m
+}
 
-  // Reinforcement ratios
-  const rho = As / (b * d) * 100; // percent
-  const rho_b = 0.85 * beta1 * fc / fy * 87000 / (87000 + fy) * 100; // percent (using psi units approx)
-  // Corrected for MPa: rho_b = 0.85*beta1*fc/fy * 600/(600+fy)
-  const rho_b_MPa = 0.85 * beta1 * fc / fy * 600 / (600 + fy) * 100;
-  const rho_min = Math.max(0.25 * Math.sqrt(fc) / fy, 1.4 / fy) * 100;
-
-  // Ductility classification
-  const epsilon_t = (d - c) / c * 0.003;
-  let ductClass = '';
-  if (epsilon_t >= 0.005) ductClass = '引張支配';
-  else if (epsilon_t >= 0.002) ductClass = '遷移領域';
-  else ductClass = '圧縮支配';
-
-  return { a, c, Mn, phiMn, phi_moment, phiVc, rho, rho_b: rho_b_MPa, rho_min,
-           epsilon_t, ductClass, Mu, Vu, ok_moment: phiMn >= Mu, ok_shear: phiVc >= Vu, ok_min: rho >= rho_min };
-}function updateStats(){
-  const r = calcAll();
-  document.getElementById('statMn').textContent = r.phiMn.toFixed(1);
-  document.getElementById('statVn').textContent = r.phiVc.toFixed(1);
-  document.getElementById('statVu').textContent = getVu().toFixed(1);
-  document.getElementById('statRho').textContent = r.rho.toFixed(3);
-  document.getElementById('statRhob').textContent = r.rho_b.toFixed(3);
-
-  const sm = document.getElementById('statusMoment');
-  sm.textContent = r.ok_moment ? '曲げ OK' : '曲げ NG';
-  sm.className = 'status-badge ' + (r.ok_moment ? 'status-ok' : 'status-ng');
-
-  const sv = document.getElementById('statusShear');
-  sv.textContent = r.ok_shear ? 'せん断 OK' : 'せん断 NG';
-  sv.className = 'status-badge ' + (r.ok_shear ? 'status-ok' : 'status-ng');
-
-  const sd = document.getElementById('statusDuct');
+/* ===== static results panel ===== */
+function updateStats(){
+  var r = calcAll();
+  el('statMn').textContent = r.phiMn.toFixed(1);
+  el('statVn').textContent = r.phiVc.toFixed(1);
+  el('statVu').textContent = getVu().toFixed(1);
+  el('statRho').textContent = r.rho.toFixed(3);
+  el('statRhob').textContent = r.rho_b.toFixed(3);
+  var sm = el('statusMoment');
+  sm.textContent = r.ok_moment ? (T.flex+' '+T.ok) : (T.flex+' '+T.ng);
+  sm.className = 'status-badge ' + (r.ok_moment?'status-ok':'status-ng');
+  var sv = el('statusShear');
+  sv.textContent = r.ok_shear ? (T.shear+' '+T.ok) : (T.shear+' '+T.ng);
+  sv.className = 'status-badge ' + (r.ok_shear?'status-ok':'status-ng');
+  var sd = el('statusDuct');
   sd.textContent = r.ductClass;
-  sd.className = 'status-badge ' + (r.ductClass === '引張支配' ? 'status-ok' : r.ductClass === '圧縮支配' ? 'status-ng' : 'status-warn');
-}function drawBeam(){
-  const canvas = document.getElementById('beamCanvas');
-  const ctx = canvas.getContext('2d');
-  const parent = canvas.parentElement;
-  const CW = Math.max(320, (parent && parent.clientWidth) || canvas.clientWidth || canvas.offsetWidth || 600);
-  const isNarrow = CW < 640;
-  const CH = isNarrow ? 760 : 700;
-  const dpr = window.devicePixelRatio || 1;
-  canvas.style.width = '100%';
-  canvas.style.setProperty('max-height', 'none', 'important');
-  canvas.style.height = CH + 'px';
-  canvas.width = Math.round(CW * dpr);
-  canvas.height = Math.round(CH * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, CW, CH);
-  ctx.fillStyle = '#f8f9fa';
-  ctx.fillRect(0, 0, CW, CH);
+  var tc = (r.eps_t>=0.005);
+  sd.className = 'status-badge ' + (tc?'status-ok': r.eps_t<0.002?'status-ng':'status-warn');
+}
 
-  const lang = (document.documentElement.lang || 'ja').toLowerCase();
-  const L = lang.startsWith('en') ? {
-    section: 'Section view', stress: 'Stress block', width: 'b', height: 'h', depth: 'd',
-    neutral: 'neutral axis', tension: 'tension force', flex: 'Flexure', shear: 'Shear', rebar: 'rebar', ok: 'OK', ng: 'NG'
-  } : lang.startsWith('zh') ? {
-    section: '\u622a\u9762\u56fe', stress: '\u5e94\u529b\u5757', width: 'b', height: 'h', depth: 'd',
-    neutral: '\u4e2d\u6027\u8f74', tension: '\u62c9\u529b', flex: '\u5f2f\u66f2', shear: '\u526a\u5207', rebar: '\u94a2\u7b4b', ok: 'OK', ng: 'NG'
-  } : {
-    section: '\u65ad\u9762\u56f3', stress: '\u5fdc\u529b\u30d6\u30ed\u30c3\u30af', width: 'b', height: 'h', depth: 'd',
-    neutral: '\u4e2d\u7acb\u8ef8', tension: '\u5f15\u5f35\u529b', flex: '\u66f2\u3052', shear: '\u305b\u3093\u65ad', rebar: '\u9244\u7b4b', ok: 'OK', ng: 'NG'
-  };
+/* ===== static section + stress-block diagram (beamCanvas) ===== */
+function drawBeam(){
+  var canvas = el('beamCanvas'); if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var parent = canvas.parentElement;
+  var CW = Math.max(320, (parent && parent.clientWidth) || canvas.clientWidth || 600);
+  var isNarrow = CW < 640;
+  var CH = isNarrow ? 760 : 700;
+  var dpr = window.devicePixelRatio || 1;
+  canvas.style.width='100%'; canvas.style.setProperty('max-height','none','important');
+  canvas.style.height = CH+'px';
+  canvas.width = Math.round(CW*dpr); canvas.height = Math.round(CH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,CW,CH); ctx.fillStyle='#f8f9fa'; ctx.fillRect(0,0,CW,CH);
 
-  const b = getB(), h = getH(), d = getD(), As = getAs(), fc = getFc(), fy = getFy();
-  const r = calcAll();
-  const a = Math.max(0, Math.min(h, r.a));
-  const c = Math.max(0, Math.min(h, r.c));
-  const cover = Math.max(0, h - d);
+  var r = calcAll();
+  var b=r.b,h=r.h,d=r.d,As=r.As,fc=r.fc,fy=r.fy;
+  var a = Math.max(0, Math.min(h, r.a));
+  var c = Math.max(0, Math.min(h, r.c));
+  var cover = Math.max(0, h-d);
 
-  function lineDash(on){ ctx.setLineDash(on ? [5, 4] : []); }
-  function rounded(x,y,w,h,r){
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x,y,w,h,r);
-    else { ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); }
+  function lineDash(on){ ctx.setLineDash(on?[5,4]:[]); }
+  function title(x,y,txt){ ctx.fillStyle='#001F3F'; ctx.font='bold 14px Noto Sans JP, system-ui, sans-serif'; ctx.textAlign='center'; ctx.fillText(txt,x,y); }
+  function label(txt,x,y,color,align,size,bold){ color=color||'#334155'; align=align||'center'; size=size||11;
+    ctx.fillStyle=color; var fam=/[^\x00-\x7F]/.test(String(txt))?'Noto Sans JP, system-ui, sans-serif':'Roboto Mono, Noto Sans JP, monospace';
+    ctx.font=(bold?'bold ':'')+size+'px '+fam; ctx.textAlign=align; ctx.fillText(txt,x,y); }
+
+  var sectionArea = isNarrow ? {x:26,y:54,w:CW-52,h:430} : {x:38,y:58,w:CW*0.58,h:CH-130};
+  var stressArea  = isNarrow ? {x:26,y:506,w:CW-52,h:210} : {x:sectionArea.x+sectionArea.w+22,y:58,w:CW-(sectionArea.x+sectionArea.w+22)-34,h:CH-130};
+
+  // section
+  (function(area){
+    title(area.x+area.w/2, area.y-22, T.section);
+    var scale = Math.min((area.w-92)/b, (area.h-52)/h);
+    var bPx=b*scale, hPx=h*scale;
+    var bx=area.x+(area.w-bPx)/2+(isNarrow?8:0);
+    var by=area.y+24+(area.h-52-hPx)/2;
+    var aPx=a*scale, coverPx=cover*scale, dLine=by+hPx-coverPx;
+    ctx.fillStyle='#d5e3f1'; ctx.strokeStyle='#001F3F'; ctx.lineWidth=2.3;
+    ctx.fillRect(bx,by,bPx,hPx); ctx.strokeRect(bx,by,bPx,hPx);
+    ctx.fillStyle='rgba(91,141,239,0.40)'; ctx.fillRect(bx,by,bPx,Math.max(4,aPx));
+    label('a='+r.a.toFixed(0)+'mm', bx+bPx+8, by+Math.max(18,aPx/2+4), '#3a63c0','left',11,true);
+    lineDash(true); ctx.strokeStyle='#94a3b8'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(bx-24, by+(c*scale)); ctx.lineTo(bx+bPx+24, by+(c*scale)); ctx.stroke(); lineDash(false);
+    label(T.neutral, bx+bPx+26, by+(c*scale)-4, '#64748b','left',9);
+    lineDash(true); ctx.strokeStyle='#64748b'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(bx-24,dLine); ctx.lineTo(bx+bPx+24,dLine); ctx.stroke(); lineDash(false);
+    label(T.depth+'='+d+'mm', bx-28, dLine+4, '#475569','right',11);
+    var nBars=Math.max(2,Math.min(6,Math.round(As/400)));
+    var barR=Math.max(5,Math.min(13,bPx/(nBars*3.2)));
+    var barY=by+hPx-Math.max(18,coverPx/2);
+    var spacing=bPx/(nBars+1);
+    ctx.fillStyle='#e74c3c';
+    for(var i=0;i<nBars;i++){ ctx.beginPath(); ctx.arc(bx+spacing*(i+1),barY,barR,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#a01d12'; ctx.lineWidth=1; ctx.stroke(); }
+    label('As='+As+'mm2', bx+bPx/2, by+hPx+22, '#334155','center',11);
+    label('b='+b+'mm', bx+bPx/2, by-12, '#334155','center',12,true);
+    ctx.save(); ctx.translate(bx-34, by+hPx/2); ctx.rotate(-Math.PI/2); label('h='+h+'mm',0,0,'#334155','center',12,true); ctx.restore();
+  })(sectionArea);
+
+  // stress block
+  (function(area){
+    title(area.x+area.w/2, area.y-22, T.stress);
+    var frameH=Math.min(area.h-76, isNarrow?150:420);
+    var scale=frameH/h;
+    var frameW=Math.max(82,Math.min(128,area.w*0.36));
+    var fx=area.x+18, fy0=area.y+28;
+    var aPx=Math.max(5,a*scale), cPx=c*scale;
+    ctx.fillStyle='#eef4fa'; ctx.strokeStyle='#94a3b8'; ctx.lineWidth=1.5;
+    ctx.fillRect(fx,fy0,frameW,frameH); ctx.strokeRect(fx,fy0,frameW,frameH);
+    ctx.fillStyle='rgba(91,141,239,0.55)'; ctx.fillRect(fx,fy0,frameW,Math.min(frameH,aPx));
+    ctx.strokeStyle='#3a63c0'; ctx.strokeRect(fx,fy0,frameW,Math.min(frameH,aPx));
+    lineDash(true); ctx.strokeStyle='#64748b';
+    ctx.beginPath(); ctx.moveTo(fx-10,fy0+cPx); ctx.lineTo(fx+frameW+140,fy0+cPx); ctx.stroke(); lineDash(false);
+    label('c='+r.c.toFixed(0)+'mm', fx+frameW+10, fy0+cPx-6, '#64748b','left',isNarrow?9:10);
+    label("0.85f'c", fx+frameW+12, fy0+16, '#3a63c0','left',10,true);
+    label('='+(0.85*fc).toFixed(0)+'MPa', fx+frameW+12, fy0+30, '#3a63c0','left',10);
+    var ty=fy0+frameH-Math.max(16,cover*scale/2);
+    ctx.strokeStyle='#e74c3c'; ctx.lineWidth=2.2;
+    ctx.beginPath(); ctx.moveTo(fx+frameW+120,ty); ctx.lineTo(fx+frameW+16,ty); ctx.stroke();
+    ctx.fillStyle='#e74c3c';
+    ctx.beginPath(); ctx.moveTo(fx+frameW+16,ty); ctx.lineTo(fx+frameW+27,ty-5); ctx.lineTo(fx+frameW+27,ty+5); ctx.closePath(); ctx.fill();
+    label(T.tension2, fx+frameW+122, ty-8, '#e74c3c','right',10,true);
+    label('T=Asfy='+(As*fy/1000).toFixed(0)+'kN', fx+frameW+122, ty+12, '#e74c3c','right',10);
+  })(stressArea);
+}
+
+/* ===== load-ramp animation (loadCanvas) ===== */
+var canvas = el('loadCanvas');
+var ctx = canvas ? canvas.getContext('2d') : null;
+var lw=0, lh=0;
+function resizeLoad(){
+  if(!canvas) return;
+  var parent = canvas.parentElement;
+  lw = Math.max(280, Math.floor(((parent&&parent.clientWidth)||600) - 44));
+  lh = 300;
+  var dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  canvas.style.width = lw+'px'; canvas.style.height = lh+'px';
+  canvas.width = Math.round(lw*dpr); canvas.height = Math.round(lh*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+var prog = 0;          // 0..1 load factor (fraction of Mn target reached)
+var playing = false;
+var animId = null;
+var lastTs = 0;
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// state at a given applied moment M (kN*m) for the CURRENT geometry
+function beamState(M, r){
+  var Mcr = crackingMoment(r);
+  var Mn = r.Mn;
+  // steel stress: linear up to yield at Mn, capped at fy
+  var ss = Mn>0 ? Math.min(r.fy, r.fy * M/Mn) : 0;
+  // concrete extreme-fibre stress: ramps to 0.85 f'c near Mn (Whitney peak)
+  var sc = Math.min(0.85*r.fc, 0.85*r.fc * M/Mn);
+  // neutral axis: uncracked ~ h/2; transitions toward ultimate c after cracking
+  var cUlt = r.c;
+  var nax;
+  if (M <= Mcr) nax = r.h/2;
+  else {
+    var f = Math.min(1, (M-Mcr)/Math.max(1e-6, (Mn-Mcr)));
+    nax = r.h/2 + (cUlt - r.h/2)*f;
   }
-  function title(x, y, text){
-    ctx.fillStyle = '#001F3F';
-    ctx.font = 'bold 14px Noto Sans JP, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, x, y);
-  }
-  function label(text, x, y, color = '#334155', align = 'center', size = 11, bold = false){
-    ctx.fillStyle = color;
-    const family = /[^\x00-\x7F]/.test(String(text)) ? 'Noto Sans JP, system-ui, sans-serif' : 'Roboto Mono, Noto Sans JP, monospace';
-    ctx.font = (bold ? 'bold ' : '') + size + 'px ' + family;
-    ctx.textAlign = align;
-    ctx.fillText(text, x, y);
-  }
+  // deflection model: uncracked stiffness EI_g, cracked EI_cr (~ 0.35 EI_g)
+  var Ec = 4700*Math.sqrt(r.fc);                 // MPa
+  var Ig = r.b*Math.pow(r.h,3)/12;
+  var Icr = 0.35*Ig;
+  var span = 14*r.d;                              // assumed span ~ 14d (slender beam) [mm]
+  var kk = span*span/9.6;                         // simply-supported central-deflection factor
+  // closed-form effective-stiffness deflection (Branson-like simplified)
+  var Ie;
+  if (M<=Mcr) Ie = Ig;
+  else { var rr=Mcr/M; Ie = Math.min(Ig, Math.max(Icr, rr*rr*rr*Ig + (1-rr*rr*rr)*Icr)); }
+  var defl = kk * (M*1e6) / (Ec*Ie);             // mm  (M in N*mm)
+  var stage;
+  if (M<=Mcr) stage = T.elastic;
+  else if (ss < r.fy-1) stage = T.cracked;
+  else if (M < Mn) stage = T.yield;
+  else stage = T.ult;
+  return { M:M, Mcr:Mcr, Mn:Mn, ss:ss, sc:sc, nax:nax, defl:defl, stage:stage, cracked: M>Mcr, yielding: ss>=r.fy-1 };
+}
 
-  const summaryH = 66;
-  const gap = 22;
-  const sectionArea = isNarrow
-    ? { x: 26, y: 54, w: CW - 52, h: 410 }
-    : { x: 38, y: 58, w: CW * 0.58, h: CH - summaryH - 96 };
-  const stressArea = isNarrow
-    ? { x: 26, y: 486, w: CW - 52, h: 198 }
-    : { x: sectionArea.x + sectionArea.w + gap, y: 58, w: CW - (sectionArea.x + sectionArea.w + gap) - 34, h: CH - summaryH - 96 };
+function fmt(v,n){ return (isFinite(v)?v:0).toFixed(n); }
 
-  function drawSection(area){
-    title(area.x + area.w / 2, area.y - 22, L.section);
-    const scale = Math.min((area.w - 92) / b, (area.h - 52) / h);
-    const bPx = b * scale, hPx = h * scale;
-    const bx = area.x + (area.w - bPx) / 2 + (isNarrow ? 8 : 0);
-    const by = area.y + 24 + (area.h - 52 - hPx) / 2;
-    const aPx = a * scale;
-    const coverPx = cover * scale;
-    const dLine = by + hPx - coverPx;
+function drawLoad(){
+  if(!ctx) return;
+  resizeLoad();
+  var W=lw, H=lh;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+  var r = calcAll();
+  var Mn = r.Mn;
+  var Mtarget = Mn*1.0;
+  var M = prog*Mtarget;
+  var s = beamState(M, r);
 
-    ctx.fillStyle = '#d5e3f1';
-    ctx.strokeStyle = '#001F3F';
-    ctx.lineWidth = 2.3;
-    ctx.fillRect(bx, by, bPx, hPx);
-    ctx.strokeRect(bx, by, bPx, hPx);
+  // ---- beam geometry on canvas ----
+  var padX=46, padTop=40, padBot=56;
+  var x0=padX, x1=W-padX, midX=(x0+x1)/2;
+  var baseY=padTop+60;                  // neutral (undeflected) beam line
+  var beamH=26;
+  // deflection scale (visual): map up to ~ span/180 to 70px
+  var span=14*r.d;
+  var maxDeflVis = span/150;
+  var dscale = 70/Math.max(1e-6, maxDeflVis);
+  var defPix = Math.min(96, s.defl*dscale);
 
-    ctx.fillStyle = 'rgba(231,76,60,0.34)';
-    ctx.fillRect(bx, by, bPx, Math.max(4, aPx));
-    label('a=' + r.a.toFixed(0) + 'mm', bx + bPx + 8, by + Math.max(18, aPx / 2 + 4), '#c0392b', 'left', 11, true);
+  // supports
+  ctx.fillStyle='#9fb3c8';
+  ctx.beginPath(); ctx.moveTo(x0-2,baseY+beamH+20); ctx.lineTo(x0+12,baseY+beamH); ctx.lineTo(x0-16,baseY+beamH); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x1+2,baseY+beamH+20); ctx.lineTo(x1-12,baseY+beamH); ctx.lineTo(x1+16,baseY+beamH); ctx.closePath(); ctx.fill();
 
-    lineDash(true);
-    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(bx - 24, dLine); ctx.lineTo(bx + bPx + 24, dLine); ctx.stroke();
-    lineDash(false);
-    label(L.depth + '=' + d + 'mm', bx - 28, dLine + 4, '#475569', 'right', 11);
+  // deflected beam (quadratic sag), top and bottom edges
+  function topY(x){ var u=(x-x0)/(x1-x0); var sag=4*u*(1-u); return baseY + defPix*sag; }
+  function botY(x){ return topY(x)+beamH; }
+  var N=60, i, xx;
+  // concrete body
+  ctx.beginPath();
+  ctx.moveTo(x0, topY(x0));
+  for(i=0;i<=N;i++){ xx=x0+(x1-x0)*i/N; ctx.lineTo(xx, topY(xx)); }
+  for(i=N;i>=0;i--){ xx=x0+(x1-x0)*i/N; ctx.lineTo(xx, botY(xx)); }
+  ctx.closePath();
+  ctx.fillStyle='#dbe4ef'; ctx.fill();
+  ctx.strokeStyle='#33425a'; ctx.lineWidth=1.4; ctx.stroke();
 
-    const nBars = Math.max(2, Math.min(6, Math.round(As / 400)));
-    const barR = Math.max(5, Math.min(13, bPx / (nBars * 3.2)));
-    const barY = by + hPx - Math.max(18, coverPx / 2);
-    const spacing = bPx / (nBars + 1);
-    ctx.fillStyle = '#2f3542';
-    for (let i = 0; i < nBars; i++) {
-      ctx.beginPath(); ctx.arc(bx + spacing * (i + 1), barY, barR, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#111827'; ctx.lineWidth = 1; ctx.stroke();
+  // compression block (top fibre, thickness grows with sc), color intensity with sc
+  var cFrac = Math.min(1, s.sc/(0.85*r.fc||1));
+  var compT = 4 + 10*cFrac;
+  ctx.beginPath();
+  ctx.moveTo(x0, topY(x0));
+  for(i=0;i<=N;i++){ xx=x0+(x1-x0)*i/N; ctx.lineTo(xx, topY(xx)); }
+  for(i=N;i>=0;i--){ xx=x0+(x1-x0)*i/N; ctx.lineTo(xx, topY(xx)+compT); }
+  ctx.closePath();
+  ctx.fillStyle='rgba(91,141,239,'+(0.35+0.5*cFrac).toFixed(2)+')'; ctx.fill();
+
+  // tension steel (bottom fibre line), colour reddens toward yield
+  var yFrac = Math.min(1, s.ss/(r.fy||1));
+  ctx.strokeStyle='rgb('+Math.round(160+95*yFrac)+','+Math.round(70-50*yFrac)+','+Math.round(60-40*yFrac)+')';
+  ctx.lineWidth = 2.2 + 2.0*yFrac;
+  ctx.beginPath();
+  for(i=0;i<=N;i++){ xx=x0+(x1-x0)*i/N; var yy=botY(xx)-4; if(i===0)ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy); }
+  ctx.stroke();
+
+  // neutral axis (dashed) inside the beam, depth from top = nax mapped to beamH
+  var naxFrac = Math.min(0.95, Math.max(0.05, s.nax/r.h));
+  ctx.setLineDash([5,4]); ctx.strokeStyle='rgba(148,163,184,0.9)'; ctx.lineWidth=1.1;
+  ctx.beginPath();
+  for(i=0;i<=N;i++){ xx=x0+(x1-x0)*i/N; var ny=topY(xx)+beamH*naxFrac; if(i===0)ctx.moveTo(xx,ny); else ctx.lineTo(xx,ny); }
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // cracks in tension zone once M>Mcr (number grows with load past cracking)
+  if (s.cracked){
+    var crackProg = Math.min(1, (s.M-s.Mcr)/Math.max(1e-6,(Mn-s.Mcr)));
+    var nCracks = Math.max(1, Math.round(1 + 8*crackProg));
+    ctx.strokeStyle='#f39c12'; ctx.lineWidth=1.5;
+    for(var k=1;k<=nCracks;k++){
+      var cx = x0 + (x1-x0)*k/(nCracks+1);
+      // longer cracks near midspan
+      var ms = 1 - Math.abs(cx-midX)/((x1-x0)/2);
+      var clen = beamH*(0.45 + 0.5*ms*crackProg);
+      var by0 = botY(cx);
+      ctx.beginPath();
+      ctx.moveTo(cx, by0);
+      ctx.lineTo(cx+2.5, by0-clen*0.5);
+      ctx.lineTo(cx-1.5, by0-clen);
+      ctx.stroke();
     }
-    label('As=' + As + 'mm2', bx + bPx / 2, by + hPx + 22, '#334155', 'center', 11);
-    label(L.width + '=' + b + 'mm', bx + bPx / 2, by - 12, '#334155', 'center', 12, true);
-    ctx.save(); ctx.translate(bx - 34, by + hPx / 2); ctx.rotate(-Math.PI / 2);
-    label(L.height + '=' + h + 'mm', 0, 0, '#334155', 'center', 12, true);
-    ctx.restore();
   }
 
-  function drawStress(area){
-    title(area.x + area.w / 2, area.y - 22, L.stress);
-    const frameH = Math.min(area.h - 76, isNarrow ? 150 : 420);
-    const scale = frameH / h;
-    const frameW = Math.max(82, Math.min(128, area.w * 0.36));
-    const fx = area.x + 18;
-    const fy0 = area.y + 28;
-    const aPx = Math.max(5, a * scale);
-    const cPx = c * scale;
+  // central load arrow (size grows with prog)
+  var arrL = 14 + 26*prog;
+  var ay1 = topY(midX)-6;
+  var ay0 = ay1 - arrL;
+  ctx.strokeStyle='#ffd54a'; ctx.lineWidth=3; ctx.fillStyle='#ffd54a';
+  ctx.beginPath(); ctx.moveTo(midX, ay0); ctx.lineTo(midX, ay1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(midX, ay1+2); ctx.lineTo(midX-6, ay1-7); ctx.lineTo(midX+6, ay1-7); ctx.closePath(); ctx.fill();
 
-    ctx.fillStyle = '#eef4fa';
-    ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5;
-    ctx.fillRect(fx, fy0, frameW, frameH);
-    ctx.strokeRect(fx, fy0, frameW, frameH);
-    ctx.fillStyle = 'rgba(231,76,60,0.48)';
-    ctx.fillRect(fx, fy0, frameW, Math.min(frameH, aPx));
-    ctx.strokeStyle = '#c0392b'; ctx.strokeRect(fx, fy0, frameW, Math.min(frameH, aPx));
-
-    lineDash(true); ctx.strokeStyle = '#64748b';
-    ctx.beginPath(); ctx.moveTo(fx - 10, fy0 + cPx); ctx.lineTo(fx + frameW + 140, fy0 + cPx); ctx.stroke();
-    lineDash(false);
-    label('c=' + r.c.toFixed(0) + 'mm', fx + frameW + 10, fy0 + cPx - 6, '#64748b', 'left', isNarrow ? 9 : 10);
-    label("0.85f'c", fx + frameW + 12, fy0 + 16, '#c0392b', 'left', 10, true);
-    label('=' + (0.85 * fc).toFixed(0) + 'MPa', fx + frameW + 12, fy0 + 30, '#c0392b', 'left', 10);
-
-    const ty = fy0 + frameH - Math.max(16, cover * scale / 2);
-    ctx.strokeStyle = '#007BFF'; ctx.lineWidth = 2.2;
-    ctx.beginPath(); ctx.moveTo(fx + frameW + 120, ty); ctx.lineTo(fx + frameW + 16, ty); ctx.stroke();
-    ctx.fillStyle = '#007BFF';
-    ctx.beginPath(); ctx.moveTo(fx + frameW + 16, ty); ctx.lineTo(fx + frameW + 27, ty - 5); ctx.lineTo(fx + frameW + 27, ty + 5); ctx.closePath(); ctx.fill();
-    label(L.tension, fx + frameW + 122, ty - 8, '#007BFF', 'right', 10, true);
-    label('T=Asfy=' + (As * fy / 1000).toFixed(0) + 'kN', fx + frameW + 122, ty + 12, '#007BFF', 'right', 10);
+  // annotation when crossing thresholds
+  ctx.textAlign='center';
+  if (s.yielding){
+    drawTag(midX, ay0-6, T.yieldTag, '#e74c3c');
+  } else if (s.cracked){
+    drawTag(midX, ay0-6, T.crackTag, '#f39c12');
   }
 
-  drawSection(sectionArea);
-  drawStress(stressArea);
+  // load-vs-deflection curve (bottom strip)
+  drawCurve(W,H,r,Mn);
 
-  const summary = [
-    { label: 'phi Mn = ' + r.phiMn.toFixed(1) + ' kN*m', ok: r.ok_moment, req: 'Mu=' + getMu() + 'kN*m', name: L.flex },
-    { label: 'phi Vc = ' + r.phiVc.toFixed(1) + ' kN', ok: r.ok_shear, req: 'Vu=' + getVu() + 'kN', name: L.shear },
-    { label: 'rho = ' + r.rho.toFixed(3) + '%', ok: r.ok_min, req: 'rho min=' + r.rho_min.toFixed(3) + '%', name: L.rebar }
-  ];
-  const sy = CH - summaryH + 6;
-  const sx0 = 30;
-  const sw = (CW - 60 - 16 * 2) / 3;
-  summary.forEach((s, i) => {
-    const sx = sx0 + i * (sw + 16);
-    ctx.fillStyle = s.ok ? '#00b894' : '#e74c3c';
-    rounded(sx, sy, sw, summaryH - 16, 8); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px Noto Sans JP, system-ui, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(s.name + ' ' + (s.ok ? L.ok : L.ng), sx + sw / 2, sy + 17);
-    ctx.font = 'bold 10px Roboto Mono, monospace';
-    ctx.fillText(s.label, sx + sw / 2, sy + 33);
-    ctx.font = '9px Roboto Mono, monospace';
-    ctx.fillText(s.req, sx + sw / 2, sy + 46);
-  });
-}function syncAll(){
-  const sliders = [
-    {id:'sldB',disp:'bDisp',unit:'mm'},{id:'sldH',disp:'hDisp',unit:'mm'},{id:'sldD',disp:'dDisp',unit:'mm'},{id:'sldAs',disp:'asDisp',unit:'mm²'},{id:'sldFc',disp:'fcDisp',unit:'MPa'},{id:'sldFy',disp:'fyDisp',unit:'MPa'},{id:'sldMu',disp:'muDisp',unit:'kN·m'},{id:'sldVu',disp:'vuDisp',unit:'kN'}];
-  sliders.forEach(s =>{
-    const el = document.getElementById(s.id);
-    const pct = (el.value - el.min) / (el.max - el.min) * 100;
-    el.style.setProperty('--pct', pct + '%');
-    var _eCB = document.getElementById(s.disp);
-    if (_eCB) { if (_eCB.tagName === 'INPUT') _eCB.value = el.value; else _eCB.textContent = el.value + ' ' + s.unit; }
+  // time/stage stamp
+  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='bold 12px Roboto Mono, monospace'; ctx.textAlign='right';
+  ctx.fillText('M/Mn = '+fmt(Mn>0?M/Mn:0,2), W-12, 20); ctx.textAlign='left';
+
+  updateLive(s);
+
+  function drawTag(x,y,txt,color){
+    ctx.font='bold 11px Noto Sans JP, system-ui, sans-serif';
+    var w=ctx.measureText(txt).width, pad=5;
+    ctx.fillStyle='rgba(10,22,40,0.9)';
+    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(x-w/2-pad, y-15, w+pad*2, 17, 4); ctx.fill(); }
+    else ctx.fillRect(x-w/2-pad, y-15, w+pad*2, 17);
+    ctx.strokeStyle=color; ctx.lineWidth=1; ctx.strokeRect(x-w/2-pad, y-15, w+pad*2, 17);
+    ctx.fillStyle=color; ctx.textAlign='center'; ctx.fillText(txt, x, y-2);
+  }
+}
+
+function drawCurve(W,H,r,Mn){
+  var gx0=46, gx1=W-16, gy1=H-14, gy0=H-86;
+  // axes
+  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(gx0,gy0); ctx.lineTo(gx0,gy1); ctx.lineTo(gx1,gy1); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='9px Roboto Mono, monospace'; ctx.textAlign='left';
+  ctx.fillText('M', gx0+3, gy0+9); ctx.textAlign='right'; ctx.fillText('δ', gx1, gy1-3); ctx.textAlign='left';
+  // sample M-delta curve across 0..Mn
+  var Mcr = crackingMoment(r);
+  var pts=[], maxDef=0, n=50, j;
+  for(j=0;j<=n;j++){ var Mi=Mn*j/n; var st=beamState(Mi,r); pts.push({m:Mi,d:st.defl}); if(st.defl>maxDef)maxDef=st.defl; }
+  maxDef=Math.max(maxDef,1e-6);
+  function px(d){ return gx0 + (gx1-gx0)*Math.min(1,d/maxDef); }
+  function py(m){ return gy1 - (gy1-gy0)*Math.min(1,Mn>0?m/Mn:0); }
+  // Mcr marker line
+  ctx.strokeStyle='rgba(243,156,18,0.5)'; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(gx0, py(Mcr)); ctx.lineTo(gx1, py(Mcr)); ctx.stroke(); ctx.setLineDash([]);
+  // curve
+  ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2;
+  ctx.beginPath();
+  for(j=0;j<pts.length;j++){ var xx=px(pts[j].d), yy=py(pts[j].m); if(j===0)ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy); }
+  ctx.stroke();
+  // current point
+  var M=prog*Mn; var cur=beamState(M,r);
+  ctx.fillStyle='#ffd54a'; ctx.beginPath(); ctx.arc(px(cur.defl),py(M),3.5,0,7); ctx.fill();
+}
+
+function updateLive(s){
+  el('liveM').textContent = fmt(s.M,1);
+  el('liveSc').textContent = fmt(s.sc,2);
+  el('liveSs').textContent = fmt(s.ss,1);
+  el('liveC').textContent = fmt(s.nax,0);
+  el('liveDef').textContent = fmt(s.defl,2);
+  el('liveStage').textContent = s.stage;
+  var ls = el('liveStage');
+  ls.style.color = s.yielding ? '#e74c3c' : s.cracked ? '#f39c12' : 'var(--accent)';
+}
+
+/* ===== animation loop ===== */
+function loop(ts){
+  if(!playing){ animId=null; return; }
+  if(!lastTs) lastTs=ts;
+  var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+  prog += dt*0.32;     // ~3.1s full ramp
+  if(prog>=1){ prog=1; drawLoad(); stopPlay(); return; }
+  drawLoad();
+  animId=requestAnimationFrame(loop);
+}
+function startPlay(){
+  if(reduce){ prog=1; drawLoad(); return; }
+  if(prog>=1) prog=0;
+  playing=true; lastTs=0;
+  var bp=el('btnPlay'); if(bp) bp.innerHTML='<i class="fas fa-pause"></i> '+T.pause;
+  if(!animId) animId=requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing=false;
+  if(animId){ cancelAnimationFrame(animId); animId=null; }
+  var bp=el('btnPlay'); if(bp) bp.innerHTML='<i class="fas fa-play"></i> '+T.play;
+}
+window.cbPlay = function(){ playing ? stopPlay() : startPlay(); };
+window.cbReset = function(){ stopPlay(); prog=0; drawLoad(); };
+window.cbPreset = function(name){
+  var P = {
+    balanced:{ b:300,h:500,d:440,As:1500,fc:30,fy:400,Mu:200,Vu:150 },
+    under:   { b:300,h:500,d:440,As:600, fc:30,fy:400,Mu:120,Vu:120 },
+    over:    { b:300,h:500,d:440,As:4500,fc:30,fy:400,Mu:500,Vu:200 }
+  }[name];
+  if(!P) return;
+  for(var key in P){
+    var sld=el('sld'+key.charAt(0).toUpperCase()+key.slice(1));
+    if(sld){ sld.value=P[key]; }
+  }
+  syncAll();
+  prog=0; stopPlay(); startPlay();
+};
+
+/* ===== sliders ===== */
+function syncAll(){
+  var sliders = [
+    {id:'sldB',disp:'bDisp',unit:'mm'},{id:'sldH',disp:'hDisp',unit:'mm'},{id:'sldD',disp:'dDisp',unit:'mm'},
+    {id:'sldAs',disp:'asDisp',unit:'mm²'},{id:'sldFc',disp:'fcDisp',unit:'MPa'},{id:'sldFy',disp:'fyDisp',unit:'MPa'},
+    {id:'sldMu',disp:'muDisp',unit:'kN·m'},{id:'sldVu',disp:'vuDisp',unit:'kN'}];
+  sliders.forEach(function(s){
+    var e=el(s.id); if(!e) return;
+    var pct=(e.value-e.min)/(e.max-e.min)*100; e.style.setProperty('--pct',pct+'%');
+    var disp=el(s.disp); if(disp){ if(disp.tagName==='INPUT') disp.value=e.value; else disp.textContent=e.value+' '+s.unit; }
   });
   updateStats();
   drawBeam();
-}['sldB','sldH','sldD','sldAs','sldFc','sldFy','sldMu','sldVu'].forEach(id =>
-  document.getElementById(id).addEventListener('input', syncAll));
-window.addEventListener('resize', drawBeam);
+  drawLoad();
+}
+window.syncAll = syncAll;
+window.syncToNum = function(sld,disp){ var s=el(sld),d=el(disp); if(s&&d){ if(d.tagName==='INPUT')d.value=s.value; else d.textContent=s.value; } syncAll(); };
+window.syncFromNum = function(sld,disp){ var s=el(sld),d=el(disp); if(s&&d) s.value=d.value; };
 
+['sldB','sldH','sldD','sldAs','sldFc','sldFy','sldMu','sldVu'].forEach(function(id){
+  var e=el(id); if(e) e.addEventListener('input', syncAll);
+});
+if(canvas){
+  canvas.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); window.cbPlay(); } });
+}
+window.addEventListener('resize', function(){ drawBeam(); drawLoad(); });
+
+// init
 syncAll();
-setTimeout(drawBeam, 60);
+setTimeout(function(){ drawBeam(); drawLoad(); if(!reduce) startPlay(); else { prog=1; drawLoad(); } }, 80);
+
+})();
 </script>
 
 <section class="explanation">
@@ -530,7 +809,36 @@ setTimeout(drawBeam, 60);
       <div class="bub">あれは、圧縮側コンクリートの複雑な応力分布を、計算しやすい長方形に置き換えたものだ。実物は放物線なんだけど、深さ<code>a</code>、強度<code>0.85f'c</code>のブロックと考えると、曲げ耐力が簡単に計算できるんだ。<code>As</code>や<code>f'c</code>を変えると、ブロックの深さ<code>a</code>がリアルタイムで変わるでしょう？あの可視化が、設計の直感を養うのにすごく役立つんだ。</div>
     </div>
   </div>
-  <h2>よくある質問</h2>
+  <h2>曲げ耐力の計算式（ACI 318 強度設計）</h2>
+<div class="fblock">
+<p>単鉄筋長方形梁の公称曲げ耐力 $M_n$ は、等価長方形応力ブロック（Whitney ブロック）を用いて次式で求めます。引張鉄筋が降伏する（引張支配）と仮定します。</p>
+<p style="text-align:center">$a = \dfrac{A_s f_y}{0.85\,f'_c\,b}, \qquad M_n = A_s f_y\!\left(d - \dfrac{a}{2}\right), \qquad \phi M_n \ge M_u$</p>
+<p>ここで $a$ は等価応力ブロック深さ、$A_s$ は引張鉄筋断面積、$f_y$ は鉄筋降伏強度、$f'_c$ はコンクリート圧縮強度、$b$ は梁幅、$d$ は有効高さです。<strong>強度低減係数 $\phi$</strong> は引張支配で $0.90$、圧縮支配で $0.65$、その間は遷移域として線形補間します。本シミュレーターは $a$・$M_n$・$\phi M_n$ を自動計算し、$\phi M_n \ge M_u$ の可否を判定します。</p>
+</div>
+
+<h2>鉄筋比（最小・釣合い・最大）と破壊モード</h2>
+<div class="fblock">
+<p>引張鉄筋比 $\rho = A_s/(b\,d)$ は破壊モードを支配します。鉄筋量が少なすぎると脆性的な突然破壊、多すぎるとコンクリートの圧縮破壊が先行するため、上下限が定められています（SI単位・MPa）。</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">指標</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">式（ACI 318, MPa）</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">意味</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">最小鉄筋比 $\rho_{min}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\max\!\left(\dfrac{1.4}{f_y},\ \dfrac{0.25\sqrt{f'_c}}{f_y}\right)$</td><td style="border:1px solid #d0d7de;padding:6px 8px">脆性破壊を防ぐ下限</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">釣合い鉄筋比 $\rho_{bal}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$0.85\,\beta_1\dfrac{f'_c}{f_y}\cdot\dfrac{600}{600+f_y}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">鉄筋降伏とコンクリート圧壊が同時</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">引張支配限界</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\rho \le 0.375\cdot 0.85\,\beta_1\dfrac{f'_c}{f_y}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\varepsilon_t \ge 0.005$、$\phi=0.90$</td></tr>
+</tbody>
+</table>
+</div>
+<p>$\beta_1$ は $f'_c \le 28$ MPa で $0.85$、それを超えると $7$ MPa ごとに $0.05$ 低減（下限 $0.65$）。$\rho < \rho_{bal}$ なら<strong>引張支配（鉄筋が先に降伏する延性的な望ましい破壊）</strong>、$\rho > \rho_{bal}$ なら<strong>圧縮支配（脆性的）</strong>です。設計では引張支配（$\varepsilon_t \ge 0.005$）に収めます。</p>
+</div>
+
+<h2>せん断耐力と日本基準との対応</h2>
+<div class="fblock">
+<p><strong>せん断耐力：</strong>$\phi V_n = \phi(V_c + V_s)$、$V_c = 0.17\sqrt{f'_c}\,b\,d$、$V_s = \dfrac{A_v f_y d}{s}$（せん断補強筋）。せん断の強度低減係数は $\phi=0.75$ です。$\phi V_n \ge V_u$ を満たすようスターラップ間隔 $s$ を決めます。</p>
+<p><strong>日本基準との違い：</strong>本ツールは米国 ACI 318 の<strong>強度設計法（終局強度に $\phi$ を乗じる）</strong>です。日本の建築では日本建築学会「RC規準」の<strong>許容応力度設計</strong>が広く使われ、許容曲げモーメントを $M = a_t\,f_t\,j$（$j \approx 7d/8$）で表します。考え方（終局強度 vs 使用応力）が異なるため、両者の数値を直接比較する際は設計法の違いに注意してください。土木分野では道路橋示方書や土木学会コンクリート標準示方書（限界状態設計法）が用いられます。</p>
+</div>
+
+<h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">「等価応力ブロックの深さ a」が断面の高さを超えた場合はどうなりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -566,6 +874,9 @@ setTimeout(drawBeam, 60);
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="concrete-beam.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -627,7 +938,7 @@ setTimeout(drawBeam, 60);
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>梁幅B=300mm、梁高H=600mm、有効高さD=540mm、コンクリート強度fc'=24MPa、鋼材強度fy=400MPa、主鉄筋As=3-D25(1470mm²)の場合：鉄筋比ρ=0.91%、釣合い鉄筋比ρ_b=3.02%となり引張支配となります。計算結果はφMn=320kN·m、φVc=185kNとなり、設計せん断力が185kN以下であれば追加スターラップ不要です。</p>
+<p>梁幅B=300mm、梁高H=600mm、有効高さD=540mm、コンクリート強度fc'=24MPa、鋼材強度fy=400MPa、主鉄筋As=3-D25(1470mm²)の場合：鉄筋比ρ=0.91%、釣合い鉄筋比ρ_b=2.60%となり引張支配となります。計算結果はφMn≈260kN·m、φVc≈101kNとなり、設計せん断力が101kN以下であれば追加スターラップ不要です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -637,6 +948,16 @@ setTimeout(drawBeam, 60);
 <li>せん断耐力φVc=0.75×0.17√fc'×b×dで計算され、高さやコンクリート強度の影響が大きいため、短スパン梁やプレキャスト梁での再確認が必須です。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4816367659?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816367659.09._SCMZZZZZZ_.jpg" alt="バイオメカニクスの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">バイオメカニクス の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

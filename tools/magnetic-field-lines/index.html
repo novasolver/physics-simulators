@@ -40,7 +40,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
 <script type="application/ld+json">
 [{
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
+    "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
     "name": "磁力線シミュレーター",
     "description": "N極・S極を自由配置して磁力線をリアルタイム描画する磁場シミュレーター。双極子・四重極子・多極子配置を可視化し、電磁FEM解析・モーター/トランス設計の基礎検討に活用できます。",
     "url": "https://novasolver.jp/tools/magnetic-field-lines.html",
@@ -209,7 +209,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="btn btn-secondary" id="togArrows" onclick="toggle('showArrows','togArrows')"><i class="fa-solid fa-arrows-alt"></i> 矢印</button>
       <button class="btn btn-secondary" id="togEquip" onclick="toggle('showEquip','togEquip')"><i class="fa-solid fa-circle-nodes"></i> 等磁位線</button>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -256,25 +264,29 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-// ========== State ==========
+window.__MFL_T={place:"左パネルで磁極を選んでクリックして配置してください",topoMono:"単極系",topoDipole:"双極子系",topoMulti:"多極子系",topoMixed:"混合"};
+(function(){
+"use strict";
+var T = window.__MFL_T || {place:"Click a pole tool, then click the canvas to place poles",topoMono:"monopole",topoDipole:"dipole",topoMulti:"multipole",topoMixed:"mixed"};
 
-let poles = []; //{x, y, charge, strength}
-
-let placeMode = null; // 'N', 'S', 'D', null
-
-let dragging = null, dragOffX=0, dragOffY=0;
+let poles = [];
+let placeMode = null;
+let dragging = null, dragOffX = 0, dragOffY = 0;
 let showArrows = false, showEquip = false;
 let poleStrength = 1.0, nLines = 14, stepSize = 3.0;
-let dirty = true;
-let fieldCache = null;
+let particles = [];
+let animId = null;
+let reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let cachedLines = [];
+let geoDirty = true;
 
 const canvas = document.getElementById('fieldCanvas');
 const ctx = canvas.getContext('2d');
 
-// ========== Math ==========
+function dpr(){ return Math.min(window.devicePixelRatio||1, 2.5); }
 
 function fieldAt(x, y){
-  let bx=0, by=0;
+  let bx = 0, by = 0;
   for(const p of poles){
     const dx = x - p.x, dy = y - p.y;
     const r2 = dx*dx + dy*dy;
@@ -283,258 +295,317 @@ function fieldAt(x, y){
     const mag = p.charge * p.strength / r2;
     bx += mag * dx/r;
     by += mag * dy/r;
-  }return{bx, by};
-}function fieldMag(x, y){
-  const {bx,by} = fieldAt(x,y);
-  return Math.sqrt(bx*bx+by*by);
-}// RK4 step for field line integration
-
+  }
+  return {bx, by};
+}
+function fieldMag(x, y){
+  const {bx, by} = fieldAt(x, y);
+  return Math.sqrt(bx*bx + by*by);
+}
 function rk4Step(x, y, h){
-  const {bx:k1x, by:k1y}= fieldAt(x, y);
+  const {bx:k1x, by:k1y} = fieldAt(x, y);
   const m1 = Math.sqrt(k1x*k1x+k1y*k1y)||1;
-  const x1=x+h*k1x/m1/2, y1=y+h*k1y/m1/2;
-  const{bx:k2x, by:k2y}= fieldAt(x1, y1);
+  const x1 = x+h*k1x/m1/2, y1 = y+h*k1y/m1/2;
+  const {bx:k2x, by:k2y} = fieldAt(x1, y1);
   const m2 = Math.sqrt(k2x*k2x+k2y*k2y)||1;
-  const x2=x+h*k2x/m2/2, y2=y+h*k2y/m2/2;
-  const{bx:k3x, by:k3y}= fieldAt(x2, y2);
+  const x2 = x+h*k2x/m2/2, y2 = y+h*k2y/m2/2;
+  const {bx:k3x, by:k3y} = fieldAt(x2, y2);
   const m3 = Math.sqrt(k3x*k3x+k3y*k3y)||1;
-  const x3=x+h*k3x/m3, y3=y+h*k3y/m3;
-  const{bx:k4x, by:k4y}= fieldAt(x3, y3);
+  const x3 = x+h*k3x/m3, y3 = y+h*k3y/m3;
+  const {bx:k4x, by:k4y} = fieldAt(x3, y3);
   const m4 = Math.sqrt(k4x*k4x+k4y*k4y)||1;
   const nx = x + h/6*(k1x/m1 + 2*k2x/m2 + 2*k3x/m3 + k4x/m4);
   const ny = y + h/6*(k1y/m1 + 2*k2y/m2 + 2*k3y/m3 + k4y/m4);
-  return{nx, ny};
-}function traceLine(sx, sy, charge){
+  return {nx, ny};
+}
+function traceLine(sx, sy, charge){
   const dir = charge > 0 ? 1 : -1;
   const h = stepSize * dir;
   const cw = canvas.width, ch = canvas.height;
   const pts = [[sx, sy]];
-  let x=sx, y=sy;
-  const maxSteps = 800;
+  let x = sx, y = sy;
+  const maxSteps = 900;
   for(let i=0;i<maxSteps;i++){
-    const {nx, ny}= rk4Step(x, y, h);
-    x=nx; y=ny;
-    pts.push([x,y]);
+    const {nx, ny} = rk4Step(x, y, h);
+    x = nx; y = ny;
+    pts.push([x, y]);
     if(x<-20||x>cw+20||y<-20||y>ch+20) break;
-    // Check if near an opposite pole
     let near = false;
     for(const p of poles){
-      if(p.charge === -charge || p.charge !== charge){
-        const dx=x-p.x, dy=y-p.y;
-        if(dx*dx+dy*dy < 100){ near=true; break; }
+      if(p.charge !== charge){
+        const dx = x-p.x, dy = y-p.y;
+        if(dx*dx+dy*dy < 90){ near = true; break; }
       }
     }
     if(near) break;
   }
   return pts;
-}// ========== Rendering ==========
-
+}
+function buildLines(){
+  cachedLines = [];
+  const r0 = 12 * dpr();
+  for(const p of poles){
+    if(p.charge <= 0) continue;
+    const n = nLines;
+    for(let i=0;i<n;i++){
+      const angle = 2*Math.PI*i/n;
+      const sx = p.x + Math.cos(angle)*r0;
+      const sy = p.y + Math.sin(angle)*r0;
+      const pts = traceLine(sx, sy, 1);
+      if(pts.length >= 2) cachedLines.push(pts);
+    }
+  }
+  geoDirty = false;
+}
 function hsv2rgb(h,s,v){
-  const i=Math.floor(h*6), f=h*6-i;
-  const p=v*(1-s), q=v*(1-f*s), t=v*(1-(1-f)*s);
-  const c=[[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i%6];
-  return `rgb(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)})`;
-}function getLineColor(x, y){
+  const i = Math.floor(h*6), f = h*6-i;
+  const p = v*(1-s), q = v*(1-f*s), t = v*(1-(1-f)*s);
+  const c = [[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i%6];
+  return 'rgb('+Math.round(c[0]*255)+','+Math.round(c[1]*255)+','+Math.round(c[2]*255)+')';
+}
+function getLineColor(x, y){
   const mag = fieldMag(x, y);
-  // Stronger field = warmer color
   const norm = Math.min(1, mag * 0.01);
-  // Blue to white: hue 220 (blue) to 60 (yellow)
   const h = (220 - norm*160)/360;
   return hsv2rgb(h, 1-norm*0.5, 0.7+norm*0.3);
-}function drawArrow(cx2, cy2, nx, ny, col){
-  const dx=nx-cx2, dy=ny-cy2;
-  const len=Math.sqrt(dx*dx+dy*dy);
-  if(len<1) return;
-  const ux=dx/len, uy=dy/len;
-  const size=6;
+}
+function rgba(col, a){ return col.replace('rgb(','rgba(').replace(')', ','+a.toFixed(2)+')'); }
+function drawArrow(cx2, cy2, nx, ny, col){
+  const dx = nx-cx2, dy = ny-cy2;
+  const len = Math.sqrt(dx*dx+dy*dy);
+  if(len < 1) return;
+  const ux = dx/len, uy = dy/len;
+  const size = 6;
   ctx.beginPath();
-  ctx.moveTo(cx2,cy2);
+  ctx.moveTo(cx2, cy2);
   ctx.lineTo(cx2-uy*size, cy2+ux*size);
   ctx.lineTo(cx2+ux*size*1.5, cy2+uy*size*1.5);
   ctx.lineTo(cx2+uy*size, cy2-ux*size);
   ctx.closePath();
-  ctx.fillStyle=col+'cc';
+  ctx.fillStyle = rgba(col, 0.8);
   ctx.fill();
-}function render(){
+}
+function spawnParticle(){
+  const nPoles = poles.filter(p=>p.charge>0);
+  if(!nPoles.length) return null;
+  const p = nPoles[Math.floor(Math.random()*nPoles.length)];
+  const a = Math.random()*2*Math.PI;
+  const r0 = 13*dpr();
+  return { x:p.x+Math.cos(a)*r0, y:p.y+Math.sin(a)*r0, life:0, maxLife:120+Math.random()*120, speed:0 };
+}
+function updateParticles(speedScale){
+  const target = Math.min(420, poles.filter(p=>p.charge>0).length * 70);
+  let guard = 60;
+  while(particles.length < target && guard-- > 0){
+    const np = spawnParticle();
+    if(!np) break;
+    particles.push(np);
+  }
+  if(particles.length > target) particles.length = target;
+  const cw = canvas.width, ch = canvas.height;
+  for(let i=particles.length-1;i>=0;i--){
+    const pt = particles[i];
+    const {bx, by} = fieldAt(pt.x, pt.y);
+    const mag = Math.sqrt(bx*bx+by*by);
+    if(mag < 1e-5){ particles.splice(i,1); continue; }
+    const step = (1.4 + Math.min(6, Math.sqrt(mag)*1.6)) * speedScale * dpr();
+    pt.x += bx/mag*step;
+    pt.y += by/mag*step;
+    pt.life++;
+    pt.speed = mag;
+    let dead = pt.life > pt.maxLife || pt.x<-10||pt.x>cw+10||pt.y<-10||pt.y>ch+10;
+    if(!dead){
+      for(const p of poles){
+        if(p.charge < 0){
+          const dx = pt.x-p.x, dy = pt.y-p.y;
+          if(dx*dx+dy*dy < 120){ dead = true; break; }
+        }
+      }
+    }
+    if(dead) particles.splice(i,1);
+  }
+}
+function drawParticles(){
+  for(const pt of particles){
+    const fade = pt.life < 12 ? pt.life/12 : (pt.life > pt.maxLife-15 ? (pt.maxLife-pt.life)/15 : 1);
+    const a = Math.max(0, Math.min(1, fade));
+    const col = getLineColor(pt.x, pt.y);
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 2.2*dpr(), 0, 2*Math.PI);
+    ctx.fillStyle = rgba(col, a);
+    ctx.fill();
+  }
+}
+function drawEquipotentials(cw, ch){
+  const res = 6 * dpr();
+  const nx = Math.floor(cw/res)+1;
+  const ny2 = Math.floor(ch/res)+1;
+  const phi = [];
+  for(let iy=0;iy<ny2;iy++){
+    phi.push([]);
+    for(let ix=0;ix<nx;ix++){
+      const x = ix*res, y = iy*res;
+      let pv = 0;
+      for(const pole of poles){
+        const dx = x-pole.x, dy = y-pole.y;
+        const r = Math.sqrt(dx*dx+dy*dy);
+        if(r>5) pv += pole.charge*pole.strength / r;
+      }
+      phi[iy].push(pv);
+    }
+  }
+  let minP = Infinity, maxP = -Infinity;
+  for(const row of phi) for(const v of row){ if(isFinite(v)){ minP=Math.min(minP,v); maxP=Math.max(maxP,v); } }
+  const levels = 14;
+  ctx.strokeStyle = 'rgba(100,150,220,0.30)';
+  ctx.lineWidth = 0.8*dpr();
+  ctx.setLineDash([4*dpr(), 4*dpr()]);
+  for(let li=1;li<levels;li++){
+    const lev = minP + (maxP-minP)*li/levels;
+    ctx.beginPath();
+    for(let iy=0;iy<ny2-1;iy++){
+      for(let ix=0;ix<nx-1;ix++){
+        const v00=phi[iy][ix], v10=phi[iy][ix+1], v01=phi[iy+1][ix], v11=phi[iy+1][ix+1];
+        const above=[v00>=lev,v10>=lev,v01>=lev,v11>=lev];
+        if(above.some(a=>a) && above.some(a=>!a)) ctx.rect(ix*res, iy*res, res, res);
+      }
+    }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+function draw(){
   const cw = canvas.width, ch = canvas.height;
   ctx.clearRect(0,0,cw,ch);
-
-  // White/light background
   const bg = ctx.createLinearGradient(0,0,cw,ch);
-  bg.addColorStop(0,'#f8faff');
-  bg.addColorStop(1,'#eef4ff');
-  ctx.fillStyle=bg;
-  ctx.fillRect(0,0,cw,ch);
-
+  bg.addColorStop(0,'#f8faff'); bg.addColorStop(1,'#eef4ff');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,cw,ch);
   if(poles.length === 0){
-    ctx.fillStyle='#99aac0';
-    ctx.font=`${14*devicePixelRatio}px Noto Sans JP`;
-    ctx.textAlign='center';
-    ctx.fillText('左パネルで磁極を選んでクリックして配置してください', cw/2, ch/2);
+    ctx.fillStyle = '#99aac0';
+    ctx.font = (14*dpr())+'px Noto Sans JP, Noto Sans SC, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(T.place, cw/2, ch/2);
+    updateStats(0, 0);
     return;
-  }// Equipotential lines (magnetic scalar potential)
-  if(showEquip){
-    drawEquipotentials(cw, ch);
-  }// Field arrow grid
+  }
+  if(geoDirty) buildLines();
+  if(showEquip) drawEquipotentials(cw, ch);
   if(showArrows){
-    const gs = 35 * devicePixelRatio;
+    const gs = 35*dpr();
     for(let gx=gs/2;gx<cw;gx+=gs){
       for(let gy=gs/2;gy<ch;gy+=gs){
-        const {bx,by} = fieldAt(gx, gy);
-        const mag=Math.sqrt(bx*bx+by*by);
+        const {bx, by} = fieldAt(gx, gy);
+        const mag = Math.sqrt(bx*bx+by*by);
         if(mag<1e-4) continue;
         const ux=bx/mag, uy=by/mag;
         const arrowLen = Math.min(gs*0.4, gs*0.4*Math.log1p(mag*0.5));
-        const col = getLineColor(gx,gy);
-        ctx.strokeStyle=col+'aa';
-        ctx.lineWidth=1.2*devicePixelRatio;
+        const col = getLineColor(gx, gy);
+        ctx.strokeStyle = rgba(col, 0.66); ctx.lineWidth = 1.2*dpr();
         ctx.beginPath();
         ctx.moveTo(gx-ux*arrowLen/2, gy-uy*arrowLen/2);
         ctx.lineTo(gx+ux*arrowLen/2, gy+uy*arrowLen/2);
         ctx.stroke();
-        // Arrowhead
         const ax=gx+ux*arrowLen/2, ay=gy+uy*arrowLen/2;
-        const perpx=-uy, perpy=ux;
-        const hs=3*devicePixelRatio;
+        const perpx=-uy, perpy=ux, hs=3*dpr();
         ctx.beginPath();
         ctx.moveTo(ax,ay);
         ctx.lineTo(ax-ux*hs*2+perpx*hs, ay-uy*hs*2+perpy*hs);
         ctx.lineTo(ax-ux*hs*2-perpx*hs, ay-uy*hs*2-perpy*hs);
         ctx.closePath();
-        ctx.fillStyle=col+'aa';
-        ctx.fill();
+        ctx.fillStyle = rgba(col, 0.66); ctx.fill();
       }
     }
-  }// Field lines
-  let lineCount = 0;
+  }
+  for(const pts of cachedLines){
+    for(let j=1;j<pts.length;j++){
+      const p0 = pts[j-1], p1 = pts[j];
+      const x0=p0[0], y0=p0[1], x1=p1[0], y1=p1[1];
+      const col = getLineColor((x0+x1)/2, (y0+y1)/2);
+      const frac = j/pts.length;
+      ctx.beginPath();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = (1.5 - frac*0.5) * dpr();
+      ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+      if(j === Math.floor(pts.length*0.35) || j === Math.floor(pts.length*0.7)){
+        drawArrow(x1, y1, x1+(x1-x0), y1+(y1-y0), col);
+      }
+    }
+  }
+  drawParticles();
   for(const p of poles){
-    if(p.charge <= 0) continue; // trace only from N poles
-    const n = nLines;
-    for(let i=0;i<n;i++){
-      const angle = (2*Math.PI*i/n);
-      const r0 = 12 * devicePixelRatio;
-      const sx = p.x + Math.cos(angle)*r0;
-      const sy = p.y + Math.sin(angle)*r0;
-      const pts = traceLine(sx, sy, 1);
-      if(pts.length < 2) continue;
-      lineCount++;
-
-      // Draw with gradient along the line
-      for(let j=1;j<pts.length;j++){
-        const [x0,y0]=pts[j-1];
-        const [x1,y1]=pts[j];
-        const col = getLineColor((x0+x1)/2, (y0+y1)/2);
-        const frac = j/pts.length;
-        ctx.beginPath();
-        ctx.strokeStyle = col;
-        ctx.lineWidth = (1.5 - frac*0.5) * devicePixelRatio;
-        ctx.moveTo(x0,y0);
-        ctx.lineTo(x1,y1);
-        ctx.stroke();
-        // Draw arrow at 1/3 and 2/3
-        if(j === Math.floor(pts.length*0.35) || j === Math.floor(pts.length*0.7)){
-          drawArrow(x1, y1, x1+(x1-x0), y1+(y1-y0), col);
-        }
-      }
-    }
-  }// Draw poles
-  for(let i=0;i<poles.length;i++){
-    const p=poles[i];
     const isN = p.charge > 0;
     const col = isN ? '#e74c3c' : '#3498db';
-    const r = 16 * devicePixelRatio;
-
-    // Glow
-    const glow = ctx.createRadialGradient(p.x, p.y, r*0.2, p.x, p.y, r*1.8);
-    glow.addColorStop(0, col+'66');
-    glow.addColorStop(1, col+'00');
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, r*1.8, 0, 2*Math.PI);
-    ctx.fillStyle=glow;
-    ctx.fill();
-
-    // Circle
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, r, 0, 2*Math.PI);
-    const grad = ctx.createRadialGradient(p.x-r*0.3, p.y-r*0.3, 0, p.x, p.y, r);
-    grad.addColorStop(0, isN ? '#ff7675' : '#74b9ff');
-    grad.addColorStop(1, col);
-    ctx.fillStyle=grad;
-    ctx.fill();
-    ctx.strokeStyle='#fff';
-    ctx.lineWidth=2*devicePixelRatio;
-    ctx.stroke();
-
-    // Label
-    ctx.fillStyle='#fff';
-    ctx.font=`bold ${11*devicePixelRatio}px Roboto Mono`;
-    ctx.textAlign='center';
-    ctx.textBaseline='middle';
-    ctx.fillText(isN ? 'N' : 'S', p.x, p.y);
+    const r = 16*dpr();
+    const glow = ctx.createRadialGradient(p.x,p.y,r*0.2,p.x,p.y,r*1.8);
+    glow.addColorStop(0, col+'66'); glow.addColorStop(1, col+'00');
+    ctx.beginPath(); ctx.arc(p.x,p.y,r*1.8,0,2*Math.PI); ctx.fillStyle=glow; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,2*Math.PI);
+    const grad = ctx.createRadialGradient(p.x-r*0.3,p.y-r*0.3,0,p.x,p.y,r);
+    grad.addColorStop(0, isN?'#ff7675':'#74b9ff'); grad.addColorStop(1, col);
+    ctx.fillStyle=grad; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2*dpr(); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold '+(11*dpr())+'px Roboto Mono';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(isN?'N':'S', p.x, p.y);
   }
-
-  // Update stats
-  document.getElementById('sPoles').textContent = poles.length;
-  const maxB = poles.length > 0 ? fieldMag(poles[0].x+40, poles[0].y).toFixed(2) : '---';
-  document.getElementById('sMaxB').textContent = poles.length ? fieldMag(canvas.width/2, canvas.height/2).toFixed(3) : '---';
-  document.getElementById('sLines').textContent = lineCount;
+  updateStats(cachedLines.length, particles.length);
+}
+function updateStats(lineCount, partCount){
+  const sP = document.getElementById('sPoles');
+  if(sP) sP.textContent = poles.length;
+  let maxB = 0;
+  if(poles.length){
+    const samples = 70;
+    for(let iy=0;iy<=samples;iy++){
+      const y = canvas.height*iy/samples;
+      for(let ix=0;ix<=samples;ix++){
+        const x = canvas.width*ix/samples;
+        let nearPole = false;
+        for(const p of poles){
+          const dx=x-p.x, dy=y-p.y;
+          if(dx*dx+dy*dy < 36){ nearPole=true; break; }
+        }
+        if(!nearPole) maxB = Math.max(maxB, fieldMag(x,y));
+      }
+    }
+  }
+  const mB = document.getElementById('sMaxB');
+  if(mB) mB.textContent = poles.length ? maxB.toFixed(3) : '0.000';
+  const sL = document.getElementById('sLines');
+  if(sL) sL.textContent = lineCount;
   const nCount = poles.filter(p=>p.charge>0).length;
   const sCount = poles.filter(p=>p.charge<0).length;
-  document.getElementById('sTopology').textContent = nCount===sCount ? '双極子系' : nCount===0||sCount===0 ? '単極系' : '混合';
-}function drawEquipotentials(cw, ch){
-  const res = 3 * devicePixelRatio;
-  const nx = Math.floor(cw/res)+1;
-  const ny2 = Math.floor(ch/res)+1;
-  // Compute potential on grid
-  const phi = [];
-  for(let iy=0;iy<ny2;iy++){
-    phi.push([]);
-    for(let ix=0;ix<nx;ix++){
-      const x=ix*res, y=iy*res;
-      let p=0;
-      for(const pole of poles){
-        const dx=x-pole.x, dy=y-pole.y;
-        const r=Math.sqrt(dx*dx+dy*dy);
-        if(r>5) p += pole.charge * pole.strength / r;
-      }
-      phi[iy].push(p);
+  const tEl = document.getElementById('sTopology');
+  if(tEl){
+    let topo = '—';
+    if(poles.length){
+      if(nCount===0 || sCount===0) topo = T.topoMono;
+      else if(poles.length===2 && nCount===1 && sCount===1) topo = T.topoDipole;
+      else if(nCount===sCount && poles.length>=4) topo = T.topoMulti;
+      else topo = T.topoMixed;
     }
-  }// Find range
-  let minP=Infinity, maxP=-Infinity;
-  for(const row of phi) for(const v of row){ if(isFinite(v)){minP=Math.min(minP,v);maxP=Math.max(maxP,v);} }const levels = 12;
-  for(let li=1;li<levels;li++){
-    const lev = minP + (maxP-minP)*li/levels;
-    ctx.beginPath();
-    ctx.strokeStyle = `rgba(100,150,220,0.35)`;
-    ctx.lineWidth = 0.8*devicePixelRatio;
-    ctx.setLineDash([4*devicePixelRatio, 4*devicePixelRatio]);
-    // Marching squares (simplified: just draw contour cells)
-    for(let iy=0;iy<ny2-1;iy++){
-      for(let ix=0;ix<nx-1;ix++){
-        const v00=phi[iy][ix], v10=phi[iy][ix+1], v01=phi[iy+1][ix], v11=phi[iy+1][ix+1];
-        const above = [v00>=lev,v10>=lev,v01>=lev,v11>=lev];
-        const edges = [];
-        if(above[0]!==above[1]) edges.push([lerp2(ix,ix+1,v00,v10,lev)*res, (iy+0.0)*res, lerp2(ix,ix+1,v00,v10,lev)*res, iy*res]);
-        // Just draw cell border if crossing
-        const anyAbove = above.some(a=>a), anyBelow = above.some(a=>!a);
-        if(anyAbove && anyBelow){
-          const cx2 = (ix+0.5)*res, cy2 = (iy+0.5)*res;
-          ctx.rect(ix*res, iy*res, res, res);
-        }
-      }
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
+    tEl.textContent = topo;
   }
-}function lerp2(a,b,va,vb,target){ return a+(b-a)*(target-va)/(vb-va); }// ========== Interaction ==========
-
+}
+function frame(){
+  if(!reduceMotion){ updateParticles(1.0); }
+  draw();
+  if(!reduceMotion) animId = requestAnimationFrame(frame);
+}
+function startLoop(){
+  if(reduceMotion){ draw(); return; }
+  if(animId) return;
+  animId = requestAnimationFrame(frame);
+}
 function setPlaceMode(m){
   placeMode = m;
-  ['btnN','btnS','btnD'].forEach(id=>document.getElementById(id)?.classList.remove('active-mode'));
-  if(m==='N') document.getElementById('btnN').classList.add('active-mode');
-  if(m==='S') document.getElementById('btnS').classList.add('active-mode');
-  if(m==='D') document.getElementById('btnD').classList.add('active-mode');
-}function poleRadius(){ return 16 * devicePixelRatio; }function hitTest(x, y){
+  ['btnN','btnS','btnD'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('active-mode'); });
+  if(m==='N'){ const el=document.getElementById('btnN'); if(el) el.classList.add('active-mode'); }
+  if(m==='S'){ const el=document.getElementById('btnS'); if(el) el.classList.add('active-mode'); }
+  if(m==='D'){ const el=document.getElementById('btnD'); if(el) el.classList.add('active-mode'); }
+}
+function poleRadius(){ return 16*dpr(); }
+function hitTest(x, y){
   const r = poleRadius()*1.5;
   for(let i=poles.length-1;i>=0;i--){
     const dx=x-poles[i].x, dy=y-poles[i].y;
@@ -542,126 +613,122 @@ function setPlaceMode(m){
   }
   return -1;
 }
-
 function getCanvasPos(e){
   const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  if(e.touches){
-    return {x:(e.touches[0].clientX-rect.left)*scaleX, y:(e.touches[0].clientY-rect.top)*scaleY};
-  }return{x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
+  const scaleX = canvas.width/rect.width, scaleY = canvas.height/rect.height;
+  if(e.touches) return {x:(e.touches[0].clientX-rect.left)*scaleX, y:(e.touches[0].clientY-rect.top)*scaleY};
+  return {x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY};
 }
-
+function placeAt(x, y){
+  if(placeMode==='N') poles.push({x,y,charge:1,strength:poleStrength});
+  else if(placeMode==='S') poles.push({x,y,charge:-1,strength:poleStrength});
+  else if(placeMode==='D'){
+    const sep = 40*dpr();
+    poles.push({x:x-sep/2,y,charge:1,strength:poleStrength});
+    poles.push({x:x+sep/2,y,charge:-1,strength:poleStrength});
+  }
+  geoDirty = true;
+}
 canvas.addEventListener('contextmenu', e=>{
   e.preventDefault();
   const {x,y}=getCanvasPos(e);
   const i=hitTest(x,y);
-  if(i>=0){ poles.splice(i,1); render(); }
+  if(i>=0){ poles.splice(i,1); geoDirty=true; particles=[]; }
 });
-
 canvas.addEventListener('mousedown', e=>{
   const {x,y}=getCanvasPos(e);
-  if(placeMode){
-    if(placeMode==='N') poles.push({x,y,charge:1,strength:poleStrength});
-    else if(placeMode==='S') poles.push({x,y,charge:-1,strength:poleStrength});
-    else if(placeMode==='D'){
-      const sep = 40*devicePixelRatio;
-      poles.push({x:x-sep/2,y,charge:1,strength:poleStrength});
-      poles.push({x:x+sep/2,y,charge:-1,strength:poleStrength});
-    }
-    render();
-  }else{
-    const i=hitTest(x,y);
-    if(i>=0){ dragging=i; dragOffX=x-poles[i].x; dragOffY=y-poles[i].y; }
-  }
+  if(placeMode){ placeAt(x,y); }
+  else { const i=hitTest(x,y); if(i>=0){ dragging=i; dragOffX=x-poles[i].x; dragOffY=y-poles[i].y; } }
 });
 canvas.addEventListener('mousemove', e=>{
   const {x,y}=getCanvasPos(e);
-  if(dragging!==null){
-    poles[dragging].x=x-dragOffX;
-    poles[dragging].y=y-dragOffY;
-    render();
-  }const{bx,by}=fieldAt(x,y);
+  if(dragging!==null){ poles[dragging].x=x-dragOffX; poles[dragging].y=y-dragOffY; geoDirty=true; }
+  const {bx,by}=fieldAt(x,y);
   const mag=Math.sqrt(bx*bx+by*by);
-  document.getElementById('cursorInfo').textContent=`|B| = ${mag.toFixed(4)}(${x.toFixed(0)}, ${y.toFixed(0)})`;
+  const ci=document.getElementById('cursorInfo');
+  if(ci) ci.textContent='|B| = '+mag.toFixed(4)+'  ('+x.toFixed(0)+', '+y.toFixed(0)+')';
 });
 canvas.addEventListener('mouseup', ()=>{ dragging=null; });
-canvas.addEventListener('touchstart', e=>{ e.preventDefault(); const {x,y}=getCanvasPos(e);
-  if(placeMode){
-    if(placeMode==='N') poles.push({x,y,charge:1,strength:poleStrength});
-    else if(placeMode==='S') poles.push({x,y,charge:-1,strength:poleStrength});
-    else if(placeMode==='D'){const sep=40*devicePixelRatio;poles.push({x:x-sep/2,y,charge:1,strength:poleStrength});poles.push({x:x+sep/2,y,charge:-1,strength:poleStrength});}
-    render();
-  }else{ const i=hitTest(x,y); if(i>=0){dragging=i;dragOffX=x-poles[i].x;dragOffY=y-poles[i].y;} }
+canvas.addEventListener('touchstart', e=>{
+  e.preventDefault(); const {x,y}=getCanvasPos(e);
+  if(placeMode){ placeAt(x,y); }
+  else { const i=hitTest(x,y); if(i>=0){ dragging=i; dragOffX=x-poles[i].x; dragOffY=y-poles[i].y; } }
 },{passive:false});
-canvas.addEventListener('touchmove', e=>{ e.preventDefault(); const {x,y}=getCanvasPos(e);
-  if(dragging!==null){poles[dragging].x=x-dragOffX;poles[dragging].y=y-dragOffY;render();}
+canvas.addEventListener('touchmove', e=>{
+  e.preventDefault(); const {x,y}=getCanvasPos(e);
+  if(dragging!==null){ poles[dragging].x=x-dragOffX; poles[dragging].y=y-dragOffY; geoDirty=true; }
 },{passive:false});
 canvas.addEventListener('touchend', ()=>{ dragging=null; });
-
-// ========== Presets ==========
-
-function clearAll(){ poles=[]; render(); }function cw(){ return canvas.width; }function ch(){ return canvas.height; }function presetDipole(){
-  poles=[];
-  const sep=70*devicePixelRatio;
-  poles.push({x:cw()/2-sep, y:ch()/2, charge:1, strength:poleStrength});
-  poles.push({x:cw()/2+sep, y:ch()/2, charge:-1, strength:poleStrength});
-  render();
-}function presetAttract(){
-  poles=[];
-  const sep=90*devicePixelRatio;
-  poles.push({x:cw()/2-sep, y:ch()/2, charge:1, strength:poleStrength});
-  poles.push({x:cw()/2+sep, y:ch()/2, charge:-1, strength:poleStrength});
-  render();
-}function presetRepel(){
-  poles=[];
-  const sep=90*devicePixelRatio;
-  poles.push({x:cw()/2-sep, y:ch()/2, charge:1, strength:poleStrength});
-  poles.push({x:cw()/2+sep, y:ch()/2, charge:1, strength:poleStrength});
-  render();
-}function presetQuad(){
-  poles=[];
-  const d=80*devicePixelRatio;
-  poles.push({x:cw()/2-d, y:ch()/2-d, charge:1, strength:poleStrength});
-  poles.push({x:cw()/2+d, y:ch()/2-d, charge:-1, strength:poleStrength});
-  poles.push({x:cw()/2+d, y:ch()/2+d, charge:1, strength:poleStrength});
-  poles.push({x:cw()/2-d, y:ch()/2+d, charge:-1, strength:poleStrength});
-  render();
-}// ========== Toggle options ==========
-
+function clearAll(){ poles=[]; particles=[]; geoDirty=true; if(reduceMotion) draw(); }
+function cw(){ return canvas.width; }
+function ch(){ return canvas.height; }
+function presetDipole(){
+  poles=[]; particles=[];
+  const sep=70*dpr();
+  poles.push({x:cw()/2-sep,y:ch()/2,charge:1,strength:poleStrength});
+  poles.push({x:cw()/2+sep,y:ch()/2,charge:-1,strength:poleStrength});
+  geoDirty=true; if(reduceMotion) draw();
+}
+function presetAttract(){
+  poles=[]; particles=[];
+  const sep=90*dpr();
+  poles.push({x:cw()/2-sep,y:ch()/2,charge:1,strength:poleStrength});
+  poles.push({x:cw()/2+sep,y:ch()/2,charge:-1,strength:poleStrength});
+  geoDirty=true; if(reduceMotion) draw();
+}
+function presetRepel(){
+  poles=[]; particles=[];
+  const sep=90*dpr();
+  poles.push({x:cw()/2-sep,y:ch()/2,charge:1,strength:poleStrength});
+  poles.push({x:cw()/2+sep,y:ch()/2,charge:1,strength:poleStrength});
+  geoDirty=true; if(reduceMotion) draw();
+}
+function presetQuad(){
+  poles=[]; particles=[];
+  const d=80*dpr();
+  poles.push({x:cw()/2-d,y:ch()/2-d,charge:1,strength:poleStrength});
+  poles.push({x:cw()/2+d,y:ch()/2-d,charge:-1,strength:poleStrength});
+  poles.push({x:cw()/2+d,y:ch()/2+d,charge:1,strength:poleStrength});
+  poles.push({x:cw()/2-d,y:ch()/2+d,charge:-1,strength:poleStrength});
+  geoDirty=true; if(reduceMotion) draw();
+}
 function toggle(varName, btnId){
   if(varName==='showArrows') showArrows=!showArrows;
   if(varName==='showEquip') showEquip=!showEquip;
-  document.getElementById(btnId).classList.toggle('btn-primary', window[varName]);
-  render();
-}// ========== Sliders ==========
-
-document.getElementById('sStrength').addEventListener('input', function(){
+  const on = varName==='showArrows' ? showArrows : showEquip;
+  const b = document.getElementById(btnId);
+  if(b) b.classList.toggle('btn-primary', on);
+  if(reduceMotion) draw();
+}
+(function(){ const s=document.getElementById('sStrength'); if(s) s.addEventListener('input', function(){
   poleStrength=parseFloat(this.value);
   poles.forEach(p=>p.strength=poleStrength);
-  render();
-});
-document.getElementById('sNLines').addEventListener('input', function(){
-  nLines=parseInt(this.value);
-  render();
-});
-document.getElementById('sStep').addEventListener('input', function(){
-  stepSize=parseFloat(this.value);
-  render();
-});
-
-// ========== Resize ==========
-
+  geoDirty=true; if(reduceMotion) draw();
+}); })();
+(function(){ const s=document.getElementById('sNLines'); if(s) s.addEventListener('input', function(){
+  nLines=parseInt(this.value,10); geoDirty=true; if(reduceMotion) draw();
+}); })();
+(function(){ const s=document.getElementById('sStep'); if(s) s.addEventListener('input', function(){
+  stepSize=parseFloat(this.value); geoDirty=true; if(reduceMotion) draw();
+}); })();
 function resizeCanvas(){
-  canvas.width = canvas.offsetWidth * devicePixelRatio;
-  canvas.height = canvas.offsetHeight * devicePixelRatio;
-  if(poles.length>0) render();
-  else render();
-}window.addEventListener('resize', ()=>{ resizeCanvas(); });
-
-// Init
+  canvas.width = canvas.offsetWidth * dpr();
+  canvas.height = canvas.offsetHeight * dpr();
+  geoDirty=true;
+  if(reduceMotion) draw();
+}
+window.addEventListener('resize', resizeCanvas);
+window.setPlaceMode = setPlaceMode;
+window.presetDipole = presetDipole;
+window.presetAttract = presetAttract;
+window.presetRepel = presetRepel;
+window.presetQuad = presetQuad;
+window.clearAll = clearAll;
+window.toggle = toggle;
 resizeCanvas();
 presetDipole();
+startLoop();
+})();
 </script>
 
 <section class="explanation">
@@ -683,14 +750,14 @@ presetDipole();
       <div class="bub">え、置いてみました…あれ？確かに線はくっついたりはするけど、きれいに交差はしませんね。なぜ交わらないんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">いいところに気づいたね。もし磁力線が交差したら、その交点で磁場の向きが2つあることになって矛盾するだろ？実はこれ、「ガウスの磁気法則」という自然界の大原則から来ているんだ。磁気単極子（Nだけ、Sだけの粒子）は存在しないから、磁力線は必ずループを描いて閉じていて、途中で始まったり終わったり、交差したりしない。シミュレーターで「表示密度」スライダーを上げると、より多くの磁力線が描かれて、このループ構造がはっきり見えるよ。</div>
+      <div class="bub">いいところに気づいたね。もし磁力線が交差したら、その交点で磁場の向きが2つあることになって矛盾するだろ？実はこれ、「ガウスの磁気法則」という自然界の大原則から来ているんだ。磁気単極子（Nだけ、Sだけの粒子）は存在しないから、磁力線は必ずループを描いて閉じていて、途中で始まったり終わったり、交差したりしない。シミュレーターで「磁力線本数/極」スライダーを上げると、より多くの磁力線が描かれて、このループ構造がはっきり見えるよ。</div>
     </div>
   </div>
   <h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">N極とS極を配置したのに磁力線が表示されません。どうすればいいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">まず、画面上で磁極が正しく配置されているか確認してください。磁極の強さ（mの値）が0になっていないか、または極端に小さくなっていないかをチェックします。また、表示範囲外に磁極があると描画されないため、ビューをリセットするかズームアウトしてみてください。</div>
+    <div class="faq-a">まず、画面上で磁極が正しく配置されているか確認してください。磁極の強さ（mの値）が0になっていないか、または極端に小さくなっていないかをチェックします。表示範囲外に磁極がある場合は「リセット」または「クリア」で初期配置に戻してください。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">磁力線の向き（矢印）は何を表していますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -716,12 +783,15 @@ presetDipole();
 <h2>よくある誤解と注意点</h2>
 <div class="fblock">
 <p>まず、このシミュレーターで扱っているのは<strong>「点磁極」という理想化されたモデル</strong>だということを押さえておこう。現実の棒磁石にはN極とS極が必ずペアで存在し、磁極は「点」ではなく面に広がっている。だから、シミュレーターでN極だけを2つ極端に近づけて配置すると、現実ではあり得ないほど強い反発が計算上は発生する。これはあくまで原理を理解するためのツールで、実機の精密設計にはより高精度なFEMソフトが必要になるよ。</p>
-<p>次に、<strong>「表示密度」スライダーの意味を誤解しない</strong>こと。これを上げると磁力線が密に表示されるが、これは「磁場そのものが強くなった」わけではない。例えば、磁極の強さを10から20にすれば磁場は強まるが、表示密度を10から20にしても、単に見えている線の本数が増えるだけだ。磁場の強弱は「磁極の強さ」スライダーと、磁力線の混み具合（線の間隔）で判断しよう。</p>
+<p>次に、<strong>「磁力線本数/極」スライダーの意味を誤解しない</strong>こと。これを上げると磁力線が密に表示されるが、これは「磁場そのものが強くなった」わけではない。磁場の強弱は「磁極の強さ」スライダーと、磁力線の混み具合（線の間隔）で判断しよう。</p>
 <p>最後に、実務でよくある落とし穴は<strong>「周辺材料の影響を無視している」</strong>点だ。このシミュレーターは真空（空気）中での計算だ。でも実際の設計では、鉄などの強磁性体があれば磁力線はそこに集中して引き寄せられ（磁気遮蔽や磁路形成）、銅などの導体があれば渦電流が発生して磁場を打ち消す方向に働く。まずは基本の「真空中の磁場」をこのツールで体感し、その上で「材料が加わるとどう変わるか」を学ぶのが正しいステップだ。</p>
 
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="magnetic-field-lines.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -775,16 +845,26 @@ presetDipole();
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>磁極強度（sStrength）を0～100の範囲で設定し、N極またはS極の磁力を決定します</li><li>磁力線本数（sNLines）を10～200本の間で選択し、磁場分布の解像度を調整します</li><li>計算ステップ数（sStep）を50～500に設定して積分精度を高め、磁力線の追跡精度を向上させます</li><li>シミュレーター上で磁極位置をドラッグして配置し、リアルタイムで磁場可視化を確認します</li><li>FEM解析前の概略設計検討に使用する場合は、ステップ数200以上を推奨します</li></ol>
+<ol><li>磁極強度（sStrength）を0.2〜3.0の範囲で設定します（本ツールでは無次元の強度です）</li><li>磁力線本数（sNLines）を6〜24本/極の範囲で選択し、表示する線の本数を調整します</li><li>積分ステップ幅（sStep）を0.5〜8pxで設定します。小さいほど滑らかですが描画負荷は増えます</li><li>シミュレーター上で磁極位置をドラッグして配置し、リアルタイムで磁場可視化を確認します</li><li>定量的な磁束密度や飽和評価はFEMなど別手法で確認してください</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>モーター設計時の永磁体配置検討を想定：N極磁極強度80、S極磁極強度80で磁力線本数150本、ステップ数300を設定した場合、磁極間距離10mmのギャップ部で磁束密度約0.8Tの均一磁場が生成されます。一方、磁力線本数50本・ステップ数100では計算速度が3倍高速化される代わりに、端部の磁場歪みが±15%程度過小評価される傾向があります。トランス鉄心設計では磁極強度40～60の範囲で飽和特性を確認するため、段階的な強度変更シミュレーションが有効です。</p>
+<p>双極子プリセットでN極とS極を配置し、磁極強度1.0、磁力線本数14本/極、ステップ幅3.0pxを設定した場合、磁力線はN極からS極へ滑らかに接続します。本ツールの磁場値は無次元の相対値であり、T（テスラ）やmm単位の実機磁束密度を直接表すものではありません。線の本数を増やすと表示密度だけが変わり、磁場そのものは強くなりません。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
-<ol><li>永磁体の温度特性：磁極強度を80以上に設定した場合、実機では温度上昇時に強度が5～10%低下するため、設計余裕を見込んで70程度に調整してから基本配置を決定してください</li><li>ギャップ部での非線形性：磁力線が密集する領域（本数が集中）では鉄心飽和の可能性があり、FEM解析で材料非線形特性B-H曲線の確認が必須です</li><li>ステップ数と精度のトレードオフ：ステップ数150以下では磁極近傍の特異点処理が不完全になるため、最小でも200以上を推奨します</li><li>モーター制御設計時は、磁力線分布から鎖交磁束を推定し、巻線インダクタンス計算の初期値とします</li></ol>
+<ol><li>磁極強度は0.2〜3.0の無次元入力で、実磁石の温度特性やB-H曲線は含みません</li><li>磁力線が密集する領域は相対的に強い場を示しますが、定量設計にはFEM解析が必要です</li><li>ステップ幅を大きくしすぎると磁極近傍の曲線が粗くなるため、0.5〜8pxの範囲で用途に合わせて調整してください</li><li>モーター制御設計時は、磁力線分布を初期検討に使い、鎖交磁束やインダクタンスは別途計算します</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "クリープ変形計算",
       "description": "Norton則とLarson-Miller法によるクリープ変形・破断寿命の計算ツール。316L・Inconel 718・Al6061・Ti-6Al-4V対応。",
       "url": "https://novasolver.jp/tools/creep-deformation.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Norton則によるクリープひずみ速度計算","Larson-Millerパラメータ法による破断寿命評価","クリープひずみ vs 時間グラフ可視化"],
       "keywords": "クリープ,Norton則,Larson-Miller,高温材料,破断寿命,316Lステンレス,Inconel,CAE材料解析",
       "datePublished": "2026-04-09",
@@ -132,6 +132,31 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 creep animation ===== */
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.84rem;font-family:inherit;font-weight:600;transition:background .2s}
+.btn:hover{background:#0056b3}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:5px 11px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.0rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.scrub-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.scrub-row input[type=range]{flex:1}
+.scrub-time{font-family:'Roboto Mono',monospace;font-size:0.78rem;color:var(--accent);min-width:80px;text-align:right}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.ebar-fill{transition:none}}
+/* end v2 additions */
+
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/creep-deformation.html">
@@ -162,6 +187,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <div class="main">
   <div class="panel">
     <div class="panel-title">材料・条件</div>
+
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button class="preset-btn" type="button" onclick="setPreset('low')">低応力・低温</button>
+        <button class="preset-btn" type="button" onclick="setPreset('high')">高応力・高温</button>
+        <button class="preset-btn" type="button" onclick="setPreset('inconel')">Inconel高温</button>
+      </div>
+    </div>
+    <div class="divider"></div>
 
     <label style="font-size:0.83rem;font-weight:600;display:block;margin-bottom:4px;">材料選択</label>
     <select id="sel-mat">
@@ -196,20 +231,65 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
+    <div class="play-row">
+      <button class="btn" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+      <button class="btn secondary" type="button" id="btnReplay" onclick="replay()"><i class="fas fa-rotate-left"></i> 最初から</button>
+      <div style="display:flex;gap:4px;margin-left:auto">
+        <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+        <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+        <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
     <div class="panel-title">計算結果</div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roT">0%</div><div class="rl">経過時間 t/t_r</div></div>
+        <div class="live-ro"><div class="rv" id="roEps">0.000</div><div class="rl">ひずみ ε</div></div>
+        <div class="live-ro"><div class="rv" id="roRate">—</div><div class="rl">速度 dε/dt [1/h]</div></div>
+        <div class="live-ro"><div class="rv" id="roStage">一次</div><div class="rl">現ステージ</div></div>
+        <div class="live-ro"><div class="rv" id="roTtr">—</div><div class="rl">破断まで [h]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> クリープ変形アニメーション（一定荷重・三段階）</div>
+      <canvas id="creepCanvas" height="420" tabindex="0" role="img" aria-label="一定荷重下で試験片が伸びるクリープアニメーション。ひずみ-時間曲線と一次・二次・三次クリープの三段階を表示します。"></canvas>
+
+      <div class="scrub-row">
+        <span style="font-size:.72rem;color:var(--muted)"><i class="fas fa-clock"></i></span>
+        <input type="range" id="scrub" min="0" max="1000" step="1" value="0" oninput="onScrub()" aria-label="クリープ寿命タイムスクラバー">
+        <span class="scrub-time" id="scrubTime">0.0 %</span>
+      </div>
+
+      <div class="legend">
+        <span><i class="swatch" style="background:#00d4a0"></i>一次（減速）</span>
+        <span><i class="swatch" style="background:#00B4D8"></i>二次（定常・最小速度）</span>
+        <span><i class="swatch" style="background:#ff5252"></i>三次（加速・破断）</span>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（Norton則・Larson-Miller）</div>
     <div class="stat-cards">
       <div class="stat-card">
         <div class="sv" id="sc-edot">—</div>
-        <div class="sl">ε̇ (1/h) クリープ速度</div>
+        <div class="sl">ε̇ₛ (1/h) 定常クリープ速度</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="sc-eps">—</div>
-        <div class="sl">ε(t) 累積ひずみ</div>
+        <div class="sl">ε(t) 現在ひずみ</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="sc-tr">—</div>
@@ -222,194 +302,318 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="charts-grid">
-      <div>
-        <div class="chart-card">
-      <div class="chart-title">クリープひずみ vs 時間</div>
-        <canvas id="creepChart"></canvas>
-    </div>
-      </div>
-      <div>
-        <div class="chart-card">
-      <div class="chart-title">Larson-Miller線図（<span style="text-transform:none">σ</span> vs LMP）</div>
-        <canvas id="lmChart"></canvas>
-    </div>
-      </div>
-    </div>
-    <div style="margin-top:20px;">
-      <div class="chart-card">
-      <div class="chart-title">結晶粒界クリープ概念図</div>
-      <canvas id="grainCanvas" width="600" height="150"></canvas>
-    </div>
-    </div>
-  
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      <p>$\dot{\varepsilon}= A\,\sigma^n \exp\!\left(-\dfrac{Q}{RT}\right)$</p>
-      <p style="margin-top:6px;">$P_{LM}= T(C + \log_{10} t_r)$</p>
-    
+      <p>定常（二次）クリープの最小速度：$\dot{\varepsilon}_s= A\,\sigma^n \exp\!\left(-\dfrac{Q}{RT}\right)$</p>
+      <p style="margin-top:6px;">破断寿命とLarson-Millerパラメータ：$t_r=\dfrac{\varepsilon_R}{\dot{\varepsilon}_s},\quad P_{LM}= T(C + \log_{10} t_r)$</p>
+      <p style="margin-top:6px;font-size:.8rem;color:var(--muted)">検証例：316L, σ=100 MPa, T=600°C → ε̇ₛ≈5.3×10⁻³³ /h（A,n,Q既定値）。アニメーションは t_r を基準に正規化し、一次→二次（定常・最小傾き）→三次（ネッキング・破断）を可視化します。</p>
+
 </div>
 </div>
 </div>
 
-<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
-
+(function(){
+"use strict";
 const R = 8.314;
+const EPS_R = 0.30;            // rupture strain
 const matParams = {
   '316L':   { A: 3e-26, n: 5.0, Q: 280000, C: 20, label: '316L SS' },
   'Inconel':{ A: 1e-20, n: 4.5, Q: 320000, C: 20, label: 'Inconel 718' },
-  'Al6061':{ A: 1e-15, n: 4.0, Q: 140000, C: 20, label: 'Al 6061' },
-  'Ti64':{ A: 1e-18, n: 4.8, Q: 260000, C: 20, label: 'Ti-6Al-4V' }
+  'Al6061': { A: 1e-15, n: 4.0, Q: 140000, C: 20, label: 'Al 6061' },
+  'Ti64':   { A: 1e-18, n: 4.8, Q: 260000, C: 20, label: 'Ti-6Al-4V' }
 };
+// three-stage normalized creep model: tau = t/tr in [0,1], eps in [0, EPS_R]
+const EP = 0.045, TP = 0.10;   // primary (decelerating) amplitude / time const
+const ET = 0.085, QT = 2.6;    // tertiary (accelerating) amplitude / exponent
+function tertN(tau){ return ET * Math.pow(Math.max(0, tau - 0.55) / 0.45, QT); }
+const ES = EPS_R - EP*(1-Math.exp(-1/TP)) - tertN(1);   // secondary slope (per unit tau)
+function epsN(tau){ tau = Math.max(0, Math.min(1, tau)); return EP*(1-Math.exp(-tau/TP)) + ES*tau + tertN(tau); }
+function rateN(tau){ const h=1e-4; return (epsN(Math.min(1,tau+h)) - epsN(Math.max(0,tau-h))) / (Math.min(1,tau+h)-Math.max(0,tau-h)); }
+function stageOf(tau){ if (tau < 0.30) return 0; if (tau < 0.62) return 1; return 2; }
 
-const slSig = document.getElementById('sl-sig');
-const slT   = document.getElementById('sl-T');
-const slTt  = document.getElementById('sl-t');
-const selMat= document.getElementById('sel-mat');
+const el = (id)=>document.getElementById(id);
+const slSig = el('sl-sig'), slT = el('sl-T'), slTt = el('sl-t'), selMat = el('sel-mat');
+const canvas = el('creepCanvas');
+const ctx = canvas.getContext('2d');
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function updateSliderFill(el){
-  const pct = (el.value - el.min) / (el.max - el.min) * 100;
-  el.style.setProperty('--pct', pct + '%');
-}[slSig, slT, slTt].forEach(s =>{ updateSliderFill(s); s.addEventListener('input', () => { updateSliderFill(s); compute(); }); });
-selMat.addEventListener('change', compute);
+let model = null;             // {edot, tr, LMP, sig, TK}
+let playing = false, animId = null, speedMult = 1;
+let tau = 0;                  // normalized life fraction [0,1]
+let lastTs = 0;
+const FULL_PLAY_SEC = 14;     // seconds for one full life at 1x
 
-// Creep chart
+const STAGE_JA = ['一次（減速）', '二次（定常・最小速度）', '三次（加速・破断）'];
+const STAGE_SHORT_JA = ['一次', '二次', '三次'];
 
-const creepCtx = document.getElementById('creepChart').getContext('2d');
-const creepChart = new Chart(creepCtx,{
-  type: 'line',
-  data: { labels: [], datasets: [{ label: 'ε(t)', data: [], borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.1)', fill: true, tension: 0.3, pointRadius: 0 }] },
-  options:{
-    responsive: true,
-    plugins: { legend: { display: false } },
-    scales:{
-      x: { title: { display: true, text: '時間 (h)' } },
-      y:{ title: { display: true, text: 'クリープひずみ' }, beginAtZero: true }
-    }
-  }
-});
-
-// LM chart
-
-const lmCtx = document.getElementById('lmChart').getContext('2d');
-const lmChart = new Chart(lmCtx,{
-  type: 'scatter',
-  data: {
-    datasets: [
-      { label: '破断点', data: [], backgroundColor: '#e74c3c', pointRadius: 8 },{ label: 'LMカーブ', data: [], borderColor: '#007BFF', showLine: true, tension: 0.4, pointRadius: 0 }
-    ]
-  },
-  options:{
-    responsive: true,
-    plugins: { legend: { display: true, position: 'top' } },
-    scales:{
-      x: { type:'linear', title: { display: true, text: 'LMP (×10³)' } },
-      y:{ title: { display: true, text: '応力 (MPa)' } }
-    }
-  }
-});
-
-function compute(){
-  const mat = selMat.value;
-  const { A, n, Q, C }= matParams[mat];
-  const sig = parseFloat(slSig.value);
-  const Tc  = parseFloat(slT.value);
-  const tMax= parseFloat(slTt.value);
-  const TK  = Tc + 273.15;
-
-  (function(){var _e=document.getElementById('valSig');if(_e)_e.value=sig.toFixed(0);})();
-  (function(){var _e=document.getElementById('valT');if(_e)_e.value=Tc.toFixed(0);})();
-  (function(){var _e=document.getElementById('valTt');if(_e)_e.value=tMax.toFixed(0);})();
-
-  const edot = A * Math.pow(sig, n) * Math.exp(-Q / (R * TK));
-
-  // creep strain vs time
-  const nPts = 50;
-  const labels = [];
-  const data = [];
-  for (let i = 0; i <= nPts; i++){
-    const t = (i / nPts) * tMax;
-    labels.push(t.toFixed(0));
-    data.push(edot * t);
-  }creepChart.data.labels = labels;
-  creepChart.data.datasets[0].data = data;
-  creepChart.update();
-
-  // rupture life from LM: P = T*(C + log10(tr)) => tr = 10^(P/T - C)
-  // We estimate tr by using edot * tr = 0.3 (typical rupture strain approx)
-  const epsRupture = 0.3;
-  const tr = epsRupture / edot;
-  const LMP = TK * (C + Math.log10(tr)) / 1000;
-
-  document.getElementById('sc-edot').textContent = edot.toExponential(2);
-  document.getElementById('sc-eps').textContent  = (edot * tMax).toExponential(3);
-  document.getElementById('sc-tr').textContent   = tr < 1e10 ? tr.toExponential(2) : '>1e10';
-  document.getElementById('sc-LMP').textContent  = LMP.toFixed(1);
-
-  // LM diagram: sweep stress
-  const stresses = [];
-  const lmCurveX = [];
-  const lmCurveY = [];
-  for (let s = 20; s <= 500; s += 20){
-    const ed = A * Math.pow(s, n) * Math.exp(-Q / (R * TK));
-    const tr2 = epsRupture / ed;
-    const lm = TK * (C + Math.log10(tr2)) / 1000;
-    lmCurveX.push(lm);
-    lmCurveY.push(s);
-  }lmChart.data.datasets[0].data = [{ x: LMP, y: sig }];
-  lmChart.data.datasets[1].data = lmCurveX.map((x, i) => ({ x, y: lmCurveY[i] }));
-  lmChart.update();
-
-  drawGrains(edot);
+function updateSliderFill(s){
+  const pct = (s.value - s.min) / (s.max - s.min) * 100;
+  s.style.setProperty('--pct', pct + '%');
 }
 
-// Grain canvas
+function compute(){
+  const m = matParams[selMat.value];
+  const sig = parseFloat(slSig.value);
+  const Tc  = parseFloat(slT.value);
+  const TK  = Tc + 273.15;
+  const e2 = el('valSig'); if (e2) e2.value = sig.toFixed(0);
+  const e3 = el('valT');   if (e3) e3.value = Tc.toFixed(0);
+  const e4 = el('valTt');  if (e4) e4.value = parseFloat(slTt.value).toFixed(0);
 
-const gc = document.getElementById('grainCanvas');
-const gctx = gc.getContext('2d');
-let grainAnim = 0;
-function drawGrains(edot) {
-  const W = gc.offsetWidth || 600;
-  gc.width = W; gc.height = 150;
-  gctx.clearRect(0,0,W,150);
-  gctx.fillStyle = '#020d1a';
-  gctx.fillRect(0,0,W,150);
+  const edot = m.A * Math.pow(sig, m.n) * Math.exp(-m.Q / (R * TK));  // Norton steady-state (1/h)
+  const tr   = EPS_R / edot;                                          // rupture life (h)
+  const LMP  = TK * (m.C + Math.log10(tr)) / 1000;
+  model = { edot, tr, LMP, sig, TK };
+  el('sc-edot').textContent = edot.toExponential(2);
+  el('sc-tr').textContent   = tr < 1e10 ? tr.toExponential(2) : '>1e10';
+  el('sc-LMP').textContent  = LMP.toFixed(1);
+}
 
-  const cols = 12, rows = 5;
-  const cw = W / cols, ch = 150 / rows;
-  const strainFactor = Math.min(0.4, edot * 1e10);
+function fmtH(h){
+  if (!isFinite(h)) return '∞';
+  if (h >= 1e10) return '>1e10';
+  if (h >= 1e4 || h < 1e-2) return h.toExponential(2);
+  return h.toFixed(h < 10 ? 2 : 0);
+}
 
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const cx = (c + 0.5) * cw;
-      const cy = (r + 0.5) * ch;
-      const rx = cw * 0.4 * (1 + strainFactor);
-      const ry = ch * 0.4 * (1 - strainFactor * 0.5);
-      gctx.beginPath();
-      gctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-      gctx.strokeStyle = 'rgba(0,180,216,0.6)';
-      gctx.lineWidth = 1;
-      gctx.stroke();
-      gctx.fillStyle = 'rgba(0,56,117,0.5)';
-      gctx.fill();
-    }
-  }// boundary sliding arrows
-  for (let r = 0; r < rows; r++){
-    const y = (r + 1) * ch;
-    const arrowOffset = strainFactor * 15;
-    gctx.strokeStyle = '#ffd700';
-    gctx.lineWidth = 1;
-    gctx.beginPath();
-    gctx.moveTo(10, y);
-    gctx.lineTo(W/2 - 10 + arrowOffset, y);
-    gctx.stroke();
+/* ===== HiDPI canvas ===== */
+let cssW = 0, cssH = 0;
+function resizeCanvas(){
+  const rect = canvas.parentElement.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width - 44));
+  cssH = 420;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function drawArrow(x0,y0,x1,y1,color,w){
+  ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w;
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+  const a=Math.atan2(y1-y0,x1-x0), h=6+w;
+  ctx.beginPath(); ctx.moveTo(x1,y1);
+  ctx.lineTo(x1-h*Math.cos(a-0.4), y1-h*Math.sin(a-0.4));
+  ctx.lineTo(x1-h*Math.cos(a+0.4), y1-h*Math.sin(a+0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+function stageColor(st){ return st===0 ? '#00d4a0' : st===1 ? '#00B4D8' : '#ff5252'; }
+
+function render(){
+  resizeCanvas();
+  const W = cssW, H = cssH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+  // layout: left = specimen, right = strain-time curve
+  const specW = Math.min(150, W*0.30);
+  const gx0 = specW + 30, gy0 = 36, gx1 = W - 20, gy1 = H - 46;
+  const gw = gx1 - gx0, gh = gy1 - gy0;
+  const eps = epsN(tau), st = stageOf(tau);
+
+  /* --- strain-time curve panel --- */
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1; ctx.font='10px Roboto Mono';
+  for (let i=0;i<=5;i++){
+    const yy = gy1 - gh*i/5;
+    ctx.beginPath(); ctx.moveTo(gx0,yy); ctx.lineTo(gx1,yy); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='right';
+    ctx.fillText((EPS_R*i/5).toFixed(2), gx0-4, yy+3);
   }
-  gctx.fillStyle = 'rgba(255,255,255,0.6)';
-  gctx.font = '11px Roboto Mono, monospace';
-  gctx.fillText('粒界すべり（クリープ）', 10, 140);
-}compute();
+  // stage band backgrounds (tau thresholds 0.30, 0.62)
+  const tx = (t)=> gx0 + gw*t;
+  const ty = (e)=> gy1 - gh*(e/EPS_R);
+  const bands=[[0,0.30,'rgba(0,212,160,0.07)'],[0.30,0.62,'rgba(0,180,216,0.07)'],[0.62,1,'rgba(255,82,82,0.07)']];
+  bands.forEach(b=>{ ctx.fillStyle=b[2]; ctx.fillRect(tx(b[0]), gy0, gw*(b[1]-b[0]), gh); });
+  // axis labels
+  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='left';
+  ctx.fillText('ひずみ ε', gx0, gy0-8);
+  ctx.textAlign='right'; ctx.fillText('時間 t / t_r', gx1, H-8);
+
+  // full faint reference curve
+  ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1.2; ctx.beginPath();
+  for (let i=0;i<=200;i++){ const t=i/200; const x=tx(t), y=ty(epsN(t)); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+  ctx.stroke();
+
+  // drawn-so-far curve, colored by stage
+  ctx.lineWidth=2.6;
+  let prev=null;
+  for (let i=0;i<=200;i++){
+    const t=i/200; if (t>tau) break;
+    const x=tx(t), y=ty(epsN(t));
+    if (prev){ ctx.strokeStyle=stageColor(stageOf(t)); ctx.beginPath(); ctx.moveTo(prev[0],prev[1]); ctx.lineTo(x,y); ctx.stroke(); }
+    prev=[x,y];
+  }
+  // secondary minimum-rate slope guide (tangent through mid secondary)
+  {
+    const t0=0.46, e0=epsN(t0), sl=ES/EPS_R; // slope in eps/EPS_R per tau is ES/EPS_R
+    ctx.setLineDash([5,4]); ctx.strokeStyle='rgba(0,180,216,0.55)'; ctx.lineWidth=1.4;
+    const dt=0.30;
+    ctx.beginPath();
+    ctx.moveTo(tx(t0-dt), ty(e0 - ES*dt));
+    ctx.lineTo(tx(t0+dt), ty(e0 + ES*dt));
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(0,180,216,0.85)'; ctx.font='10px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText('最小クリープ速度 ε̇ₛ', tx(t0)+6, ty(e0)-8);
+  }
+  // current point marker
+  if (prev){
+    ctx.beginPath(); ctx.arc(tx(tau), ty(eps), 5, 0, 7); ctx.fillStyle=stageColor(st); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+  }
+  // rupture marker
+  if (tau >= 0.999){
+    ctx.fillStyle='#ff5252'; ctx.font='bold 11px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText('破断', tx(1), ty(EPS_R)-8);
+  }
+
+  /* --- specimen (elongating bar under constant load) --- */
+  const cx = specW/2 + 14;
+  const topY = 54, gripH = 16;
+  const baseLen = gy1 - topY - gripH - 40;
+  const elong = 1 + eps*1.4;                       // visual elongation
+  const barLen = Math.min(baseLen*elong, gy1 - topY - gripH - 10);
+  const neck = st===2 ? (tau-0.62)/0.38 : 0;       // necking 0..1 in tertiary
+  const baseW = Math.min(34, specW*0.36);
+  // load arrow (down at top grip is fixed; tensile load pulls bottom down)
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='10px Noto Sans JP'; ctx.textAlign='center';
+  ctx.fillText('一定荷重 σ', cx, topY-18);
+  drawArrow(cx, topY-14, cx, topY-2, '#ffd54a', 2);
+  // top grip
+  ctx.fillStyle='#4a5a72'; ctx.fillRect(cx-baseW/2-6, topY, baseW+12, gripH);
+  // bar body with necking near middle
+  const bodyTop = topY+gripH, bodyBot = bodyTop+barLen;
+  ctx.beginPath();
+  const segs=24;
+  for (let i=0;i<=segs;i++){
+    const f=i/segs, yy=bodyTop+barLen*f;
+    const neckFac = 1 - neck*0.55*Math.exp(-Math.pow((f-0.5)/0.16,2));
+    ctx.lineTo(cx - baseW/2*neckFac, yy);
+  }
+  for (let i=segs;i>=0;i--){
+    const f=i/segs, yy=bodyTop+barLen*f;
+    const neckFac = 1 - neck*0.55*Math.exp(-Math.pow((f-0.5)/0.16,2));
+    ctx.lineTo(cx + baseW/2*neckFac, yy);
+  }
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(cx-baseW/2,0,cx+baseW/2,0);
+  grad.addColorStop(0,'#0d5a8a'); grad.addColorStop(0.5, st===2?'#b03030':'#1f86c0'); grad.addColorStop(1,'#0d5a8a');
+  ctx.fillStyle=grad; ctx.fill();
+  ctx.strokeStyle='rgba(0,180,216,0.7)'; ctx.lineWidth=1.4; ctx.stroke();
+  // bottom grip
+  ctx.fillStyle='#4a5a72'; ctx.fillRect(cx-baseW/2-6, bodyBot, baseW+12, gripH);
+  drawArrow(cx, bodyBot+gripH+2, cx, bodyBot+gripH+16, '#ffd54a', 2);
+  // rupture crack in tertiary end
+  if (tau >= 0.985){
+    ctx.strokeStyle='#ff5252'; ctx.lineWidth=2.4;
+    const my=bodyTop+barLen*0.5;
+    ctx.beginPath(); ctx.moveTo(cx-baseW*0.22, my-3); ctx.lineTo(cx+baseW*0.22, my+3); ctx.stroke();
+  }
+  // specimen labels
+  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='center';
+  ctx.fillText('試験片', cx, gy1-10);
+  ctx.fillStyle=stageColor(st); ctx.font='bold 11px Noto Sans JP';
+  ctx.fillText(STAGE_JA[st], cx, gy1+6);
+
+  // timestamp
+  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='right';
+  ctx.fillText('t/t_r = '+(tau*100).toFixed(1)+'%', W-12, 18); ctx.textAlign='left';
+
+  updateLive();
+}
+
+function updateLive(){
+  const eps = epsN(tau), st = stageOf(tau);
+  el('roT').textContent = (tau*100).toFixed(1)+'%';
+  el('roEps').textContent = eps.toFixed(4);
+  el('roStage').textContent = STAGE_SHORT_JA[st];
+  el('roStage').style.color = stageColor(st);
+  el('sc-eps').textContent = eps.toExponential(3);
+  el('scrub').value = String(Math.round(tau*1000));
+  el('scrubTime').textContent = (tau*100).toFixed(1)+' %';
+  if (model){
+    // instantaneous physical rate = (dEps/dtau)/tr  [1/h]; secondary => model.edot
+    const rate = rateN(tau) / model.tr;
+    el('roRate').textContent = rate>0 ? rate.toExponential(2) : '0';
+    const ttr = model.tr * (1 - tau);
+    el('roTtr').textContent = tau>=0.999 ? '破断' : fmtH(ttr);
+  }
+}
+
+/* ===== Animation loop ===== */
+function loop(ts){
+  if (!playing){ animId=null; return; }
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min(0.05, (ts-lastTs)/1000); lastTs = ts;
+  tau += dt * speedMult / FULL_PLAY_SEC;
+  if (tau >= 1){ tau = 1; render(); stopPlay(); return; }
+  render();
+  animId = requestAnimationFrame(loop);
+}
+function startPlay(){
+  if (reduceMotion){ tau = 1; render(); return; }
+  if (tau >= 1) tau = 0;
+  playing = true; lastTs = 0;
+  el('btnPlay').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing = false;
+  if (animId){ cancelAnimationFrame(animId); animId=null; }
+  el('btnPlay').innerHTML = '<i class="fas fa-play"></i> 再生';
+}
+window.togglePlay = function(){ playing ? stopPlay() : startPlay(); };
+window.replay = function(){ tau = 0; render(); startPlay(); };
+window.setSpeed = function(s){
+  speedMult = s;
+  document.querySelectorAll('.speed-btn').forEach(b=>{
+    const a = parseFloat(b.dataset.speed)===s;
+    b.classList.toggle('active', a);
+    b.style.borderColor = a ? 'var(--accent)' : '';
+    b.style.color = a ? 'var(--accent)' : '';
+  });
+};
+window.onScrub = function(){
+  stopPlay();
+  tau = parseFloat(el('scrub').value)/1000;
+  render();
+};
+window.setPreset = function(name){
+  const P = {
+    low:     { mat:'316L',    sig:80,  T:550 },
+    high:    { mat:'316L',    sig:200, T:750 },
+    inconel: { mat:'Inconel', sig:300, T:750 }
+  }[name];
+  if (!P) return;
+  selMat.value = P.mat;
+  slSig.value = P.sig; slT.value = P.T;
+  [slSig, slT].forEach(updateSliderFill);
+  onParam();
+};
+
+function onParam(){
+  const wasPlaying = playing;
+  stopPlay();
+  compute();
+  tau = 0;
+  render();
+  if (wasPlaying && !reduceMotion) startPlay();
+}
+
+[slSig, slT, slTt].forEach(s=>{ updateSliderFill(s); s.addEventListener('input', ()=>{ updateSliderFill(s); onParam(); }); });
+selMat.addEventListener('change', onParam);
+canvas.addEventListener('keydown', e=>{ if (e.key===' '||e.key==='Enter'){ e.preventDefault(); window.togglePlay(); } });
+window.addEventListener('resize', ()=>{ if(model) render(); });
+
+// init
+compute();
+render();
+if (!reduceMotion) startPlay();
+})();
 </script>
 
 <section class="explanation">
@@ -446,7 +650,7 @@ function drawGrains(edot) {
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">計算結果のクリープひずみ速度が極端に大きい／小さい場合、何を確認すべきですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">応力と温度の単位を確認してください。応力はMPa、温度は絶対温度（K）で入力が必要です。また、材料の適用範囲（例：316Lは600〜800℃）を超えていないかチェックしてください。</div>
+    <div class="faq-a">入力範囲を確認してください。応力はMPa、温度は摂氏（°C）で入力し、ツール内部で絶対温度（K）に換算してNorton則を計算します。また、材料の適用範囲（例：316Lは600〜800℃）を超えていないかチェックしてください。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">このツールは、非定常クリープ（一次・三次クリープ）も計算できますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -470,6 +674,9 @@ function drawGrains(edot) {
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="creep-deformation.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -520,6 +727,16 @@ function drawGrains(edot) {
  </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

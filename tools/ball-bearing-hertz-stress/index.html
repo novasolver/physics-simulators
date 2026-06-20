@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "玉軸受の接触応力シミュレーター",
       "description": "玉直径・玉数・ピッチ円直径・軸受全荷重から、1玉あたり最大荷重と内輪・外輪のヘルツ接触応力をリアルタイムに計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/ball-bearing-hertz-stress.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Stribeck の荷重分布による1玉最大荷重の計算","内輪（凹面）と外輪（凸面）のヘルツ接触応力","接触半径と等価曲率半径の表示","玉軸受断面の可視化"],
       "keywords": "玉軸受,ボールベアリング,接触応力,ヘルツ接触,Hertz,内輪,外輪,Stribeck,軸受寿命",
       "datePublished": "2026-05-16",
@@ -102,6 +102,13 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.viz-toolbar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
+.viz-toolbar .btn{ padding:6px 12px; font-size:.82rem; }
+.ov-toggles{ display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 2px; font-size:.8rem; color:var(--muted); }
+.ov-toggles label{ display:inline-flex; align-items:center; gap:4px; cursor:pointer; }
+.preset-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.preset-row .btn{ padding:5px 10px; font-size:.78rem; }
+@media(max-width:820px){ #cv{ height:auto; } }
 </style>
 </head>
 <body>
@@ -165,27 +172,54 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
-    <div class="btn-group">
+    <div class="preset-row">
+      <button type="button" class="btn secondary" onclick="applyPreset('light')">軽荷重</button>
+      <button type="button" class="btn secondary" onclick="applyPreset('medium')">中荷重</button>
+      <button type="button" class="btn secondary" onclick="applyPreset('heavy')">重荷重</button>
+    </div>
+
+    <div class="btn-group" style="margin-top:8px;">
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">材料は軸受鋼（E*=115.4 GPa, ν=0.3）固定。接触角 α=0°（深溝玉軸受）、軌道溝による適合度は考慮しない簡略モデル。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">材料は軸受鋼（E*=115.4 GPa, ν=0.3）固定。接触角 α=0°（深溝玉軸受）、軌道溝による適合度は考慮しない簡略モデル。荷重スライダーを動かすとアニメーションが目標荷重まで再加圧します。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（ライブ）</div>
       <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statFmax">—</div><div class="sl">1玉最大荷重 F_max</div></div>
-        <div class="stat-card"><div class="sv" id="statPmaxI">—</div><div class="sl">内輪接触応力 p_max,i（凹面）</div></div>
-        <div class="stat-card"><div class="sv" id="statPmaxO">—</div><div class="sl">外輪接触応力 p_max,o（凸面）</div></div>
-        <div class="stat-card"><div class="sv" id="statContactA">—</div><div class="sl">接触半径 a（内輪・球-平面近似）</div></div>
+        <div class="stat-card"><div class="sv" id="statLoad">—</div><div class="sl">作用荷重 F（加圧中／玉あたり）</div></div>
+        <div class="stat-card"><div class="sv" id="statPmaxI">—</div><div class="sl">最大接触圧 p_max（内輪・凹面）</div></div>
+        <div class="stat-card"><div class="sv" id="statPmaxO">—</div><div class="sl">最大接触圧 p_max,o（外輪・凸面）</div></div>
+        <div class="stat-card"><div class="sv" id="statContactA">—</div><div class="sl">接触半径 a（内輪）</div></div>
+        <div class="stat-card"><div class="sv" id="statDelta">—</div><div class="sl">弾性接近量 δ（内輪）</div></div>
+        <div class="stat-card"><div class="sv" id="statTau">—</div><div class="sl">最大せん断応力 τ_max（深さ）</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-circle-notch"></i> 軸受断面と接触点</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">外輪・内輪・玉の断面図／赤丸＝接触点（外輪は応力が高く赤、内輪はやや低く橙）／D_p＝ピッチ円直径、D_b＝玉直径</p>
+      <div class="chart-title"><i class="fas fa-circle-notch"></i> ヘルツ接触のライブ可視化</div>
+      <div class="viz-toolbar">
+        <button type="button" class="btn" id="btnPlay" onclick="togglePlay()" aria-label="再生／一時停止"><i class="fas fa-pause"></i> 一時停止</button>
+        <button type="button" class="btn secondary" onclick="restartAnim()" aria-label="最初から"><i class="fas fa-redo"></i> 最初から</button>
+      </div>
+      <div class="ov-toggles" role="group" aria-label="表示オーバーレイ">
+        <label><input type="checkbox" id="ovPressure" checked onchange="needRedraw=true"> 圧力分布</label>
+        <label><input type="checkbox" id="ovPatch" checked onchange="needRedraw=true"> 接触パッチ</label>
+        <label><input type="checkbox" id="ovShear" checked onchange="needRedraw=true"> 地下せん断応力</label>
+        <label><input type="checkbox" id="ovDeform" checked onchange="needRedraw=true"> 変形（扁平）</label>
+      </div>
+      <canvas id="cv" width="600" height="420" role="img" aria-label="玉が軌道に押し付けられ、接触が扁平化し、半楕円のヘルツ圧力分布と地下のせん断応力場がリアルタイムに描かれるアニメーション"></canvas>
+      <p class="canvas-hint">左＝玉が軌道に押し付けられ扁平化／半楕円の赤い曲線＝接触圧 p(x)／玉直下の等高線＝地下せん断応力（最大は表面下 ≈0.48a の深さ）。荷重を上げると接触パッチ 2a と圧力が増大します。</p>
     </div>
 
     <div class="chart-card">
@@ -196,11 +230,13 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         $$F_\text{max} = \frac{5\,F_\text{radial}}{Z\,\cos\alpha}$$
         <p style="margin-top:6px;">内輪（凹面接触）と外輪（凸面接触）の等価曲率半径：</p>
         $$\frac{1}{R_{eq,i}} = \frac{1}{r_b} - \frac{1}{R_i},\qquad \frac{1}{R_{eq,o}} = \frac{1}{r_b} + \frac{1}{R_o}$$
-        <p style="margin-top:6px;">球-平面型ヘルツ接触の最大接触圧（E* は等価弾性率）：</p>
-        $$p_\text{max} = \frac{1}{\pi}\left(\frac{6\,F_\text{max}\,E^{*2}}{R_{eq}^{\,2}}\right)^{1/3}$$
-        <p style="margin-top:6px;">接触半径：</p>
-        $$a = \left(\frac{3\,F_\text{max}\,R_{eq}}{4\,E^*}\right)^{1/3}$$
-        <p style="margin-top:8px;">外輪側は等価曲率半径が小さいため接触面積が狭くなり、内輪側より高い接触応力が発生します。</p>
+        <p style="margin-top:6px;">接触半径と最大接触圧（球-平面型ヘルツ接触、E* は等価弾性率）：</p>
+        $$a = \left(\frac{3\,F\,R_{eq}}{4\,E^*}\right)^{1/3},\qquad p_\text{max} = \frac{3F}{2\pi a^2} = \frac{1}{\pi}\left(\frac{6\,F\,E^{*2}}{R_{eq}^{\,2}}\right)^{1/3}$$
+        <p style="margin-top:6px;">弾性接近量（接近量 δ）と圧力分布（半楕円体）：</p>
+        $$\delta = \frac{a^2}{R_{eq}},\qquad p(r) = p_\text{max}\sqrt{1-\left(\tfrac{r}{a}\right)^2}$$
+        <p style="margin-top:6px;">最大せん断応力は表面ではなく表面下に現れます：</p>
+        $$\tau_\text{max} \approx 0.31\,p_\text{max}\quad(\text{深さ } z \approx 0.48\,a)$$
+        <p style="margin-top:8px;">外輪側は等価曲率半径が小さいため接触面積が狭くなり、内輪側より高い接触応力が発生します。疲労き裂はこの地下 τ_max の位置から発生します。</p>
       </div>
     </div>
   </div>
@@ -222,12 +258,20 @@ function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
   return { w: w, h: h, dpr: dpr };
 }
 
-// ========== Ball Bearing Hertz Contact Stress Simulator ==========
+// ========== Ball Bearing Hertz Contact Stress Simulator (v2, animated) ==========
 var cv = document.getElementById('cv');
 var cvCtx = cv.getContext('2d');
 
 // material (steel)
 var ESTAR = 115.4e9; // Pa, equivalent modulus for steel-steel (E=200 GPa, nu=0.3)
+
+// --- animation state ---
+var loadFrac = 0;          // 0..1 ramp of applied load toward target
+var targetFrac = 1;        // target ramp level
+var playing = true;
+var needRedraw = true;
+var lastDimsW = 0, lastDimsH = 0;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function getParams() {
   var F = parseFloat(document.getElementById('slF').value) * 1000; // N
@@ -239,7 +283,7 @@ function getParams() {
 
 function fmtStress(pa) {
   if (!isFinite(pa)) return '—';
-  if (pa >= 1e9) return (pa / 1e9).toFixed(2) + ' GPa';
+  if (Math.abs(pa) >= 1e9) return (pa / 1e9).toFixed(2) + ' GPa';
   return (pa / 1e6).toFixed(0) + ' MPa';
 }
 function fmtForce(n) {
@@ -252,166 +296,271 @@ function fmtLen(m) {
   return (m * 1000).toFixed(3) + ' mm';
 }
 
-function computeStress(Fmax, Req) {
-  // Hertz sphere contact: p_max = (1/pi) * (6 F E*^2 / R^2)^(1/3)
-  var inside = 6 * Fmax * ESTAR * ESTAR / (Req * Req);
-  return Math.cbrt(inside) / Math.PI;
-}
-function computeContactRadius(Fmax, Req) {
-  return Math.cbrt(3 * Fmax * Req / (4 * ESTAR));
-}
+// Hertz sphere-on-plane: p_max = (1/pi)(6 F E*^2 / R^2)^(1/3) = 3F/(2 pi a^2)
+function computeStress(F, Req) { return Math.cbrt(6 * F * ESTAR * ESTAR / (Req * Req)) / Math.PI; }
+function computeContactRadius(F, Req) { return Math.cbrt(3 * F * Req / (4 * ESTAR)); }
 
-function compute() {
+// full model at a given applied-load fraction; returns derived quantities
+function model(frac) {
   var p = getParams();
-  // physical geometry
   var rb = p.Db / 2;            // ball radius (m)
   var Ri = (p.Dp - p.Db) / 2;   // inner race radius (m)
   var Ro = (p.Dp + p.Db) / 2;   // outer race radius (m)
+  if (Ri <= 0 || rb <= 0) return null;
 
-  if (Ri <= 0 || rb <= 0) { return; }
+  var FmaxFull = 5 * p.F / p.Z; // Stribeck most-loaded ball, alpha=0
+  var F = FmaxFull * frac;      // applied load at this instant
 
-  // Stribeck max load per ball, alpha = 0
-  var Fmax = 5 * p.F / p.Z;
+  var ReqI = rb * Ri / (Ri - rb);  // inner (concave)
+  var ReqO = rb * Ro / (Ro + rb);  // outer (convex)
 
-  // Equivalent radii
-  // Inner race (concave): 1/Req_i = 1/rb - 1/Ri  => Req_i = rb*Ri/(Ri - rb)
-  var ReqI = rb * Ri / (Ri - rb);
-  // Outer race (convex): 1/Req_o = 1/rb + 1/Ro  => Req_o = rb*Ro/(Ro + rb)
-  var ReqO = rb * Ro / (Ro + rb);
+  var aI = F > 0 ? computeContactRadius(F, ReqI) : 0;
+  var aO = F > 0 ? computeContactRadius(F, ReqO) : 0;
+  var pmaxI = F > 0 ? computeStress(F, ReqI) : 0;
+  var pmaxO = F > 0 ? computeStress(F, ReqO) : 0;
+  var deltaI = aI * aI / ReqI;          // elastic approach
+  var tauMax = 0.31 * pmaxI;            // max subsurface shear
+  var zTau = 0.48 * aI;                 // its depth
 
-  var pmaxI = computeStress(Fmax, ReqI);
-  var pmaxO = computeStress(Fmax, ReqO);
-  var aI = computeContactRadius(Fmax, ReqI);
-
-  document.getElementById('statFmax').textContent = fmtForce(Fmax);
-  document.getElementById('statPmaxI').textContent = fmtStress(pmaxI);
-  document.getElementById('statPmaxO').textContent = fmtStress(pmaxO);
-  document.getElementById('statContactA').textContent = fmtLen(aI);
-
-  drawBearing(p, rb, Ri, Ro, pmaxI, pmaxO);
+  return { p:p, rb:rb, Ri:Ri, Ro:Ro, FmaxFull:FmaxFull, F:F,
+           ReqI:ReqI, ReqO:ReqO, aI:aI, aO:aO, pmaxI:pmaxI, pmaxO:pmaxO,
+           deltaI:deltaI, tauMax:tauMax, zTau:zTau };
 }
 
-function drawBearing(p, rb, Ri, Ro, pmaxI, pmaxO) {
-  var ctx = cvCtx;
-  var __novaDims1 = __novaHiDpiCanvas(cv, cv.clientWidth || cv.width, cv.clientHeight || cv.height, cv.getContext('2d'));
-var W = __novaDims1.w, H = __novaDims1.h;
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
+function updateStats(m) {
+  if (!m) return;
+  document.getElementById('statLoad').textContent = fmtForce(m.F) + ' / ' + fmtForce(m.FmaxFull);
+  document.getElementById('statPmaxI').textContent = fmtStress(m.pmaxI);
+  document.getElementById('statPmaxO').textContent = fmtStress(m.pmaxO);
+  document.getElementById('statContactA').textContent = fmtLen(m.aI);
+  document.getElementById('statDelta').textContent = fmtLen(m.deltaI);
+  document.getElementById('statTau').textContent = fmtStress(m.tauMax) + ' @ ' + fmtLen(m.zTau);
+}
 
-  var cx = W * 0.5, cy = H * 0.5;
-  // pick a scale so the outer race fits well
-  var maxRpx = Math.min(W, H) * 0.42;
-  var scale = maxRpx / (Ro + rb * 0.9);
-  var RoP = Ro * scale;
-  var RiP = Ri * scale;
-  var rbP = rb * scale;
-  var outerEdgeP = RoP + rbP * 0.9; // outer ring outside edge
-  var innerEdgeP = Math.max(2, RiP - rbP * 0.9); // inner ring bore edge
+// ===== drawing =====
+function ensureDims() {
+  var cw = cv.clientWidth || 600, ch = cv.clientHeight || 420;
+  if (cw !== lastDimsW || ch !== lastDimsH) {
+    var d = __novaHiDpiCanvas(cv, cw, ch, cvCtx);
+    lastDimsW = cw; lastDimsH = ch;
+    return d;
+  }
+  return { w: lastDimsW, h: lastDimsH };
+}
 
-  // outer ring
-  ctx.fillStyle = '#1c2f47';
-  ctx.beginPath(); ctx.arc(cx, cy, outerEdgeP, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#0a1929';
-  ctx.beginPath(); ctx.arc(cx, cy, RoP, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#3d567a'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(cx, cy, outerEdgeP, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx, cy, RoP, 0, Math.PI * 2); ctx.stroke();
+function draw(m) {
+  var d = ensureDims();
+  var W = d.w, H = d.h, ctx = cvCtx;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
+  if (!m) return;
 
-  // inner ring
-  ctx.fillStyle = '#1c2f47';
-  ctx.beginPath(); ctx.arc(cx, cy, RiP, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#0a1929';
-  ctx.beginPath(); ctx.arc(cx, cy, innerEdgeP, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#3d567a'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(cx, cy, RiP, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx, cy, innerEdgeP, 0, Math.PI * 2); ctx.stroke();
+  var ovP = document.getElementById('ovPressure').checked;
+  var ovPatch = document.getElementById('ovPatch').checked;
+  var ovShear = document.getElementById('ovShear').checked;
+  var ovDef = document.getElementById('ovDeform').checked;
 
-  // pitch circle (dashed)
-  var DpP = (Ri + Ro) / 2 * scale; // pitch radius pixel
-  ctx.strokeStyle = 'rgba(143,184,224,0.45)';
-  ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-  ctx.beginPath(); ctx.arc(cx, cy, DpP, 0, Math.PI * 2); ctx.stroke();
-  ctx.setLineDash([]);
+  // --- geometry of the close-up: ball pressed on a flat raceway (inner contact) ---
+  var cx = W * 0.5;
+  var surfaceY = H * 0.62;            // raceway surface line
+  // physical scale: aI is sub-mm; choose px-per-meter so 2a spans a visible width
+  var aRef = m.aI > 0 ? m.aI : 1e-4;
+  var ppm = (W * 0.30) / Math.max(aRef, 1e-5);   // px per meter, keep patch ~30% width
+  // clamp so ball radius stays on-screen
+  var rbPx = Math.min(m.rb * ppm, H * 0.42);
+  // recompute effective ppm from clamp to keep visual ball sane while patch grows with load
+  var aPx = m.aI * ppm;
+  var deltaPx = m.deltaI * ppm;
+  // ball center (undeformed touches surface; under load it sinks delta)
+  var ballCx = cx, ballCy = surfaceY - rbPx + (ovDef ? deltaPx : 0);
 
-  // balls (show up to 6 of them around the bottom for readability, plus full count text)
-  var nShown = Math.min(6, p.Z);
-  // emphasize the bottom-most ball (loaded one)
-  for (var i = 0; i < nShown; i++) {
-    var ang = Math.PI * 0.5 + (i - (nShown - 1) / 2) * (Math.PI * 2 / Math.max(p.Z, nShown));
-    var bx = cx + DpP * Math.cos(ang);
-    var by = cy + DpP * Math.sin(ang);
-    var isLoaded = (i === Math.floor((nShown - 1) / 2));
-    // ball body
-    var grad = ctx.createRadialGradient(bx - rbP * 0.3, by - rbP * 0.3, rbP * 0.1, bx, by, rbP);
-    grad.addColorStop(0, isLoaded ? '#fff3a3' : '#7ec8e3');
-    grad.addColorStop(1, isLoaded ? '#e6a800' : '#1c5a8a');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(bx, by, rbP * 0.95, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = isLoaded ? '#FFD166' : '#3d567a';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
+  // raceway slab
+  ctx.fillStyle = '#13243b';
+  ctx.fillRect(0, surfaceY, W, H - surfaceY);
+  ctx.strokeStyle = '#2c4a6e'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0, surfaceY); ctx.lineTo(W, surfaceY); ctx.stroke();
 
-    if (isLoaded) {
-      // contact points: inner race (toward center) and outer race (away)
-      var dxIn = (RiP) * Math.cos(ang), dyIn = RiP * Math.sin(ang);
-      var dxOut = RoP * Math.cos(ang), dyOut = RoP * Math.sin(ang);
-      // outer contact (higher stress) – red
-      ctx.fillStyle = '#e74c3c';
-      ctx.shadowColor = '#e74c3c'; ctx.shadowBlur = 12;
-      ctx.beginPath(); ctx.arc(cx + dxOut, cy + dyOut, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0;
-      // inner contact (lower) – orange
-      ctx.fillStyle = '#e67e22';
-      ctx.shadowColor = '#e67e22'; ctx.shadowBlur = 10;
-      ctx.beginPath(); ctx.arc(cx + dxIn, cy + dyIn, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0;
+  // --- subsurface shear stress field (contours under the contact) ---
+  if (ovShear && m.pmaxI > 0) {
+    var maxDepthPx = Math.min(H - surfaceY - 4, aPx * 4.5 + 8);
+    var halfW = Math.min(W * 0.45, aPx * 4 + 10);
+    var img = ctx.createImageData(Math.max(1, Math.round(halfW * 2)), Math.max(1, Math.round(maxDepthPx)));
+    var iw = img.width, ih = img.height;
+    for (var yy = 0; yy < ih; yy++) {
+      var zp = (yy / ppm);            // depth in m
+      for (var xx = 0; xx < iw; xx++) {
+        var xm = (xx - iw / 2) / ppm; // lateral pos in m
+        // approximate von-Mises-like shear magnitude under axisymmetric Hertz point load,
+        // peaking at z~0.48a on the axis; smooth radial falloff
+        var zr = zp / Math.max(m.aI, 1e-9);
+        var rr = Math.abs(xm) / Math.max(m.aI, 1e-9);
+        // on-axis shear profile (normalized 0..~0.31): bump centered near 0.48a
+        var axial = Math.exp(-Math.pow((zr - 0.48) / 0.42, 2));
+        var radial = Math.exp(-Math.pow(rr / (0.9 + 0.5 * zr), 2));
+        var val = axial * radial; // 0..1
+        var idx = (yy * iw + xx) * 4;
+        // colour ramp: deep blue -> cyan -> yellow -> red
+        var t = Math.min(1, val);
+        img.data[idx]   = Math.round(40 + 215 * Math.min(1, t * 1.6));
+        img.data[idx+1] = Math.round(60 + 140 * Math.min(1, Math.max(0, 1.4 - Math.abs(t - 0.6) * 2.2)));
+        img.data[idx+2] = Math.round(120 + 100 * (1 - t));
+        img.data[idx+3] = Math.round(200 * t);
+      }
+    }
+    ctx.putImageData(img, Math.round(cx - halfW), Math.round(surfaceY + 1));
+    // mark depth of max shear
+    var zMaxPx = m.zTau * ppm;
+    if (zMaxPx > 2 && zMaxPx < maxDepthPx) {
+      ctx.strokeStyle = 'rgba(255,209,102,0.85)'; ctx.lineWidth = 1.2; ctx.setLineDash([4,3]);
+      ctx.beginPath(); ctx.moveTo(cx - halfW, surfaceY + zMaxPx); ctx.lineTo(cx + halfW, surfaceY + zMaxPx); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#FFD166'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('τ_max @ z≈0.48a', cx + halfW + 6 > W - 4 ? cx - halfW : cx + halfW + 6, surfaceY + zMaxPx + 4);
     }
   }
 
-  // diameter dimension lines
-  ctx.strokeStyle = 'rgba(207,227,247,0.7)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath(); ctx.moveTo(cx - DpP, cy); ctx.lineTo(cx + DpP, cy); ctx.stroke();
-  ctx.setLineDash([]);
+  // --- the ball (flattened at contact when deform overlay on) ---
+  var grad = ctx.createRadialGradient(ballCx - rbPx*0.35, ballCy - rbPx*0.35, rbPx*0.1, ballCx, ballCy, rbPx);
+  grad.addColorStop(0, '#bfe3ff'); grad.addColorStop(1, '#2a6da3');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  if (ovDef && aPx > 1) {
+    // draw ball but clip its bottom to the surface to show flattening of the contact patch
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, surfaceY);
+    ctx.clip();
+    ctx.beginPath(); ctx.arc(ballCx, ballCy, rbPx, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // flat contact patch on surface
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(ballCx - aPx, surfaceY);
+    ctx.quadraticCurveTo(ballCx, surfaceY - 0.5, ballCx + aPx, surfaceY);
+    ctx.lineTo(ballCx + aPx, surfaceY - 0.5);
+    ctx.lineTo(ballCx - aPx, surfaceY - 0.5);
+    ctx.closePath(); ctx.fill();
+  } else {
+    ctx.arc(ballCx, ballCy, rbPx, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.strokeStyle = '#7ec8e3'; ctx.lineWidth = 1.4;
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,surfaceY+1); ctx.clip();
+  ctx.beginPath(); ctx.arc(ballCx, ballCy, rbPx, 0, Math.PI*2); ctx.stroke(); ctx.restore();
 
-  // labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('D_p = ' + (p.Dp * 1000).toFixed(0) + ' mm', 12, 20);
-  ctx.fillText('D_b = ' + (p.Db * 1000).toFixed(1) + ' mm', 12, 38);
-  ctx.fillText('Z = ' + p.Z + ' 個', 12, 56);
-  ctx.fillText('α = 0° (深溝玉軸受)', 12, 74);
+  // load arrow pushing down on the ball
+  ctx.strokeStyle = '#ff6b6b'; ctx.fillStyle = '#ff6b6b'; ctx.lineWidth = 2.5;
+  var arrTop = Math.max(8, ballCy - rbPx - 36), arrBot = ballCy - rbPx - 6;
+  ctx.beginPath(); ctx.moveTo(ballCx, arrTop); ctx.lineTo(ballCx, arrBot); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ballCx, arrBot + 4); ctx.lineTo(ballCx - 6, arrBot - 4); ctx.lineTo(ballCx + 6, arrBot - 4); ctx.closePath(); ctx.fill();
 
+  // --- contact patch markers (2a) ---
+  if (ovPatch && aPx > 0.5) {
+    ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(ballCx - aPx, surfaceY); ctx.lineTo(ballCx + aPx, surfaceY); ctx.stroke();
+    ctx.fillStyle = '#FFD166';
+    ctx.beginPath(); ctx.arc(ballCx - aPx, surfaceY, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ballCx + aPx, surfaceY, 3, 0, Math.PI*2); ctx.fill();
+    ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillText('2a = ' + (m.aI*2*1000).toFixed(3) + ' mm', ballCx, surfaceY + 16);
+  }
+
+  // --- semi-elliptical pressure distribution p(x) drawn above the surface ---
+  if (ovP && m.pmaxI > 0) {
+    var pScale = (H * 0.34) / Math.max(m.pmaxI, 1e6); // px per Pa for plot
+    ctx.fillStyle = 'rgba(231,76,60,0.22)';
+    ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    var first = true;
+    for (var s = -1; s <= 1.0001; s += 0.04) {
+      var px = ballCx + s * aPx;
+      var pv = m.pmaxI * Math.sqrt(Math.max(0, 1 - s * s));
+      var py = surfaceY - pv * pScale - 2;
+      if (first) { ctx.moveTo(ballCx - aPx, surfaceY - 2); ctx.lineTo(px, py); first = false; }
+      else ctx.lineTo(px, py);
+    }
+    ctx.lineTo(ballCx + aPx, surfaceY - 2);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // peak marker
+    var peakY = surfaceY - m.pmaxI * pScale - 2;
+    ctx.fillStyle = '#e74c3c'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillText('p_max = ' + fmtStress(m.pmaxI), ballCx, Math.max(12, peakY - 6));
+    ctx.strokeStyle = 'rgba(231,76,60,0.5)'; ctx.setLineDash([3,3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ballCx, peakY); ctx.lineTo(ballCx, surfaceY - 2); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // --- labels ---
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillText('荷重 F = ' + fmtForce(m.F) + '  (目標 ' + fmtForce(m.FmaxFull) + ')', 12, 20);
+  ctx.fillText('δ = ' + fmtLen(m.deltaI), 12, 38);
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#e74c3c';
-  ctx.fillText('外輪接触 p_max,o = ' + fmtStress(pmaxO), W - 12, 20);
   ctx.fillStyle = '#e67e22';
-  ctx.fillText('内輪接触 p_max,i = ' + fmtStress(pmaxI), W - 12, 38);
-
-  // bottom hint
-  ctx.fillStyle = 'rgba(207,227,247,0.6)';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('黄色＝最大荷重を受ける玉（Stribeck 解析）', cx, H - 10);
+  ctx.fillText('内輪 p_max,i = ' + fmtStress(m.pmaxI), W - 12, 20);
+  ctx.fillStyle = '#e74c3c';
+  ctx.fillText('外輪 p_max,o = ' + fmtStress(m.pmaxO), W - 12, 38);
+  ctx.fillStyle = 'rgba(207,227,247,0.6)'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('内輪（凹面）接触の拡大図 — 荷重を上げると 2a と圧力が増大', cx, H - 8);
 }
 
-function resetParams() {
-  var defs = { slF: 10, slDb: 12, slZ: 8, slDp: 50 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
+// ===== animation loop =====
+var lastT = 0;
+function frame(t) {
+  var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+  lastT = t;
+  if (playing && !reduceMotion) {
+    // ramp load toward target with a gentle ease, then hold + slight breathing
+    if (Math.abs(loadFrac - targetFrac) > 0.001) {
+      loadFrac += (targetFrac - loadFrac) * Math.min(1, dt * 2.2);
+      needRedraw = true;
+    }
+  }
+  if (needRedraw || (playing && !reduceMotion)) {
+    var m = model(loadFrac);
+    updateStats(m);
+    draw(m);
+    needRedraw = false;
+  }
+  requestAnimationFrame(frame);
+}
+
+// ===== controls =====
+function togglePlay() {
+  playing = !playing;
+  var b = document.getElementById('btnPlay');
+  b.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+  needRedraw = true;
+}
+function restartAnim() {
+  loadFrac = 0; targetFrac = 1; needRedraw = true;
+  if (!playing) togglePlay();
+}
+// slider input re-pressurizes the animation to the new target
+function compute() { targetFrac = 1; if (reduceMotion) { loadFrac = 1; } needRedraw = true; }
+
+function applyPreset(kind) {
+  var presets = {
+    light:  { slF: 3,  slDb: 14, slZ: 10, slDp: 60 },
+    medium: { slF: 10, slDb: 12, slZ: 8,  slDp: 50 },
+    heavy:  { slF: 40, slDb: 10, slZ: 7,  slDp: 45 }
+  };
+  var d = presets[kind]; if (!d) return;
+  Object.keys(d).forEach(function (id) { document.getElementById(id).value = d[id]; });
   updateSlider(document.getElementById('slF'), 'slFVal', 1, '');
   updateSlider(document.getElementById('slDb'), 'slDbVal', 1, '');
   updateSlider(document.getElementById('slZ'), 'slZVal', 0, '');
   updateSlider(document.getElementById('slDp'), 'slDpVal', 0, '');
-  compute();
+  restartAnim();
 }
 
-window.addEventListener('resize', function () { compute(); });
+function resetParams() {
+  applyPreset('medium');
+}
 
-compute();
+window.addEventListener('resize', function () { lastDimsW = 0; needRedraw = true; });
+
+// initial render
+if (reduceMotion) { loadFrac = 1; playing = false; document.getElementById('btnPlay').innerHTML = '<i class="fas fa-play"></i> 再生'; }
+needRedraw = true;
+requestAnimationFrame(frame);
 </script>
 
 <section class="explanation">
@@ -459,7 +608,7 @@ compute();
     </div>
     <div class="faq-item">
       <button type="button" class="faq-q" onclick="toggleFaq(this)">玉径 D_b を変えたら何が効きますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-      <div class="faq-a">玉径 D_b は3つの効果で応力を下げます。(1) 等価曲率半径 R_eq が直接 D_b に比例して大きくなり、接触面積が広がる。(2) 内輪半径 R_i = (D_p - D_b)/2 が小さくなり、凹面適合がやや増す。(3) 外輪半径 R_o = (D_p + D_b)/2 が大きくなり、凸面の鋭さが緩和される。スライダーで D_b を 12 mm → 18 mm に増やすと、外輪応力は約 8.6 GPa から約 6.5 GPa まで低下します。ただし軸受全体の寸法と玉数 Z にも影響するため、設計では D_b と Z のバランスが重要です。</div>
+      <div class="faq-a">玉径 D_b は3つの効果で応力を下げます。(1) 等価曲率半径 R_eq が直接 D_b に比例して大きくなり、接触面積が広がる。(2) 内輪半径 R_i = (D_p - D_b)/2 が小さくなり、凹面適合がやや増す。(3) 外輪半径 R_o = (D_p + D_b)/2 が大きくなり、凸面の鋭さが緩和される。スライダーで D_b を 12 mm → 18 mm に増やすと、外輪応力は約 8.6 GPa から約 6.8 GPa まで低下します。ただし軸受全体の寸法と玉数 Z にも影響するため、設計では D_b と Z のバランスが重要です。</div>
     </div>
   </div>
 
@@ -478,6 +627,9 @@ compute();
     <p>最後に、<strong>このシミュレーターの結果を直接「軸受の寿命」と解釈する</strong>誤解に注意してください。応力 p_max は瞬間的な最大値であり、軸受寿命（L10 等）は p_max の9乗（玉軸受）に反比例する強烈な感度を持ちます。応力が2倍になれば寿命は 1/512 になります。逆に、応力を 4 GPa から 3 GPa に下げるだけで寿命は約 10 倍に延びます。本ツールで応力を計算したら、L10 寿命計算ツール（rolling-bearing シミュレーター）と組み合わせて、応力レベルが寿命要件を満たすかを必ず検証してください。応力単独では「設計の良し悪し」は判断できません。</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="ball-bearing-hertz-stress.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -532,7 +684,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>6205深溝玉軸受（Db=19.05mm、Z=8、Dp=71.5mm）に軸荷重5kNを加えた場合：Stribeck荷重分布でF_max≈1.2kN、内輪外径60mm・外輪内径80mmから曲率半径ri=15mm、ro=20mmと設定。Hertz接触式 p_max=418√(F_max·κ/a²)により、接触半径a≈1.8mm、内輪接触応力p_max,i≈2,840MPa、外輪接触応力p_max,o≈2,650MPaが算出され、SUJ2（焼き入れ鋼）の接触疲労限度2,500MPa超過を判定できます</p>
+<p>既定値（軸受全荷重 F_total=10kN、玉直径 Db=12mm、玉数 Z=8、ピッチ円直径 Dp=50mm、軸受鋼 E*=115.4GPa）の場合：Stribeck 荷重分布より1玉最大荷重 F_max=5·F/Z=6.25kN。球-平面ヘルツ接触式 p_max=(1/π)(6·F_max·E*²/R_eq²)^(1/3) で、内輪（凹面）接触応力 p_max,i≈5.94GPa、外輪（凸面）接触応力 p_max,o≈8.61GPa、接触半径 a≈0.709mm が算出されます。外輪側は等価曲率半径が小さく応力が約1.45倍高いため、軸受鋼（SUJ2）の許容接触応力（静的約4GPa）を大きく超える過負荷ケースと判定できます。玉径を大きくする・玉数を増やす・荷重を下げると応力が下がります</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -542,6 +694,16 @@ compute();
 <li>ISO281疲労寿命式L₁₀（h）=10⁶/(n)·(C/P)³において、接触応力がp_max≈3,000MPa超過時は材料焼入れ深さ確認と残留応力分布測定を推奨</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

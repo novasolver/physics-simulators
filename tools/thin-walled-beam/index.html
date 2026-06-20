@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "薄肉開断面梁の断面定数計算",
       "description": "薄肉開断面梁（C形・Z形・L形・I形）の断面積・断面二次モーメント・せん断中心・そり定数をリアルタイム計算。",
       "url": "https://novasolver.jp/tools/thin-walled-beam.html",
@@ -51,7 +51,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["C形・Z形・L形・I形断面の断面定数計算","せん断中心位置の計算","そり定数（ワーピング定数）の計算","主軸方向の可視化"],
       "keywords": "薄肉梁,開断面,断面定数,せん断中心,そり定数,断面二次モーメント,構造解析",
       "datePublished": "2026-04-09",
@@ -191,7 +191,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="tSlider" min="1" max="20" step="0.5" value="5" oninput="syncToNum('tSlider','tVal');updateSlider(this,'tVal',1,'');compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -297,8 +305,8 @@ function onSectionChange(){ compute(); }function compute(){
     const Iz_flange = t * Math.pow(b - t, 3) / 12 + t * (b - t) * Math.pow(t + (b - t) / 2 - zbar, 2);
     Iz = Iz_web + Iz_flange;
     Iyz = t * h * (t / 2 - zbar) * (0 - ybar) + t * (b - t) * (t + (b - t) / 2 - zbar) * (-(h / 2 - t / 2) - ybar);
-    e = 0; // approx
-    Iw = 0; // L-section Iw ≈ 0
+    e = NaN; // L-section shear center is not represented by this one-axis e output
+    Iw = NaN; // L-section warping constant is not implemented in this simplified model
   }else{ // I
     // I-section: two flanges b, web h, thickness t
     A = 2 * t * b + t * (h - 2 * t);
@@ -318,9 +326,9 @@ function onSectionChange(){ compute(); }function compute(){
   document.getElementById('statA').textContent = A.toFixed(0);
   document.getElementById('statIx').textContent = (Ix / 1e4).toFixed(1);
   document.getElementById('statIz').textContent = (Iz / 1e4).toFixed(1);
-  document.getElementById('statE').textContent = isNaN(e) ? '0.0' : e.toFixed(1);
+  document.getElementById('statE').textContent = isNaN(e) ? '未実装' : e.toFixed(1);
   document.getElementById('statIyz').textContent = (Iyz / 1e4).toFixed(1);
-  document.getElementById('statIw').textContent = (Iw / 1e6).toFixed(1);
+  document.getElementById('statIw').textContent = isNaN(Iw) ? '未実装' : (Iw / 1e6).toFixed(1);
 
   drawSection(type, b, h, t, e, theta_p, ybar, zbar, Iyz);
   drawChart(Ix, Iz, b, h, t);
@@ -484,7 +492,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">そり定数がゼロと表示されるのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">そり定数は薄肉開断面にのみ定義されます。I形断面のように断面が二軸対称な場合や、閉断面（角パイプなど）ではそり定数はゼロになります。また、板厚が極端に薄い場合も数値が小さくなり、表示上ゼロと見えることがあります。</div>
+    <div class="faq-a">この簡易モデルではC形、Z形、I形に近似的なそり定数を表示します。二軸対称なI形でも、横座屈などで用いるワーピング定数はゼロとは限りません。L形断面のそり定数はこのページでは未実装として表示します。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">計算結果の断面二次モーメントは、どの軸を基準にしていますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -492,7 +500,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">L形断面のせん断中心はどこにありますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">L形断面（等辺・不等辺とも）のせん断中心は、通常、フランジとウェブの交点（角部）に位置します。これはL形が二つの矩形板の組み合わせであり、せん断力が作用してもねじれが生じにくい形状であるためです。</div>
+    <div class="faq-a">L形断面のせん断中心は重心とは一致せず、断面の向きと脚寸法に依存します。このページの1軸オフセットeではL形の位置を表せないため、L形を選んだ場合は未実装として扱い、詳細設計では専用のせん断中心計算またはFEMで確認してください。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -512,6 +520,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="thin-walled-beam.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -573,7 +584,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>C形鋼材(b=100mm、h=200mm、t=6mm)の場合、断面積A=1872mm²、y軸周り慣性モーメントIx≒67.3×10⁴mm⁴、z軸周り慣性モーメントIz≒6.8×10⁴mm⁴が得られます。せん断中心eは約18.5mmとなり、片持ちばり(長さ3000mm、先端荷重50kN)の計算時に採用する値になります。そり定数Iw≒42.0×10⁶mm⁶はノンユニフォームねじりによる断面ひずみ予測に必要です</p>
+<p>このページの寸法定義でC形断面(b=100mm、h=200mm、t=6mm)を入力すると、断面積A=2400mm²、Ix=1529.4×10⁴mm⁴、Iz=268.9×10⁴mm⁴、せん断中心オフセットe=37.5mm、そり定数Iw=17500.0×10⁶mm⁶となります。標準形鋼表の寸法定義とは異なる場合があるため、実部材では断面表やFEM結果と照合してください。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -583,6 +594,16 @@ compute();
 <li>そり定数Iwは非対称開断面で特に重要で、L形アングル(50×50×5mm)では約0.15×10⁶mm⁶程度となり、鋼構造の耐風設計におけるねじれ剛性評価に直結します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

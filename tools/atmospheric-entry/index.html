@@ -38,7 +38,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "大気圏再突入・空力加熱計算機",
       "description": "突入速度・角度・弾道係数を操作して、最大減速G・熱流束・壁面温度・積算熱量をリアルタイムでシミュレーション。",
       "url": "https://novasolver.jp/tools/atmospheric-entry.html",
@@ -48,7 +48,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Fay-Riddell簡易熱流束モデル","大気密度の指数モデル（スケールハイト）","弾道突入軌跡アニメーション","高度/速度/G/熱流束のグラフ","アポロ/スペースシャトル/スターシップ プリセット"],
       "keywords": "大気圏再突入,空力加熱,熱シールド,減速G,弾道係数,宇宙船,再突入カプセル",
       "datePublished": "2026-04-08",
@@ -161,10 +161,17 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   <div class="panel">
     <div class="panel-title">プリセット</div>
     <div class="btn-group">
-      <button class="preset-btn" onclick="setPreset('apollo')">アポロ</button>
-      <button class="preset-btn" onclick="setPreset('shuttle')">シャトル</button>
-      <button class="preset-btn" onclick="setPreset('starship')">スターシップ</button>
+      <button class="preset-btn" onclick="setPreset('apollo')">アポロ風</button>
+      <button class="preset-btn" onclick="setPreset('shallow')">浅い突入</button>
+      <button class="preset-btn" onclick="setPreset('steep')">急な突入</button>
       <button class="preset-btn" onclick="setPreset('meteor')">隕石</button>
+    </div>
+
+    <div class="divider"></div>
+    <div class="panel-title">再生コントロール</div>
+    <div class="btn-group">
+      <button class="preset-btn" id="btnPlay" onclick="togglePlay()" aria-label="再生 / 一時停止"><i class="fas fa-play"></i> 再生</button>
+      <button class="preset-btn" onclick="resetAnim()" aria-label="最初から"><i class="fas fa-undo"></i> 最初から</button>
     </div>
 
     <div class="divider"></div>
@@ -175,8 +182,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <input type="range" id="sV0" min="7" max="12" step="0.1" value="11.0" oninput="syncToNum('sV0','vV0')">
     </div>
     <div class="param-group">
-      <div class="param-label"><span class="param-name">突入角度 γ</span><div class="num-wrap"><input type="number" class="num-input" id="vGamma" value="8.0" min="1" max="30" step="0.5" oninput="syncFromNum('sGamma','vGamma')"><span class="num-unit">°</span></div></div>
-      <input type="range" id="sGamma" min="1" max="30" step="0.5" value="8.0" oninput="syncToNum('sGamma','vGamma')">
+      <div class="param-label"><span class="param-name">突入角度 γ</span><div class="num-wrap"><input type="number" class="num-input" id="vGamma" value="6.5" min="1" max="30" step="0.5" oninput="syncFromNum('sGamma','vGamma')"><span class="num-unit">°</span></div></div>
+      <input type="range" id="sGamma" min="1" max="30" step="0.5" value="6.5" oninput="syncToNum('sGamma','vGamma')">
     </div>
     <div class="param-group">
       <div class="param-label"><span class="param-name">弾道係数 β</span><div class="num-wrap"><input type="number" class="num-input" id="vBeta" value="350" min="100" max="10000" step="50" oninput="syncFromNum('sBeta','vBeta')"><span class="num-unit">kg/m²</span></div></div>
@@ -193,40 +200,48 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ計測値</div>
     <div class="stat-grid">
+      <div class="stat-card"><div class="sv" id="scAlt">—</div><div class="sl">高度 (km)</div></div>
+      <div class="stat-card"><div class="sv" id="scVel">—</div><div class="sl">速度 (km/s)</div></div>
+      <div class="stat-card"><div class="sv" id="scG">—</div><div class="sl">減速 (g)</div></div>
+      <div class="stat-card"><div class="sv" id="scQ">—</div><div class="sl">熱流束 (MW/m²)</div></div>
       <div class="stat-card"><div class="sv" id="scGmax">—</div><div class="sl">最大G (g)</div></div>
       <div class="stat-card"><div class="sv" id="scQmax">—</div><div class="sl">最大熱流束 (MW/m²)</div></div>
-      <div class="stat-card"><div class="sv" id="scTwall">—</div><div class="sl">壁面温度 (K)</div></div>
-      <div class="stat-card"><div class="sv" id="scQtot">—</div><div class="sl">積算熱量 (MJ/m²)</div></div>
+      <div class="stat-card"><div class="sv" id="scHgmax">—</div><div class="sl">最大G高度 (km)</div></div>
+      <div class="stat-card"><div class="sv" id="scTwall">—</div><div class="sl">最大壁面温度 (K)</div></div>
     </div>
     </div>
 
-    <div class="tab-row">
-      <button class="tab-btn active" onclick="showTab('traj')">突入軌跡</button>
-      <button class="tab-btn" onclick="showTab('vel')">速度・高度</button>
-      <button class="tab-btn" onclick="showTab('heat')">熱流束・G</button>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-meteor"></i> 突入アニメーション（プラズマ加熱）</div>
+      <canvas id="trajCanvas" height="360" role="img" aria-label="大気圏に突入し減速・加熱するカプセルのアニメーション"></canvas>
     </div>
-    <div id="tabTraj" class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 軌道</div><canvas id="trajCanvas" height="380"></canvas></div>
-    </div>
-    <div id="tabVel" class="canvas-wrap">
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 速度</div><canvas class="ux-chartjs-canvas" id="velChart"></canvas></div>
-    </div>
-    <div id="tabHeat" class="canvas-wrap">
-      <canvas class="ux-chartjs-canvas" id="heatChart"></canvas>
-    </div>
-  
-<div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
-      <p>$\rho(h) = \rho_0 e^{-h/H}$（H=7000 m）</p>
-      <p>$\dot{q}\approx C_h \rho^{0.5}V^3 R_n^{-0.5}$</p>
-      <p>平衡壁温: $\varepsilon\sigma T_w^4 = \dot{q}$</p>
-    
-</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 高度 対 速度（現在点マーカー付き）</div>
+      <canvas class="ux-chartjs-canvas" id="hvChart" role="img" aria-label="高度対速度のプロファイル"></canvas>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-fire"></i> 減速G・熱流束プロファイル（対 高度）</div>
+      <canvas class="ux-chartjs-canvas" id="profChart" role="img" aria-label="高度に対する減速Gと熱流束のプロファイル"></canvas>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>$\rho(h) = \rho_0\, e^{-h/H}$（指数大気、$H\approx7000\,$m）</p>
+      <p>減速: $a = \dfrac{\tfrac12\rho V^2}{\beta}$、 弾道係数 $\beta = \dfrac{m}{C_d A}$</p>
+      <p>Allen–Eggers 最大減速: $a_\max = \dfrac{V_e^2 \sin\gamma}{2eH}$（速度 $V_e/\sqrt{e}$ で発生）</p>
+      <p>淀み点加熱: $\dot{q}\approx K\,\rho^{0.5}V^3 R_n^{-0.5}$、 平衡壁温 $\varepsilon\sigma T_w^4 = \dot{q}$</p>
+    </div>
 </div>
 </div>
 
@@ -260,23 +275,205 @@ function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
   return { w: w, h: h, dpr: dpr };
 }
 
+/* ===== v2 real-time Allen-Eggers ballistic entry animation ===== */
 const PRESETS = {
-  apollo:   {V0:11.0, gamma:6.5,  beta:350,  Rn:0.60, eps:0.85},
-  shuttle:{V0:7.8,  gamma:1.5,  beta:140,  Rn:0.20, eps:0.80},
-  starship:{V0:7.9,  gamma:3.5,  beta:600,  Rn:0.40, eps:0.85},
-  meteor:{V0:12.0, gamma:25.0, beta:8000, Rn:0.05, eps:0.90}
+  apollo:  {V0:11.0, gamma:6.5,  beta:350,  Rn:0.60, eps:0.85},
+  shallow: {V0:7.8,  gamma:2.0,  beta:140,  Rn:0.30, eps:0.85},
+  steep:   {V0:11.0, gamma:18.0, beta:600,  Rn:0.40, eps:0.85},
+  meteor:  {V0:12.0, gamma:25.0, beta:8000, Rn:0.05, eps:0.90}
 };
 
-const rho0 = 1.225, H = 7000, g0 = 9.81, sigma = 5.67e-8, Ch = 1.83e-4;
+const rho0 = 1.225, H = 7000, g0 = 9.81, sigma = 5.67e-8, Ksg = 1.83e-4;
+const H0_ALT = 120000;            // start altitude (m)
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const sliderIds=['sV0','sGamma','sBeta','sRn','sEps'];
-const sliderNumMap={'sV0':'vV0','sGamma':'vGamma','sBeta':'vBeta','sRn':'vRn','sEps':'vEps'};
-sliderIds.forEach(id=>{
-  const el=document.getElementById(id);
-  el.addEventListener('input',()=>{updateSlider(el);if(sliderNumMap[id])syncToNum(id,sliderNumMap[id]);compute();});
-  updateSlider(el);
-});
+// ---- physics: integrate a full entry trajectory ----
+function simulate(V0_kms, gamma_deg, beta, Rn, eps){
+  const V0=V0_kms*1000, gamma=gamma_deg*Math.PI/180, dt=0.05;
+  let h=H0_ALT, v=V0, x=0, t=0;
+  const S=[];                       // sampled states
+  let Gmax=0,qmax=0,Qtot=0,twallMax=0,hAtGmax=0;
+  for(let i=0;i<200000;i++){
+    const rho=rho0*Math.exp(-h/H);
+    const drag=0.5*rho*v*v/beta;    // m/s^2  (beta = m/(Cd*A))
+    const G=drag/g0;
+    const q=Ksg*Math.sqrt(rho)*Math.pow(v,3)/Math.sqrt(Rn);   // W/m^2
+    const Twall=Math.pow(q/(eps*sigma),0.25);
+    if(G>Gmax){Gmax=G;hAtGmax=h;}
+    qmax=Math.max(qmax,q); Qtot+=q*dt; twallMax=Math.max(twallMax,Twall);
+    if(i%4===0) S.push({t,h,x,v,G,q,Tw:Twall});
+    v-=drag*dt; if(v<50){S.push({t,h,x,v,G,q,Tw:Twall});break;}
+    h-=v*Math.sin(gamma)*dt; x+=v*Math.cos(gamma)*dt; t+=dt;
+    if(h<=0){S.push({t,h:0,x,v,G,q,Tw:Twall});break;}
+  }
+  return {S,Gmax,qmax,Qtot,twallMax,hAtGmax};
+}
 
+// ---- current simulation + animation state ----
+let SIM=null, frame=0, playing=false, rafId=null;
+
+function readParams(){
+  return {
+    V0:parseFloat(document.getElementById('sV0').value),
+    gamma:parseFloat(document.getElementById('sGamma').value),
+    beta:parseFloat(document.getElementById('sBeta').value),
+    Rn:parseFloat(document.getElementById('sRn').value),
+    eps:parseFloat(document.getElementById('sEps').value)
+  };
+}
+
+// ---- Chart.js profiles ----
+const hvChart=new Chart(document.getElementById('hvChart').getContext('2d'),{type:'line',data:{datasets:[
+  {label:'軌道（高度 対 速度）',data:[],borderColor:'#007BFF',borderWidth:2,pointRadius:0,parsing:false},
+  {label:'現在点',data:[],borderColor:'#e74c3c',backgroundColor:'#e74c3c',showLine:false,pointRadius:6,parsing:false}
+]},options:{animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,
+  plugins:{legend:{labels:{boxWidth:12}}},
+  scales:{x:{type:'linear',title:{display:true,text:'速度 (km/s)'}},y:{title:{display:true,text:'高度 (km)'},min:0}}}});
+
+const profChart=new Chart(document.getElementById('profChart').getContext('2d'),{type:'line',data:{datasets:[
+  {label:'熱流束 (MW/m²)',data:[],borderColor:'#e74c3c',borderWidth:2,pointRadius:0,parsing:false,yAxisID:'y1'},
+  {label:'減速G (g)',data:[],borderColor:'#e67e00',borderWidth:2,pointRadius:0,borderDash:[4,3],parsing:false,yAxisID:'y2'},
+  {label:'現在 q',data:[],borderColor:'#e74c3c',backgroundColor:'#e74c3c',showLine:false,pointRadius:6,parsing:false,yAxisID:'y1'},
+  {label:'現在 G',data:[],borderColor:'#e67e00',backgroundColor:'#e67e00',showLine:false,pointRadius:6,parsing:false,yAxisID:'y2'}
+]},options:{animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,
+  plugins:{legend:{labels:{boxWidth:12}}},
+  scales:{x:{type:'linear',reverse:true,title:{display:true,text:'高度 (km)'}},
+    y1:{title:{display:true,text:'熱流束 (MW/m²)'},position:'left',min:0},
+    y2:{title:{display:true,text:'減速G (g)'},position:'right',min:0,grid:{drawOnChartArea:false}}}}});
+
+// ---- trajectory animation canvas ----
+const trajCanvas=document.getElementById('trajCanvas');
+const tCtx=trajCanvas.getContext('2d');
+
+function drawScene(){
+  const __d=__novaHiDpiCanvas(trajCanvas, trajCanvas.clientWidth || trajCanvas.getBoundingClientRect().width || 600,
+                              trajCanvas.clientHeight || parseFloat(trajCanvas.getAttribute('height')) || 360, tCtx);
+  const W=__d.w, Hc=__d.h;
+  tCtx.clearRect(0,0,W,Hc);
+  const gy=Hc*0.88;
+  // sky
+  const sky=tCtx.createLinearGradient(0,0,0,gy);
+  sky.addColorStop(0,'#000010');sky.addColorStop(0.35,'#001030');sky.addColorStop(0.7,'#001F3F');sky.addColorStop(1,'#0a4080');
+  tCtx.fillStyle=sky;tCtx.fillRect(0,0,W,gy);
+  tCtx.fillStyle='#2d5a1b';tCtx.fillRect(0,gy,W,Hc-gy);
+
+  if(!SIM||SIM.S.length<2)return;
+  const S=SIM.S, h0=H0_ALT;
+  const xMax=S[S.length-1].x||1;
+  const X=px=>40+px/xMax*(W-60);
+  const Y=hm=>gy-(hm/h0)*(gy-12);
+
+  // denser-atmosphere shading near ground
+  tCtx.fillStyle='rgba(0,180,216,0.06)';tCtx.fillRect(0,Y(60000),W,gy-Y(60000));
+  tCtx.fillStyle='rgba(0,180,216,0.06)';tCtx.fillRect(0,Y(30000),W,gy-Y(30000));
+
+  // altitude gridlines
+  tCtx.font='10px Roboto Mono';tCtx.textAlign='left';
+  [100,80,60,40,20].forEach(hkm=>{
+    const ly=Y(hkm*1000);
+    tCtx.strokeStyle='rgba(255,255,255,0.08)';tCtx.lineWidth=1;tCtx.beginPath();tCtx.moveTo(0,ly);tCtx.lineTo(W,ly);tCtx.stroke();
+    tCtx.fillStyle='rgba(255,255,255,0.45)';tCtx.fillText(hkm+' km',4,ly-2);
+  });
+
+  const idx=Math.min(frame,S.length-1);
+
+  // full trajectory (faint) + flown path (glowing) up to current point
+  tCtx.lineWidth=2;
+  tCtx.beginPath();
+  S.forEach((p,i)=>{const xx=X(p.x),yy=Y(p.h);i?tCtx.lineTo(xx,yy):tCtx.moveTo(xx,yy);});
+  tCtx.strokeStyle='rgba(255,255,255,0.12)';tCtx.stroke();
+
+  tCtx.beginPath();
+  for(let i=0;i<=idx;i++){const p=S[i],xx=X(p.x),yy=Y(p.h);i?tCtx.lineTo(xx,yy):tCtx.moveTo(xx,yy);}
+  const grad=tCtx.createLinearGradient(0,0,W,0);
+  grad.addColorStop(0,'rgba(0,123,255,0.85)');grad.addColorStop(0.5,'rgba(255,120,0,0.95)');grad.addColorStop(1,'rgba(255,210,0,0.9)');
+  tCtx.strokeStyle=grad;tCtx.lineWidth=3;tCtx.stroke();
+
+  // capsule + plasma glow scaled by heat flux
+  const cur=S[idx], cx=X(cur.x), cy=Y(cur.h);
+  const qMW=cur.q/1e6;
+  const glowR=Math.min(46,10+Math.sqrt(qMW)*9);
+  const rg=tCtx.createRadialGradient(cx,cy,0,cx,cy,glowR);
+  rg.addColorStop(0,'rgba(255,255,210,0.95)');rg.addColorStop(0.35,'rgba(255,140,0,0.7)');rg.addColorStop(0.7,'rgba(255,40,0,0.35)');rg.addColorStop(1,'rgba(255,0,0,0)');
+  tCtx.fillStyle=rg;tCtx.beginPath();tCtx.arc(cx,cy,glowR,0,7);tCtx.fill();
+  // plasma trail streaks (ahead/below = direction of travel)
+  tCtx.strokeStyle='rgba(255,170,40,0.5)';tCtx.lineWidth=2;
+  for(let k=1;k<=3;k++){tCtx.beginPath();tCtx.moveTo(cx,cy);tCtx.lineTo(cx-7*k,cy-3*k);tCtx.stroke();}
+  // capsule body
+  tCtx.fillStyle='#eef';tCtx.beginPath();tCtx.arc(cx,cy,5,0,7);tCtx.fill();
+
+  // peak-G altitude marker
+  const hg=SIM.hAtGmax/1000;
+  if(hg>0){const ly=Y(SIM.hAtGmax);tCtx.strokeStyle='rgba(230,126,0,0.8)';tCtx.setLineDash([5,4]);tCtx.lineWidth=1.5;
+    tCtx.beginPath();tCtx.moveTo(0,ly);tCtx.lineTo(W,ly);tCtx.stroke();tCtx.setLineDash([]);
+    tCtx.fillStyle='#e67e00';tCtx.textAlign='right';tCtx.fillText('最大G '+hg.toFixed(0)+' km',W-6,ly-3);tCtx.textAlign='left';}
+}
+
+// ---- live numbers + chart markers ----
+function updateLive(){
+  if(!SIM)return;
+  const S=SIM.S, idx=Math.min(frame,S.length-1), c=S[idx];
+  document.getElementById('scAlt').textContent=(c.h/1000).toFixed(1);
+  document.getElementById('scVel').textContent=(c.v/1000).toFixed(2);
+  document.getElementById('scG').textContent=c.G.toFixed(1);
+  document.getElementById('scQ').textContent=(c.q/1e6).toFixed(2);
+  hvChart.data.datasets[1].data=[{x:c.v/1000,y:c.h/1000}];hvChart.update('none');
+  profChart.data.datasets[2].data=[{x:c.h/1000,y:c.q/1e6}];
+  profChart.data.datasets[3].data=[{x:c.h/1000,y:c.G}];profChart.update('none');
+}
+
+// ---- rebuild everything from params ----
+function compute(){
+  const p=readParams();
+  ['sV0','sGamma','sBeta','sRn','sEps'].forEach(id=>{var e=document.getElementById(id);if(e)updateSlider(e);});
+  // mirror slider->number boxes
+  var s;
+  if((s=document.getElementById('vV0')))s.value=p.V0.toFixed(1);
+  if((s=document.getElementById('vGamma')))s.value=p.gamma.toFixed(1);
+  if((s=document.getElementById('vBeta')))s.value=p.beta;
+  if((s=document.getElementById('vRn')))s.value=p.Rn.toFixed(2);
+  if((s=document.getElementById('vEps')))s.value=p.eps.toFixed(2);
+
+  SIM=simulate(p.V0,p.gamma,p.beta,p.Rn,p.eps);
+  frame=0;
+  // summary stats
+  document.getElementById('scGmax').textContent=SIM.Gmax.toFixed(1);
+  document.getElementById('scQmax').textContent=(SIM.qmax/1e6).toFixed(2);
+  document.getElementById('scHgmax').textContent=(SIM.hAtGmax/1000).toFixed(1);
+  document.getElementById('scTwall').textContent=SIM.twallMax.toFixed(0);
+  // profile curves
+  hvChart.data.datasets[0].data=SIM.S.map(p=>({x:p.v/1000,y:p.h/1000}));
+  profChart.data.datasets[0].data=SIM.S.map(p=>({x:p.h/1000,y:p.q/1e6}));
+  profChart.data.datasets[1].data=SIM.S.map(p=>({x:p.h/1000,y:p.G}));
+  hvChart.update('none');profChart.update('none');
+  if(reduceMotion){frame=SIM.S.length-1;}      // show final state, no motion
+  drawScene();updateLive();
+}
+
+// ---- animation loop ----
+function loop(){
+  if(!playing)return;
+  frame+=2;
+  if(frame>=SIM.S.length-1){frame=SIM.S.length-1;playing=false;setPlayBtn();drawScene();updateLive();return;}
+  drawScene();updateLive();
+  rafId=requestAnimationFrame(loop);
+}
+function setPlayBtn(){
+  const b=document.getElementById('btnPlay');
+  b.innerHTML=playing?'<i class="fas fa-pause"></i> 一時停止':'<i class="fas fa-play"></i> 再生';
+}
+function togglePlay(){
+  if(!SIM)return;
+  if(!playing && frame>=SIM.S.length-1)frame=0;   // restart if finished
+  playing=!playing;setPlayBtn();
+  if(playing){rafId=requestAnimationFrame(loop);}else if(rafId)cancelAnimationFrame(rafId);
+}
+function resetAnim(){
+  playing=false;if(rafId)cancelAnimationFrame(rafId);setPlayBtn();
+  frame=0;drawScene();updateLive();
+}
+
+// ---- presets ----
 function setPreset(name){
   const p=PRESETS[name];
   document.getElementById('sV0').value=p.V0;
@@ -284,161 +481,22 @@ function setPreset(name){
   document.getElementById('sBeta').value=p.beta;
   document.getElementById('sRn').value=p.Rn;
   document.getElementById('sEps').value=p.eps;
-  sliderIds.forEach(id=>updateSlider(document.getElementById(id)));
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
-  event.target.classList.add('active');
+  if(typeof event!=='undefined'&&event&&event.target)event.target.classList.add('active');
+  playing=false;if(rafId)cancelAnimationFrame(rafId);setPlayBtn();
   compute();
-}let activeTab='traj';
-function showTab(t){
-  activeTab=t;
-  document.getElementById('tabTraj').style.display=t==='traj'?'':'none';
-  document.getElementById('tabVel').style.display=t==='vel'?'':'none';
-  document.getElementById('tabHeat').style.display=t==='heat'?'':'none';
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active',['traj','vel','heat'][i]===t);
-  });
-}// Chart setup
+}
 
-const velCtx=document.getElementById('velChart').getContext('2d');
-const velChart=new Chart(velCtx,{type:'line',data:{labels:[],datasets:[
-  {label:'速度 (km/s)',data:[],borderColor:'#007BFF',borderWidth:2,pointRadius:0,yAxisID:'y1'},{label:'高度 (km)',data:[],borderColor:'#00B4D8',borderWidth:2,pointRadius:0,borderDash:[4,3],yAxisID:'y2'}
-]},options:{animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,interaction:{mode:'index',intersect:false},
-  plugins:{legend:{labels:{boxWidth:12}}},
-  scales:{x:{ title:{display:true,text:'時間 (s)'}},y1:{title:{display:true,text:'速度 (km/s)'},position:'left'},y2:{title:{display:true,text:'高度 (km)'},position:'right',grid:{drawOnChartArea:false}}}}});
-
-const heatCtx=document.getElementById('heatChart').getContext('2d');
-const heatChart=new Chart(heatCtx,{type:'line',data:{labels:[],datasets:[
-  {label:'熱流束 (MW/m²)',data:[],borderColor:'#e74c3c',borderWidth:2,pointRadius:0,yAxisID:'y1'},{label:'減速G (g)',data:[],borderColor:'#e67e00',borderWidth:2,pointRadius:0,borderDash:[4,3],yAxisID:'y2'}
-]},options:{animation:false,responsive:true,maintainAspectRatio:false,resizeDelay:100,interaction:{mode:'index',intersect:false},
-  plugins:{legend:{labels:{boxWidth:12}}},
-  scales:{x:{ title:{display:true,text:'時間 (s)'}},y1:{title:{display:true,text:'熱流束 (MW/m²)'},position:'left',min:0},y2:{title:{display:true,text:'減速G (g)'},position:'right',min:0,grid:{drawOnChartArea:false}}}}});
-
-// Trajectory canvas
-
-const trajCanvas=document.getElementById('trajCanvas');
-const tCtx=trajCanvas.getContext('2d');
-let gTraj=[];
-
-function drawTraj(){
-  const __novaDims=__novaHiDpiCanvas(trajCanvas, trajCanvas.clientWidth || trajCanvas.getBoundingClientRect().width || 600, trajCanvas.clientHeight || parseFloat(trajCanvas.getAttribute('height')) || 380, tCtx);
-  const W=__novaDims.w,H_c=__novaDims.h;
-  tCtx.clearRect(0,0,W,H_c);
-  // Sky gradient
-  const skyGrad=tCtx.createLinearGradient(0,0,0,H_c*0.8);
-  skyGrad.addColorStop(0,'#000010');skyGrad.addColorStop(0.3,'#001030');skyGrad.addColorStop(0.6,'#001F3F');skyGrad.addColorStop(1,'#0a4080');
-  tCtx.fillStyle=skyGrad;tCtx.fillRect(0,0,W,H_c*0.85);
-  // Ground
-  tCtx.fillStyle='#2d5a1b';tCtx.fillRect(0,H_c*0.85,W,H_c*0.15);
-  // Atmosphere glow band
-  tCtx.fillStyle='rgba(0,180,216,0.07)';tCtx.fillRect(0,H_c*0.1,W,H_c*0.2);
-
-  if(gTraj.length<2)return;
-  const h0=gTraj[0].h, hEnd=0;
-  const xRange=gTraj[gTraj.length-1].x-gTraj[0].x || 1;
-  const xOff=gTraj[0].x;
-
-  // Trajectory path
-  tCtx.save();
-  tCtx.beginPath();
-  gTraj.forEach((pt,i)=>{
-    const px=30+(pt.x-xOff)/xRange*(W-60);
-    const py=H_c*0.85-(pt.h/h0)*(H_c*0.75);
-    if(i===0)tCtx.moveTo(px,py);else tCtx.lineTo(px,py);
-  });
-  // Glow stroke
-  tCtx.lineWidth=4;
-  const tGrad=tCtx.createLinearGradient(30,0,W-30,0);
-  tGrad.addColorStop(0,'rgba(0,123,255,0.8)');tGrad.addColorStop(0.5,'rgba(255,100,0,1)');tGrad.addColorStop(1,'rgba(255,200,0,0.8)');
-  tCtx.strokeStyle=tGrad;tCtx.stroke();
-  tCtx.restore();
-
-  // Vehicle dot at last point
-  const last=gTraj[gTraj.length-1];
-  const finalIdx=Math.min(Math.floor(gTraj.length*0.85),gTraj.length-1);
-  const cur=gTraj[finalIdx];
-  const px=30+(cur.x-xOff)/xRange*(W-60);
-  const py=H_c*0.85-(cur.h/h0)*(H_c*0.75);
-
-  const glow=cur.q/1e6;
-  const glowRad=Math.min(24,8+glow*0.8);
-  const radGrad=tCtx.createRadialGradient(px,py,0,px,py,glowRad);
-  radGrad.addColorStop(0,'rgba(255,200,50,0.9)');radGrad.addColorStop(0.4,'rgba(255,100,0,0.6)');radGrad.addColorStop(1,'rgba(255,0,0,0)');
-  tCtx.fillStyle=radGrad;tCtx.beginPath();tCtx.arc(px,py,glowRad,0,Math.PI*2);tCtx.fill();
-  tCtx.fillStyle='#fff';tCtx.beginPath();tCtx.arc(px,py,4,0,Math.PI*2);tCtx.fill();
-
-  // altitude labels
-  tCtx.fillStyle='rgba(255,255,255,0.5)';tCtx.font='10px Roboto Mono';tCtx.textAlign='left';
-  [120,80,40].forEach(hkm=>{
-    const ly=H_c*0.85-(hkm*1000/h0)*(H_c*0.75);
-    tCtx.fillText(hkm+'km',4,ly+4);
-    tCtx.strokeStyle='rgba(255,255,255,0.1)';tCtx.lineWidth=1;tCtx.beginPath();tCtx.moveTo(0,ly);tCtx.lineTo(W,ly);tCtx.stroke();
-  });
-}function simulate(V0_kms, gamma_deg, beta, Rn, eps){
-  const V0=V0_kms*1000;
-  const gamma=gamma_deg*Math.PI/180;
-  const dt=0.2;
-  let h=135000, v=V0, t=0;
-  let x=0;
-  const traj=[];
-  let Gmax=0, qmax=0, Qtot=0, twallMax=0;
-  const times=[], vels=[], alts=[], qs=[], Gs=[];
-
-  for(let i=0;i<20000;i++){
-    const rho=rho0*Math.exp(-h/H);
-    const Cd=1.0, A=1.0;
-    const drag=0.5*rho*v*v*(1/beta);
-    const a=-drag; // deceleration m/s²
-    const G=Math.abs(a)/g0;
-    const q=Ch*Math.pow(rho,0.5)*Math.pow(v,3)*Math.pow(Rn,-0.5);
-    const Twall=Math.pow(q/(eps*sigma),0.25);
-    Gmax=Math.max(Gmax,G);qmax=Math.max(qmax,q);Qtot+=q*dt;twallMax=Math.max(twallMax,Twall);
-    traj.push({h,x,q,v,t});
-    times.push(t.toFixed(1));vels.push(v/1000);alts.push(h/1000);qs.push(q/1e6);Gs.push(G);
-    v+=a*dt;v=Math.max(v,100);
-    h-=v*Math.sin(gamma)*dt;
-    x+=v*Math.cos(gamma)*dt;
-    t+=dt;
-    if(h<=0||v<200)break;
-    if(i%10!==0)continue; // thin out traj points
-    if(traj.length>400){traj.splice(0,1);}
-  }return{Gmax,qmax,Qtot,twallMax,traj:traj.filter((_,i)=>i%5===0),times,vels,alts,qs,Gs};
-}function compute(){
-  const V0=parseFloat(document.getElementById('sV0').value);
-  const gamma=parseFloat(document.getElementById('sGamma').value);
-  const beta=parseFloat(document.getElementById('sBeta').value);
-  const Rn=parseFloat(document.getElementById('sRn').value);
-  const eps=parseFloat(document.getElementById('sEps').value);
-  (function(){var _e=document.getElementById('vV0');if(_e){if(_e.tagName==='INPUT')_e.value=V0.toFixed(1);else _e.textContent=V0.toFixed(1)+' km/s';}})();
-  (function(){var _e=document.getElementById('vGamma');if(_e){if(_e.tagName==='INPUT')_e.value=gamma.toFixed(1);else _e.textContent=gamma.toFixed(1)+' °';}})();
-  (function(){var _e=document.getElementById('vBeta');if(_e){if(_e.tagName==='INPUT')_e.value=beta;else _e.textContent=beta+' kg/m²';}})();
-  (function(){var _e=document.getElementById('vRn');if(_e){if(_e.tagName==='INPUT')_e.value=Rn.toFixed(2);else _e.textContent=Rn.toFixed(2)+' m';}})();
-  (function(){var _e=document.getElementById('vEps');if(_e){if(_e.tagName==='INPUT')_e.value=eps.toFixed(2);else _e.textContent=eps.toFixed(2);}})();
-
-  const res=simulate(V0,gamma,beta,Rn,eps);
-  document.getElementById('scGmax').textContent=res.Gmax.toFixed(1);
-  document.getElementById('scQmax').textContent=(res.qmax/1e6).toFixed(2);
-  document.getElementById('scTwall').textContent=res.twallMax.toFixed(0);
-  document.getElementById('scQtot').textContent=(res.Qtot/1e6).toFixed(1);
-  gTraj=res.traj;
-
-  // Resize canvas before drawing
-  const rect=trajCanvas.getBoundingClientRect();
-  if(trajCanvas.width!==rect.width){trajCanvas.width=rect.width||600;}
-  drawTraj();
-
-  const thin=4;
-  velChart.data.labels=res.times.filter((_,i)=>i%thin===0);
-  velChart.data.datasets[0].data=res.vels.filter((_,i)=>i%thin===0);
-  velChart.data.datasets[1].data=res.alts.filter((_,i)=>i%thin===0);
-  velChart.update('none');
-  heatChart.data.labels=res.times.filter((_,i)=>i%thin===0);
-  heatChart.data.datasets[0].data=res.qs.filter((_,i)=>i%thin===0);
-  heatChart.data.datasets[1].data=res.Gs.filter((_,i)=>i%thin===0);
-  heatChart.update('none');
-}window.addEventListener('resize',()=>{
-  const rect=trajCanvas.getBoundingClientRect();
-  if(rect.width>0){trajCanvas.width=rect.width;drawTraj();}
+// ---- wire sliders ----
+const sliderNumMap={'sV0':'vV0','sGamma':'vGamma','sBeta':'vBeta','sRn':'vRn','sEps':'vEps'};
+['sV0','sGamma','sBeta','sRn','sEps'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('input',()=>{updateSlider(el);if(sliderNumMap[id])syncToNum(id,sliderNumMap[id]);
+    playing=false;if(rafId)cancelAnimationFrame(rafId);setPlayBtn();compute();});
+  updateSlider(el);
 });
+
+window.addEventListener('resize',()=>{drawScene();});
 
 compute();
 </script>
@@ -450,26 +508,26 @@ compute();
       <div class="bub">「空力加熱」って何ですか？宇宙船が燃えてしまうということ？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大まかに言うと、超高速で大気に突っ込むと、機体の前の空気が猛烈に圧縮されて高温になる現象だよ。例えばアポロカプセルは、熱シールド表面が太陽の表面温度（約5500℃）の半分くらいの2700℃以上になったんだ。このシミュレーターで「アポロ」プリセットを選んで「計算」を押すと、その凄まじい熱流束の値が見られるよ。</div>
+      <div class="bub">大まかに言うと、超高速で大気に突っ込むと、機体の前の空気が猛烈に圧縮されて高温になる現象だよ。例えばアポロカプセルは、熱シールド表面が太陽の表面温度（約5500℃）の半分くらいの2700℃以上になったんだ。このシミュレーターで「アポロ風」プリセットを選んで「再生」を押すと、カプセルが大気に突入して減速しながらプラズマで赤熱していく様子と、熱流束がピークに達する瞬間がアニメーションで見られるよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">え、そうなんですか！じゃあ「弾道係数」って何が変わるんですか？上のスライダーで変えられますよね。</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">実務では「どれだけブレーキが効きやすいか」を表す重要なパラメータだ。弾道係数βが大きい（重くて空気抵抗が小さい）と、カプセルみたいにズンっと深くまで落ちて急激に加熱される。逆にβが小さいスペースシャトルは、上層大気でグライダーのように長く滑空してゆっくり熱を逃がすんだ。シミュレーターで「スペースシャトル」と「アポロ」を切り替えて比べてみて。</div>
+      <div class="bub">実務では「どれだけブレーキが効きやすいか」を表す重要なパラメータだ。弾道係数βが大きい（重くて空気抵抗が小さい）と、カプセルみたいにズンっと深くまで落ちて急激に加熱される。逆にβが小さいと、上層大気でグライダーのように長く滑空してゆっくり熱を逃がすんだ。シミュレーターで「浅い突入」と「急な突入」を切り替えて、減速G・熱流束プロファイルのピークが現れる高度がどう変わるか比べてみて。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">なるほど！でも「突入角度」を浅くしすぎるとダメって聞きました。このツールで試しても大丈夫？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">いい質問だね。シミュレーターで「突入角度γ」を1度とか2度にしてみると、最大Gも熱流束も小さくなるけど、これは「スキップ再突入」の危険ゾーンなんだ。実際には水面で石けりするように大気で跳ね返され、宇宙に戻ってしまう。有人ミッションでは6〜12度の「安全な廊下」を通る。逆に20度以上にすると…Gも熱も危険な数値になるから、ぜひ自分で確認してみて！</div>
+      <div class="bub">いい質問だね。シミュレーターで「突入角度γ」を1度とか2度にしてみると、最大Gも熱流束も小さくなるけど、これは「スキップ再突入」の危険ゾーンなんだ。実際には水面で石けりするように大気で跳ね返され、宇宙に戻ってしまう。有人ミッションでは6〜12度の「安全な廊下」を通る。逆に「急な突入」プリセット（18度）にすると、最大Gが100g近く、熱流束も20MW/m²超という危険な数値になる。再生してアニメーションでカプセルが一気に赤熱する様子を確認してみて！</div>
     </div>
   </div>
   <h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">プリセット以外の機体で計算するにはどうすればいいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">「カスタム」モードを選択し、速度・角度・弾道係数・ノーズ半径を任意の値に変更してください。弾道係数は機体の質量/（抗力係数×断面積）で概算できます。</div>
+    <div class="faq-a">プリセットを選んだ後、各スライダー（突入速度・突入角度・弾道係数・ノーズ半径・放射率）を任意の値に直接変更してください。弾道係数は機体の質量/（抗力係数×断面積）で概算できます。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">計算結果の最大G値はどのくらいの範囲を想定していますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -501,6 +559,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="atmospheric-entry.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -556,13 +617,13 @@ compute();
 <h3>使い方ガイド</h3>
 <ol>
 <li>再突入速度(km/s)、再突入角度(度)、弾道係数(kg/m²)、鼻半径(m)をプリセットまたは手動で設定します</li>
-<li>「計算実行」をクリックすると、Fay-Riddellの空力加熱式とニュートン的圧力係数に基づき最大G、最大熱流束、平衡壁面温度、積算熱量を算出します</li>
+<li>プリセット選択またはスライダー変更で自動的に、簡易空力加熱式（淀み点 q̇∝√ρ·V³·R_n^−0.5）に基づき最大G・最大熱流束・平衡壁面温度・積算熱量を算出します</li>
 <li>結果グラフで高度に対する加熱率と機体加速度の時間推移を確認し、複数条件を比較できます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>アポロ司令船(V0=11.0km/s、γ=-5.5°、β=75kg/m²、Rn=1.0m)では最大熱流束8.2MW/m²、平衡壁面温度1840K、最大G値5.2gが得られます。一方スペースシャトル軌道船(V0=7.8km/s、γ=-1.5°、β=145kg/m²、Rn=0.23m)では同じ高度区間で熱流束0.68MW/m²、壁面温度960K、最大G値1.8gとなり、低角度再突入と高い弾道係数により加熱が著しく低減されることが明確に示されます</p>
+<p>「アポロ風」プリセット(V0=11.0km/s、γ=6.5°、β=350kg/m²、Rn=0.6m)では、本ツールの弾道突入モデルで最大減速 ≈36.7g(高度約37.6km)、最大熱流束 ≈8.30MW/m²、最大壁面温度 ≈3622K が得られます。これはAllen–Eggersの解析式 a_max = V₀²·sinγ/(2eH) と一致し、最大減速は速度 V₀/√e ≈6.7km/s の時点で起こります。一方「浅い突入」プリセット(V0=7.8km/s、γ=2.0°、β=140kg/m²、Rn=0.30m)では最大減速 ≈5.7g、最大熱流束 ≈1.47MW/m² となり、浅い角度により加熱とGが大きく低減されることが分かります。なお本モデルは揚力ゼロの純弾道突入で、実機のアポロは揚力制御により最大Gを6〜7gに抑えていた点に注意してください。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -572,6 +633,16 @@ compute();
 <li>鼻半径0.15m以下の尖鋭形状では熱流束が乱流遷移により±30%変動するため、CFD検証なしに本計算結果を構造設計に直接適用してはいけません</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

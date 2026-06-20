@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "生体力学・骨応力解析シミュレーター",
       "description": "骨種別・体重・歩行位相から圧縮応力と曲げ応力をリアルタイム計算し、骨強度との比較・断面応力分布の可視化・疲労寿命評価を行う生体力学CAEツール。",
       "url": "https://novasolver.jp/tools/biomedical-stress.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["骨種別選択（大腿骨・脛骨・橈骨・椎体）","体重・歩行位相・モーメントアームのスライダー入力","圧縮応力・曲げ応力のリアルタイム計算","骨強度との比較と骨折リスク評価","断面応力分布の可視化","疲労寿命（Nf）の推定"],
       "keywords": "生体力学,骨応力,骨折リスク,大腿骨,CAE,バイオメカニクス,応力解析,中空円筒モデル",
       "datePublished": "2026-04-09",
@@ -215,7 +215,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div style="margin-top:10px;text-align:center">
       <span id="riskBadge" class="risk-badge risk-ok">安全</span>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4816367659?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816367659.09._SCMZZZZZZ_.jpg" alt="バイオメカニクスの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">バイオメカニクス の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -302,10 +310,13 @@ function switchTab(tab, btn){
   const sigma_c = F / A;       // Pa
   const sigma_b = M * y / I;   // Pa
   const sigma_max = sigma_c + sigma_b;
-  const SF = bone.sigmaC / sigma_max;
-  // Fatigue: Nf = (sigma_ult / sigma_a)^m * Nref
-  const Nf = Math.pow(bone.sigmaC / sigma_max, FATIGUE_M) * FATIGUE_NREF;
-  return{ F, M, sigma_c, sigma_b, sigma_max, SF, Nf, bone };
+  const sigma_tens = Math.max(0, sigma_b - sigma_c);
+  const sfComp = bone.sigmaC / Math.max(sigma_max, 1e-9);
+  const sfTens = sigma_tens > 0 ? bone.sigmaT / sigma_tens : Infinity;
+  const SF = Math.min(sfComp, sfTens);
+  // Fatigue: use the controlling static-strength ratio for this simplified check.
+  const Nf = Math.pow(Math.max(SF, 0), FATIGUE_M) * FATIGUE_NREF;
+  return{ F, M, sigma_c, sigma_b, sigma_max, sigma_tens, sfComp, sfTens, SF, Nf, bone };
 }function updateUI(){
   (function(){var _e=document.getElementById('bwVal');var v=document.getElementById('bwSlider').value;if(_e){if(_e.tagName==='INPUT')_e.value=v;else _e.textContent=v+' kg';}})();
   (function(){var _e=document.getElementById('armVal');var v=parseFloat(document.getElementById('armSlider').value).toFixed(1);if(_e){if(_e.tagName==='INPUT')_e.value=v;else _e.textContent=v+' cm';}})();
@@ -483,7 +494,7 @@ const W = __novaDims0.w, H = __novaDims0.h;
     data: {
       labels: weights,
       datasets: [
-        { label: '圧縮応力 σc', data: sc_data, borderColor: '#007BFF', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },{ label: '曲げ応力 σb', data: sb_data, borderColor: '#00B4D8', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },{ label: '最大応力 σmax', data: smax_data, borderColor: '#e74c3c', backgroundColor: 'transparent', borderWidth: 3, pointRadius: 0, tension: 0.3 },{ label: '圧縮強度 (170 MPa)', data: weights.map(() => 170), borderColor: '#f39c12', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [6,4], pointRadius: 0 }]
+        { label: '圧縮応力 σc', data: sc_data, borderColor: '#007BFF', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },{ label: '曲げ応力 σb', data: sb_data, borderColor: '#00B4D8', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },{ label: '最大応力 σmax', data: smax_data, borderColor: '#e74c3c', backgroundColor: 'transparent', borderWidth: 3, pointRadius: 0, tension: 0.3 },{ label: '圧縮強度 (' + (bone.sigmaC/1e6).toFixed(0) + ' MPa)', data: weights.map(() => bone.sigmaC/1e6), borderColor: '#f39c12', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [6,4], pointRadius: 0 }]
     },
     options:{
       responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
@@ -563,6 +574,9 @@ updateUI();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="biomedical-stress.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -602,14 +616,14 @@ updateUI();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>体重スライダー（bwSlider）を50～150 kgの範囲で調整し、対象患者の実体重を入力します</li>
-<li>腕の負荷係数スライダー（armSlider）を0～2.0の範囲で設定し、片腕懸垂などの動作負荷を指定します</li>
-<li>「解析実行」ボタンを押すと、大腿骨近位部の圧縮力（kN）、椎体L4の曲げ応力（MPa）、最大応力およご安全率（骨強度との比）がリアルタイム表示されます</li>
+<li>体重スライダー（bwSlider）を40～150 kgの範囲で調整し、対象者の体重を入力します</li>
+<li>モーメントアーム（armSlider）を1～15 cmの範囲で設定し、荷重線から骨断面中心までの距離を指定します</li>
+<li>骨種別・歩行位相・体重・モーメントアームを変更すると、圧縮力（kN）、曲げ応力（MPa）、最大応力、安全率、疲労寿命が自動で更新されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>体重80 kg、腕負荷係数1.5（階段昇降時の衝撃）の場合、大腿骨頸部に約2.8 kNの圧縮力が作用し、曲げ応力は皮質骨許容値90 MPaに対して約68 MPaとなります。最大応力が発生する部位はCalcar femorale（大腿骨内側支持部）で、安全率は1.32です。健康な成人骨（Young's modulus 17 GPa）であれば骨折リスク低値ですが、骨粗鬆症患者（骨密度T値-2.5以下）では安全率が0.95まで低下し、転倒時の病的骨折リスクが高まります</p>
+<p>大腿骨、立脚期、体重80 kg、モーメントアーム5 cmの場合、圧縮力は約2.35 kN、圧縮側最大応力は約61.3 MPa、引張側も考慮した安全率は約2.63です。走行やモーメントアーム増加では曲げ応力が大きくなり、引張強度側が支配する場合があるため、安全率と断面応力分布を合わせて確認してください。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -619,6 +633,16 @@ updateUI();
 <li>シミュレーション結果は健常成人の標準的な骨形状を基準としているため、変形性骨関節症患者や骨移植術後患者の個別解析には医療画像（CT/MRI）を用いた患者固有モデルの構築が必須です</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4816367659?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816367659.09._SCMZZZZZZ_.jpg" alt="バイオメカニクスの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">バイオメカニクス の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

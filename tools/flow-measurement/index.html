@@ -43,14 +43,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "流量計設計・オリフィス/ベンチュリ計算機",
       "description": "ISO 5167準拠の差圧式流量計（オリフィス・ベンチュリ・ピトー管）設計シミュレーター。差圧ΔPと流量係数Cdから流量Qをリアルタイム計算し、Q-ΔP特性曲線と永久圧力損失比較、不確かさ推定にも対応。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/flow-measurement.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "keywords": "流量計,オリフィス,ベンチュリ,ISO 5167,差圧,流量係数,流量測定,ピトー管"
@@ -238,7 +238,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="nuSlider2" min="0.5" max="100" step="0.5" value="1.0" oninput="syncToNum('nuSlider2','nuVal2Num');updateSlider(this);compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
 <div class="viz-panel">
@@ -255,7 +263,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 流量計断面図（概略）</div><canvas id="meterCanvas" height="180" style="background:#0a1628;"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 流れと圧力のライブ可視化（連続の式＋差圧）</div>
+        <canvas id="meterCanvas" height="300" style="background:#0a1628;" role="img" aria-label="管内を流れる流体が絞り部で加速し、圧力が低下して下流で部分的に回復する様子のアニメーション。ベナコントラクタとマノメータの差圧を表示します。"></canvas>
+        <div class="legend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:8px">
+          <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:3px;border-radius:2px;display:inline-block;background:#00B4D8"></i>流れの粒子（速いほど明るい）</span>
+          <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:3px;border-radius:2px;display:inline-block;background:#ffd54a"></i>圧力プロファイル p(x)</span>
+          <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:18px;height:3px;border-radius:2px;display:inline-block;background:#e17055"></i>ベナコントラクタ（最小断面）</span>
+        </div>
+      </div>
     
 
 
@@ -285,189 +300,353 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 
 <script>
+(function(){
+"use strict";
 
-let currentMeter = 'orifice';
-let qDpChart = null, permLossChart = null;
+/* ===== State ===== */
+var currentMeter = 'orifice';
+var qDpChart = null, permLossChart = null;
+var last = null;            // latest computed scalars for the animation
+var phase = 0;              // particle animation phase
+var rafId = null;
+var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const METER_CD ={ orifice: 0.61, venturi: 0.98, pitot: 1.0 };
-const METER_PERM ={ orifice: 0.55, venturi: 0.12, pitot: 0.02 }; // fraction of DP
+var METER_CD   = { orifice: 0.61, venturi: 0.98, pitot: 1.0 };
+var METER_PERM = { orifice: 0.55, venturi: 0.12, pitot: 0.02 }; // permanent loss as fraction of DP
+var METER_NAME = { orifice: 'オリフィス', venturi: 'ベンチュリ', pitot: 'ピトー管' };
+
+function $(id){ return document.getElementById(id); }
+function val(id){ return parseFloat($(id).value); }
+
+/* ===== Physics: DP flow measurement (ISO 5167 form) =====
+   Q = Cd * A2 * sqrt(2 dP / rho) / sqrt(1 - beta^4)
+   The velocity-of-approach factor E = 1/sqrt(1-beta^4) accounts for the
+   upstream velocity. dP relates to Q as dP ∝ Q^2. */
+function physics(){
+  var D1   = val('d1Slider') / 1000;            // m
+  var beta = val('betaSlider');
+  var dP   = val('dpSlider') * 1000;            // Pa
+  var rho  = val('rhoSlider');                  // kg/m3
+  var Cd   = val('cdSlider');
+  var nu   = val('nuSlider2') * 1e-6;           // m2/s
+
+  var D2 = D1 * beta;
+  var A1 = Math.PI * D1 * D1 / 4;
+  var A2 = Math.PI * D2 * D2 / 4;
+
+  var Q, vThroat;
+  if (currentMeter === 'pitot'){
+    var vCenter = Math.sqrt(2 * dP / rho);
+    Q = 0.85 * A1 * vCenter;                    // profile-factor approximation
+    vThroat = vCenter;
+  } else {
+    Q = Cd * A2 * Math.sqrt(2 * dP / rho) / Math.sqrt(1 - Math.pow(beta, 4));
+    vThroat = Q / A2;
+  }
+  var v1 = Q / A1;
+  var ReThroat = (currentMeter === 'pitot' ? v1 * D1 : vThroat * D2) / nu;
+  var permFrac = METER_PERM[currentMeter];
+
+  // simplified GUM 95% expanded uncertainty
+  var uncert = Math.sqrt(Math.pow(0.5/100,2)*4 + Math.pow(0.25*0.3/100,2)*4 + Math.pow(0.25*0.1/100,2)*4) * 100 * 2;
+
+  return { D1:D1, D2:D2, beta:beta, dP:dP, rho:rho, Cd:Cd, A1:A1, A2:A2,
+           Q:Q, v1:v1, vThroat:vThroat, ReThroat:ReThroat, permFrac:permFrac,
+           uncert:uncert, rangeability:10 };
+}
+
+function compute(){
+  var p = physics();
+  last = p;
+
+  $('scQ').textContent      = (p.Q*3600).toFixed(2)+' m³/h';
+  $('scV1').textContent     = p.v1.toFixed(2)+' m/s';
+  $('scRe2').textContent    = p.ReThroat > 10000 ? (p.ReThroat/1000).toFixed(0)+'k' : p.ReThroat.toFixed(0);
+  $('scCdUsed').textContent = p.Cd.toFixed(3);
+  $('scPerm').textContent   = (p.permFrac*100).toFixed(0)+'%';
+  $('scRange').textContent  = p.rangeability.toFixed(0)+':1';
+  $('scUncert').textContent = '± '+p.uncert.toFixed(1)+'%';
+  $('scD2').textContent     = (p.D2*1000).toFixed(1)+' mm';
+
+  drawQdpChart(p.D1, p.beta, p.rho, p.Cd);
+  drawPermLossChart(p.dP);
+  if (REDUCED) drawMeter();   // single static frame
+}
 
 function setMeter(type){
   currentMeter = type;
-  ['orifice','venturi','pitot'].forEach(t => document.getElementById('btn-'+t).classList.toggle('active', t===type));
-  const cdSlider = document.getElementById('cdSlider');
-  const defaultCd = METER_CD[type];
-  cdSlider.value = defaultCd;
-  updateSlider(cdSlider);
-  document.getElementById('betaGroup').style.display = (type === 'pitot') ? 'none' : 'block';
+  ['orifice','venturi','pitot'].forEach(function(t){ $('btn-'+t).classList.toggle('active', t===type); });
+  var cdSlider = $('cdSlider');
+  cdSlider.value = METER_CD[type];
+  if (typeof updateSlider === 'function'){ try { updateSlider(cdSlider); } catch(e){} }
+  cdSlider.style.setProperty('--pct', ((METER_CD[type]-parseFloat(cdSlider.min))/(parseFloat(cdSlider.max)-parseFloat(cdSlider.min))*100)+'%');
+  var cdNum = $('cdValNum'); if (cdNum) cdNum.value = METER_CD[type];
+  $('betaGroup').style.display = (type === 'pitot') ? 'none' : 'block';
   compute();
-  drawMeter();
-}function compute(){
-  const D1 = parseFloat(document.getElementById('d1Slider').value) / 1000;
-  const beta = parseFloat(document.getElementById('betaSlider').value);
-  const dP = parseFloat(document.getElementById('dpSlider').value) * 1000; // Pa
-  const rho = parseFloat(document.getElementById('rhoSlider').value);
-  const Cd = parseFloat(document.getElementById('cdSlider').value);
-  const nu = parseFloat(document.getElementById('nuSlider2').value) * 1e-6;
+}
 
-  const D2 = D1 * beta;
-  const A1 = Math.PI * D1 * D1 / 4;
-  const A2 = Math.PI * D2 * D2 / 4;
+/* ===== HiDPI hero animation: flow accelerating through the constriction ===== */
+// Pipe radius profile r(x) for current meter, x in [0,1]. Returns fraction of pipeR.
+function radiusProfile(x, beta, type){
+  var tIn = 0.34, tThroat = 0.46, tOut = 0.56, tEnd = 0.80; // throat geometry along pipe
+  if (type === 'pitot'){ return 1; }            // straight pipe (pitot probe)
+  if (type === 'orifice'){
+    // sharp plate at x≈0.46; bore = beta. Vena contracta a touch downstream.
+    if (x < tThroat) return 1;
+    if (x < tThroat + 0.012) return beta;        // plate face -> bore
+    var vc = 0.62 + 0.38*beta;                   // contraction coefficient ~ vena contracta
+    var rMin = beta * vc;
+    if (x < 0.55) return rMin;                    // vena contracta (minimum)
+    // expansion / recovery back to wall
+    var f = Math.min(1, (x - 0.55) / (0.92 - 0.55));
+    return rMin + (1 - rMin) * f * f;
+  }
+  // venturi: smooth converging-throat-diverging
+  if (x < tIn) return 1;
+  if (x < tThroat){ var a=(x-tIn)/(tThroat-tIn); return 1 - (1-beta)*0.5*(1-Math.cos(Math.PI*a)); }
+  if (x < tOut) return beta;
+  if (x < tEnd){ var b=(x-tOut)/(tEnd-tOut); return beta + (1-beta)*0.5*(1-Math.cos(Math.PI*b)); }
+  return 1;
+}
 
-  let Q;
-  if (currentMeter === 'pitot') {
-    const v_center = Math.sqrt(2 * dP / rho);
-    Q = 0.85 * A1 * v_center; // approximate with velocity profile factor
-  }else{
-    Q = Cd * A2 * Math.sqrt(2 * dP / rho) / Math.sqrt(1 - Math.pow(beta, 4));
+// local axial velocity multiplier = (A1/A_local) = (pipeR/r)^2 by continuity
+function velFactor(rFrac){ return 1 / (rFrac*rFrac); }
+
+var particles = [];
+function seedParticles(n, H){
+  particles = [];
+  for (var i=0;i<n;i++){
+    particles.push({ x: Math.random(), yr: (Math.random()*2-1)*0.86 });
+  }
+}
+
+function drawMeter(){
+  var canvas = $('meterCanvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  var W = canvas.offsetWidth || canvas.parentElement.offsetWidth || 600;
+  var H = 300;
+  canvas.style.height = H + 'px';
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+
+  var p = last || physics();
+  var beta = p.beta;
+  var type = currentMeter;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+  var padX = 16;
+  var x0 = padX, x1 = W - padX;
+  var pipeCY = 96, pipeR = 56;                 // pipe centerline & radius (px)
+  var Xof = function(t){ return x0 + t*(x1-x0); };
+  var Yof = function(t, sign){ return pipeCY + sign*radiusProfile(t,beta,type)*pipeR; };
+
+  // ---- pressure profile p(x): high upstream, dips at min area, recovers (with permanent loss) ----
+  // Static pressure follows Bernoulli: p ∝ -v^2 ; v ∝ velFactor. Normalize to [0,1] band.
+  var N = 120, prof = [], vmax = 1;
+  for (var i=0;i<=N;i++){ var t=i/N; var v=velFactor(radiusProfile(t,beta,type)); if(v>vmax)vmax=v; }
+  var pUp = 1.0;                               // upstream reference (normalized)
+  var permFrac = p.permFrac;
+  for (var k=0;k<=N;k++){
+    var tt=k/N;
+    var vv=velFactor(radiusProfile(tt,beta,type));
+    // ideal: p = pUp - (v^2 - 1)*scale  ; recovery loses permFrac of the dip downstream
+    var dip = (vv*vv - 1)/(vmax*vmax - 1 + 1e-6);   // 0..1, max at min area
+    var recovered = (tt > 0.55) ? (1 - permFrac) : 1; // downstream keeps (1-loss)
+    var localDip = dip * recovered;
+    if (type === 'pitot'){ localDip = (tt>0.46 && tt<0.54)?1:0; }
+    prof.push(pUp - localDip*0.92);
   }
 
-  const v1 = Q / A1;
-  const v2 = currentMeter === 'pitot' ? v1 : Q / A2;
-  const Re_throat = v2 * D2 / nu;
-  const permFrac = METER_PERM[currentMeter];
-  const permLoss = dP * permFrac;
-  const rangeability = 10; // typical sqrt(100:1) from 100:1 DP range
-  const uncert = Math.sqrt(Math.pow(0.5/100,2)*4 + Math.pow(0.25*0.3/100,2)*4 + Math.pow(0.25*0.1/100,2)*4) * 100 * 2; // simplified
+  // ---- draw pipe body fill ----
+  ctx.beginPath();
+  ctx.moveTo(Xof(0), Yof(0,-1));
+  for (var a=0;a<=N;a++){ ctx.lineTo(Xof(a/N), Yof(a/N,-1)); }
+  for (var b=N;b>=0;b--){ ctx.lineTo(Xof(b/N), Yof(b/N,1)); }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,123,255,0.06)'; ctx.fill();
 
-  document.getElementById('scQ').textContent = (Q*3600).toFixed(2)+' m³/h';
-  document.getElementById('scV1').textContent = v1.toFixed(2)+' m/s';
-  document.getElementById('scRe2').textContent = Re_throat > 10000 ? (Re_throat/1000).toFixed(0)+'k' : Re_throat.toFixed(0);
-  document.getElementById('scCdUsed').textContent = Cd.toFixed(3);
-  document.getElementById('scPerm').textContent = (permFrac*100).toFixed(0)+'%';
-  document.getElementById('scRange').textContent = rangeability.toFixed(0)+':1';
-  document.getElementById('scUncert').textContent = '± '+uncert.toFixed(1)+'%';
-  document.getElementById('scD2').textContent = (D2*1000).toFixed(1)+' mm';
+  // pipe walls
+  ctx.lineWidth = 2.4; ctx.strokeStyle = (type==='venturi')?'#00b894':'#3a6ea5';
+  ctx.beginPath(); ctx.moveTo(Xof(0),Yof(0,-1));
+  for (var c=0;c<=N;c++){ ctx.lineTo(Xof(c/N),Yof(c/N,-1)); } ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(Xof(0),Yof(0,1));
+  for (var d=0;d<=N;d++){ ctx.lineTo(Xof(d/N),Yof(d/N,1)); } ctx.stroke();
 
-  drawQdpChart(D1, beta, rho, Cd);
-  drawPermLossChart(dP);
-  drawMeter();
-}function drawMeter(){
-  const canvas = document.getElementById('meterCanvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = canvas.offsetWidth * devicePixelRatio;
-  canvas.height = 180 * devicePixelRatio;
-  ctx.scale(devicePixelRatio, devicePixelRatio);
-  const W = canvas.offsetWidth, H = 180;
-  ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, W, H);
-  const beta = parseFloat(document.getElementById('betaSlider').value);
-  const cy = H / 2, pipeR = 35, throatR = Math.round(pipeR * beta);
-
-  ctx.strokeStyle = '#007BFF'; ctx.lineWidth = 2;
-
-  if (currentMeter === 'orifice') {
-    // Pipe walls
-    ctx.strokeRect(20, cy-pipeR, W-40, pipeR*2);
-    // Orifice plate
-    const px = W/2;
-    ctx.fillStyle = '#007BFF'; ctx.globalAlpha = 0.8;
-    ctx.fillRect(px-4, cy-pipeR, 8, (pipeR-throatR));
-    ctx.fillRect(px-4, cy+throatR, 8, (pipeR-throatR));
+  // orifice plate body
+  if (type === 'orifice'){
+    var pxp = Xof(0.46);
+    ctx.fillStyle = '#5a7da5'; ctx.globalAlpha = 0.92;
+    var bore = beta*pipeR;
+    ctx.fillRect(pxp-3, pipeCY-pipeR, 6, pipeR-bore);
+    ctx.fillRect(pxp-3, pipeCY+bore, 6, pipeR-bore);
     ctx.globalAlpha = 1;
-    // Flow arrows
-    for (let i = 0; i < 4; i++) {
-      const ay = cy - pipeR + 15 + i * 18;
-      ctx.beginPath(); ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 1.5;
-      ctx.moveTo(40, ay); ctx.lineTo(W-60, ay);
-      ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(W-65, ay-5); ctx.lineTo(W-60, ay); ctx.lineTo(W-65, ay+5); ctx.stroke();
-    }
-    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '11px Noto Sans JP, sans-serif';
-    ctx.textAlign = 'center'; ctx.fillText('D₁', W*0.25, cy+pipeR+16);
-    ctx.fillText('D₂', W/2+20, cy-throatR-6);
-    ctx.fillText('ΔP', W/2+40, cy-pipeR+20);
-  }else if (currentMeter === 'venturi'){
-    ctx.strokeStyle = '#00b894'; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(20, cy-pipeR); ctx.lineTo(W*0.35, cy-pipeR);
-    ctx.quadraticCurveTo(W*0.45, cy-pipeR, W/2, cy-throatR);
-    ctx.lineTo(W*0.55, cy-throatR);
-    ctx.quadraticCurveTo(W*0.7, cy-throatR, W*0.8, cy-pipeR);
-    ctx.lineTo(W-20, cy-pipeR);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(20, cy+pipeR); ctx.lineTo(W*0.35, cy+pipeR);
-    ctx.quadraticCurveTo(W*0.45, cy+pipeR, W/2, cy+throatR);
-    ctx.lineTo(W*0.55, cy+throatR);
-    ctx.quadraticCurveTo(W*0.7, cy+throatR, W*0.8, cy+pipeR);
-    ctx.lineTo(W-20, cy+pipeR);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('Venturi Tube', W/2, cy+pipeR+16);
-  }else{
-    // Pitot
-    ctx.strokeStyle = '#007BFF'; ctx.lineWidth = 2;
-    ctx.strokeRect(20, cy-pipeR, W-40, pipeR*2);
-    ctx.strokeStyle = '#e17055'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(W/2, cy-pipeR); ctx.lineTo(W/2, cy-8); ctx.stroke();
-    ctx.beginPath(); ctx.arc(W/2, cy-8, 5, 0, Math.PI*2); ctx.fillStyle='#e17055'; ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('Pitot Tube', W/2, cy+pipeR+16);
   }
-}function drawQdpChart(D1, beta, rho, Cd){
-  const A2 = Math.PI * D1 * D1 / 4 * beta * beta;
-  const dps = [], qs = [];
-  for (let dp = 1; dp <= 500; dp += 10) {
+  // pitot probe
+  if (type === 'pitot'){
+    ctx.strokeStyle = '#e17055'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(Xof(0.5), pipeCY-pipeR); ctx.lineTo(Xof(0.5), pipeCY); ctx.stroke();
+    ctx.beginPath(); ctx.arc(Xof(0.5), pipeCY, 4, 0, 7); ctx.fillStyle='#e17055'; ctx.fill();
+  }
+
+  // ---- flow particles (speed up through throat) ----
+  for (var pi=0; pi<particles.length; pi++){
+    var P = particles[pi];
+    var rfrac = radiusProfile(P.x, beta, type);
+    var vf = velFactor(rfrac);
+    var px = Xof(P.x);
+    var py = pipeCY + P.yr * rfrac * pipeR;
+    // speed -> brightness/length of streak
+    var speedNorm = Math.min(1, (vf-0.6)/ (vmax-0.6+1e-6));
+    var streak = 4 + speedNorm*16;
+    var alpha = 0.35 + 0.55*speedNorm;
+    var g = ctx.createLinearGradient(px-streak, py, px, py);
+    g.addColorStop(0,'rgba(0,180,216,0)');
+    g.addColorStop(1,'rgba(120,'+Math.round(200+40*speedNorm)+',255,'+alpha.toFixed(2)+')');
+    ctx.strokeStyle = g; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(px-streak, py); ctx.lineTo(px, py); ctx.stroke();
+  }
+
+  // ---- pressure tap manometers (up & downstream) showing ΔP ----
+  var tapU = 0.30, tapD = 0.62;
+  var pU = prof[Math.round(tapU*N)], pD = prof[Math.round(tapD*N)];
+  function manometer(t, pv, label){
+    var mx = Xof(t);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(mx, pipeCY-radiusProfile(t,beta,type)*pipeR); ctx.lineTo(mx, 24); ctx.stroke();
+    // tube
+    var tubeH = 50, baseY = 24;
+    ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(mx-4, baseY, 8, tubeH);
+    // mercury/fluid column height ~ pressure
+    var col = Math.max(2, pv*tubeH);
+    ctx.fillStyle = '#4aa3ff'; ctx.fillRect(mx-4, baseY+tubeH-col, 8, col);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth=1; ctx.strokeRect(mx-4, baseY, 8, tubeH);
+    ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='10px Roboto Mono, monospace'; ctx.textAlign='center';
+    ctx.fillText(label, mx, baseY-4);
+  }
+  manometer(tapU, pU, 'p₁');
+  manometer(tapD, pD, 'p₂');
+
+  // ---- pressure profile curve p(x) overlaid along the bottom band ----
+  var bandTop = 196, bandBot = 286;
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x0,bandTop); ctx.lineTo(x1,bandTop); ctx.stroke();
+  ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 2.2; ctx.beginPath();
+  for (var q=0;q<=N;q++){
+    var yy = bandBot - prof[q]*(bandBot-bandTop);
+    if (q===0) ctx.moveTo(Xof(q/N), yy); else ctx.lineTo(Xof(q/N), yy);
+  }
+  ctx.stroke();
+  // mark the minimum (vena contracta / throat)
+  var minI=0, minV=2; for (var m2=0;m2<=N;m2++){ if(prof[m2]<minV){minV=prof[m2];minI=m2;} }
+  var vcx = Xof(minI/N);
+  ctx.strokeStyle = 'rgba(225,112,85,0.7)'; ctx.setLineDash([4,4]); ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.moveTo(vcx, 30); ctx.lineTo(vcx, bandBot); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#e17055'; ctx.font='10px Noto Sans JP, sans-serif'; ctx.textAlign='center';
+  ctx.fillText('ベナコントラクタ', vcx, bandBot+ -76);
+
+  // labels
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='12px Roboto Mono, monospace'; ctx.textAlign='left';
+  ctx.fillText('ΔP = '+(p.dP/1000).toFixed(1)+' kPa', x0+4, bandTop-8);
+  ctx.textAlign='right';
+  ctx.fillText('Q = '+(p.Q*3600).toFixed(1)+' m³/h   v_throat = '+p.vThroat.toFixed(1)+' m/s', x1-4, bandTop-8);
+  ctx.textAlign='left';
+  ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.font='10px Noto Sans JP, sans-serif';
+  ctx.fillText('圧力 p(x)', x0+4, bandBot-2);
+  ctx.fillText(METER_NAME[type]+'：絞りで加速→圧力低下→下流で部分回復', x0+70, bandBot-2);
+}
+
+function animate(){
+  if (last){
+    // advance particles; faster where the pipe is narrow (continuity)
+    var beta = last.beta, type = currentMeter;
+    var baseSpeed = 0.0042 * Math.max(0.5, Math.min(3, last.vThroat/8));
+    for (var i=0;i<particles.length;i++){
+      var P = particles[i];
+      var rfrac = radiusProfile(P.x, beta, type);
+      P.x += baseSpeed * velFactor(rfrac);
+      if (P.x > 1){ P.x -= 1; P.yr = (Math.random()*2-1)*0.86; }
+    }
+  }
+  drawMeter();
+  rafId = requestAnimationFrame(animate);
+}
+
+/* ===== Chart.js: Q–ΔP characteristic & permanent loss comparison ===== */
+function drawQdpChart(D1, beta, rho, Cd){
+  if (typeof Chart === 'undefined') return;
+  var A2 = Math.PI * D1 * D1 / 4 * beta * beta;
+  var dps = [], qs = [];
+  for (var dp = 1; dp <= 500; dp += 10){
     dps.push(dp);
-    const Q = currentMeter === 'pitot'
+    var Q = currentMeter === 'pitot'
       ? 0.85 * Math.PI*D1*D1/4 * Math.sqrt(2*dp*1000/rho)
       : Cd * A2 * Math.sqrt(2*dp*1000/rho) / Math.sqrt(1-Math.pow(beta,4));
     qs.push((Q*3600).toFixed(2));
-  }if (qDpChart) qDpChart.destroy();
-  qDpChart = new Chart(document.getElementById('qDpChart'),{
+  }
+  if (qDpChart) qDpChart.destroy();
+  qDpChart = new Chart($('qDpChart'),{
     type: 'line',
-    data: { labels: dps.map(d=>d+' kPa'), datasets: [{
+    data: { labels: dps.map(function(d){return d+' kPa';}), datasets: [{
       label: 'Q (m³/h)', data: qs,
       borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.1)', fill: true, tension: 0.3, pointRadius: 0
     }]},
-    options:{ responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
+    options:{ responsive: true, animation: false, maintainAspectRatio: false, resizeDelay:100,
       plugins: { legend: { labels: { color: '#6c757d', font: { size: 11 }}}},
       scales:{ x: { ticks: { color: '#6c757d', maxTicksLimit: 8, font: { size: 10 }}, grid:{ color: 'rgba(0,0,0,0.05)'}},
         y:{ ticks: { color: '#6c757d', font: { size: 10 }}, grid:{ color: 'rgba(0,0,0,0.05)'},
           title:{ display: true, text: '流量 Q (m³/h)', color: '#6c757d', font: { size: 11 }}}}}
   });
-}function drawPermLossChart(dP_Pa){
-  const meters = ['オリフィス', 'ベンチュリ', 'ピトー管'];
-  const perms = [METER_PERM.orifice, METER_PERM.venturi, METER_PERM.pitot];
-  const vals = perms.map(p => (p * dP_Pa / 1000).toFixed(2));
+}
+function drawPermLossChart(dP_Pa){
+  if (typeof Chart === 'undefined') return;
+  var meters = ['オリフィス', 'ベンチュリ', 'ピトー管'];
+  var perms = [METER_PERM.orifice, METER_PERM.venturi, METER_PERM.pitot];
+  var vals = perms.map(function(pp){ return (pp * dP_Pa / 1000).toFixed(2); });
   if (permLossChart) permLossChart.destroy();
-  permLossChart = new Chart(document.getElementById('permLossChart'), {
+  permLossChart = new Chart($('permLossChart'), {
     type: 'bar',
     data: { labels: meters, datasets: [{
-      label: '永久圧力損失 (kPa)',
-      data: vals,
+      label: '永久圧力損失 (kPa)', data: vals,
       backgroundColor: ['rgba(225,112,85,0.7)', 'rgba(0,184,148,0.7)', 'rgba(0,123,255,0.7)'],
       borderColor: ['#e17055','#00b894','#007BFF'], borderWidth: 2, borderRadius: 6
     }]},
-    options:{ responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100, indexAxis: 'y',
+    options:{ responsive: true, animation: false, maintainAspectRatio: false, resizeDelay:100, indexAxis: 'y',
       plugins: { legend: { display: false }},
       scales:{ x: { ticks: { color: '#6c757d', font: { size: 10 }}, grid:{ color: 'rgba(0,0,0,0.05)'},
         title:{ display: true, text: '永久圧力損失 (kPa)', color: '#6c757d', font: { size: 11 }}},
         y:{ ticks: { color: '#6c757d', font: { size: 11 }}}}}
   });
-}// Init
-['d1Slider','betaSlider','dpSlider','rhoSlider','cdSlider','nuSlider2'].forEach(id =>{
-  const el = document.getElementById(id);
-  const dec = ['betaSlider','cdSlider'].includes(id) ? (id==='cdSlider'?3:2) : (id==='nuSlider2'?1:0);
-  const units = {d1Slider:'mm', betaSlider:'', dpSlider:'kPa', rhoSlider:'kg/m³', cdSlider:'', nuSlider2:'cSt'};
-  const valIdMap ={d1Slider:'d1Val', betaSlider:'betaVal', dpSlider:'dpVal', rhoSlider:'rhoVal', cdSlider:'cdVal', nuSlider2:'nuVal2'};
-  updateSlider(el, valIdMap[id], dec, units[id]);
-});
-// fix ids
+}
 
-var _gd1Val=document.getElementById('d1ValNum');if(_gd1Val)_gd1Val.textContent = '100 mm';
-var _gbetaVal=document.getElementById('betaValNum');if(_gbetaVal)_gbetaVal.textContent = '0.50';
-var _gdpVal=document.getElementById('dpValNum');if(_gdpVal)_gdpVal.textContent = '50.0 kPa';
-var _grhoVal=document.getElementById('rhoValNum');if(_grhoVal)_grhoVal.textContent = '998 kg/m³';
-var _gcdVal=document.getElementById('cdValNum');if(_gcdVal)_gcdVal.textContent = '0.610';
-var _gnuVal2=document.getElementById('nuVal2Num');if(_gnuVal2)_gnuVal2.textContent = '1.0 cSt';
-['d1Slider','betaSlider','dpSlider','rhoSlider','cdSlider','nuSlider2'].forEach(id =>{
-  const el = document.getElementById(id);
-  const v = parseFloat(el.value), mn = parseFloat(el.min), mx = parseFloat(el.max);
-  el.style.setProperty('--pct', ((v-mn)/(mx-mn)*100)+'%');
-});
-compute();
-window.addEventListener('resize', () =>{ compute(); });
+/* ===== Init ===== */
+function initSliders(){
+  ['d1Slider','betaSlider','dpSlider','rhoSlider','cdSlider','nuSlider2'].forEach(function(id){
+    var el = $(id);
+    var v = parseFloat(el.value), mn = parseFloat(el.min), mx = parseFloat(el.max);
+    el.style.setProperty('--pct', ((v-mn)/(mx-mn)*100)+'%');
+  });
+}
+
+// expose handlers used by inline oninput / onclick
+window.compute  = compute;
+window.setMeter = setMeter;
+
+function boot(){
+  initSliders();
+  seedParticles(64, 300);
+  compute();
+  if (!REDUCED){ rafId = requestAnimationFrame(animate); }
+  else { drawMeter(); }
+  window.addEventListener('resize', function(){ compute(); if (REDUCED) drawMeter(); });
+}
+if (document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', boot); }
+else { boot(); }
+})();
 </script>
 
 <section class="explanation">
@@ -530,6 +709,9 @@ window.addEventListener('resize', () =>{ compute(); });
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="flow-measurement.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -585,7 +767,7 @@ window.addEventListener('resize', () =>{ compute(); });
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>DN150配管（d₁=150mm）にISO 5167オリフィス板（β=0.60、D₂=90mm）を装着し、差圧ΔP=80kPaを計測した場合：ρ=1000kg/m³（水）を代入すると、流量Q≈54.2m³/hが算出されます。このとき管内流速v₁≈8.5m/s、スロート部Re≈7.6×10⁵となり、Cd=0.617（オリフィス鋭孔用値）を適用。永久圧力損失率は差圧の約72%となり、ベンチュリなら約10%に低減可能です。流量不確かさ（95%信頼度）は約±3.2%です。</p>
+<p>DN150配管（d₁=150mm）にISO 5167オリフィス板（β=0.60、D₂=90mm）を装着し、差圧ΔP=80kPaを計測した場合：ρ=1000kg/m³（水）・Cd=0.617を代入すると、流量Q≈191.6m³/hが算出されます。このとき管内流速v₁≈3.0m/s、スロート部Re≈7.5×10⁵となります。永久圧力損失率はオリフィスで差圧の約55%（本ツール既定値）、ベンチュリなら約12%に低減可能です。流量不確かさ（95%信頼度）は本ツールの簡易モデルで約±2.0%です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -596,6 +778,16 @@ window.addEventListener('resize', () =>{ compute(); });
 <li>オリフィス孔の経時汚損（堆積物）でβ値が低下し流量が過大計測される傾向；定期的な開口検査（年1回以上）を推奨</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

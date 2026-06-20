@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "外気・還気エンタルピー混合シミュレーター",
       "description": "外気と還気の2流体混合をエンタルピー保存則で計算し、混合空気の温度・絶対湿度・比エンタルピーをリアルタイムに算出して空気線図上に可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/enthalpy-mixing-air.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["外気・還気から混合空気の状態量をリアルタイム計算","外気導入率 OAF（質量流量比）に基づく加重平均","空気線図上に OA・RA・MA の3状態点を表示","混合温度・絶対湿度・比エンタルピー・相対湿度の表示"],
       "keywords": "エンタルピー混合,外気導入率,OAF,湿り空気,還気,空気線図,空調,HVAC,Magnus式",
       "datePublished": "2026-05-16",
@@ -169,6 +169,15 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">還気の相対湿度は 50%、大気圧は 1013 hPa で固定。OAF=0% は全還気循環、100% は全外気導入を意味します。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -183,9 +192,9 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-area"></i> 空気線図上の混合（T–w）</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">赤=外気 OA / 青=還気 RA / 緑=混合 MA。3点は直線上に並び、MA は OAF に応じて OA–RA 間を移動します。</p>
+      <div class="chart-title"><i class="fas fa-chart-area"></i> 混合のライブ可視化：流れ＋空気線図</div>
+      <canvas id="cv" width="600" height="640"></canvas>
+      <p class="canvas-hint">左：外気(OA)と還気(RA)の2つの気流が混合ボックスで合流し、混合空気(MA)として流出します（色＝温度）。右の空気線図では OA・RA・MA の3点が直線上に並び、緑の MA 点が OAF に応じて OA–RA 間をリアルタイムに移動します。</p>
     </div>
 
     <div class="chart-card">
@@ -205,206 +214,244 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Enthalpy Mixing of Air (OA + RA → MA) Simulator ==========
-var cv = document.getElementById('cv');
-var ctx = cv.getContext('2d');
-var P_ATM = 1013; // hPa
-var RH_RA = 50;   // fixed return air RH (%)
+// ========== Enthalpy Mixing of Air (OA + RA -> MA) Simulator — v2 (live) ==========
+(function(){
+  "use strict";
+  var cv = document.getElementById('cv');
+  if(!cv) return;
+  var ctx = cv.getContext('2d');
+  var P_ATM = 1013; // hPa
+  var RH_RA = 50;   // fixed return-air RH (%)
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function esat(T) {
-  // Magnus type, hPa
-  return 6.112 * Math.exp(17.62 * T / (243.12 + T));
-}
-
-// returns w (g/kg) and h (kJ/kg DA) from T (degC) and RH (%)
-function stateFromTRH(T, RH) {
-  var es = esat(T);
-  var e = (RH / 100) * es;
-  var w = 622 * e / (P_ATM - e); // g/kg
-  var h = 1.006 * T + (w / 1000) * (2501 + 1.86 * T); // kJ/kg DA
-  return { T: T, RH: RH, es: es, e: e, w: w, h: h };
-}
-
-// from mixed w (g/kg) and h (kJ/kg DA), back-solve T
-function tempFromHW(h, w) {
-  // h = 1.006 T + w/1000 (2501 + 1.86 T)
-  // h = 1.006 T + 2.501 w + 0.00186 w T
-  // T = (h - 2.501 w) / (1.006 + 0.00186 w)
-  return (h - 2.501 * w) / (1.006 + 0.00186 * w);
-}
-
-// from w (g/kg) and T (degC) back-solve RH
-function rhFromTW(T, w) {
-  var es = esat(T);
-  var e = w * P_ATM / (622 + w);
-  return (e / es) * 100;
-}
-
-function fmt(v, d) {
-  if (!isFinite(v)) return '—';
-  return v.toFixed(d);
-}
-
-function getParams() {
-  var Toa = parseFloat(document.getElementById('slToa').value);
-  var RHoa = parseFloat(document.getElementById('slRHoa').value);
-  var Tra = parseFloat(document.getElementById('slTra').value);
-  var oaf = parseFloat(document.getElementById('slOAF').value);
-  return { Toa: Toa, RHoa: RHoa, Tra: Tra, RHra: RH_RA, oaf: oaf };
-}
-
-function resizeCanvas() {
-  var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-  var h = Math.round(w * 0.65);
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
-  cv.width = Math.round(w * dpr);
-  cv.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cv.dataset.cssW = String(w);
-  cv.dataset.cssH = String(h);
-}
-
-function drawChart(oa, ra, ma) {
-  var W = parseFloat(cv.dataset.cssW) || cv.width / (window.devicePixelRatio || 1), H = parseFloat(cv.dataset.cssH) || cv.height / (window.devicePixelRatio || 1);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var pad = { l: 54, r: 22, t: 22, b: 42 };
-  var Tmin = 0, Tmax = 40, Wmin = 0, Wmax = 25; // g/kg
-  function tx(T) { return pad.l + (T - Tmin) * (W - pad.l - pad.r) / (Tmax - Tmin); }
-  function ty(w) { return H - pad.b - (w - Wmin) * (H - pad.t - pad.b) / (Wmax - Wmin); }
-
-  // grid
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.lineWidth = 1;
-  for (var t = Tmin; t <= Tmax; t += 5) {
-    ctx.beginPath(); ctx.moveTo(tx(t), pad.t); ctx.lineTo(tx(t), H - pad.b); ctx.stroke();
+  function esat(T){ return 6.112 * Math.exp(17.62 * T / (243.12 + T)); }
+  function stateFromTRH(T, RH){
+    var es = esat(T);
+    var e = (RH/100)*es;
+    var w = 622*e/(P_ATM - e);                 // g/kg DA
+    var h = 1.006*T + (w/1000)*(2501 + 1.86*T); // kJ/kg DA
+    return { T:T, RH:RH, w:w, h:h };
   }
-  for (var ww = Wmin; ww <= Wmax; ww += 5) {
-    ctx.beginPath(); ctx.moveTo(pad.l, ty(ww)); ctx.lineTo(W - pad.r, ty(ww)); ctx.stroke();
+  function tempFromHW(h, w){ return (h - 2.501*w)/(1.006 + 0.00186*w); }
+  function rhFromTW(T, w){ var es = esat(T); var e = w*P_ATM/(622 + w); return (e/es)*100; }
+  function fmt(v, d){ return isFinite(v) ? v.toFixed(d) : '—'; }
+  function num(id){ return parseFloat(document.getElementById(id).value); }
+
+  // temperature -> colour (cold blue .. warm red)
+  function tColor(T, a){
+    var f = Math.max(0, Math.min(1, (T + 10) / 50)); // -10..40C
+    var r = Math.round(40 + f*210);
+    var g = Math.round(120 - Math.abs(f-0.5)*120 + 40);
+    var b = Math.round(235 - f*200);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + (a==null?1:a) + ')';
   }
 
-  // RH lines
-  var rhList = [20, 40, 60, 80, 100];
-  var cols = ['#3b6fa0', '#4f8cc2', '#5fa8d3', '#80c2e8', '#8fb8e0'];
-  for (var k = 0; k < rhList.length; k++) {
-    var rh = rhList[k];
-    ctx.strokeStyle = cols[k];
-    ctx.lineWidth = (rh === 100) ? 2 : 1;
-    ctx.beginPath();
-    var first = true;
-    for (var t2 = Tmin; t2 <= Tmax; t2 += 0.5) {
-      var es = esat(t2);
-      var e = (rh / 100) * es;
-      var w_ = 622 * e / (P_ATM - e);
-      if (w_ > Wmax * 1.05) continue;
-      var wc = Math.min(w_, Wmax);
-      if (first) { ctx.moveTo(tx(t2), ty(wc)); first = false; }
-      else ctx.lineTo(tx(t2), ty(wc));
+  function getParams(){
+    return { Toa:num('slToa'), RHoa:num('slRHoa'), Tra:num('slTra'), RHra:RH_RA, oaf:num('slOAF') };
+  }
+
+  // ---- current solved state (recomputed on input) ----
+  var S = null;
+  function solve(){
+    var p = getParams();
+    var oa = stateFromTRH(p.Toa, p.RHoa);
+    var ra = stateFromTRH(p.Tra, p.RHra);
+    var x = p.oaf/100;
+    var w_ma = x*oa.w + (1-x)*ra.w;
+    var h_ma = x*oa.h + (1-x)*ra.h;
+    var T_ma = tempFromHW(h_ma, w_ma);
+    var RH_ma = rhFromTW(T_ma, w_ma);
+    var ma = { T:T_ma, w:w_ma, h:h_ma, RH:RH_ma };
+    S = { oa:oa, ra:ra, ma:ma, x:x };
+    document.getElementById('statTma').textContent  = fmt(T_ma, 1) + ' °C';
+    document.getElementById('statWma').textContent  = fmt(w_ma, 2) + ' g/kg';
+    document.getElementById('statHma').textContent  = fmt(h_ma, 1) + ' kJ/kg DA';
+    document.getElementById('statRHma').textContent = fmt(RH_ma, 1) + ' %';
+  }
+
+  // ---- HiDPI sizing ----
+  var W = 600, H = 640;
+  function resizeCanvas(){
+    var cw = Math.max(300, Math.min(cv.parentElement.clientWidth - 40, 760));
+    var ch = Math.round(cw * 1.06); // mixing diagram on top, chart below
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.style.width = cw + 'px';
+    cv.style.height = ch + 'px';
+    cv.width = Math.round(cw * dpr);
+    cv.height = Math.round(ch * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    W = cw; H = ch;
+  }
+
+  // ---- flowing particles for the mixing diagram ----
+  var parts = []; // {stream:0/1/2, p:0..1, off:-1..1}
+  function seedParts(){
+    parts = [];
+    for(var i=0;i<46;i++) parts.push({s:0, p:Math.random(), off:(Math.random()*2-1)});
+    for(var j=0;j<46;j++) parts.push({s:1, p:Math.random(), off:(Math.random()*2-1)});
+    for(var k=0;k<60;k++) parts.push({s:2, p:Math.random(), off:(Math.random()*2-1)});
+  }
+  seedParts();
+
+  // ===== Mixing diagram (top region) =====
+  function drawMix(top, hgt){
+    var oa = S.oa, ra = S.ra, ma = S.ma, x = S.x;
+    // layout
+    var boxW = Math.min(150, W*0.26), boxH = Math.min(120, hgt*0.62);
+    var bx = W*0.5 - boxW/2, by = top + (hgt - boxH)/2;
+    var inLen = bx - 18;            // x from 18 to bx
+    var outLen = (W-18) - (bx+boxW);
+    var yOA = by + boxH*0.30, yRA = by + boxH*0.70;
+    var yOUT = by + boxH*0.50;
+    // duct half-thickness scaled by mass share (visual)
+    var hOA = 6 + 16*x, hRA = 6 + 16*(1-x), hOUT = 14;
+
+    // inlet ducts
+    function duct(x0,x1,yc,hh,col){
+      ctx.fillStyle = col;
+      ctx.fillRect(x0, yc-hh, x1-x0, hh*2);
     }
-    ctx.stroke();
-    // label
-    var tlab = 36;
-    var eslab = esat(tlab);
-    var elab = (rh / 100) * eslab;
-    var wlab = 622 * elab / (P_ATM - elab);
-    if (wlab > 0 && wlab < Wmax) {
-      ctx.fillStyle = cols[k];
-      ctx.font = 'bold 10px "Roboto Mono",monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText(rh + '%', tx(tlab) + 3, ty(wlab) - 3);
+    duct(18, bx, yOA, hOA, tColor(oa.T,0.16));
+    duct(18, bx, yRA, hRA, tColor(ra.T,0.16));
+    duct(bx+boxW, W-18, yOUT, hOUT, tColor(ma.T,0.16));
+
+    // particles
+    for(var i=0;i<parts.length;i++){
+      var pt = parts[i], px, py, col, r=2.2;
+      if(pt.s===0){ px = 18 + pt.p*inLen; py = yOA + pt.off*(hOA-2.5); col = tColor(oa.T,0.95); }
+      else if(pt.s===1){ px = 18 + pt.p*inLen; py = yRA + pt.off*(hRA-2.5); col = tColor(ra.T,0.95); }
+      else { px = (bx+boxW) + pt.p*outLen; py = yOUT + pt.off*(hOUT-3); col = tColor(ma.T,0.95); }
+      ctx.beginPath(); ctx.arc(px, py, r, 0, 6.2832); ctx.fillStyle = col; ctx.fill();
     }
-  }
 
-  // axes labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Noto Sans JP",sans-serif';
-  ctx.textAlign = 'center';
-  for (var t3 = Tmin; t3 <= Tmax; t3 += 5) {
-    ctx.fillText(t3 + '°C', tx(t3), H - pad.b + 16);
-  }
-  ctx.textAlign = 'right';
-  for (var w3 = Wmin; w3 <= Wmax; w3 += 5) {
-    ctx.fillText(w3.toFixed(0), pad.l - 6, ty(w3) + 4);
-  }
-  ctx.fillStyle = '#cfe3f7';
-  ctx.textAlign = 'center';
-  ctx.fillText('乾球温度 T (°C)', W / 2, H - 6);
-  ctx.save();
-  ctx.translate(14, H / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('絶対湿度 w (g/kg DA)', 0, 0);
-  ctx.restore();
-
-  // mixing line OA - RA
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath();
-  ctx.moveTo(tx(oa.T), ty(Math.min(oa.w, Wmax)));
-  ctx.lineTo(tx(ra.T), ty(Math.min(ra.w, Wmax)));
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // points
-  function dot(p, color, label) {
-    var X = tx(p.T), Y = ty(Math.min(p.w, Wmax));
-    ctx.beginPath();
-    ctx.arc(X, Y, 7, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 10;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#fff';
+    // mixing box
+    ctx.fillStyle = 'rgba(20,40,66,0.92)';
+    ctx.strokeStyle = 'rgba(0,180,216,0.8)';
     ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px "Roboto Mono",monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(label + ' (' + p.T.toFixed(1) + '°C, ' + p.w.toFixed(1) + 'g/kg)', X + 11, Y - 9);
+    if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx,by,boxW,boxH,10); ctx.fill(); ctx.stroke(); }
+    else { ctx.fillRect(bx,by,boxW,boxH); ctx.strokeRect(bx,by,boxW,boxH); }
+    ctx.fillStyle = '#cfe3f7'; ctx.font='bold 12px "Noto Sans JP",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('混合ボックス', bx+boxW/2, by+boxH/2-4);
+    ctx.fillStyle = tColor(ma.T,1); ctx.font='bold 13px "Roboto Mono",monospace';
+    ctx.fillText(fmt(ma.T,1)+'°C', bx+boxW/2, by+boxH/2+15);
+
+    // labels
+    ctx.font='bold 12px "Roboto Mono",monospace'; ctx.textAlign='left';
+    ctx.fillStyle = '#ff8a80'; ctx.fillText('外気 OA '+fmt(oa.T,0)+'°C', 20, yOA-hOA-5);
+    ctx.fillStyle = '#82b1ff'; ctx.fillText('還気 RA '+fmt(ra.T,0)+'°C', 20, yRA+hRA+14);
+    ctx.fillStyle = '#69f0ae'; ctx.textAlign='right'; ctx.fillText('混合 MA', W-20, yOUT-hOUT-5);
+    ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px "Noto Sans JP",sans-serif';
+    ctx.fillText('外気導入率 OAF = '+fmt(S.x*100,0)+'%', W*0.5, top+13);
   }
-  dot(oa, '#e74c3c', 'OA');
-  dot(ra, '#3498db', 'RA');
-  dot(ma, '#2ecc71', 'MA');
-}
 
-function compute() {
-  var p = getParams();
-  var oa = stateFromTRH(p.Toa, p.RHoa);
-  var ra = stateFromTRH(p.Tra, p.RHra);
-  var x = p.oaf / 100;
-  var w_ma = x * oa.w + (1 - x) * ra.w;       // g/kg
-  var h_ma = x * oa.h + (1 - x) * ra.h;       // kJ/kg DA
-  var T_ma = tempFromHW(h_ma, w_ma);
-  var RH_ma = rhFromTW(T_ma, w_ma);
-  var ma = { T: T_ma, w: w_ma, h: h_ma, RH: RH_ma };
+  // ===== Psychrometric chart (bottom region) =====
+  function drawChart(top, hgt){
+    var oa = S.oa, ra = S.ra, ma = S.ma;
+    var pad = { l:54, r:24, t:14, b:40 };
+    var Tmin=0, Tmax=40, Wmin=0, Wmax=25;
+    var x0 = pad.l, x1 = W - pad.r, y0 = top + pad.t, y1 = top + hgt - pad.b;
+    function tx(T){ return x0 + (T-Tmin)*(x1-x0)/(Tmax-Tmin); }
+    function ty(w){ return y1 - (w-Wmin)*(y1-y0)/(Wmax-Wmin); }
 
-  document.getElementById('statTma').textContent = fmt(T_ma, 1) + ' °C';
-  document.getElementById('statWma').textContent = fmt(w_ma, 2) + ' g/kg';
-  document.getElementById('statHma').textContent = fmt(h_ma, 1) + ' kJ/kg DA';
-  document.getElementById('statRHma').textContent = fmt(RH_ma, 1) + ' %';
+    // grid
+    ctx.strokeStyle='rgba(143,184,224,0.16)'; ctx.lineWidth=1;
+    for(var t=Tmin;t<=Tmax;t+=5){ ctx.beginPath(); ctx.moveTo(tx(t),y0); ctx.lineTo(tx(t),y1); ctx.stroke(); }
+    for(var ww=Wmin;ww<=Wmax;ww+=5){ ctx.beginPath(); ctx.moveTo(x0,ty(ww)); ctx.lineTo(x1,ty(ww)); ctx.stroke(); }
 
-  drawChart(oa, ra, ma);
-}
+    // RH curves (saturation = 100%)
+    var rhList=[20,40,60,80,100], cols=['#3b6fa0','#4f8cc2','#5fa8d3','#80c2e8','#9fd0f0'];
+    for(var ki=0;ki<rhList.length;ki++){
+      var rh=rhList[ki]; ctx.strokeStyle=cols[ki]; ctx.lineWidth=(rh===100)?2.2:1; ctx.beginPath();
+      var first=true;
+      for(var tt=Tmin;tt<=Tmax;tt+=0.5){
+        var ee=(rh/100)*esat(tt); var wv=622*ee/(P_ATM-ee);
+        if(wv>Wmax*1.05) continue;
+        var wc=Math.min(wv,Wmax);
+        if(first){ ctx.moveTo(tx(tt),ty(wc)); first=false; } else ctx.lineTo(tx(tt),ty(wc));
+      }
+      ctx.stroke();
+      var es2=esat(36), e2=(rh/100)*es2, wl=622*e2/(P_ATM-e2);
+      if(wl>0&&wl<Wmax){ ctx.fillStyle=cols[ki]; ctx.font='bold 10px "Roboto Mono",monospace'; ctx.textAlign='left'; ctx.fillText(rh+'%', tx(36)+3, ty(wl)-3); }
+    }
 
-function resetParams() {
-  var defs = { slToa: 32, slRHoa: 60, slTra: 26, slOAF: 30 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slToa'), 'slToaVal', 1, '');
-  updateSlider(document.getElementById('slRHoa'), 'slRHoaVal', 0, '');
-  updateSlider(document.getElementById('slTra'), 'slTraVal', 1, '');
-  updateSlider(document.getElementById('slOAF'), 'slOAFVal', 0, '');
-  compute();
-}
+    // axes
+    ctx.fillStyle='#cfe3f7'; ctx.font='11px "Noto Sans JP",sans-serif'; ctx.textAlign='center';
+    for(var t3=Tmin;t3<=Tmax;t3+=5) ctx.fillText(t3+'°C', tx(t3), y1+16);
+    ctx.textAlign='right';
+    for(var w3=Wmin;w3<=Wmax;w3+=5) ctx.fillText(w3.toFixed(0), x0-6, ty(w3)+4);
+    ctx.textAlign='center'; ctx.fillText('乾球温度 T (°C)', (x0+x1)/2, top+hgt-4);
+    ctx.save(); ctx.translate(14,(y0+y1)/2); ctx.rotate(-Math.PI/2); ctx.fillText('絶対湿度 w (g/kg DA)',0,0); ctx.restore();
 
-window.addEventListener('resize', function () { resizeCanvas(); compute(); });
+    // mixing line OA–RA
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1.6; ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(tx(oa.T), ty(Math.min(oa.w,Wmax)));
+    ctx.lineTo(tx(ra.T), ty(Math.min(ra.w,Wmax)));
+    ctx.stroke(); ctx.setLineDash([]);
 
-resizeCanvas();
-compute();
+    function dot(p,color,label){
+      var X=tx(p.T), Y=ty(Math.min(p.w,Wmax));
+      ctx.beginPath(); ctx.arc(X,Y,7,0,6.2832);
+      ctx.fillStyle=color; ctx.shadowColor=color; ctx.shadowBlur=10; ctx.fill(); ctx.shadowBlur=0;
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold 12px "Roboto Mono",monospace'; ctx.textAlign='left';
+      ctx.fillText(label+' ('+p.T.toFixed(1)+'°C, '+p.w.toFixed(1)+'g/kg)', X+11, Y-9);
+    }
+    dot(oa,'#e74c3c','OA');
+    dot(ra,'#3498db','RA');
+    // pulsing halo on MA so the "slides along the line" point pops
+    var MX=tx(ma.T), MY=ty(Math.min(ma.w,Wmax));
+    var pulse = reduceMotion ? 11 : (11 + 4*Math.abs(Math.sin(Date.now()/420)));
+    ctx.beginPath(); ctx.arc(MX,MY,pulse,0,6.2832); ctx.strokeStyle='rgba(46,204,113,0.5)'; ctx.lineWidth=2; ctx.stroke();
+    dot(ma,'#2ecc71','MA');
+    // annotation: MA on the line
+    ctx.fillStyle='rgba(105,240,174,0.85)'; ctx.font='11px "Noto Sans JP",sans-serif'; ctx.textAlign='center';
+    ctx.fillText('MA は OA–RA を OAF='+fmt(S.x*100,0)+'% で内分', (x0+x1)/2, y0-2);
+  }
+
+  function frame(){
+    ctx.fillStyle = '#0a1929';
+    ctx.fillRect(0, 0, W, H);
+    var mixH = Math.min(190, H*0.32);
+    drawMix(8, mixH);
+    drawChart(mixH + 14, H - mixH - 14);
+  }
+
+  var lastUpd = 0;
+  function tick(ts){
+    // advance particles, speed ~ flow
+    var spd = 0.010;
+    for(var i=0;i<parts.length;i++){
+      var add = parts[i].s===2 ? spd*1.15 : spd;
+      parts[i].p += add;
+      if(parts[i].p > 1){ parts[i].p -= 1; parts[i].off = (Math.random()*2-1); }
+    }
+    frame();
+    requestAnimationFrame(tick);
+  }
+
+  function rebuild(){ resizeCanvas(); solve(); if(reduceMotion) frame(); }
+
+  // public hooks used by inline oninput / reset button
+  window.compute = function(){ solve(); if(reduceMotion) frame(); };
+  window.resetParams = function(){
+    var defs = { slToa:32, slRHoa:60, slTra:26, slOAF:30 };
+    Object.keys(defs).forEach(function(id){ document.getElementById(id).value = defs[id]; });
+    if(typeof updateSlider==='function'){
+      updateSlider(document.getElementById('slToa'),'slToaVal',1,'');
+      updateSlider(document.getElementById('slRHoa'),'slRHoaVal',0,'');
+      updateSlider(document.getElementById('slTra'),'slTraVal',1,'');
+      updateSlider(document.getElementById('slOAF'),'slOAFVal',0,'');
+    }
+    var nums = { slToaVal:32, slRHoaVal:60, slTraVal:26, slOAFVal:30 };
+    Object.keys(nums).forEach(function(id){ var e=document.getElementById(id); if(e) e.value=nums[id]; });
+    solve(); if(reduceMotion) frame();
+  };
+
+  window.addEventListener('resize', rebuild);
+  rebuild();
+  if(reduceMotion) frame(); else requestAnimationFrame(tick);
+})();
 </script>
 
 <section class="explanation">
@@ -472,6 +519,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="enthalpy-mixing-air.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -525,15 +575,15 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>外気温度(OA温度)と相対湿度をスライダーで設定します。例：夏季35℃、RH40%の場合、h_oa≈90kJ/kg(DA)となります</li>
-<li>還気温度(RA温度)と相対湿度を入力します。室内設定26℃、RH50%の状態をシミュレートする場合に対応</li>
+<li>外気温度(OA温度)と相対湿度をスライダーで設定します。例：夏季35℃、RH40%の場合、本ツールの式では h_oa≈71.4kJ/kg(DA)、w_oa≈14.10g/kg(DA)となります</li>
+<li>還気温度(RA温度)を入力します。還気相対湿度は50%固定で、室内設定26℃、RH50%の状態をシミュレートします</li>
 <li>外気導入率(OAF：Outdoor Air Fraction)を0～100%で指定し、混合比率を決定します</li>
 <li>リアルタイム計算により、混合空気(MA)の温度・絶対湿度・エンタルピー・相対湿度が自動算出されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>夏季設計条件：OA(35℃、RH40%)とRA(26℃、RH50%)をOAF=30%で混合する場合、飽和水蒸気圧式およびエンタルピー保存則h_ma=0.7×h_oa+0.3×h_raに基づき計算します。OA絶対湿度w_oa≈11.0g/kg(DA)、RA絶対湿度w_ra≈9.5g/kg(DA)のとき、混合空気はT_ma≈28.7℃、w_ma≈10.25g/kg(DA)、h_ma≈78.5kJ/kg(DA)、RH_ma≈45%となります。</p>
+<p>夏季設計条件：OA(35℃、RH40%)とRA(26℃、RH50%)をOAF=30%で混合する場合、外気3割・還気7割なので h_ma=0.3×h_oa+0.7×h_ra、w_ma=0.3×w_oa+0.7×w_ra で計算します。本ツールの式では OA絶対湿度w_oa≈14.10g/kg(DA)、RA絶対湿度w_ra≈10.47g/kg(DA)、混合空気はT_ma≈28.7℃、w_ma≈11.56g/kg(DA)、h_ma≈58.4kJ/kg(DA)、RH_ma≈47.0%となります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -543,6 +593,16 @@ compute();
 <li>高湿地域の施設(病院・研究室)では、計算結果の相対湿度が±5%以内に収まるよう計器精度を確保し、定期的にキャリブレーションを実施してください</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

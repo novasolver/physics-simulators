@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "制御系ステップ応答・伝達関数シミュレーター",
       "description": "2次遅れ系の固有角周波数ωnと減衰比ζからステップ応答をリアルタイム計算。s平面の極を可視化し、立上り時間・オーバーシュート・整定時間を自動計算。",
       "url": "https://novasolver.jp/tools/control-step.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["2次系ステップ応答のリアルタイム計算","過減衰・臨界減衰・不足減衰の3ケース比較","s平面の極配置表示","立上り時間・オーバーシュート・整定時間の自動計算"],
       "keywords": "ステップ応答,2次遅れ系,伝達関数,減衰比,固有角周波数,s平面,制御工学シミュレーター",
       "datePublished": "2026-04-08",
@@ -118,6 +118,26 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 live readouts / animation controls ===== */
+#stepCanvas{display:block;width:100%;border-radius:8px;background:#0a1628}
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.62rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.03em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.scrub-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.scrub-row input[type=range]{flex:1}
+.scrub-time{font-family:'Roboto Mono',monospace;font-size:0.78rem;color:var(--accent);min-width:64px;text-align:right}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap}
+.preset-btn{padding:4px 10px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+#stepCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){input[type=range]::-webkit-slider-thumb{transition:none}}
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/control-step.html">
@@ -183,13 +203,64 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <button class="btn secondary" id="cmpBtn" onclick="toggleCompare()"><i class="fas fa-layer-group"></i> 3ケース比較</button>
     </div>
 
-    <div class="divider"></div>
-    <div class="panel-title"><i class="fas fa-chart-bar"></i> 応答指標</div>
 
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4816359281?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816359281.09._SCMZZZZZZ_.jpg" alt="電気回路の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電気回路 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（追跡中）</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roT">0.00</div><div class="rl">時刻 t [s]</div></div>
+        <div class="live-ro"><div class="rv" id="roY">0.000</div><div class="rl">出力 y(t)</div></div>
+        <div class="live-ro"><div class="rv" id="roOS">0.0</div><div class="rl">オーバーシュート %</div></div>
+        <div class="live-ro"><div class="rv" id="roRise">—</div><div class="rl">立上り時間 [s]</div></div>
+        <div class="live-ro"><div class="rv" id="roSettle">—</div><div class="rl">整定時間 [s]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> リアルタイム・ステップ応答アニメーション</div>
+      <canvas id="stepCanvas" height="360" tabindex="0" role="img" aria-label="2次遅れ系のステップ応答を左から右へリアルタイムに描画するアニメーション。±2%整定帯・オーバーシュート頂点・立上り時間・整定時間のマーカーを表示します。"></canvas>
+
+      <div class="scrub-row">
+        <span style="font-size:.72rem;color:var(--muted)"><i class="fas fa-clock"></i></span>
+        <input type="range" id="scrub" min="0" max="1000" step="1" value="0" oninput="onScrub()" aria-label="応答タイムスクラバー">
+        <span class="scrub-time" id="scrubTime">0.00 s</span>
+      </div>
+
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+        <button class="btn secondary" type="button" id="btnReplay" onclick="replayAnim()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="preset-btn speed-btn" type="button" data-speed="0.25" onclick="setSpeed(0.25)">0.25×</button>
+          <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+        </div>
+      </div>
+
+      <div class="preset-row" style="margin-top:10px">
+        <button class="preset-btn" type="button" onclick="setDamp('under')">不足減衰 ζ=0.3</button>
+        <button class="preset-btn" type="button" onclick="setDamp('crit')">臨界減衰 ζ=1.0</button>
+        <button class="preset-btn" type="button" onclick="setDamp('over')">過減衰 ζ=1.8</button>
+      </div>
+
+      <div class="legend">
+        <span><i class="swatch" style="background:#007BFF"></i>出力 y(t)</span>
+        <span><i class="swatch" style="background:rgba(150,150,150,.7)"></i>目標値（ステップ入力）</span>
+        <span><i class="swatch" style="background:rgba(0,180,216,.5)"></i>±2% 整定帯</span>
+        <span><i class="swatch" style="background:#f39c12"></i>頂点</span>
+        <span><i class="swatch" style="background:#e84393"></i>整定時刻</span>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（最終値）</div>
     <div class="stat-cards">
       <div class="stat-card"><div class="sv" id="stRise">—</div><div class="sl">立上り時間 (s)</div></div>
       <div class="stat-card" id="cardOS2"><div class="sv" id="stOS">—</div><div class="sl">オーバーシュート %</div></div>
@@ -201,178 +272,372 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="canvas-wrap">
       <div class="chart-card">
-      <div class="chart-title">ステップ応答</div>
-      <canvas class="ux-chartjs-canvas" id="chartStep"></canvas>
-    </div>
-    </div>
-    <div class="canvas-wrap">
-      <div class="chart-card">
       <div class="chart-title">s平面（極配置）</div>
       <canvas id="spCanvas" height="200"></canvas>
     </div>
     </div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
       <p>$$G(s)=\frac{K\omega_n^2}{s^2+2\zeta\omega_n s+\omega_n^2}$$</p>
-      <p style="font-size:0.78rem;margin-top:8px;">$\omega_d = \omega_n\sqrt{1-\zeta^2}$ （不足減衰時）</p>
-    
+      <p style="font-size:0.78rem;margin-top:8px;">$\omega_d = \omega_n\sqrt{1-\zeta^2}$ （不足減衰時）、$M_p=e^{-\zeta\pi/\sqrt{1-\zeta^2}}$、$t_s\approx 4/(\zeta\omega_n)$</p>
+      <p style="font-size:0.75rem;margin-top:6px;color:var(--muted)">検証例：$\zeta=0.5,\ \omega_n=2$ → $M_p\approx16.3\%$, $t_s\approx4.0$ s。</p>
+
 </div>
 </div>
 </div>
 
-<script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
+(function(){
+"use strict";
+var LBL={trace:'追跡中',apex:'頂点 Mp',rise:'立上り',settle:'整定',input:'ステップ入力',
+  nonOsc:'0 (非振動)',press:'「再生」で応答を描画',landRise:'立上り時間',
+  msgUnder:'振動しながら収束（不足減衰）',msgCrit:'最速・無振動（臨界減衰）',msgOver:'単調に収束（過減衰）',msgFirst:'1次遅れ（指数収束）'};
 
-document.querySelectorAll('input[type=range]').forEach(el=>{
-  const min=parseFloat(el.min),max=parseFloat(el.max),val=parseFloat(el.value);
-  el.style.setProperty('--pct',((val-min)/(max-min)*100).toFixed(1)+'%');
+var orderMode=2, compareMode=false, dampPreset=null;
+var traj=[];           // {t,y}
+var meta={rise:null,peakT:null,peakV:0,settle:null,K:1,sp:1,tEnd:10};
+var playing=false, animId=null, speedMult=1, simT=0, lastTs=0;
+
+function el(id){return document.getElementById(id);}
+function gv(id){return parseFloat(el(id).value);}
+
+// keep slider fill bars in sync
+document.querySelectorAll('input[type=range]').forEach(function(e){
+  var min=parseFloat(e.min),max=parseFloat(e.max),val=parseFloat(e.value);
+  e.style.setProperty('--pct',((val-min)/(max-min)*100).toFixed(1)+'%');
 });
+function refreshSliderFill(e){
+  var min=parseFloat(e.min),max=parseFloat(e.max),val=parseFloat(e.value);
+  e.style.setProperty('--pct',((val-min)/(max-min)*100).toFixed(1)+'%');
+}
 
-let orderMode=2, compareMode=false;
+/* ===== analytic step response (verified: Mp=exp(-ζπ/√(1-ζ²)), ts≈4/(ζωn)) ===== */
+function yAt(t,wn,zeta,K){
+  if(t<=0)return 0;
+  if(orderMode===1)return K*(1-Math.exp(-wn*t));
+  if(Math.abs(zeta-1)<0.001)return K*(1-(1+wn*t)*Math.exp(-wn*t));
+  if(zeta<1){
+    var wd=wn*Math.sqrt(1-zeta*zeta);
+    return K*(1-Math.exp(-zeta*wn*t)*(Math.cos(wd*t)+(zeta*wn/wd)*Math.sin(wd*t)));
+  }
+  var r1=-zeta*wn+wn*Math.sqrt(zeta*zeta-1);
+  var r2=-zeta*wn-wn*Math.sqrt(zeta*zeta-1);
+  return K*(1+(r2/(r1-r2))*Math.exp(r1*t)-(r1/(r1-r2))*Math.exp(r2*t));
+}
 
-function setOrder(n, btn){
-  orderMode=n;
-  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('zetaGroup').style.display=n===1?'none':'';
-  runSim();
-}function toggleCompare(){
-  compareMode=!compareMode;
-  const btn=document.getElementById('cmpBtn');
-  btn.style.background=compareMode?'rgba(0,123,255,.1)':'';
-  btn.style.borderColor=compareMode?'var(--accent)':'';
-  btn.style.color=compareMode?'var(--accent)':'';
-  runSim();
-}function stepResponse2(wn, zeta, K, tArr){
-  return tArr.map(t=>{
-    if(t<0)return 0;
-    if(Math.abs(zeta-1)<0.001){
-      return K*(1-(1+wn*t)*Math.exp(-wn*t));
-    }else if(zeta<1){
-      const wd=wn*Math.sqrt(1-zeta*zeta);
-      return K*(1-Math.exp(-zeta*wn*t)*(Math.cos(wd*t)+(zeta*wn/wd)*Math.sin(wd*t)));
-    }else{
-      const r1=-zeta*wn+wn*Math.sqrt(zeta*zeta-1);
-      const r2=-zeta*wn-wn*Math.sqrt(zeta*zeta-1);
-      return K*(1+(r2/(r1-r2))*Math.exp(r1*t)-(r1/(r1-r2))*Math.exp(r2*t));
-    }
-  });
-}function stepResponse1(wn, K, tArr){
-  return tArr.map(t=>K*(1-Math.exp(-wn*t)));
-}function computeMetrics(tArr, yArr, K){
-  const sp=K;
-  let rise10=null,rise90=null,peakVal=0,settleTime=null;
-  for(let i=0;i<yArr.length;i++){
-    if(rise10===null&&yArr[i]>=sp*0.1)rise10=tArr[i];
-    if(rise90===null&&yArr[i]>=sp*0.9)rise90=tArr[i];
-    if(yArr[i]>peakVal)peakVal=yArr[i];
-  }const band=sp*0.02;
-  for(let i=yArr.length-1;i>=0;i--){
-    if(Math.abs(yArr[i]-sp)>band){settleTime=tArr[i];break;}
-  }return{
-    riseTime:(rise10!==null&&rise90!==null)?(rise90-rise10):null,
-    overshoot:Math.max(0,(peakVal-sp)/sp*100),
-    settleTime
+function compute(){
+  var wn=gv('Wn'), zeta=gv('Zeta'), K=gv('Gain');
+  var tEnd=Math.max(10,8/Math.max(wn,0.1)+4);
+  var N=600;
+  traj=[];
+  var rise10=null,rise90=null,peakV=0,peakT=null,settle=null,sp=K,band=K*0.02;
+  for(var i=0;i<N;i++){
+    var t=i*tEnd/(N-1);
+    var y=yAt(t,wn,zeta,K);
+    traj.push({t:t,y:y});
+    if(rise10===null&&y>=sp*0.1)rise10=t;
+    if(rise90===null&&y>=sp*0.9)rise90=t;
+    if(y>peakV){peakV=y;peakT=t;}
+  }
+  for(var j=traj.length-1;j>=0;j--){
+    if(Math.abs(traj[j].y-sp)>band){settle=traj[j].t;break;}
+  }
+  meta={
+    rise:(rise10!==null&&rise90!==null)?(rise90-rise10):null,
+    peakT:(peakV>sp+1e-9)?peakT:null,
+    peakV:peakV,
+    overshoot:Math.max(0,(peakV-sp)/sp*100),
+    settle:settle,K:K,sp:sp,tEnd:tEnd
   };
-}let chart=null;
-function buildChart(){
-  const ctx=document.getElementById('chartStep').getContext('2d');
-  chart=new Chart(ctx,{
-    type:'line',data:{datasets:[]},
-    options:{
-      animation:false,responsive:true,
-      maintainAspectRatio:false,resizeDelay:100,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'top',labels:{font:{size:11}}}},
-      scales:{
-        x:{type:'linear',title:{display:true,text:'時間 t (s)'},grid:{color:'rgba(0,0,0,.05)'}},
-        y:{title:{display:true,text:'応答 y(t)'},grid:{color:'rgba(0,0,0,.05)'}}
-      }
-    }
-  });
-}function runSim(){
-  const wn=parseFloat(document.getElementById('Wn').value);
-  const zeta=parseFloat(document.getElementById('Zeta').value);
-  const K=parseFloat(document.getElementById('Gain').value);
-  const tEnd=Math.max(10,8/Math.max(wn,0.1)+4);
-  const N=400;
-  const tArr=Array.from({length:N},(_,i)=>i*tEnd/(N-1));
-  let yMain;
-  if(orderMode===1)yMain=stepResponse1(wn,K,tArr);
-  else yMain=stepResponse2(wn,zeta,K,tArr);
-
-  const datasets=[];
-  datasets.push({label:'目標値 K='+K.toFixed(1),data:tArr.map(t=>({x:t,y:K})),
-    borderColor:'rgba(150,150,150,.4)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,tension:0});
-
-  if(compareMode&&orderMode===2){
-    const yOver=stepResponse2(wn,1.5,K,tArr);
-    const yCrit=stepResponse2(wn,1.0,K,tArr);
-    datasets.push({label:'過減衰 ζ=1.5',data:tArr.map((t,i)=>({x:t,y:yOver[i]})),
-      borderColor:'#e17055',borderWidth:2,pointRadius:0,tension:0.2});
-    datasets.push({label:'臨界減衰 ζ=1.0',data:tArr.map((t,i)=>({x:t,y:yCrit[i]})),
-      borderColor:'#fdcb6e',borderWidth:2,pointRadius:0,tension:0.2});
-  }datasets.push({
-    label:orderMode===1?'1次系 ωn='+wn.toFixed(1):'ζ='+zeta.toFixed(2)+' ωn='+wn.toFixed(1),
-    data:tArr.map((t,i)=>({x:t,y:yMain[i]})),
-    borderColor:'#007BFF',borderWidth:2.5,pointRadius:0,tension:0.2
-  });
-  chart.data.datasets=datasets;
-  chart.update('none');
-
-  const m=computeMetrics(tArr,yMain,K);
-  document.getElementById('stRise').textContent=m.riseTime!==null?m.riseTime.toFixed(3):'—';
-  document.getElementById('cardOS2').classList.toggle('warn',m.overshoot>20);
-  document.getElementById('stOS').textContent=m.overshoot.toFixed(1)+'%';
-  document.getElementById('stSettle').textContent=m.settleTime!==null?m.settleTime.toFixed(3):'—';
-  const wd=zeta<1?(wn*Math.sqrt(Math.max(0,1-zeta*zeta))).toFixed(3):'0 (非振動)';
-  document.getElementById('stWd').textContent=wd;
-  document.getElementById('stGain').textContent=K.toFixed(2);
+  updateFinalStats(wn,zeta);
   drawSPlane(wn,zeta);
 }
 
-const spc=document.getElementById('spCanvas');
-const spctx=spc.getContext('2d');
+function updateFinalStats(wn,zeta){
+  el('stRise').textContent=meta.rise!==null?meta.rise.toFixed(3):'—';
+  el('cardOS2').classList.toggle('warn',meta.overshoot>20);
+  el('stOS').textContent=meta.overshoot.toFixed(1)+'%';
+  el('stSettle').textContent=meta.settle!==null?meta.settle.toFixed(3):'—';
+  var wd=(orderMode===1)?'—':(zeta<1?(wn*Math.sqrt(Math.max(0,1-zeta*zeta))).toFixed(3):LBL.nonOsc);
+  el('stWd').textContent=wd;
+  el('stGain').textContent=meta.K.toFixed(2);
+}
+
+/* ===== HiDPI canvas ===== */
+var cv=el('stepCanvas'), ctx=cv.getContext('2d'), cssW=0, cssH=360;
+function resizeCanvas(){
+  var rect=cv.parentElement.getBoundingClientRect();
+  cssW=Math.max(280,Math.floor(rect.width-32));
+  cssH=360;
+  var dpr=Math.min(window.devicePixelRatio||1,2.5);
+  cv.style.width=cssW+'px'; cv.style.height=cssH+'px';
+  cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function bounds(){
+  var maxY=meta.K*1.1;
+  if(meta.peakV>maxY)maxY=meta.peakV*1.06;
+  maxY=Math.max(maxY,meta.K*1.1,0.1);
+  return {maxX:meta.tEnd,maxY:maxY};
+}
+function tf(W,H,b){
+  var padL=50,padR=22,padT=22,padB=34;
+  var sx=(W-padL-padR)/b.maxX;
+  var sy=(H-padT-padB)/b.maxY;
+  return {padL:padL,padR:padR,padT:padT,padB:padB,sx:sx,sy:sy,
+    tx:function(x){return padL+x*sx;}, ty:function(y){return H-padB-y*sy;}};
+}
+
+function drawGrid(W,H,b,T){
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1; ctx.font='10px Roboto Mono';
+  var i;
+  for(i=0;i<=5;i++){
+    var yg=b.maxY*i/5;
+    ctx.beginPath(); ctx.moveTo(T.padL,T.ty(yg)); ctx.lineTo(W-T.padR,T.ty(yg)); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='right'; ctx.fillText(yg.toFixed(2),T.padL-4,T.ty(yg)+3);
+  }
+  for(i=0;i<=5;i++){
+    var xg=b.maxX*i/5;
+    ctx.beginPath(); ctx.moveTo(T.tx(xg),T.padT); ctx.lineTo(T.tx(xg),H-T.padB); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='center'; ctx.fillText(xg.toFixed(1),T.tx(xg),H-8);
+  }
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='right';
+  ctx.fillText('t [s]',W-T.padR-2,H-20);
+  ctx.save(); ctx.translate(12,T.padT+26); ctx.rotate(-Math.PI/2); ctx.textAlign='center';
+  ctx.fillText('y(t)',0,0); ctx.restore(); ctx.textAlign='left';
+}
+
+function render(){
+  resizeCanvas();
+  var W=cssW,H=cssH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+  if(traj.length<2){
+    ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.font='13px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText(LBL.press,W/2,H/2); ctx.textAlign='left'; return;
+  }
+  var b=bounds(), T=tf(W,H,b);
+  drawGrid(W,H,b,T);
+
+  var sp=meta.sp, band=sp*0.02;
+  // ±2% settling band
+  ctx.fillStyle='rgba(0,180,216,0.10)';
+  ctx.fillRect(T.padL,T.ty(sp+band),W-T.padL-T.padR,T.ty(sp-band)-T.ty(sp+band));
+  ctx.strokeStyle='rgba(0,180,216,0.45)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(T.padL,T.ty(sp+band)); ctx.lineTo(W-T.padR,T.ty(sp+band)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(T.padL,T.ty(sp-band)); ctx.lineTo(W-T.padR,T.ty(sp-band)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // setpoint (step input) line
+  ctx.strokeStyle='rgba(160,160,160,0.7)'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(T.padL,T.ty(sp)); ctx.lineTo(W-T.padR,T.ty(sp)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(200,200,200,0.85)'; ctx.font='10px Roboto Mono'; ctx.textAlign='left';
+  ctx.fillText(LBL.input+' K='+sp.toFixed(2),T.padL+4,T.ty(sp)-4);
+
+  var t=Math.min(simT,meta.tEnd);
+
+  // traced curve up to current t
+  ctx.strokeStyle='#007BFF'; ctx.lineWidth=2.6; ctx.beginPath();
+  var started=false, cur=null;
+  for(var i=0;i<traj.length;i++){
+    if(traj[i].t>t)break;
+    var px=T.tx(traj[i].x!==undefined?traj[i].x:traj[i].t), py=T.ty(traj[i].y);
+    if(!started){ctx.moveTo(px,py);started=true;}else ctx.lineTo(px,py);
+    cur=traj[i];
+  }
+  // include interpolated current head
+  var head=stateAt(t);
+  if(started){ctx.lineTo(T.tx(t),T.ty(head));}
+  ctx.stroke();
+
+  // rise-time marker (when reached)
+  if(meta.rise!==null){
+    // mark 90% crossing time = rise window end; approximate by first t where y>=0.9*sp
+    var t90=null;
+    for(var r=0;r<traj.length;r++){if(traj[r].y>=sp*0.9){t90=traj[r].t;break;}}
+    if(t90!==null && t>=t90){
+      var rx=T.tx(t90);
+      ctx.strokeStyle='rgba(46,204,113,0.7)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(rx,T.padT); ctx.lineTo(rx,H-T.padB); ctx.stroke(); ctx.setLineDash([]);
+      annot(LBL.rise+' '+(meta.rise!==null?meta.rise.toFixed(2):'')+'s',rx,T.padT+12,'#2ecc71',T);
+    }
+  }
+
+  // overshoot peak marker
+  if(meta.peakT!==null && t>=meta.peakT){
+    var pxk=T.tx(meta.peakT), pyk=T.ty(meta.peakV);
+    ctx.beginPath(); ctx.arc(pxk,pyk,4.5,0,7); ctx.fillStyle='#f39c12'; ctx.fill();
+    annot(LBL.apex+' '+meta.overshoot.toFixed(1)+'%',pxk,pyk-8,'#f39c12',T);
+  }
+
+  // settling-time marker
+  if(meta.settle!==null && t>=meta.settle){
+    var sx=T.tx(meta.settle);
+    ctx.strokeStyle='rgba(232,67,147,0.8)'; ctx.lineWidth=1.2; ctx.setLineDash([2,3]);
+    ctx.beginPath(); ctx.moveTo(sx,T.padT); ctx.lineTo(sx,H-T.padB); ctx.stroke(); ctx.setLineDash([]);
+    annot(LBL.settle+' '+meta.settle.toFixed(2)+'s',sx,H-T.padB-6,'#e84393',T);
+  }
+
+  // moving head dot
+  var hx=T.tx(t), hy=T.ty(head);
+  var g=ctx.createRadialGradient(hx-2,hy-2,1,hx,hy,8);
+  g.addColorStop(0,'#fff'); g.addColorStop(1,'#007BFF');
+  ctx.beginPath(); ctx.arc(hx,hy,6,0,7); ctx.fillStyle=g; ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=1; ctx.stroke();
+
+  // timestamp
+  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='right';
+  ctx.fillText('t = '+t.toFixed(2)+' s',W-12,16); ctx.textAlign='left';
+
+  updateLive(t,head);
+}
+
+function annot(text,x,y,color,T){
+  ctx.font='bold 10px Noto Sans JP';
+  var w=ctx.measureText(text).width, pad=4;
+  var bx=x-w/2-pad; if(bx<2)bx=2; if(bx+w+pad*2>cssW-2)bx=cssW-2-w-pad*2;
+  var by=y-14;
+  ctx.fillStyle='rgba(10,22,40,0.85)';
+  if(ctx.roundRect){ctx.beginPath();ctx.roundRect(bx,by,w+pad*2,15,4);ctx.fill();}
+  else ctx.fillRect(bx,by,w+pad*2,15);
+  ctx.strokeStyle=color; ctx.lineWidth=1; ctx.strokeRect(bx,by,w+pad*2,15);
+  ctx.fillStyle=color; ctx.textAlign='center'; ctx.fillText(text,bx+w/2+pad,by+11); ctx.textAlign='left';
+}
+
+function stateAt(t){
+  if(!traj.length)return 0;
+  if(t<=0)return 0;
+  if(t>=meta.tEnd)return traj[traj.length-1].y;
+  var lo=0,hi=traj.length-1;
+  while(hi-lo>1){var m=(lo+hi)>>1; if(traj[m].t<t)lo=m;else hi=m;}
+  var a=traj[lo],bb=traj[hi];
+  var f=(t-a.t)/((bb.t-a.t)||1);
+  return a.y+f*(bb.y-a.y);
+}
+
+function updateLive(t,y){
+  el('roT').textContent=t.toFixed(2);
+  el('roY').textContent=y.toFixed(3);
+  el('roOS').textContent=(t>= (meta.peakT||1e9)||meta.peakT===null)?meta.overshoot.toFixed(1):'…';
+  el('roRise').textContent=(meta.rise!==null&&t>=(meta.peakT||0))?meta.rise.toFixed(3):(meta.rise!==null?'…':'—');
+  el('roSettle').textContent=(meta.settle!==null&&t>=meta.settle)?meta.settle.toFixed(3):(meta.settle!==null?'…':'—');
+  el('scrub').value=String(Math.round(t/meta.tEnd*1000));
+  el('scrubTime').textContent=t.toFixed(2)+' s';
+}
+
+/* ===== s-plane ===== */
+var spc=el('spCanvas'), spctx=spc.getContext('2d');
 function drawSPlane(wn,zeta){
-  const W=spc.offsetWidth||400;
-  spc.width=W; spc.height=200;
+  var W=spc.offsetWidth||400; spc.width=W; spc.height=200;
   spctx.fillStyle='#020d1a'; spctx.fillRect(0,0,W,200);
-  const cx=W/2,cy=100;
+  var cx=W/2,cy=100;
   spctx.strokeStyle='rgba(255,255,255,.3)'; spctx.lineWidth=1;
   spctx.beginPath(); spctx.moveTo(0,cy); spctx.lineTo(W,cy); spctx.stroke();
   spctx.beginPath(); spctx.moveTo(cx,0); spctx.lineTo(cx,200); spctx.stroke();
   spctx.fillStyle='rgba(255,255,255,.5)'; spctx.font='10px Roboto Mono,monospace';
-  spctx.fillText('Re',W-24,cy-6);
-  spctx.fillText('Im',cx+6,14);
-  spctx.fillText('s平面（極：×）',8,16);
-  const scale=Math.min(cx,cy)/(wn*1.5+0.1);
-  const sigma=-zeta*wn;
-  const wd=wn*Math.sqrt(Math.max(0,1-zeta*zeta));
+  spctx.fillText('Re',W-24,cy-6); spctx.fillText('Im',cx+6,14); spctx.fillText('s平面（極：×）',8,16);
+  var scale=Math.min(cx,cy)/(wn*1.5+0.1);
+  var sigma=-zeta*wn, wd=wn*Math.sqrt(Math.max(0,1-zeta*zeta));
   spctx.beginPath(); spctx.arc(cx,cy,wn*scale,0,Math.PI*2);
   spctx.strokeStyle='rgba(0,123,255,.25)'; spctx.lineWidth=1; spctx.stroke();
-  function drawPole(re,im,color){
-    const px=cx+re*scale,py=cy-im*scale;
-    spctx.strokeStyle=color; spctx.lineWidth=2.5;
-    const s=6;
+  function pole(re,im,color){
+    var px=cx+re*scale,py=cy-im*scale;
+    spctx.strokeStyle=color; spctx.lineWidth=2.5; var s=6;
     spctx.beginPath(); spctx.moveTo(px-s,py-s); spctx.lineTo(px+s,py+s); spctx.stroke();
     spctx.beginPath(); spctx.moveTo(px+s,py-s); spctx.lineTo(px-s,py+s); spctx.stroke();
     spctx.fillStyle=color; spctx.font='10px Roboto Mono,monospace';
-    spctx.fillText('('+re.toFixed(2)+(im!==0?','+im.toFixed(2)+'j':'')+')' ,px+8,py-4);
-  }if(orderMode===1){
-    drawPole(-wn,0,'#00b894');
-  }else if(zeta<1){
-    drawPole(sigma,wd,'#007BFF');
-    drawPole(sigma,-wd,'#007BFF');
-  }else if(Math.abs(zeta-1)<0.001){
-    drawPole(sigma,0,'#fdcb6e');
-  }else{
-    const r1=-zeta*wn+wn*Math.sqrt(zeta*zeta-1);
-    const r2=-zeta*wn-wn*Math.sqrt(zeta*zeta-1);
-    drawPole(r1,0,'#e17055'); drawPole(r2,0,'#e17055');
+    spctx.fillText('('+re.toFixed(2)+(im!==0?','+im.toFixed(2)+'j':'')+')',px+8,py-4);
   }
-}buildChart();
-runSim();
+  if(orderMode===1){pole(-wn,0,'#00b894');}
+  else if(zeta<1){pole(sigma,wd,'#007BFF'); pole(sigma,-wd,'#007BFF');}
+  else if(Math.abs(zeta-1)<0.001){pole(sigma,0,'#fdcb6e');}
+  else{var r1=-zeta*wn+wn*Math.sqrt(zeta*zeta-1),r2=-zeta*wn-wn*Math.sqrt(zeta*zeta-1);pole(r1,0,'#e17055');pole(r2,0,'#e17055');}
+}
+
+/* ===== animation loop ===== */
+function loop(ts){
+  if(!playing){animId=null;return;}
+  if(!lastTs)lastTs=ts;
+  var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+  simT+=dt*speedMult*Math.max(1,meta.tEnd/6);
+  if(simT>=meta.tEnd){simT=meta.tEnd; render(); stopPlay(); return;}
+  render(); animId=requestAnimationFrame(loop);
+}
+function startPlay(){
+  if(traj.length<2)return;
+  if(simT>=meta.tEnd)simT=0;
+  playing=true; lastTs=0;
+  el('btnPlay').innerHTML='<i class="fas fa-pause"></i> 一時停止';
+  if(!animId)animId=requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing=false; if(animId){cancelAnimationFrame(animId);animId=null;}
+  el('btnPlay').innerHTML='<i class="fas fa-play"></i> 再生';
+}
+window.togglePlay=function(){playing?stopPlay():startPlay();};
+window.replayAnim=function(){simT=0; render(); startPlay();};
+window.setSpeed=function(s){
+  speedMult=s;
+  document.querySelectorAll('.speed-btn').forEach(function(b){
+    var a=parseFloat(b.dataset.speed)===s;
+    b.classList.toggle('active',a);
+    b.style.borderColor=a?'var(--accent)':''; b.style.color=a?'var(--accent)':'';
+  });
+};
+window.onScrub=function(){
+  if(traj.length<2)return;
+  stopPlay(); simT=gv('scrub')/1000*meta.tEnd; render();
+};
+
+/* ===== param changes (called by inline oninput) ===== */
+function recompute(restart){
+  ['Wn','Zeta','Gain'].forEach(function(id){refreshSliderFill(el(id));});
+  var wasPlaying=playing; stopPlay();
+  compute();
+  if(restart){simT=0;}
+  if(simT>meta.tEnd)simT=meta.tEnd;
+  render();
+  if(wasPlaying&&restart)startPlay();
+}
+window.runSim=function(){recompute(false);};
+
+window.setOrder=function(n,btn){
+  orderMode=n;
+  document.querySelectorAll('.type-btn').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  el('zetaGroup').style.display=n===1?'none':'';
+  recompute(true);
+};
+window.toggleCompare=function(){
+  compareMode=!compareMode;
+  var btn=el('cmpBtn');
+  btn.style.background=compareMode?'rgba(0,123,255,.1)':'';
+  btn.style.borderColor=compareMode?'var(--accent)':'';
+  btn.style.color=compareMode?'var(--accent)':'';
+  recompute(false);
+};
+window.setDamp=function(kind){
+  if(orderMode!==2){orderMode=2; document.querySelectorAll('.type-btn').forEach(function(b,i){b.classList.toggle('active',i===1);}); el('zetaGroup').style.display='';}
+  var z=kind==='under'?0.3:(kind==='crit'?1.0:1.8);
+  el('Zeta').value=z; if(el('ZetaVal'))el('ZetaVal').value=z.toFixed(2);
+  recompute(true); startPlay();
+};
+
+cv.addEventListener('keydown',function(e){
+  if(e.key===' '||e.key==='Enter'){e.preventDefault(); window.togglePlay();}
+});
+window.addEventListener('resize',function(){render();});
+
+// honor reduced motion: render a static settled frame instead of auto-animating
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+compute();
+if(reduce){ simT=meta.tEnd; render(); }
+else { simT=0; render(); startPlay(); }
+})();
 </script>
 
 <section class="explanation">
@@ -388,7 +653,7 @@ runSim();
       <div class="bub">え、そうなんですか！確かに変えました。ζが1の時は一番スムーズに上がってますね。これが「臨界減衰」ってやつですか？実務ではどの値がよく使われるんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">その通り！ζ=1が臨界減衰だ。実務では、例えば産業用ロボットアームのサーボ制御だと、応答が速くてオーバーシュートも小さいζ=0.7前後がよく使われるね。シミュレーターの「実務の目安」にもある通り、約4.3%のオーバーシュートでバランスが良いんだ。ωnのスライダーもいじると、応答の速さがどう変わるか体感できるよ。</div>
+      <div class="bub">その通り！ζ=1が臨界減衰だ。実務では、ζ=0.7では理論上約4.6%のオーバーシュートで、速さと安定のバランスが良いんだ。ωnのスライダーもいじると、応答の速さがどう変わるか体感できるよ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">s平面に表示されてる「×」印（極）の位置と、グラフの形が連動して動いてますね。これってどういう関係があるんですか？</div>
@@ -431,6 +696,9 @@ runSim();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="control-step.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -485,25 +753,35 @@ runSim();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>固有角周波数Wn（rad/s）を0.5～10の範囲で調整し、システムの応答速度を決定する</li>
+<li>自然角周波数Wnを0.1〜20 rad/sで設定し、応答速度を選びます。</li>
 <li>減衰比Zeta（ζ）を0～2.0の範囲で変更して、過減衰（ζ>1）・臨界減衰（ζ=1）・不足減衰（ζ<1）の応答特性を比較する</li>
-<li>静的ゲインGainを0.5～5.0で設定後、ステップ入力を印加してリアルタイムで立上り時間・オーバーシュート・整定時間2%を確認する</li>
-<li>極配置図とボード線図（ゲイン線図・位相線図）を同時観察し、周波数特性との対応を検証する</li>
+<li>定常ゲインGainを0.1〜5.0で設定し、立上り時間、オーバーシュート、2%整定時間の変化を確認します。</li>
+<li>s平面の極配置図を同時観察し、極の位置（実部=減衰の速さ、虚部=振動の速さ）と応答波形の対応を検証する</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>Wn=2.0rad/s、Zeta=0.5、Gain=1.0の不足減衰系を想定。ステップ応答では立上り時間≈0.8秒、オーバーシュート≈16%、整定時間2%≈3.2秒となる。減衰固有角振動数ωd=Wn√(1-ζ²)≈1.73rad/sで振動周期T=2π/ωd≈3.6秒。同じWn=2.0で減衰比をZeta=1.0（臨界減衰）に変更すると、振動が消滅し立上り時間≈2.0秒まで延伸するが、オーバーシュート0%を実現。低周波ゲインは両者ともGain値に依存し、高周波ではZetaが大きいほど減衰が強化される。</p>
+<p>Wn=2.0rad/s、Zeta=0.5、Gain=1.0の不足減衰系を想定。ステップ応答では立上り時間≈0.8秒、オーバーシュート≈16.3%、整定時間2%≈4.0秒となる。減衰固有角振動数ωd=Wn√(1-ζ²)≈1.73rad/sで振動周期T=2π/ωd≈3.6秒。同じWn=2.0で減衰比をZeta=1.0（臨界減衰）に変更すると、振動が消滅し立上り時間≈1.7秒まで延伸するが、オーバーシュート0%を実現。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
 <li>ζ&lt;0.7の低減衰系は位置決め制御で大きなオーバーシュートを引き起こすため、機械要素（減速機バックラッシュ、軸ねじりなど）との整合性を確認必須</li>
 <li>DCサーボモータ制御ではWn=3～5rad/s、ζ=0.7～0.8の組み合わせが応答速度と安定性のバランスを取りやすい</li>
-<li>ボード線図でゲイン余裕20dB以上、位相余裕45度以上を確保するとパラメータ変動時の安定性が向上</li>
+<li>周波数領域の余裕（ゲイン余裕20dB以上・位相余裕45度以上）は別ツールのボード線図シミュレーターで確認すると、パラメータ変動時の安定性評価に役立つ</li>
 <li>Gainを過大に設定するとコントローラ飽和・アクチュエータ限界に達するため、実際の出力制約を反映した値を入力する</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4816359281?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816359281.09._SCMZZZZZZ_.jpg" alt="電気回路の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電気回路 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

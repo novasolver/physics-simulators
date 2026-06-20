@@ -26,7 +26,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[
-{"@type":"SoftwareApplication","name":"橋梁トラス設計シミュレーター","description":"ノードと部材を自由配置し、自作トラス橋にトラックを走らせて応力解析。各部材の張力・圧縮をリアルタイム可視化し、限界超過で崩壊する様子も再現。最軽量設計に挑戦できる構造シミュレーターです。","url":"https://novasolver.jp/tools/bridge-builder.html","applicationCategory":"EngineeringApplication","operatingSystem":"Web Browser","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"publisher":{"@type":"Organization","name":"NovaSolver Project","url":"https://novasolver.jp"},"datePublished":"2026-04-17","dateModified":"2026-04-17","inLanguage":"ja"},
+{"@type":"SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html","name":"橋梁トラス設計シミュレーター","description":"ノードと部材を自由配置し、自作トラス橋にトラックを走らせて応力解析。各部材の張力・圧縮をリアルタイム可視化し、限界超過で崩壊する様子も再現。最軽量設計に挑戦できる構造シミュレーターです。","url":"https://novasolver.jp/tools/bridge-builder.html","applicationCategory":"EngineeringApplication","operatingSystem":"Web Browser","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"publisher":{"@type":"Organization","name":"NovaSolver Project","url":"https://novasolver.jp","sameAs":["https://github.com/novasolver"]},"datePublished":"2026-04-17","dateModified":"2026-04-17","inLanguage":"ja"},
 {"@type":"FAQPage","mainEntity":[
 {"@type":"Question","name":"トラス橋はどのように力を伝達しますか？","acceptedAnswer":{"@type":"Answer","text":"トラス橋は三角形を基本単位とする骨組構造で、各部材には軸力（引張または圧縮）のみが作用します。荷重は部材の軸方向に伝達され、支点で地面に伝えられます。三角形は変形しにくい形状のため、少ない材料で大きなスパンを架けることができます。"}},
 {"@type":"Question","name":"なぜ三角形は構造的に安定なのですか？","acceptedAnswer":{"@type":"Answer","text":"三角形は3つの辺の長さが決まると形状が一意に定まる唯一の多角形です。四角形以上は辺の長さが同じでも平行四辺形のように変形できますが、三角形はできません。この幾何学的な剛性がトラス構造の安定性の源です。"}},
@@ -148,7 +148,7 @@ input[type=range]{accent-color:var(--accent);cursor:pointer}
 
 <div class="ctrl-group">
 <div class="ctrl-label"><span>素材</span></div>
-<select id="selMat" onchange="S.material=this.value">
+<select id="selMat" onchange="S.material=this.value;updateStats()">
 <option value="steel">鋼材 SS400 (E=200GPa, σy=245MPa)</option>
 <option value="aluminum">アルミ A6061 (E=70GPa, σy=276MPa)</option>
 <option value="wood">集成材 (E=12GPa, σy=30MPa)</option>
@@ -157,7 +157,7 @@ input[type=range]{accent-color:var(--accent);cursor:pointer}
 
 <div class="ctrl-group">
 <div class="ctrl-label"><span>部材断面積</span><div class="num-wrap"><input type="number" class="num-input" id="areaVal" value="1000" min="100" max="10000" step="100" oninput="syncFromNum('areaSlider','areaVal')"><span class="num-unit">mm²</span></div></div>
-<input type="range" id="areaSlider" min="100" max="10000" step="100" value="1000" oninput="syncToNum('areaSlider','areaVal');S.area=this.value*1e-6;document.getElementById('areaVal').value=this.value+' mm²'">
+<input type="range" id="areaSlider" min="100" max="10000" step="100" value="1000" oninput="syncToNum('areaSlider','areaVal');S.area=this.value*1e-6;updateStats()">
 </div>
 
 <div class="sec-title">プリセット</div>
@@ -167,16 +167,17 @@ input[type=range]{accent-color:var(--accent);cursor:pointer}
 <button class="preset-btn" onclick="loadPreset('howe')">ハウ</button>
 <button class="preset-btn" onclick="loadPreset('arch')">アーチ</button>
 </div>
+<button class="btn btn-outline" onclick="clearAll()"><i class="fas fa-eraser"></i> Clear</button>
 </div>
 
 <div id="testControls" style="display:none">
 <div class="ctrl-group">
 <div class="ctrl-label"><span>トラック荷重</span><div class="num-wrap"><input type="number" class="num-input" id="loadVal" value="200" min="50" max="2000" step="50" oninput="syncFromNum('loadSlider','loadVal')"><span class="num-unit">kN</span></div></div>
-<input type="range" id="loadSlider" min="50" max="2000" step="50" value="200" oninput="syncToNum('loadSlider','loadVal');S.truckLoad=+this.value;document.getElementById('loadVal').value=this.value+' kN'">
+<input type="range" id="loadSlider" min="50" max="2000" step="50" value="200" oninput="syncToNum('loadSlider','loadVal');S.truckLoad=+this.value">
 </div>
 <div class="ctrl-group">
 <div class="ctrl-label"><span>変形倍率</span><div class="num-wrap"><input type="number" class="num-input" id="scaleVal" value="50" min="1" max="200" step="1" oninput="syncFromNum('scaleSlider','scaleVal')"><span class="num-unit">x</span></div></div>
-<input type="range" id="scaleSlider" min="1" max="200" step="1" value="50" oninput="syncToNum('scaleSlider','scaleVal');S.deformScale=+this.value;document.getElementById('scaleVal').value=this.value+'x'">
+<input type="range" id="scaleSlider" min="1" max="200" step="1" value="50" oninput="syncToNum('scaleSlider','scaleVal');S.deformScale=+this.value">
 </div>
 <button class="btn btn-primary" id="btnTest" onclick="startTest()"><i class="fas fa-play"></i> トラック発進</button>
 <button class="btn btn-outline" onclick="resetTest()"><i class="fas fa-redo"></i> リセット</button>
@@ -190,7 +191,16 @@ input[type=range]{accent-color:var(--accent);cursor:pointer}
 <div class="result-item"><div class="result-val" id="rWeight">0</div><div class="result-label">総重量 [kg]</div></div>
 <div class="result-item"><div class="result-val" id="rSafety">—</div><div class="result-label">安全率</div></div>
 </div>
-</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 
 <div class="viz-panel">
 <div class="canvas-wrap">
@@ -258,7 +268,6 @@ function solve(){
 
   // Gravity
   for(let i=0;i<members.length;i++){
-    if(S.failed.has(i))continue;
     const m=members[i],a=nodes[m.a],b=nodes[m.b];
     const L=Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2);
     const w=mat.rho*S.area*L*9.81/2;
@@ -283,10 +292,16 @@ function solve(){
     }
   }
 
-  // BCs
+  // BCs and disconnected-node DOF condensation
+  const big=1e20;
   for(let i=0;i<n;i++){
-    if(nodes[i].pin){const big=1e20;K[2*i][2*i]+=big;K[2*i+1][2*i+1]+=big;F[2*i]=0;F[2*i+1]=0;}
-    if(nodes[i].roller){const big=1e20;K[2*i+1][2*i+1]+=big;F[2*i+1]=0;}
+    if(nodes[i].pin){K[2*i][2*i]+=big;K[2*i+1][2*i+1]+=big;F[2*i]=0;F[2*i+1]=0;}
+    if(nodes[i].roller){K[2*i+1][2*i+1]+=big;F[2*i+1]=0;}
+  }
+  const connected=new Set();
+  for(const m of members){connected.add(m.a);connected.add(m.b);}
+  for(let i=0;i<n;i++){
+    if(!connected.has(i)){K[2*i][2*i]+=big;K[2*i+1][2*i+1]+=big;F[2*i]=0;F[2*i+1]=0;}
   }
 
   // Gauss elimination
@@ -307,6 +322,7 @@ function solve(){
     if(S.failed.has(i)){stresses.push(0);continue;}
     const m=S.members[i],a=nodes[m.a],b=nodes[m.b];
     const dx=b.x-a.x,dy=b.y-a.y,L=Math.sqrt(dx*dx+dy*dy);
+    if(L<1e-6){stresses.push(0);continue;}
     const c=dx/L,s=dy/L;
     const dL=c*(u[2*m.b]-u[2*m.a])+s*(u[2*m.b+1]-u[2*m.a+1]);
     stresses.push(mat.E*dL/L);
@@ -319,35 +335,30 @@ function loadPreset(type){
   const panels=6,pw=SPAN/panels,h=3;
   S.nodes=[{x:0,y:0,pin:true,roller:false},{x:SPAN,y:0,pin:false,roller:true}];
   S.members=[];S.failed.clear();
-  // Bottom chord nodes
   for(let i=1;i<panels;i++)S.nodes.push({x:i*pw,y:0});
+  const bi=i=>i===0?0:(i===panels?1:i+1);
   if(type==='warren'){
     for(let i=0;i<panels;i++){S.nodes.push({x:(i+0.5)*pw,y:h});}
-    const nb=panels+1,nt=panels;
-    for(let i=0;i<panels;i++)S.members.push({a:i,b:i+1});
-    for(let i=0;i<panels;i++){S.members.push({a:i,b:nb+i});S.members.push({a:i+1,b:nb+i});}
+    const nb=panels+1;
+    for(let i=0;i<panels;i++)S.members.push({a:bi(i),b:bi(i+1)});
+    for(let i=0;i<panels;i++){S.members.push({a:bi(i),b:nb+i});S.members.push({a:bi(i+1),b:nb+i});}
     for(let i=0;i<panels-1;i++)S.members.push({a:nb+i,b:nb+i+1});
   }else if(type==='pratt'||type==='howe'){
     for(let i=0;i<=panels;i++)S.nodes.push({x:i*pw,y:h});
     const nb=panels+1;
-    for(let i=0;i<panels;i++){S.members.push({a:i,b:i+1});S.members.push({a:nb+i,b:nb+i+1});}
-    for(let i=0;i<=panels;i++)S.members.push({a:i,b:nb+i});
+    for(let i=0;i<panels;i++){S.members.push({a:bi(i),b:bi(i+1)});S.members.push({a:nb+i,b:nb+i+1});}
+    for(let i=0;i<=panels;i++)S.members.push({a:bi(i),b:nb+i});
     for(let i=0;i<panels;i++){
-      if(type==='pratt')S.members.push({a:nb+i,b:i+1});
-      else S.members.push({a:i,b:nb+i+1});
+      if(type==='pratt')S.members.push({a:nb+i,b:bi(i+1)});
+      else S.members.push({a:bi(i),b:nb+i+1});
     }
   }else if(type==='arch'){
-    for(let i=1;i<panels;i++){const t=i/panels;S.nodes.push({x:i*pw,y:h*4*t*(1-t)});}
-    const n=S.nodes.length;
-    for(let i=0;i<n-1;i++)S.members.push({a:i,b:i+1});
-    // Verticals + diags from deck to arch
-    const deck=[];for(let i=0;i<n;i++){if(Math.abs(S.nodes[i].y)<0.1)deck.push(i);}
-    const arch=[];for(let i=0;i<n;i++){if(S.nodes[i].y>0.1)arch.push(i);}
-    for(const ai of arch){
-      let best=-1,bd=Infinity;
-      for(const di of deck){const d=Math.abs(S.nodes[di].x-S.nodes[ai].x);if(d<bd){bd=d;best=di;}}
-      if(best>=0)S.members.push({a:ai,b:best});
-    }
+    const arch=[];
+    for(let i=1;i<panels;i++){const t=i/panels;S.nodes.push({x:i*pw,y:h*4*t*(1-t)});arch.push(S.nodes.length-1);}
+    for(let i=0;i<panels;i++)S.members.push({a:bi(i),b:bi(i+1)});
+    const chain=[bi(0),...arch,bi(panels)];
+    for(let i=0;i<chain.length-1;i++)S.members.push({a:chain[i],b:chain[i+1]});
+    for(let i=1;i<panels;i++)S.members.push({a:arch[i-1],b:bi(i)});
   }
   updateStats();
 }
@@ -451,7 +462,7 @@ function draw(){
     ctx.fillStyle='#333';ctx.fillText('0',lx+8,ly+44);ctx.fillText('0.5',lx+48,ly+44);ctx.fillText('1.0',lx+82,ly+44);
   }
 
-  requestAnimationFrame(draw);
+
 }
 
 // ===== Events =====
@@ -666,14 +677,20 @@ function hideMsg(){document.getElementById('msgOverlay').className='msg-overlay'
 
 // ===== Init =====
 window.addEventListener('resize',resize);
-resize();initSupports();updateStats();draw();
-loadPreset('warren');
+let __drawLoopStarted=false;
+function startDrawLoop(){
+  if(__drawLoopStarted)return;
+  __drawLoopStarted=true;
+  function frame(){draw();requestAnimationFrame(frame);}
+  requestAnimationFrame(frame);
+}
+resize();initSupports();loadPreset('warren');startDrawLoop();
 
 (function(){
   var __novaRedrawPending=false;
   function __novaCall(fn){try{if(typeof fn==='function'&&fn.length===0)fn();}catch(e){}}
   function __novaRefreshCharts(){try{if(typeof Chart!=='undefined'&&Chart.getChart){document.querySelectorAll('canvas').forEach(function(c){var ch=Chart.getChart(c);if(ch){try{ch.resize();}catch(e){}try{ch.update('none');}catch(e){}}});}}catch(e){}}
-  function __novaRedraw(){__novaRedrawPending=false;__novaCall(typeof resize==='function'?resize:null);__novaCall(typeof resizeCanvas==='function'?resizeCanvas:null);__novaCall(typeof initCanvas==='function'?initCanvas:null);__novaCall(typeof compute==='function'?compute:null);__novaCall(typeof update==='function'?update:null);__novaCall(typeof render==='function'?render:null);__novaCall(typeof draw==='function'?draw:null);__novaCall(typeof drawOrbit==='function'?drawOrbit:null);__novaCall(typeof drawBearing==='function'?drawBearing:null);__novaCall(typeof drawPhasor==='function'?drawPhasor:null);__novaCall(typeof drawSpectrum==='function'?drawSpectrum:null);__novaCall(typeof drawShell==='function'?drawShell:null);__novaCall(typeof drawPStress==='function'?drawPStress:null);__novaCall(typeof drawTSF==='function'?drawTSF:null);__novaCall(typeof drawCircuit==='function'?drawCircuit:null);__novaCall(typeof drawCircuitDiagram==='function'?drawCircuitDiagram:null);__novaCall(typeof drawScheme==='function'?drawScheme:null);__novaCall(typeof updateChart==='function'?updateChart:null);__novaCall(typeof updateCharts==='function'?updateCharts:null);__novaRefreshCharts();}
+  function __novaRedraw(){__novaRedrawPending=false;__novaCall(typeof resize==='function'?resize:null);__novaCall(typeof resizeCanvas==='function'?resizeCanvas:null);__novaCall(typeof initCanvas==='function'?initCanvas:null);__novaCall(typeof compute==='function'?compute:null);__novaCall(typeof update==='function'?update:null);__novaCall(typeof render==='function'?render:null);__novaCall(typeof drawOrbit==='function'?drawOrbit:null);__novaCall(typeof drawBearing==='function'?drawBearing:null);__novaCall(typeof drawPhasor==='function'?drawPhasor:null);__novaCall(typeof drawSpectrum==='function'?drawSpectrum:null);__novaCall(typeof drawShell==='function'?drawShell:null);__novaCall(typeof drawPStress==='function'?drawPStress:null);__novaCall(typeof drawTSF==='function'?drawTSF:null);__novaCall(typeof drawCircuit==='function'?drawCircuit:null);__novaCall(typeof drawCircuitDiagram==='function'?drawCircuitDiagram:null);__novaCall(typeof drawScheme==='function'?drawScheme:null);__novaCall(typeof updateChart==='function'?updateChart:null);__novaCall(typeof updateCharts==='function'?updateCharts:null);__novaRefreshCharts();}
   function __novaSchedule(ms){setTimeout(__novaRedraw,ms||0);}
   [0,120,420,900,1400].forEach(__novaSchedule);
   window.addEventListener('load',function(){[0,180,520,1000,1600].forEach(__novaSchedule);});
@@ -715,7 +732,7 @@ loadPreset('warren');
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">解析結果の数値はどのように見ればいいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">部材に表示される色と数値で応力状態を確認できます。青は圧縮、赤は引張を示し、数値は許容応力に対する比率（％）です。100％を超えると崩壊リスクが高まるため、余裕を持った設計を心がけてください。</div>
+    <div class="faq-a">Member color shows stress utilization: low ratios are blue and ratios beyond yield trend red. The page does not print per-member force numbers and it does not check buckling, so treat the colors as a yield-only warning.</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -724,7 +741,7 @@ loadPreset('warren');
 <p><strong>構造最適化：</strong>「同じ荷重を支えるのに最も軽い構造は何か？」はトポロジー最適化の古典的な問題です。部材を足したり引いたりして安全率を維持しながら最軽量を目指す操作は、まさにこの問題を手作業で解いていることになります。</p>
 <p><strong>崩壊メカニズムの理解：</strong>1つの部材が破壊されると力の再配分が起き、隣の部材に過大な応力が集中する「連鎖崩壊」が発生し得ます。2007年ミネアポリスI-35W橋の崩落は、まさにこのメカニズムでした。</p>
 
-<h2></div>
+</div>
 <h2>よくある誤解と注意点</h2>
 <div class="fblock">
 <p>まず、<strong>「部材を増やせば増やすほど強い橋になる」というのは大きな誤解</strong>です。確かに部材が多いと力の分散は期待できますが、その分自重が増えます。例えば、中央スパンに無闇に斜材を追加すると、その部材自体の重さで中央部がたわみ、かえって応力が増大する「逆効果」が起こり得ます。最適設計は「必要な部材を必要な場所に」配置することです。</p>
@@ -741,6 +758,9 @@ loadPreset('warren');
 <p>橋梁トラス設計シミュレーターの物理モデルでは、各節点（ノード）と部材（メンバー）からなるトラス構造を有限要素法に基づき解析します。部材は軸力のみを伝達するピン結合と仮定し、各節点における力の釣り合いから全体の剛性方程式 \(\mathbf{K} \mathbf{u} = \mathbf{f}\) を構築します。ここで \(\mathbf{K}\) は全体剛性行列、\(\mathbf{u}\) は節点変位ベクトル、\(\mathbf{f}\) は外力ベクトルです。トラックの荷重は走行位置に応じて節点荷重に換算され、各部材に生じる軸力 \(N\) はひずみエネルギー最小化により算出されます。部材の応力 \(\sigma = N / A\) が材料の降伏応力 \(\sigma_y\) を超えると、その部材は塑性崩壊し、構造全体が不安定になります。また、座屈についてはオイラーの式 \(P_{\text{cr}} = \frac{\pi^2 E I}{L^2}\) に基づき、圧縮部材の限界荷重を評価します。これらの物理則に従い、リアルタイムで応力分布が可視化され、設計の軽量化と強度のバランスを試行錯誤できます。</p>
 </div>
 </section>
+
+
+
 </div>
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="bridge-builder.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -793,27 +813,35 @@ loadPreset('warren');
 <!-- codex-static-related-tools:end -->
 
 <div class="howto-card howto-guide">
-<h3>使い方ガイド</h3>
+<h3>How to use</h3>
 <ol>
-<li>areaSliderでトラス部材の断面積を1～50cm²の範囲で設定し、鋼材SS400の断面特性を決定する</li>
-<li>loadSliderで橋梁に作用する集中荷重を0～100kNまで増加させ、各節点の応力分布を観測する</li>
-<li>scaleSliderでトラス長さを2～10mの範囲で調整し、スパン長とたわみ量の関係を検証する</li>
-<li>計算結果の応力値がSS400の許容応力度235N/mm²を超えないことを確認し、部材サイズを最適化する</li>
+<li>Set member area from 1 to 100 cm2 (100 to 10000 mm2).</li>
+<li>Set truck load from 50 to 2000 kN. The span is fixed at 12 m.</li>
+<li>The scale slider is deformation display scale, 1 to 200x, not bridge length.</li>
+<li>Member color shows stress ratio abs(sigma)/sigma_y: blue is low utilization and red exceeds the limit. The tool does not show per-member numbers or buckling.</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
-<h3>具体的な計算例</h3>
-<p>スパン8m、断面積30cm²のH形鋼トラス（E=200GPa）に50kNの集中荷重を中央に加えた場合、シミュレーション結果は圧縮弦材の応力83N/mm²、引張下弦材の応力127N/mm²、中央部のたわみ12mmとなります。このとき部材の安全率は許容応力度235N/mm²に対して1.85倍確保され、実設計での軽量化検討余地があります。</p>
+<h3>Measured example</h3>
+<p>For the 12 m Warren preset with steel, A=3000 mm2, and a 50 kN center load, the top chord compression is about -42.8 MPa, bottom chord tension is about +20.9 MPa, and midspan deflection is about 19.7 mm.</p>
 </div>
 <div class="howto-card howto-notes">
-<h3>実務での注意点</h3>
-<ul>
-<li>格子トラスの幾何学的形状変化：スケール調整時に二次応力が増加するため、L/d比が150を超えないよう座屈検定を併行実施する</li>
-<li>荷重分布の実現性：集中荷重モデルは支点反力の集中を招くため、実橋梁では鋪装厚やH鋼ウェブでの局部座屈を検証する必要がある</li>
-<li>材質選定の影響：断面積減少時にSS400からSN400Bへの材質変更を検討し、降伏応力度390N/mm²での再計算を行う</li>
-<li>温度応力の追加：実環境での温度差20℃によるひずみは175マイクロひずみとなり、長スパンでは無視できない軸力増加をもたらす</li>
-</ul>
+<h3>Notes</h3>
+<ol>
+<li>This model checks yielding only; it does not evaluate buckling, joints, fatigue, or local plate behavior.</li>
+<li>SN400B yield strength is typically 235 N/mm2; the code steel preset uses 245 MPa.</li>
+<li>Steel thermal strain for alpha=1.2e-5/K and deltaT=20 C is 240 microstrain.</li>
+</ol>
 </div>
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
 <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

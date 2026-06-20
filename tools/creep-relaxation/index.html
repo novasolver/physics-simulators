@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "クリープ・応力緩和シミュレーター",
       "description": "Norton則 ε̇=Aσⁿexp(-Q/RT) によるクリープひずみと応力緩和をリアルタイム計算。316SS・IN718プリセット、Arrhenius温度補正、一次・二次クリープ曲線を可視化する高温材料シミュレーター。",
       "url": "https://novasolver.jp/tools/creep-relaxation.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Norton則による二次クリープ速度計算","一次・二次・三次クリープ曲線可視化","応力緩和モード（一定ひずみ）","Arrhenius温度補正による多温度比較"],
       "keywords": "クリープ,応力緩和,Norton則,Arrhenius,高温強度,CAE,材料力学",
       "datePublished": "2026-04-09",
@@ -133,6 +133,22 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 relaxation animation ===== */
+.relax-canvas-wrap{position:relative;margin-bottom:10px}
+#relaxAnim{display:block;width:100%;border-radius:8px;background:#0a1628}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.83rem;font-family:inherit;font-weight:600;transition:background .2s}
+.btn:hover{background:#0056b3}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover{background:var(--border)}
+.scrub-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.scrub-row input[type=range]{flex:1}
+.scrub-time{font-family:'Roboto Mono',monospace;font-size:0.78rem;color:var(--accent);min-width:90px;text-align:right}
+.speed-btn{padding:4px 9px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;color:var(--text)}
+.speed-btn.active{border-color:var(--accent);color:var(--accent)}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.btn{transition:none}}
+
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/creep-relaxation.html">
@@ -171,8 +187,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="btn-group">
-      <button class="mode-btn active" id="modeCreep" onclick="setMode('creep')">クリープ (σ一定)</button>
-      <button class="mode-btn" id="modeRelax" onclick="setMode('relax')">応力緩和 (ε一定)</button>
+      <button class="mode-btn" id="modeCreep" onclick="setMode('creep')">クリープ (σ一定)</button>
+      <button class="mode-btn active" id="modeRelax" onclick="setMode('relax')">応力緩和 (ε一定)</button>
     </div>
 
     <div class="divider"></div>
@@ -231,27 +247,55 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">統計サマリー</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 一定ひずみ保持：応力緩和アニメーション</div>
+      <div class="relax-canvas-wrap">
+        <canvas id="relaxAnim" height="300" tabindex="0" role="img" aria-label="一定ひずみで保持された部材の応力がMaxwellモデルに従い時間とともに緩和する様子と、σ(t)緩和曲線をリアルタイム描画します。"></canvas>
+      </div>
+      <div class="scrub-row">
+        <span style="font-size:.72rem;color:var(--muted)"><i class="fas fa-clock"></i></span>
+        <input type="range" id="scrub" min="0" max="1000" step="1" value="0" oninput="onScrub()" aria-label="時間スクラバー">
+        <span class="scrub-time" id="scrubTime">0 h</span>
+      </div>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+        <button class="btn secondary" type="button" id="btnReplay" onclick="replay()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button class="speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+          <button class="speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)">1×</button>
+          <button class="speed-btn" type="button" data-speed="4" onclick="setSpeed(4)">4×</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（ライブ）</div>
     <div class="stat-cards">
       <div class="stat-card">
         <div class="sv" id="statRate">—</div>
-        <div class="sl">ε̇ (s⁻¹) @T,σ</div>
+        <div class="sl">時刻 t (h)</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="statT1p">—</div>
-        <div class="sl">ε=1% 到達 (h)</div>
+        <div class="sl">応力 σ (MPa)</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="statSigmaEnd">—</div>
-        <div class="sl">σ(t_max) MPa</div>
+        <div class="sl">残存率 σ/σ₀ (%)</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="statTh">—</div>
-        <div class="sl">均質化温度 T/Tm</div>
+        <div class="sl">緩和時間 τ (h)</div>
       </div>
     </div>
     </div>
@@ -274,177 +318,352 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
+/* v2 stress-relaxation simulator (single IIFE, no globals leaked except onclick handlers) */
+(function(){
+  "use strict";
+  const R_GAS = 8.314;
+  const MATERIALS = {
+    '316SS': { n: 5.0, Q: 250000, Tm: 1673, E: 160, label: '316 SS' },
+    'IN718':{ n: 4.5, Q: 290000, Tm: 1609, E: 200, label: 'IN718' }
+  };
+  let currentMode = 'relax';
 
-const R_GAS = 8.314;
-const MATERIALS = {
-  '316SS': { A: 1e-15, n: 5.0, Q: 250000, Tm: 1673, E: 160, label: '316 SS' },
-  'IN718':{ A: 1e-18, n: 4.5, Q: 290000, Tm: 1609, E: 200, label: 'IN718' }
-};
-let currentMode = 'creep';
+  const $ = id => document.getElementById(id);
 
-function setPct(el){
-  const pct = (el.value - el.min) / (el.max - el.min) * 100;
-  el.style.setProperty('--pct', pct + '%');
-}function wire(id, displayId, decimals, numId){
-  const sl = document.getElementById(id);
-  const dv = document.getElementById(displayId);
-  function upd() {
-    var v = parseFloat(sl.value).toFixed(decimals);
-    if(dv){ if(dv.tagName==='INPUT') dv.value=v; else dv.textContent=v; }
-    if(numId){ var ne=document.getElementById(numId); if(ne) ne.value=v; }
-    setPct(sl);
+  function setPct(elx){
+    const pct = (elx.value - elx.min) / (elx.max - elx.min) * 100;
+    elx.style.setProperty('--pct', pct + '%');
   }
-  sl.addEventListener('input', () =>{ upd(); compute(); });
-  upd();
-}wire('nExp','nVal',1,'nValNum');
-wire('qEnergy','qVal',0,'qValNum');
-wire('sigma0','sigmaVal',0,'sigmaValNum');
-wire('temperature','tempVal',0,'tempValNum');
-wire('eModulus','eVal',0,'eValNum');
-wire('tmax','tmaxVal',0,'tmaxValNum');
-
-function setMaterial(mat){
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  if (mat !== 'Custom') {
-    const m = MATERIALS[mat];
-    document.getElementById(mat === '316SS' ? 'pre316' : 'preIN718').classList.add('active');
-    document.getElementById('nExp').value = m.n; setPct(document.getElementById('nExp')); (function(){var e=document.getElementById('nValNum');if(e)e.value=m.n.toFixed(1);var _gnVal=document.getElementById('nValNum');if(_gnVal)_gnVal.textContent=m.n.toFixed(1);})();
-    document.getElementById('qEnergy').value = m.Q / 1000; setPct(document.getElementById('qEnergy')); (function(){var e=document.getElementById('qValNum');if(e)e.value=(m.Q/1000).toFixed(0);var _gqVal=document.getElementById('qValNum');if(_gqVal)_gqVal.textContent=(m.Q/1000).toFixed(0);})();
-    document.getElementById('eModulus').value = m.E; setPct(document.getElementById('eModulus')); (function(){var e=document.getElementById('eValNum');if(e)e.value=m.E;var _geVal=document.getElementById('eValNum');if(_geVal)_geVal.textContent=m.E;})();
-  }else{
-    document.getElementById('preCustom').classList.add('active');
-  }
-  compute();
-}function setMode(mode){
-  currentMode = mode;
-  document.getElementById('modeCreep').classList.toggle('active', mode === 'creep');
-  document.getElementById('modeRelax').classList.toggle('active', mode === 'relax');
-  document.getElementById('chart1Title').textContent = mode === 'creep' ? '① クリープひずみ ε(t) vs 時間' : '① 応力緩和 σ(t) vs 時間（T一定）';
-  compute();
-}function getA(n, Q){
-  // Normalize A so that at T=600°C, σ=100MPa the creep rate is physically meaningful
-  // We use a reference A that gives ~1e-10 /s for 316SS at 600°C 100MPa
-  const T_ref = 873.15;
-  const arrh_ref = Math.exp(-Q / (R_GAS * T_ref));
-  const sigma_ref = 100;
-  const rate_ref_316 = 1e-10;
-  // Scale A to match this reference
-  const n_slider = n;
-  const A_scaled = rate_ref_316 / (Math.pow(sigma_ref, n_slider) * arrh_ref + 1e-300);
-  return A_scaled;
-}function creepRate(A, sigma, n, Q, T_K){
-  return A * Math.pow(Math.abs(sigma), n) * Math.exp(-Q / (R_GAS * T_K));
-}const N_PTS = 80;
-
-const creepChart = new Chart(document.getElementById('creepChart').getContext('2d'),{
-  type: 'line',
-  data: { labels: [], datasets: [
-    { label: '一次+二次クリープ', data: [], borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.08)', borderWidth: 2.5, pointRadius: 0, fill: true, tension: 0.3 }
-  ]},
-  options:{ responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
-    plugins: { legend: { labels: { font: { family: 'Noto Sans JP', size: 11 } } } },
-    scales:{
-      x: { title: { display: true, text: '時間 t (h)', font: { family: 'Noto Sans JP', size: 11 } } },
-      y:{ title: { display: true, text: currentMode === 'creep' ? 'クリープひずみ ε' : '応力 σ (MPa)', font: { family: 'Noto Sans JP', size: 11 } }, beginAtZero: true }
+  function wire(id, decimals, numId){
+    const sl = $(id);
+    function upd(){
+      const v = parseFloat(sl.value).toFixed(decimals);
+      if(numId){ const ne = $(numId); if(ne) ne.value = v; }
+      setPct(sl);
     }
+    sl.addEventListener('input', () => { upd(); rebuild(); });
+    upd();
   }
-});
 
-const relaxChart = new Chart(document.getElementById('relaxChart').getContext('2d'),{
-  type: 'line',
-  data: { labels: [], datasets: [
-    { label: 'T₀', data: [], borderColor: '#007BFF', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.3 },{ label: 'T₀+100K', data: [], borderColor: '#e17055', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.3, borderDash: [5,3] },{ label: 'T₀+200K', data: [], borderColor: '#fd79a8', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.3, borderDash: [2,3] }
-  ]},
-  options:{ responsive: true, maintainAspectRatio:false,resizeDelay:100,animation: false,
-    plugins: { legend: { labels: { font: { family: 'Noto Sans JP', size: 11 } } } },
-    scales:{
-      x: { title: { display: true, text: '時間 t (h)', font: { family: 'Noto Sans JP', size: 11 } } },
-      y:{ title: { display: true, text: '応力 σ (MPa)', font: { family: 'Noto Sans JP', size: 11 } }, beginAtZero: false }
+  function setMaterial(mat){
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    if (mat !== 'Custom'){
+      const m = MATERIALS[mat];
+      $(mat === '316SS' ? 'pre316' : 'preIN718').classList.add('active');
+      $('nExp').value = m.n; setPct($('nExp'));
+      const nN = $('nValNum'); if(nN) nN.value = m.n.toFixed(1);
+      $('qEnergy').value = m.Q/1000; setPct($('qEnergy'));
+      const qN = $('qValNum'); if(qN) qN.value = (m.Q/1000).toFixed(0);
+      $('eModulus').value = m.E; setPct($('eModulus'));
+      const eN = $('eValNum'); if(eN) eN.value = m.E;
+    } else {
+      $('preCustom').classList.add('active');
     }
+    rebuild();
   }
-});
+  function setMode(mode){
+    currentMode = mode;
+    $('modeCreep').classList.toggle('active', mode === 'creep');
+    $('modeRelax').classList.toggle('active', mode === 'relax');
+    const c1 = $('chart1Title');
+    if (c1) c1.textContent = mode === 'creep' ? '① クリープひずみ ε(t) vs 時間' : '① 応力緩和 σ(t) vs 時間（T一定）';
+    rebuild();
+  }
 
-function compute(){
-  const n = parseFloat(document.getElementById('nExp').value);
-  const Q = parseFloat(document.getElementById('qEnergy').value) * 1000;
-  const sigma0 = parseFloat(document.getElementById('sigma0').value);
-  const T_C = parseFloat(document.getElementById('temperature').value);
-  const E_GPa = parseFloat(document.getElementById('eModulus').value);
-  const E = E_GPa * 1e3; // MPa
-  const t_max = parseFloat(document.getElementById('tmax').value);
-  const T_K = T_C + 273.15;
-  const A = getA(n, Q);
+  function getA(n, Q){
+    // Reference-normalized teaching model: epsdot=1e-10 /s at 600°C, 100 MPa.
+    const T_ref = 873.15;
+    const arrh_ref = Math.exp(-Q / (R_GAS * T_ref));
+    const sigma_ref = 100;
+    const rate_ref = 1e-10;
+    return rate_ref / (Math.pow(sigma_ref, n) * arrh_ref + 1e-300);
+  }
+  function creepRate(A, sigma, n, Q, T_K){
+    return A * Math.pow(Math.abs(sigma), n) * Math.exp(-Q / (R_GAS * T_K));
+  }
 
-  // 図1： Creep ε(t) or Relaxation σ(t) at given T
-  const labels = [];
-  const data1 = [];
-  const eps_dot = creepRate(A, sigma0, n, Q, T_K);
-  const eps_dot_per_h = eps_dot * 3600;
-  let t1p = eps_dot_per_h > 0 ? 0.01 / eps_dot_per_h : Infinity;
+  function readParams(){
+    const n = parseFloat($('nExp').value);
+    const Q = parseFloat($('qEnergy').value) * 1000;
+    const sigma0 = parseFloat($('sigma0').value);
+    const T_C = parseFloat($('temperature').value);
+    const E_GPa = parseFloat($('eModulus').value);
+    const t_max = parseFloat($('tmax').value);
+    const T_K = T_C + 273.15;
+    const A = getA(n, Q);
+    const E = E_GPa * 1e3; // MPa
+    const eps_dot = creepRate(A, sigma0, n, Q, T_K); // 1/s
+    // Maxwell relaxation time tau = eta/E = sigma0/(E*eps_dot), in seconds -> hours
+    const tau_s = eps_dot > 0 ? sigma0 / (E * eps_dot) : Infinity;
+    const tau_h = tau_s / 3600;
+    return { n, Q, sigma0, T_C, E_GPa, E, t_max, T_K, A, eps_dot, tau_h };
+  }
+  // Maxwell stress relaxation: sigma(t) = sigma0 * exp(-t/tau)
+  function sigmaAt(t_h, p){
+    if (!isFinite(p.tau_h) || p.tau_h <= 0) return p.sigma0;
+    return p.sigma0 * Math.exp(-t_h / p.tau_h);
+  }
 
-  for (let i = 0; i <= N_PTS; i++) {
-    const t_h = t_max * i / N_PTS;
-    const t_s = t_h * 3600;
-    labels.push(t_h.toFixed(0));
-    if (currentMode === 'creep') {
-      // Primary + secondary
-      const tau = t_max * 3600 * 0.05;
-      const eps0_primary = eps_dot * tau * 0.3;
-      const eps = eps_dot * t_s + eps0_primary * (1 - Math.exp(-t_s / tau));
-      data1.push(parseFloat(eps.toExponential(3)));
-    }else{
-      // Relaxation: σ(t) = σ0 / [1 + E_MPa * A * n * σ0^(n-1) * t_s]^(1/n)
-      const denom = 1 + E * A * n * Math.pow(sigma0, n - 1) * t_s;
-      const sigma_t = sigma0 / Math.pow(Math.max(denom, 1e-10), 1 / n);
-      data1.push(parseFloat(sigma_t.toFixed(3)));
+  /* ===== Chart.js panels (kept) ===== */
+  const N_PTS = 80;
+  const creepChart = new Chart($('creepChart').getContext('2d'),{
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: '一次+二次クリープ', data: [], borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,0.08)', borderWidth: 2.5, pointRadius: 0, fill: true, tension: 0.3 }
+    ]},
+    options:{ responsive: true, maintainAspectRatio:false, resizeDelay:100, animation: false,
+      plugins: { legend: { labels: { font: { family: 'Noto Sans JP', size: 11 } } } },
+      scales:{
+        x: { title: { display: true, text: '時間 t (h)', font: { family: 'Noto Sans JP', size: 11 } } },
+        y:{ title: { display: true, text: '応力 σ (MPa)', font: { family: 'Noto Sans JP', size: 11 } }, beginAtZero: true }
+      }
     }
-  }
-  if (currentMode === 'creep' && !data1.some(v => Math.abs(Number(v)) > 0)) {
-    data1[data1.length - 1] = 1e-12;
-  }
-  creepChart.data.labels = labels;
-  creepChart.data.datasets[0].data = data1;
-  creepChart.data.datasets[0].label = currentMode === 'creep' ? '一次+二次クリープ' : '応力緩和 σ(t)';
-  creepChart.options.scales.y.title.text = currentMode === 'creep' ? 'クリープひずみ ε' : '応力 σ (MPa)';
-  creepChart.update('none');
+  });
+  const relaxChart = new Chart($('relaxChart').getContext('2d'),{
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'T₀', data: [], borderColor: '#007BFF', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.3 },{ label: 'T₀+100K', data: [], borderColor: '#e17055', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.3, borderDash: [5,3] },{ label: 'T₀+200K', data: [], borderColor: '#fd79a8', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.3, borderDash: [2,3] }
+    ]},
+    options:{ responsive: true, maintainAspectRatio:false, resizeDelay:100, animation: false,
+      plugins: { legend: { labels: { font: { family: 'Noto Sans JP', size: 11 } } } },
+      scales:{
+        x: { title: { display: true, text: '時間 t (h)', font: { family: 'Noto Sans JP', size: 11 } } },
+        y:{ title: { display: true, text: '応力 σ (MPa)', font: { family: 'Noto Sans JP', size: 11 } }, beginAtZero: false }
+      }
+    }
+  });
 
-  // 図2： Relaxation at T0, T0+100K, T0+200K
-  const relaxLabels = [];
-  const d0 = [], d1 = [], d2 = [];
-  const dT = [0, 100, 200];
-  for (let i = 0; i <= N_PTS; i++){
-    const t_h = t_max * i / N_PTS;
-    const t_s = t_h * 3600;
-    relaxLabels.push(t_h.toFixed(0));
-    dT.forEach((dt, idx) => {
-      const Tk = T_K + dt;
-      const A_loc = getA(n, Q) * Math.exp(-Q / R_GAS * (1/Tk - 1/T_K));
-      const denom = 1 + E * A_loc * n * Math.pow(sigma0, n - 1) * t_s;
-      const sig = sigma0 / Math.pow(Math.max(denom, 1e-10), 1/n);
-      [d0,d1,d2][idx].push(parseFloat(sig.toFixed(3)));
-    });
-  }relaxChart.data.labels = relaxLabels;
-  relaxChart.data.datasets[0].data = d0;
-  relaxChart.data.datasets[1].data = d1;
-  relaxChart.data.datasets[2].data = d2;
-  relaxChart.data.datasets[0].label = `T₀=${T_C}°C`;
-  relaxChart.data.datasets[1].label = `T₀+100K=${T_C+100}°C`;
-  relaxChart.data.datasets[2].label = `T₀+200K=${T_C+200}°C`;
-  relaxChart.update('none');
+  function updateCharts(p){
+    const labels = [], data1 = [];
+    for (let i=0;i<=N_PTS;i++){
+      const t_h = p.t_max*i/N_PTS;
+      labels.push(t_h.toFixed(0));
+      if (currentMode === 'creep'){
+        const t_s = t_h*3600;
+        const tau = p.t_max*3600*0.05;
+        const eps0_primary = p.eps_dot*tau*0.3;
+        const eps = p.eps_dot*t_s + eps0_primary*(1-Math.exp(-t_s/tau));
+        data1.push(parseFloat(eps.toExponential(3)));
+      } else {
+        data1.push(parseFloat(sigmaAt(t_h, p).toFixed(3)));
+      }
+    }
+    if (currentMode === 'creep' && !data1.some(v => Math.abs(Number(v))>0)) data1[data1.length-1]=1e-12;
+    creepChart.data.labels = labels;
+    creepChart.data.datasets[0].data = data1;
+    creepChart.data.datasets[0].label = currentMode === 'creep' ? '一次+二次クリープ' : '応力緩和 σ(t)';
+    creepChart.options.scales.y.title.text = currentMode === 'creep' ? 'クリープひずみ ε' : '応力 σ (MPa)';
+    creepChart.update('none');
 
-  // Stats
-  const rateStr = eps_dot.toExponential(2);
-  document.getElementById('statRate').textContent = rateStr;
-  document.getElementById('statT1p').textContent = isFinite(t1p) ? t1p.toExponential(2) : '∞';
-  // σ at t_max (relaxation)
-  const t_max_s = t_max * 3600;
-  const denom_end = 1 + E * A * n * Math.pow(sigma0, n - 1) * t_max_s;
-  const sigma_end = sigma0 / Math.pow(Math.max(denom_end, 1e-10), 1/n);
-  document.getElementById('statSigmaEnd').textContent = sigma_end.toFixed(1);
-  // Homologous temperature (assume Tm based on material, use 1600K as default)
-  const Tm_K = 1600;
-  document.getElementById('statTh').textContent = (T_K / Tm_K).toFixed(3);
-}compute();
+    const relaxLabels = [], d0=[], d1=[], d2=[]; const dT=[0,100,200];
+    for (let i=0;i<=N_PTS;i++){
+      const t_h = p.t_max*i/N_PTS; relaxLabels.push(t_h.toFixed(0));
+      dT.forEach((dt, idx) => {
+        const Tk = p.T_K + dt;
+        const epsd = creepRate(p.A, p.sigma0, p.n, p.Q, Tk);
+        const tau_h = epsd>0 ? p.sigma0/(p.E*epsd)/3600 : Infinity;
+        const sig = (isFinite(tau_h)&&tau_h>0) ? p.sigma0*Math.exp(-t_h/tau_h) : p.sigma0;
+        [d0,d1,d2][idx].push(parseFloat(sig.toFixed(3)));
+      });
+    }
+    relaxChart.data.labels = relaxLabels;
+    relaxChart.data.datasets[0].data = d0;
+    relaxChart.data.datasets[1].data = d1;
+    relaxChart.data.datasets[2].data = d2;
+    relaxChart.data.datasets[0].label = `T₀=${p.T_C}°C`;
+    relaxChart.data.datasets[1].label = `T₀+100K=${p.T_C+100}°C`;
+    relaxChart.data.datasets[2].label = `T₀+200K=${p.T_C+200}°C`;
+    relaxChart.update('none');
+  }
+
+  /* ===== Hero animation canvas ===== */
+  const canvas = $('relaxAnim');
+  const ctx = canvas.getContext('2d');
+  let P = null;           // current params
+  let simT = 0;           // current time (h)
+  let playing = false, animId = null, lastTs = 0, speedMult = 1;
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let cssW = 0, cssH = 300;
+  function resizeCanvas(){
+    const rect = canvas.parentElement.getBoundingClientRect();
+    cssW = Math.max(260, Math.floor(rect.width));
+    cssH = 300;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawSpringDashpot(x0, yTop, yBot, frac){
+    // a clamped Maxwell element: spring (top) in series with dashpot (bottom),
+    // total length held FIXED. frac = sigma/sigma0 (1 -> spring fully stretched).
+    const midShift = (1 - frac) * (yBot - yTop) * 0.34; // dashpot piston creeps down as stress relaxes
+    const yMid = yTop + (yBot - yTop) * 0.5 + midShift;
+    // clamp plates
+    ctx.strokeStyle = '#9fb3c8'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x0-46, yTop); ctx.lineTo(x0+46, yTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0-46, yBot); ctx.lineTo(x0+46, yBot); ctx.stroke();
+    // spring (top half): color intensity tracks remaining stress
+    const coils = 6, sTop = yTop+6, sBot = yMid-6;
+    const stressCol = `rgb(${Math.round(80+175*frac)},${Math.round(120+40*(1-frac))},${Math.round(216-150*frac)})`;
+    ctx.strokeStyle = stressCol; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0, sTop);
+    for (let i=0;i<=coils;i++){
+      const yy = sTop + (sBot-sTop)*(i/coils);
+      ctx.lineTo(x0 + (i%2===0?-22:22), yy);
+    }
+    ctx.lineTo(x0, sBot); ctx.stroke();
+    // dashpot (bottom half): cylinder + piston
+    const cTop = yMid+6, cBot = yBot-6;
+    ctx.strokeStyle = '#5f7488'; ctx.lineWidth = 2;
+    ctx.strokeRect(x0-18, cTop, 36, cBot-cTop);
+    ctx.fillStyle = 'rgba(0,180,216,0.15)'; ctx.fillRect(x0-17, cTop+1, 34, cBot-cTop-2);
+    // piston rod from spring to piston head, head height tracks creep
+    const headY = cTop + (cBot-cTop)*0.18 + (1-frac)*(cBot-cTop)*0.6;
+    ctx.strokeStyle = stressCol; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x0, sBot); ctx.lineTo(x0, headY); ctx.stroke();
+    ctx.fillStyle = '#ffd54a'; ctx.fillRect(x0-15, headY-4, 30, 8);
+    // fixed-strain bracket label
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '10px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText('固定ひずみ', x0+54, yTop+4);
+    ctx.fillText('（全長一定）', x0+54, yBot);
+  }
+
+  function render(){
+    if (!cssW) resizeCanvas();
+    const W = cssW, H = cssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+    if (!P){ return; }
+
+    const t = Math.min(simT, P.t_max);
+    const sig = sigmaAt(t, P);
+    const frac = P.sigma0 > 0 ? sig/P.sigma0 : 0;
+
+    // left: Maxwell element animation
+    drawSpringDashpot(70, 40, H-40, frac);
+
+    // right: sigma(t) relaxation curve drawn up to current time
+    const gx0 = 170, gy0 = 30, gw = W-170-20, gh = H-30-40;
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+    ctx.strokeRect(gx0, gy0, gw, gh);
+    const tx = th => gx0 + (th/P.t_max)*gw;
+    const ty = s => gy0 + gh - (s/P.sigma0)*gh;
+    // residual line (sigma -> 0 asymptote shown as baseline already)
+    // full faint curve
+    ctx.strokeStyle = 'rgba(0,180,216,0.25)'; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i=0;i<=120;i++){ const th=P.t_max*i/120; const xx=tx(th), yy=ty(sigmaAt(th,P)); i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy); }
+    ctx.stroke();
+    // drawn portion up to t
+    ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.6; ctx.beginPath();
+    const steps = 120; let drew=false;
+    for (let i=0;i<=steps;i++){
+      const th = P.t_max*i/steps; if (th>t) break;
+      const xx=tx(th), yy=ty(sigmaAt(th,P)); drew?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy); drew=true;
+    }
+    ctx.stroke();
+    // current marker
+    const cx = tx(t), cy = ty(sig);
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 7); ctx.fillStyle = '#ffd54a'; ctx.fill();
+    // tau marker (vertical dashed) if within range
+    if (isFinite(P.tau_h) && P.tau_h <= P.t_max){
+      ctx.strokeStyle='rgba(255,213,74,0.5)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(tx(P.tau_h), gy0); ctx.lineTo(tx(P.tau_h), gy0+gh); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle='rgba(255,213,74,0.8)'; ctx.font='10px Roboto Mono'; ctx.textAlign='center';
+      ctx.fillText('t=τ (σ₀/e)', tx(P.tau_h), gy0+gh+12);
+    }
+    // axes labels
+    ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='left';
+    ctx.fillText('σ (MPa)', gx0+2, gy0-8 < 14 ? 14 : gy0-2);
+    ctx.textAlign='right'; ctx.fillText('時間 t (h)', gx0+gw, gy0+gh+24);
+    // live time stamp on canvas
+    ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='right';
+    ctx.fillText('t = '+t.toFixed(0)+' h', W-10, 16);
+    ctx.textAlign='left';
+
+    updateLive(t, sig, frac);
+  }
+
+  function updateLive(t, sig, frac){
+    $('statRate').textContent = t.toFixed(0);
+    $('statT1p').textContent = sig.toFixed(1);
+    $('statSigmaEnd').textContent = (frac*100).toFixed(1);
+    $('statTh').textContent = isFinite(P.tau_h) ? (P.tau_h>=10 ? P.tau_h.toFixed(0) : P.tau_h.toFixed(1)) : '∞';
+    $('scrub').value = String(Math.round((P.t_max?t/P.t_max:0)*1000));
+    $('scrubTime').textContent = t.toFixed(0)+' h';
+  }
+
+  /* ===== animation control ===== */
+  function loop(ts){
+    if (!playing){ animId = null; return; }
+    if (!lastTs) lastTs = ts;
+    const dtReal = Math.min(0.05, (ts-lastTs)/1000); lastTs = ts;
+    // map: full t_max sweeps in ~10s at 1x
+    simT += dtReal * speedMult * (P.t_max/10);
+    if (simT >= P.t_max){ simT = P.t_max; render(); stopPlay(); return; }
+    render(); animId = requestAnimationFrame(loop);
+  }
+  function startPlay(){
+    if (!P || reduceMotion) { if(P){ simT = P.t_max; render(); } return; }
+    if (simT >= P.t_max) simT = 0;
+    playing = true; lastTs = 0;
+    $('btnPlay').innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    if (!animId) animId = requestAnimationFrame(loop);
+  }
+  function stopPlay(){
+    playing = false;
+    if (animId){ cancelAnimationFrame(animId); animId = null; }
+    $('btnPlay').innerHTML = '<i class="fas fa-play"></i> 再生';
+  }
+  function togglePlay(){ playing ? stopPlay() : startPlay(); }
+  function replay(){ simT = 0; render(); startPlay(); }
+  function setSpeed(s){
+    speedMult = s;
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.toggle('active', parseFloat(b.dataset.speed)===s));
+  }
+  function onScrub(){
+    stopPlay();
+    if (!P) return;
+    simT = parseFloat($('scrub').value)/1000 * P.t_max;
+    render();
+  }
+
+  function rebuild(){
+    const wasPlaying = playing;
+    stopPlay();
+    P = readParams();
+    updateCharts(P);
+    if (simT > P.t_max) simT = P.t_max;
+    render();
+    if (wasPlaying && !reduceMotion) startPlay();
+  }
+
+  // expose onclick handlers
+  window.setMaterial = setMaterial;
+  window.setMode = setMode;
+  window.togglePlay = togglePlay;
+  window.replay = replay;
+  window.setSpeed = setSpeed;
+  window.onScrub = onScrub;
+
+  // init
+  wire('nExp', 1, 'nValNum');
+  wire('qEnergy', 0, 'qValNum');
+  wire('sigma0', 0, 'sigmaValNum');
+  wire('temperature', 0, 'tempValNum');
+  wire('eModulus', 0, 'eValNum');
+  wire('tmax', 0, 'tmaxValNum');
+  P = readParams();
+  updateCharts(P);
+  if (reduceMotion){ simT = P.t_max; }
+  render();
+  window.addEventListener('resize', () => { resizeCanvas(); render(); });
+  canvas.addEventListener('keydown', e => {
+    if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); togglePlay(); }
+  });
+})();
 </script>
 
 <section class="explanation">
@@ -505,6 +724,9 @@ function compute(){
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="creep-relaxation.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -558,14 +780,14 @@ function compute(){
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>材料種別から応力指数nと活性化エネルギーQを選択（316ステンレス鋼はn=5.0・Q=310kJ/mol、IN718はn=3.5・Q=450kJ/mol）</li>
+<li>材料種別から応力指数nと活性化エネルギーQを選択（この簡易モデルでは316SSはn=5.0・Q=250kJ/mol、IN718はn=4.5・Q=290kJ/molの感度比較用プリセットです）</li>
 <li>初期応力σ₀（MPa単位、通常20～150）と作用温度T（K単位、650～1100）を入力</li>
 <li>シミュレータがNorton則 ε̇=A·σⁿ·exp(-Q/RT) に従い、クリープひずみ速度・1%到達時間・応力緩和曲線を出力</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>316SS製タービンディスク、初期応力100MPa・850K条件：n=5.0、Q=310kJ/mol、ガス定数R=8.314J/(mol·K)を代入するとクリープひずみ速度は約1.2×10⁻⁷s⁻¹が得られ、1%塑性変形到達には約230時間を要します。同条件でIN718（n=3.5、Q=450kJ/mol）では応力指数が小さいため3.8×10⁻⁸s⁻¹と低速化し、到達時間は約620時間に延長します。応力緩和は初期100MPaから1000時間後に約78MPaまで減衰します。</p>
+<p>316SS製タービンディスク、初期応力100MPa・850K条件：n=5.0、Q=310kJ/mol、ガス定数R=8.314J/(mol·K)を代入すると本ツールの基準条件（100MPa・600℃）では、参照正規化によりクリープひずみ速度は1.0×10⁻¹⁰s⁻¹、1%到達時間は約2.78×10⁴時間です。同条件でIN718（n=3.5、Q=450kJ/mol）では応力指数が小さいため3.8×10⁻⁸s⁻¹と低速化し、到達時間は約620時間に延長します。応力緩和は初期100MPaから1000時間後に約78MPaまで減衰します。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -575,6 +797,16 @@ function compute(){
 <li>応力指数nが大きいほど応力依存性が強いため、316SS(n=5.0)では初期応力10%増加で到達時間が約37%短縮される非線形応答を考慮し、設計安全係数を最低1.5以上確保</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

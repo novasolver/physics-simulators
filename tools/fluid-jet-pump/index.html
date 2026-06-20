@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ジェットポンプ（エジェクタ）シミュレーター",
       "description": "エジェクタ（ジェットポンプ）の動作をリアルタイム可視化。動力流体圧力・流量・吸込圧力を調整し、エントレインメント比・圧縮比・混合効率を瞬時に計算。",
       "url": "https://novasolver.jp/tools/fluid-jet-pump.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["エントレインメント比 M = Qd/Qm の計算","圧力分布グラフ（エジェクタ軸方向）","P-Q曲線の比較","混合効率の評価"],
       "keywords": "ジェットポンプ,エジェクタ,エントレインメント比,圧縮比,混合効率,流体工学,CAE",
       "datePublished": "2026-04-08",
@@ -131,6 +131,19 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* v2 hero additions */
+.stat-card .sv{ font-size:1.3rem; font-weight:800; color:var(--accent); font-family:'Roboto Mono', monospace; line-height:1.1; }
+.stats-grid-live{ grid-template-columns:repeat(3,1fr); }
+@media(max-width:600px){ .stats-grid-live{ grid-template-columns:repeat(2,1fr); } }
+canvas#ejectorCanvas{ height:240px; }
+canvas#ejectorCanvas:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+.legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:0.72rem; color:var(--muted); margin-top:10px; }
+.legend span{ display:inline-flex; align-items:center; gap:5px; }
+.legend i.swatch{ width:14px; height:14px; border-radius:50%; display:inline-block; }
+.play-row{ display:flex; gap:8px; margin-top:10px; }
+.btn-sim{ display:inline-flex; align-items:center; gap:6px; background:var(--accent); color:#fff; border:none; padding:7px 16px; border-radius:8px; cursor:pointer; font-size:0.82rem; font-family:inherit; font-weight:600; }
+.btn-sim:hover{ background:#0056b3; }
+
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/fluid-jet-pump.html">
@@ -181,261 +194,354 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <label>混合効率 η_mix <div class="num-wrap"><input type="number" class="num-input" id="etaNum" value="0.80" min="0.50" max="0.99" step="0.01" oninput="syncFromNum('eta','etaNum')"><span class="num-unit"></span></div></label>
       <input type="range" id="eta" oninput="syncToNum('eta','etaNum')" min="0.50" max="0.99" value="0.80" step="0.01">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="val" id="statM">—</div><div class="lbl">エントレインメント比 M</div></div>
-      <div class="stat-card"><div class="val" id="statCr">—</div><div class="lbl">圧縮比 Cr</div></div>
-      <div class="stat-card"><div class="val" id="statEff">—</div><div class="lbl">効率 η (%)</div></div>
-      <div class="stat-card"><div class="val" id="statQt">—</div><div class="lbl">総流量 Qt (L/s)</div></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値（運転中）</div>
+    <div class="stats-grid stats-grid-live">
+      <div class="stat-card"><div class="sv" id="statM">—</div><div class="lbl">エントレインメント比 M</div></div>
+      <div class="stat-card"><div class="sv" id="statQd">—</div><div class="lbl">吸込流量 Qd [L/s]</div></div>
+      <div class="stat-card"><div class="sv" id="statEff">—</div><div class="lbl">効率 η [%]</div></div>
+      <div class="stat-card"><div class="sv" id="statPb">—</div><div class="lbl">吐出圧力 Pb [kPa]</div></div>
+      <div class="stat-card"><div class="sv" id="statCr">—</div><div class="lbl">圧縮比 Cr</div></div>
+      <div class="stat-card"><div class="sv" id="statQt">—</div><div class="lbl">総流量 Qt [L/s]</div></div>
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> エジェクタ断面図（流れ可視化）</div><canvas id="ejectorCanvas" height="220"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> エジェクタ流れ可視化（ライブ）</div>
+      <canvas id="ejectorCanvas" height="240" tabindex="0" role="img" aria-label="ジェットポンプの流れアニメーション。動力ジェットが吸引流を巻き込み、ディフューザで昇圧する様子を表示します。"></canvas>
+      <div class="legend">
+        <span><i class="swatch" style="background:#00d4ff"></i>動力流体（高速ジェット）</span>
+        <span><i class="swatch" style="background:#4CAF50"></i>吸引流体（二次流）</span>
+        <span><i class="swatch" style="background:#ffd54a"></i>混合流（昇圧）</span>
+      </div>
+      <div class="play-row">
+        <button class="btn-sim" type="button" id="btnPlay" onclick="ejPlay()"><i class="fas fa-pause"></i> 一時停止</button>
+      </div>
+    </div>
+
     <div class="viz-title" style="margin-top:20px;">圧力分布（軸方向）</div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 圧力</div><canvas id="pressureChart"></canvas></div>
     <div class="viz-title" style="margin-top:20px;">P-Q 特性曲線</div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> ポンプ性能曲線 P-Q</div><canvas id="pqChart"></canvas></div>
-  
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
-: $M = Q_d / Q_m$<br>
+<strong>エントレインメント比</strong>: $M = Q_d / Q_m$<br>
       <strong>圧縮比</strong>: $C_r = (P_b - P_s)/(P_m - P_b)$<br>
       <strong>効率</strong>: $\eta = M \times C_r$<br>
       <strong>運動量保存</strong>: $\rho Q_m V_m = \rho (Q_m+Q_d) V_{mix}$
-    
+
 </div>
 </div>
 </div>
 
 <script>
+(function(){
+"use strict";
+var L = {
+  inlet:'入口', nozzle:'ノズル', throat:'喉部', mix:'混合室', diff:'ディフューザ出口',
+  motive:'動力流体', suction:'吸引流', mixc:'混合室', diffuser:'ディフューザ',
+  pLabel:'圧力 (kPa)', ejPQ:'エジェクタ P-Q', op:'動作点',
+  flow:'流量 (L/s)', press:'圧力 (kPa)', stall:'動作不成立: Pb は Ps〜Pm の範囲に設定してください',
+  pause:'<i class="fas fa-pause"></i> 一時停止', play:'<i class="fas fa-play"></i> 再生'
+};
+var $ = function(id){ return document.getElementById(id); };
+var pressureChart, pqChart;
+var particles = [], animId = null, playing = true, lastR = null, lastP = null;
 
-const $ = id => document.getElementById(id);
-let pressureChart, pqChart;
-
-function getParams() {
-  return {
-    Pm: +$('pm').value,
-    Qm: +$('qm').value,
-    Ps: +$('ps').value,
-    Pb: +$('pb').value,
-    eta: +$('eta').value
-  };
-}function calcEjector(p){
-  const dP_m = p.Pm - p.Pb;
-  const dP_s = p.Pb - p.Ps;
+function getParams(){
+  return { Pm:+$('pm').value, Qm:+$('qm').value, Ps:+$('ps').value, Pb:+$('pb').value, eta:+$('eta').value };
+}
+// Physics: Cr=(Pb-Ps)/(Pm-Pb); M from motive/suction pressure ratio (momentum/Bernoulli scaling)
+function calcEjector(p){
+  var dP_m = p.Pm - p.Pb;     // available motive head over discharge
+  var dP_s = p.Pb - p.Ps;     // head the secondary must be lifted through
   if (dP_m <= 0 || dP_s < 0) return null;
-  const Cr = dP_s / dP_m;
-  const M = p.eta * Math.sqrt(dP_m / Math.max(dP_s, 0.1)) * 0.35;
-  const Qd = M * p.Qm;
-  const Qt = p.Qm + Qd;
-  const eff = M * Cr * 100;
-  return { M, Cr, Qd, Qt, eff };
-}function updateDisplay(){
-  const p = getParams();
-  const r = calcEjector(p);
-  if (!r) { $('statM').textContent = '—'; return; }
+  var Cr = dP_s / dP_m;
+  var M = p.eta * Math.sqrt(dP_m / Math.max(dP_s, 0.1)) * 0.35;
+  var Qd = M * p.Qm;          // secondary (entrained) flow
+  var Qt = p.Qm + Qd;         // mixed/discharge flow
+  var eff = M * Cr * 100;
+  return { M:M, Cr:Cr, Qd:Qd, Qt:Qt, eff:eff };
+}
 
+function setStats(p, r){
+  if (!r){ ['statM','statQd','statEff','statPb','statCr','statQt'].forEach(function(id){ $(id).textContent='—'; }); return; }
   $('statM').textContent = r.M.toFixed(3);
-  $('statCr').textContent = r.Cr.toFixed(3);
+  $('statQd').textContent = r.Qd.toFixed(2);
   $('statEff').textContent = r.eff.toFixed(1);
+  $('statPb').textContent = p.Pb.toFixed(0);
+  $('statCr').textContent = r.Cr.toFixed(3);
   $('statQt').textContent = r.Qt.toFixed(2);
+}
 
-  drawEjector(p, r);
+function updateDisplay(){
+  var p = getParams();
+  var r = calcEjector(p);
+  lastP = p; lastR = r;
+  setStats(p, r);
   updateCharts(p, r);
-}function drawEjector(p, r){
-  const canvas = $('ejectorCanvas');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.offsetWidth, H = 220;
-  var __novaW = W;
-  var __novaH = H;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+}
 
-  ctx.fillStyle = '#0a0f1e';
-  ctx.fillRect(0, 0, W, H);
-
-  const cx = W / 2, cy = H / 2;
-  const nozzleX = W * 0.18;
-  const mixStart = W * 0.32;
-  const mixEnd = W * 0.72;
-  const outX = W * 0.88;
-  const bodyH = H * 0.32;
-  const nozzleH = H * 0.12;
-
-  // Body outline
-  ctx.strokeStyle = '#007BFF';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(W * 0.05, cy - bodyH);
-  ctx.lineTo(nozzleX, cy - bodyH);
-  ctx.lineTo(mixStart, cy - bodyH * 0.55);
-  ctx.lineTo(mixEnd, cy - bodyH * 0.55);
-  ctx.lineTo(outX, cy - bodyH * 0.75);
-  ctx.lineTo(W * 0.95, cy - bodyH * 0.75);
-  ctx.moveTo(W * 0.95, cy + bodyH * 0.75);
-  ctx.lineTo(outX, cy + bodyH * 0.75);
-  ctx.lineTo(mixEnd, cy + bodyH * 0.55);
-  ctx.lineTo(mixStart, cy + bodyH * 0.55);
-  ctx.lineTo(nozzleX, cy + bodyH);
-  ctx.lineTo(W * 0.05, cy + bodyH);
-  ctx.stroke();
-
-  // Nozzle
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(nozzleX, cy - nozzleH);
-  ctx.lineTo(mixStart - W*0.02, cy - nozzleH * 0.4);
-  ctx.lineTo(mixStart - W*0.02, cy + nozzleH * 0.4);
-  ctx.lineTo(nozzleX, cy + nozzleH);
-  ctx.closePath();
-  ctx.stroke();
-
-  // Motive flow arrows
-  const arrowColor = '#00B4D8';
-  for (let i = 0; i < 4; i++) {
-    const ax = W * 0.07 + i * W * 0.04;
-    drawArrow(ctx, ax, cy, ax + W*0.03, cy, arrowColor, 1.5);
+/* ===== Geometry (CSS px) ===== */
+var GEO = null;
+function geom(W, H){
+  var cy = H/2;
+  return {
+    cy: cy,
+    bodyTop: H*0.18, bodyBot: H*0.82,
+    nozzleX: W*0.18, nozTip: W*0.32,
+    throatX: W*0.36, throatEnd: W*0.62,
+    diffEnd: W*0.86, outX: W*0.97,
+    nozzleH: H*0.085, throatH: H*0.13, outH: H*0.30
+  };
+}
+// half-height of duct interior at x
+function ductHalf(g, x, W){
+  if (x < g.throatX){
+    var f = (x - W*0.02) / (g.throatX - W*0.02); f = Math.max(0, Math.min(1, f));
+    return (g.outH*1.05) + (g.throatH - g.outH*1.05)*f;  // suction chamber tapers to throat
+  } else if (x < g.throatEnd){
+    return g.throatH;                                    // constant-area mixing throat
+  } else {
+    var f2 = (x - g.throatEnd)/(g.diffEnd - g.throatEnd); f2 = Math.max(0, Math.min(1, f2));
+    return g.throatH + (g.outH - g.throatH)*f2;          // diffuser expands
   }
+}
 
-  // Suction arrows (secondary flow)
-  ctx.fillStyle = '#4CAF50';
-  ctx.font = '11px Roboto Mono';
-  ctx.fillText('吸引流', mixStart + 4, cy - bodyH * 0.3);
-  for (let i = -1; i <= 1; i += 2) {
-    drawArrow(ctx, mixStart + W*0.02, cy + i * bodyH * 0.42, mixStart + W*0.05, cy + i * bodyH * 0.3, '#4CAF50', 1.2);
+/* ===== HiDPI ===== */
+var cv = $('ejectorCanvas'), ctx = cv.getContext('2d'), cssW=0, cssH=0;
+function resize(){
+  cssW = Math.max(280, Math.floor(cv.parentElement.getBoundingClientRect().width - 44));
+  cssH = 240;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.style.width = cssW+'px'; cv.style.height = cssH+'px';
+  cv.width = Math.round(cssW*dpr); cv.height = Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  GEO = geom(cssW, cssH);
+}
+
+function spawn(kind, W){
+  var g = GEO;
+  if (kind === 'motive'){
+    return { kind:'motive', x: W*0.04, y: g.cy + (Math.random()-0.5)*g.nozzleH*1.4, vx: 0, mixed:false };
   }
+  // suction: enters from top/bottom suction ports near chamber
+  var top = Math.random() < 0.5;
+  return { kind:'suction', x: W*(0.20+Math.random()*0.12),
+           y: top ? g.bodyTop+4 : g.bodyBot-4, vx:0, vy: top?1:-1, mixed:false };
+}
 
-  // Labels
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 11px Noto Sans JP';
-  ctx.fillText('動力流体', W * 0.06, cy - bodyH - 6);
-  ctx.fillText(`Pm=${p.Pm}kPa`, W * 0.06, cy - bodyH + 8);
-  ctx.fillStyle = '#00B4D8';
-  ctx.fillText('混合室', mixStart + 4, cy + bodyH * 0.55 + 14);
-  ctx.fillStyle = '#FFA500';
-  ctx.fillText('ディフューザ', mixEnd + 4, cy - bodyH * 0.55 - 6);
-  ctx.fillStyle = '#007BFF';
-  ctx.fillText(`Qt=${r.Qt.toFixed(2)}L/s`, outX + 4, cy - 4);
-
-  // Pressure label
-  ctx.fillStyle = '#aaa';
-  ctx.font = '10px Roboto Mono';
-  ctx.fillText(`Ps=${p.Ps}kPa`, mixStart - 50, cy + bodyH * 0.55 + 14);
-  ctx.fillText(`Pb=${p.Pb}kPa`, mixEnd + 4, cy + bodyH * 0.55 + 14);
-}function drawArrow(ctx, x1, y1, x2, y2, color, lw){
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = lw;
+function drawBody(g, W, H, p, r){
+  // duct walls
+  ctx.strokeStyle = '#3a6ea5'; ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
+  for (var s=-1; s<=1; s+=2){
+    var first=true;
+    for (var x=W*0.02; x<=g.outX; x+=4){
+      var y = g.cy - s*ductHalf(g,x,W);
+      if (first){ ctx.moveTo(x,y); first=false; } else ctx.lineTo(x,y);
+    }
+  }
   ctx.stroke();
-  const angle = Math.atan2(y2 - y1, x2 - x1);
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - 7 * Math.cos(angle - 0.4), y2 - 7 * Math.sin(angle - 0.4));
-  ctx.lineTo(x2 - 7 * Math.cos(angle + 0.4), y2 - 7 * Math.sin(angle + 0.4));
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}function updateCharts(p, r){
-  // Pressure distribution along ejector
-  const positions = ['入口', 'ノズル', '喉部', '混合室', 'ディフューザ出口'];
-  const pressures = [
-    p.Pm,
-    p.Pm * 0.6,
-    p.Ps * 1.1,
-    (p.Ps + p.Pb) / 2,
-    p.Pb
-  ];
-
-  if (!pressureChart) {
-    pressureChart = new Chart($('pressureChart'), {
-      type: 'line',
-      data: {
-        labels: positions,
-        datasets: [{
-          label: '圧力 (kPa)',
-          data: pressures,
-          borderColor: '#007BFF',
-          backgroundColor: 'rgba(0,123,255,0.12)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 5,
-          pointBackgroundColor: '#007BFF'
-        }]
-      },
-      options:{
-        responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-        plugins: { legend: { display: false } },
-        scales:{
-          x: { grid: { color: 'rgba(0,0,0,0.06)' }, ticks:{ font: { size: 11 } } },
-          y:{ grid: { color: 'rgba(0,0,0,0.06)' }, ticks:{ font: { size: 11 }, callback: v => v + ' kPa' } }
-        }
-      }
-    });
-  }else{
-    pressureChart.data.datasets[0].data = pressures;
-    pressureChart.update('none');
-  }// P-Q curve
-  const qRange = Array.from({length: 20}, (_, i) => i * p.Qm * 0.15);
-  const pqData = qRange.map(q =>{
-    const mFrac = q / Math.max(p.Qm, 0.01);
-    return p.Pm - (p.Pm - p.Ps) * mFrac * 0.6;
+  // suction ports (top & bottom inlets feeding the chamber)
+  ctx.strokeStyle = '#2f7d32'; ctx.lineWidth = 2;
+  [[g.bodyTop, -1],[g.bodyBot, 1]].forEach(function(pr){
+    ctx.beginPath();
+    ctx.moveTo(W*0.20, pr[0]); ctx.lineTo(W*0.20, g.cy - pr[1]*ductHalf(g,W*0.20,W));
+    ctx.moveTo(W*0.30, pr[0]); ctx.lineTo(W*0.30, g.cy - pr[1]*ductHalf(g,W*0.30,W));
+    ctx.stroke();
   });
+  // motive nozzle (converging)
+  ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(g.nozzleX, g.cy - g.outH*0.6);
+  ctx.lineTo(g.nozTip, g.cy - g.nozzleH);
+  ctx.lineTo(g.nozTip, g.cy + g.nozzleH);
+  ctx.lineTo(g.nozzleX, g.cy + g.outH*0.6);
+  ctx.stroke();
+  // section dividers
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  [g.throatX, g.throatEnd].forEach(function(x){ ctx.beginPath(); ctx.moveTo(x,g.bodyTop); ctx.lineTo(x,g.bodyBot); ctx.stroke(); });
+  ctx.setLineDash([]);
+  // labels
+  ctx.fillStyle = '#cfe8ff'; ctx.font = 'bold 11px Noto Sans JP'; ctx.textAlign='left';
+  ctx.fillText(L.motive, W*0.03, g.cy - g.outH*0.6 - 6);
+  ctx.fillStyle = '#7fd18a'; ctx.fillText(L.suction, W*0.205, g.bodyTop - 4);
+  ctx.fillStyle = '#9fb4c8'; ctx.font = '10px Roboto Mono'; ctx.textAlign='center';
+  ctx.fillText(L.throat, (g.throatX+g.throatEnd)/2, g.bodyBot+14);
+  ctx.fillStyle = '#ffd54a'; ctx.fillText(L.diffuser, (g.throatEnd+g.diffEnd)/2, g.bodyBot+14);
+  ctx.textAlign='left';
+}
 
+function pressureBar(g, W, H, p, r){
+  // diffuser pressure-recovery indicator (rises from Ps near throat to Pb at outlet)
+  var bx = g.diffEnd+4, bw = 10, by0 = g.cy - g.outH, bh = g.outH*2;
+  var frac = (p.Pb - p.Ps) / Math.max(p.Pm - p.Ps, 1); frac = Math.max(0.04, Math.min(1, frac));
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(bx, by0, bw, bh);
+  var fillH = bh*frac;
+  var grad = ctx.createLinearGradient(0, by0+bh-fillH, 0, by0+bh);
+  grad.addColorStop(0,'#ffd54a'); grad.addColorStop(1,'#f39c12');
+  ctx.fillStyle = grad; ctx.fillRect(bx, by0+bh-fillH, bw, fillH);
+  ctx.fillStyle = '#ffd54a'; ctx.font='9px Roboto Mono'; ctx.textAlign='left';
+  ctx.fillText('Pb', bx+bw+2, by0+bh-fillH+4);
+  ctx.fillStyle = '#9fb4c8';
+  ctx.fillText('Pm='+p.Pm+'kPa', W*0.03, g.cy - g.outH*0.6 + 8);
+  ctx.fillText('Ps='+p.Ps+'kPa', W*0.205, g.bodyTop + 10);
+  ctx.textAlign='left';
+}
+
+function frame(){
+  var W=cssW, H=cssH, g=GEO, p=lastP, r=lastR;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0a0f1e'; ctx.fillRect(0,0,W,H);
+  drawBody(g, W, H, p, r);
+
+  if (!r){
+    ctx.fillStyle = '#ff8a8a'; ctx.font='12px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText(L.stall, W/2, H/2); ctx.textAlign='left';
+    pressureBar(g, W, H, p, r||{});
+    if (playing) animId = requestAnimationFrame(frame);
+    return;
+  }
+
+  // motive jet speed scales with sqrt(Pm-Pb); entrainment strength with M
+  var jetV = 1.6 + Math.sqrt(Math.max(p.Pm - p.Pb, 1))/14;
+  var Mr = r.M;
+  // spawn rates
+  if (Math.random() < 0.9) particles.push(spawn('motive', W));
+  if (Math.random() < Math.min(0.85, 0.18 + Mr*0.5)) particles.push(spawn('suction', W));
+  if (particles.length > 420) particles.splice(0, particles.length-420);
+
+  for (var i=particles.length-1; i>=0; i--){
+    var pt = particles[i];
+    if (pt.kind === 'suction' && !pt.mixed){
+      // drawn toward centerline & downstream (entrainment by low-pressure jet)
+      pt.y += pt.vy * (0.6 + Mr*1.4);
+      pt.x += (0.4 + Mr*0.8);
+      if (Math.abs(pt.y - g.cy) < g.throatH*0.8 && pt.x > g.throatX){ pt.mixed = true; pt.vx = jetV*0.6; }
+    } else {
+      // motive + mixed: travel along axis, slow in diffuser (pressure recovery)
+      var spd;
+      if (pt.x < g.throatEnd){
+        spd = pt.mixed ? jetV*0.65 : jetV;          // throat: fast
+      } else {
+        var fd = (pt.x - g.throatEnd)/Math.max(g.diffEnd-g.throatEnd,1);
+        spd = (pt.mixed?jetV*0.65:jetV) * (1 - 0.62*Math.min(1,fd)); // diffuser: slow down
+      }
+      pt.vx = spd;
+      pt.x += spd;
+      // gentle pull of motive toward axis as it leaves nozzle
+      var half = ductHalf(g, pt.x, W);
+      if (pt.y < g.cy - half + 2) pt.y += 0.8;
+      if (pt.y > g.cy + half - 2) pt.y -= 0.8;
+    }
+    if (pt.x > g.outX){ particles.splice(i,1); continue; }
+
+    // color: motive cyan, suction green, mixed yellow
+    var col, rad;
+    if (pt.kind==='motive'){ col = pt.x>g.throatEnd?'#ffe08a':'#00d4ff'; rad=2.0; }
+    else if (pt.mixed){ col = '#ffd54a'; rad=1.8; }
+    else { col = '#4CAF50'; rad=1.7; }
+    ctx.beginPath(); ctx.arc(pt.x, pt.y, rad, 0, 7); ctx.fillStyle = col; ctx.fill();
+  }
+
+  pressureBar(g, W, H, p, r);
+
+  // live annotation: entrainment + recovery
+  ctx.fillStyle='rgba(255,255,255,0.82)'; ctx.font='bold 11px Roboto Mono'; ctx.textAlign='right';
+  ctx.fillText('M = '+r.M.toFixed(2)+'  η = '+r.eff.toFixed(0)+'%', W-14, 16);
+  ctx.textAlign='left';
+
+  if (playing) animId = requestAnimationFrame(frame);
+}
+
+function staticFrame(){
+  // prefers-reduced-motion: one representative frame with a few fixed particles
+  var W=cssW, H=cssH, g=GEO, p=lastP, r=lastR;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a0f1e'; ctx.fillRect(0,0,W,H);
+  drawBody(g,W,H,p,r);
+  if (r){
+    for (var x=g.nozTip; x<g.outX; x+=14){
+      ctx.beginPath(); ctx.arc(x, g.cy, x>g.throatEnd?2.4:2.0, 0, 7);
+      ctx.fillStyle = x>g.throatEnd?'#ffd54a':'#00d4ff'; ctx.fill();
+    }
+    for (var s=-1;s<=1;s+=2){
+      ctx.beginPath(); ctx.arc(W*0.26, g.cy+s*g.throatH*1.3, 2, 0, 7); ctx.fillStyle='#4CAF50'; ctx.fill();
+    }
+  }
+  pressureBar(g,W,H,p,r||{});
+}
+
+window.ejPlay = function(){
+  playing = !playing;
+  $('btnPlay').innerHTML = playing ? L.pause : L.play;
+  if (playing){ if(!animId) animId = requestAnimationFrame(frame); }
+  else { if(animId){ cancelAnimationFrame(animId); animId=null; } }
+};
+
+function updateCharts(p, r){
+  var positions = [L.inlet, L.nozzle, L.throat, L.mix, L.diff];
+  var pressures = [ p.Pm, p.Pm*0.6, p.Ps*1.1, (p.Ps+p.Pb)/2, p.Pb ];
+  if (!pressureChart){
+    pressureChart = new Chart($('pressureChart'), {
+      type:'line',
+      data:{ labels:positions, datasets:[{ label:L.pLabel, data:pressures, borderColor:'#007BFF',
+        backgroundColor:'rgba(0,123,255,0.12)', tension:0.4, fill:true, pointRadius:5, pointBackgroundColor:'#007BFF' }] },
+      options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:100,
+        plugins:{ legend:{ display:false } },
+        scales:{ x:{ grid:{ color:'rgba(0,0,0,0.06)' }, ticks:{ font:{ size:11 } } },
+          y:{ grid:{ color:'rgba(0,0,0,0.06)' }, ticks:{ font:{ size:11 }, callback:function(v){ return v+' kPa'; } } } } }
+    });
+  } else { pressureChart.data.datasets[0].data = pressures; pressureChart.update('none'); }
+
+  var qRange = Array.from({length:20}, function(_,i){ return i*p.Qm*0.15; });
+  var pqData = qRange.map(function(q){ var mFrac = q/Math.max(p.Qm,0.01); return p.Pm - (p.Pm-p.Ps)*mFrac*0.6; });
+  var opPt = r ? [{x:+r.Qt.toFixed(2), y:p.Pb}] : [];
   if (!pqChart){
     pqChart = new Chart($('pqChart'), {
-      type: 'line',
-      data: {
-        labels: qRange.map(q => q.toFixed(2)),
-        datasets: [
-          {
-            label: 'エジェクタ P-Q',
-            data: pqData,
-            borderColor: '#00B4D8',
-            backgroundColor: 'rgba(0,180,216,0.08)',
-            tension: 0.3,
-            fill: true
-          },{
-            label: '動作点',
-            data: [{x: r.Qt.toFixed(2), y: p.Pb}],
-            type: 'scatter',
-            pointBackgroundColor: '#ff6b6b',
-            pointRadius: 8,
-            showLine: false
-          }
-        ]
-      },
-      options:{
-        responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100,
-        plugins: { legend: { labels: { font: { size: 11 } } } },
-        scales:{
-          x: { title: { display: true, text: '流量 (L/s)', font: { size: 11 } }, grid:{ color: 'rgba(0,0,0,0.06)' } },
-          y:{ title: { display: true, text: '圧力 (kPa)', font: { size: 11 } }, grid:{ color: 'rgba(0,0,0,0.06)' } }
-        }
-      }
+      type:'line',
+      data:{ labels:qRange.map(function(q){ return q.toFixed(2); }),
+        datasets:[
+          { label:L.ejPQ, data:pqData, borderColor:'#00B4D8', backgroundColor:'rgba(0,180,216,0.08)', tension:0.3, fill:true },
+          { label:L.op, data:opPt, type:'scatter', pointBackgroundColor:'#ff6b6b', pointRadius:8, showLine:false }
+        ] },
+      options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:100,
+        plugins:{ legend:{ labels:{ font:{ size:11 } } } },
+        scales:{ x:{ title:{ display:true, text:L.flow, font:{ size:11 } }, grid:{ color:'rgba(0,0,0,0.06)' } },
+          y:{ title:{ display:true, text:L.press, font:{ size:11 } }, grid:{ color:'rgba(0,0,0,0.06)' } } } }
     });
-  }else{
-    pqChart.data.labels = qRange.map(q => q.toFixed(2));
+  } else {
+    pqChart.data.labels = qRange.map(function(q){ return q.toFixed(2); });
     pqChart.data.datasets[0].data = pqData;
-    pqChart.data.datasets[1].data = [{x: r.Qt.toFixed(2), y: p.Pb}];
+    pqChart.data.datasets[1].data = opPt;
     pqChart.update('none');
   }
-}['pm','qm','ps','pb','eta'].forEach(id => $( id).addEventListener('input', updateDisplay));
+}
+
+['pm','qm','ps','pb','eta'].forEach(function(id){ $(id).addEventListener('input', updateDisplay); });
+
+var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+resize();
 updateDisplay();
+if (reduce){
+  playing = false;
+  $('btnPlay').innerHTML = L.play;
+  staticFrame();
+} else {
+  animId = requestAnimationFrame(frame);
+}
+window.addEventListener('resize', function(){ resize(); if (reduce || !playing) staticFrame(); });
+})();
 </script>
 
 <section class="explanation">
@@ -445,7 +551,7 @@ updateDisplay();
       <div class="bub">ジェットポンプって、モーターも羽根車もないのにどうやって水を吸い上げるんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大まかに言うと、水道のホースで勢いよく水を流すと、周りの空気が引っ張られてくる現象を利用してるんだ。このシミュレーターで、上の「動力流体圧力」のスライダーを最大にしてみて。ノズルから噴射される流体（青色）の勢いが増して、周りの流体（オレンジ色）をぐいっと巻き込むのが見えるよね。これが基本原理だ。</div>
+      <div class="bub">大まかに言うと、水道のホースで勢いよく水を流すと、周りの空気が引っ張られてくる現象を利用してるんだ。このシミュレーターで、上の「動力流体圧力」のスライダーを最大にしてみて。ノズルから噴射される流体（青色）の勢いが増して、周りの流体（緑色の吸引流）をぐいっと巻き込むのが見えるよね。これが基本原理だ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">え、そうなんですか！で、画面に出てくる「エントレインメント比」って何の数字ですか？</div>
@@ -457,7 +563,7 @@ updateDisplay();
       <div class="bub">なるほど！でも、巻き込むだけでなく、適切に圧力を上げて送り出さないとダメですよね？「圧縮比」がそれですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">その通り！「どれだけ圧力を上げられたか」を表すのが圧縮比だ。例えば、工場の排水を少し高い場所に戻す時は、この値が重要になる。シミュレーターで「混合室出口圧力」を上げてみよう。出口が詰まったような状態になるから、二次流体が吸い込みにくくなり、全体の効率（η）が大きく落ちるのがわかる。これが「サージング」に近い現象だ。</div>
+      <div class="bub">その通り！「どれだけ圧力を上げられたか」を表すのが圧縮比だ。例えば、工場の排水を少し高い場所に戻す時は、この値が重要になる。シミュレーターで「背圧 Pb」を上げてみよう。出口が詰まったような状態になるから、二次流体が吸い込みにくくなり、全体の効率（η）が大きく落ちるのがわかる。これが「サージング」に近い現象だ。</div>
     </div>
   </div>
   <h2>よくある質問</h2>
@@ -496,6 +602,9 @@ updateDisplay();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fluid-jet-pump.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -542,16 +651,26 @@ updateDisplay();
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>動力流体の質量流量（qm）と圧力（pm）を入力します。例えば圧縮空気の場合、qm=5kg/s、pm=0.8MPaが標準的です</li><li>吸込流体の圧力（ps）と背圧（pb）を設定します。水吸上げの場合はps=-0.05MPa（減圧側）、pb=0.1MPaが目安です</li><li>シミュレーター上部のスライダーで各パラメータを調整するとリアルタイムでエントレインメント比（混合流量/動力流量）、圧縮比（出口圧力/入口圧力）、混合効率がグラフに表示されます</li></ol>
+<ol><li>動力流体の流量Qm（0.1〜5.0 L/s）と圧力Pm（100〜1000 kPa）を設定します。既定値はQm=1.0 L/s、Pm=500 kPaです</li><li>吸込圧力Ps（10〜200 kPa）と背圧Pb（50〜400 kPa）を設定します。Ps＜Pb＜Pmが動作の成立条件です</li><li>スライダーを調整するとエントレインメント比M=Qd/Qm、圧縮比Cr=(Pb−Ps)/(Pm−Pb)、効率η=M×Crがリアルタイムに表示されます</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>蒸気駆動のジェットポンプで液体窒素を吸上げる場合：動力流体（飽和蒸気）qm=12kg/s、pm=1.2MPa、吸込液体ps=-0.02MPa、背圧pb=0.5MPaを入力すると、エントレインメント比は約2.8、圧縮比は2.1となり、出口は0.84kg/sの吸込流体が加わった14.8kg/sの混合流となります。</p>
+<p>既定条件（動力流体圧力Pm=500kPa、動力流量Qm=1.0L/s、吸込圧力Ps=50kPa、背圧Pb=150kPa、混合効率0.80）では、エントレインメント比M≈0.524、圧縮比Cr≈0.286、効率η≈15.0%、総流量Qt≈1.52L/sと計算されます。背圧Pbを上げるとMが低下しCrが上昇するトレードオフも確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
-<ul><li>動力流体の圧力が高いほどエントレインメント比は増加しますが、pm=2.0MPaを超えるとキャビテーション発生リスクが上昇するため、設計段階で動力源の能力を確認してください</li><li>吸込圧力psが背圧pbに近づくとエントレインメント比は急減するため、最低でもpb-ps≧0.3MPaの条件を維持することが重要です</li><li>混合効率が70%未満の場合、ノズル設計が不適切な可能性があります。CAE解析で流路形状を最適化することをお勧めします</li></ul>
+<ul><li>動力流体圧力Pmが高いほどエントレインメント比は増加しますが、実機ではノズル出口速度の上昇に伴いキャビテーション発生リスクも高まるため、設計段階で動力源の能力を確認してください</li><li>背圧Pbが動力流体圧力Pmに近づくと（圧力差Pm−Pbが小さくなると）動作が成立しなくなるため、十分な駆動圧力差を確保することが重要です</li><li>混合効率η_mixが低い場合、ノズル設計が不適切な可能性があります。CAE解析で流路形状を最適化することをお勧めします</li></ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

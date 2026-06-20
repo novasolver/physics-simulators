@@ -123,14 +123,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "転がり軸受寿命シミュレーター（L10寿命・ISO 281）",
       "description": "ISO 281に基づいて転がり軸受のL10寿命（100万回転）・L10h寿命（時間）・修正寿命Lnmをリアルタイム計算。玉軸受・ころ軸受に対応。信頼性係数a₁・潤滑汚染係数a_ISOを考慮した修正寿命も算出。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/bearing-life.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -213,6 +213,23 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div class="btn-group" style="margin-bottom:14px">
+      <button class="btn" id="playBtn" type="button" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+      <button class="btn secondary" type="button" onclick="resetAnim()"><i class="fas fa-rotate-left"></i> 最初から</button>
+    </div>
+
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">プリセット</span></div>
+      <div class="btn-group">
+        <button class="toggle-btn" type="button" onclick="applyPreset('light')">軽荷重</button>
+        <button class="toggle-btn" type="button" onclick="applyPreset('heavy')">重荷重</button>
+        <button class="toggle-btn" type="button" onclick="applyPreset('highspeed')">高速</button>
+        <button class="toggle-btn" type="button" onclick="applyPreset('lowspeed')">低速</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">軸受種別</span>
@@ -276,11 +293,19 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4873117984?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4873117984.09._SCMZZZZZZ_.jpg" alt="機械学習の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">機械学習 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
 <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（ライブ）</div>
     <div class="stat-cards">
       <div class="stat-card">
         <div class="sv" id="statL10">—</div>
@@ -305,21 +330,37 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-      <div class="charts">
-        <div class="canvas-wrap">
-          <div class="chart-card">
-      <div class="chart-title">L₁₀ 寿命 vs 荷重 P（log-log）</div>
-          <canvas id="chartL10" height="220"></canvas>
-    </div>
+      <div class="chart-card">
+        <div class="chart-title"><i class="fas fa-circle-notch"></i> 回転する軸受と荷重ゾーン（リアルタイム）</div>
+        <canvas id="bearingCanvas" height="300" aria-label="荷重を受けて回転する転がり軸受のアニメーション。荷重ゾーンと転動体、寿命消費の進捗を表示。" role="img"></canvas>
+        <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--muted);margin-top:6px;flex-wrap:wrap;gap:6px">
+          <span>回転数 <strong id="revLabel" style="color:var(--accent)">0</strong> 万回転</span>
+          <span>経過 <strong id="timeLabel" style="color:var(--accent)">0.0</strong> h</span>
+          <span>赤=荷重大 / 青=軽荷重の転動体</span>
         </div>
-        <div class="canvas-wrap">
-          <div class="chart-card">
-      <div class="chart-title">ワイブル分布（寿命ばらつき）</div>
-          <canvas class="ux-chartjs-canvas" id="chartWeibull" height="220"></canvas>
-    </div>
+        <div style="margin-top:8px">
+          <div style="font-size:0.72rem;color:var(--muted);margin-bottom:3px">L₁₀ 寿命の消費（<span id="lifeConsumedLabel">0.0</span>%）</div>
+          <div style="height:14px;background:var(--border);border-radius:7px;overflow:hidden">
+            <div id="lifeBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--green),var(--orange));transition:width .1s linear"></div>
+          </div>
         </div>
       </div>
-    
+
+      <div class="charts">
+        <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> L₁₀ 寿命 vs C/P 比（現在の運転点）</div>
+          <canvas id="curveCanvas" height="240" aria-label="C/P比に対するL10寿命の曲線と現在の運転点。"></canvas>
+    </div>
+        <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> L₁₀ 寿命 vs 荷重 P（log-log）</div>
+          <canvas id="chartL10" height="220"></canvas>
+    </div>
+        <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-area"></i> ワイブル分布（寿命ばらつき）</div>
+          <canvas class="ux-chartjs-canvas" id="chartWeibull" height="220"></canvas>
+    </div>
+      </div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
         <p>基本定格寿命（L10）：</p>
@@ -328,7 +369,8 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <p style="margin-top:6px;">時間換算：$L_{10h}=\dfrac{10^6}{60n}L_{10}$　（$n$：rpm）</p>
         <p style="margin-top:6px;">修正寿命：$L_{nm}=a_1\cdot a_{ISO}\cdot L_{10}$</p>
         <p style="margin-top:6px;">$a_1$：信頼性係数（90%=1.0, 95%=0.62, 99%=0.21）</p>
-      
+        <p style="margin-top:6px;">荷重を2倍にすると寿命は $2^p$ 倍（玉軸受で約8倍）に短縮されます。</p>
+
 </div>
 </div>
   </div>
@@ -337,6 +379,13 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script>
 
 let chartL10 = null, chartWeibull = null;
+// ---- v2 animation state ----
+const I18N = {
+  good:'優良', ok:'適正', caution:'注意', overload:'過負荷'
+};
+let animState = { running:true, rev:0, time:0, last:0, raf:null };
+let cur = { C:20, P:5, n:1500, a1:1, aISO:1, p:3, L10:64, L10h:711, Lnm:711, cp:4 };
+const REDUCE_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function getParams(){
   const bType = document.getElementById('bearingType').value;
@@ -346,13 +395,14 @@ function getParams(){
   const a1 = parseFloat(document.getElementById('reliability').value);
   const aISO = parseFloat(document.getElementById('aiso').value);
   const p = bType === 'ball' ? 3 : 10/3;
-  return { C, P, n, a1, aISO, p };
+  return { C, P, n, a1, aISO, p, bType };
 }function compute(){
-  const { C, P, n, a1, aISO, p }= getParams();
+  const { C, P, n, a1, aISO, p, bType }= getParams();
   const L10 = Math.pow(C / P, p);
   const L10h = (1e6 / (60 * n)) * L10;
   const Lnm = a1 * aISO * L10h;
   const cp = C / P;
+  cur = { C, P, n, a1, aISO, p, bType, L10, L10h, Lnm, cp };
 
   document.getElementById('statL10').textContent = L10.toFixed(1);
   document.getElementById('statL10h').textContent = L10h < 10000 ? L10h.toFixed(0) : (L10h / 1000).toFixed(1) + 'k';
@@ -364,11 +414,194 @@ function getParams(){
   const fatigue = document.getElementById('statFatigue');
   cpCard.className = 'stat-card' + (cp >= 3 ? ' ok' : ' warn');
 
-  if (cp >= 5){ fatigue.textContent = '優良'; fatigueCard.className = 'stat-card ok'; }else if (cp >= 3){ fatigue.textContent = '適正'; fatigueCard.className = 'stat-card ok'; }else if (cp >= 2){ fatigue.textContent = '注意'; fatigueCard.className = 'stat-card warn'; }else{ fatigue.textContent = '過負荷'; fatigueCard.className = 'stat-card warn'; }
+  if (cp >= 5){ fatigue.textContent = I18N.good; fatigueCard.className = 'stat-card ok'; }else if (cp >= 3){ fatigue.textContent = I18N.ok; fatigueCard.className = 'stat-card ok'; }else if (cp >= 2){ fatigue.textContent = I18N.caution; fatigueCard.className = 'stat-card warn'; }else{ fatigue.textContent = I18N.overload; fatigueCard.className = 'stat-card warn'; }
 
   drawL10Chart(C, P, p, L10);
   drawWeibullChart(L10h, p);
-}function drawL10Chart(C, P, p, currentL10){
+  drawCurve();
+}
+
+// ===== Real-time rotating bearing animation =====
+const NBALLS = 11;
+function setupHiDPI(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || canvas.parentElement.clientWidth || 360;
+  const cssH = parseInt(canvas.getAttribute('height')) || 300;
+  const needW = Math.round(cssW * dpr), needH = Math.round(cssH * dpr);
+  if (canvas.width !== needW || canvas.height !== needH){ canvas.width = needW; canvas.height = needH; }
+  canvas.style.height = cssH + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { ctx, W: cssW, H: cssH };
+}
+
+function drawBearing(angle){
+  const canvas = document.getElementById('bearingCanvas');
+  if (!canvas) return;
+  const { ctx, W, H } = setupHiDPI(canvas);
+  ctx.clearRect(0,0,W,H);
+  const cx = W/2, cy = H/2;
+  const Ro = Math.min(W,H)*0.42;     // outer race radius
+  const Ri = Ro*0.55;                 // inner race radius
+  const Rp = (Ro+Ri)/2;               // pitch radius
+  const rb = (Ro-Ri)*0.42;            // rolling element radius
+  const isRoller = cur.bType === 'roller';
+
+  // outer race ring
+  ctx.lineWidth = (Ro-Ri)*0.28;
+  ctx.strokeStyle = '#cdd6e0';
+  ctx.beginPath(); ctx.arc(cx,cy,Ro,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = '#cdd6e0';
+  ctx.beginPath(); ctx.arc(cx,cy,Ri,0,Math.PI*2); ctx.stroke();
+
+  // Load arrow (downward, fixed direction = load zone at bottom)
+  ctx.strokeStyle = '#e17055'; ctx.fillStyle = '#e17055'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cx, cy-Ro-26); ctx.lineTo(cx, cy-Ro-4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-6, cy-Ro-12); ctx.lineTo(cx, cy-Ro-2); ctx.lineTo(cx+6, cy-Ro-12); ctx.closePath(); ctx.fill();
+  ctx.font = '11px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('荷重 P', cx, cy-Ro-30);
+
+  // load-zone arc (bottom ~140deg), where elements carry load
+  ctx.strokeStyle = 'rgba(225,112,85,0.18)'; ctx.lineWidth = (Ro-Ri)*0.9;
+  ctx.beginPath(); ctx.arc(cx,cy,Rp, Math.PI*0.28, Math.PI*0.72); ctx.stroke();
+
+  // rolling elements
+  for (let i=0;i<NBALLS;i++){
+    const a = angle + i*2*Math.PI/NBALLS;
+    const ex = cx + Rp*Math.cos(a);
+    const ey = cy + Rp*Math.sin(a);
+    // load factor: max at bottom (a = +PI/2), Stribeck-like
+    let lz = Math.cos(a - Math.PI/2);    // 1 at bottom, -1 at top
+    lz = Math.max(0, lz);                 // only lower half loaded
+    const t = lz;                         // 0..1
+    const r = Math.round(0 + t*225);
+    const g = Math.round(123 - t*60);
+    const b = Math.round(255 - t*200);
+    ctx.fillStyle = `rgb(${r},${Math.max(0,g)},${Math.max(0,b)})`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+    if (isRoller){
+      ctx.save(); ctx.translate(ex,ey); ctx.rotate(a+Math.PI/2);
+      const rw = rb*1.1, rh = rb*1.9;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(-rw/2,-rh/2,rw,rh,3); else ctx.rect(-rw/2,-rh/2,rw,rh);
+      ctx.fill(); ctx.stroke(); ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(ex,ey,rb,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    }
+  }
+  // inner hub with rotation tick
+  ctx.fillStyle = '#001F3F';
+  ctx.beginPath(); ctx.arc(cx,cy,Ri*0.6,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Ri*0.55*Math.cos(angle*2.18), cy+Ri*0.55*Math.sin(angle*2.18)); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font='10px sans-serif';
+  ctx.fillText(isRoller?'ころ軸受':'玉軸受', cx, cy+4);
+}
+
+function animLoop(ts){
+  if (!animState.last) animState.last = ts;
+  const dt = Math.min(0.05, (ts - animState.last)/1000); // s
+  animState.last = ts;
+  if (animState.running){
+    // revolutions in this frame: n[rpm]/60 * dt
+    const dRev = (cur.n/60)*dt;        // shaft revolutions
+    animState.rev += dRev;
+    animState.time += dt;
+  }
+  // visual angle: spin at a viewable rate, proportional to speed but capped
+  const visSpeed = Math.min(3.2, 0.4 + cur.n/2500);
+  drawBearing(animState.rev * 0.7 + (animState.running? performance.now()/1000*visSpeed : 0));
+  // life consumption: relate animated revs to L10 (million revs). Accelerate so it's visible.
+  const totalRevMillion = cur.L10;     // million revs to L10
+  const ACCEL = 50000;                  // make accumulation visible
+  const consumedMillion = (animState.rev*ACCEL)/1e6;
+  let frac = Math.min(1, consumedMillion/totalRevMillion);
+  document.getElementById('lifeBar').style.width = (frac*100).toFixed(1)+'%';
+  document.getElementById('lifeConsumedLabel').textContent = (frac*100).toFixed(1);
+  document.getElementById('revLabel').textContent = (animState.rev*ACCEL/1e4).toFixed(0);
+  // equivalent operating hours at current speed
+  const opHours = (animState.rev*ACCEL)/(cur.n*60);
+  document.getElementById('timeLabel').textContent = opHours.toFixed(1);
+  if (frac >= 1 && animState.running){ animState.running = false; updatePlayBtn(); }
+  animState.raf = requestAnimationFrame(animLoop);
+}
+
+// ===== Custom L10 vs C/P curve canvas =====
+function drawCurve(){
+  const canvas = document.getElementById('curveCanvas');
+  if (!canvas) return;
+  const { ctx, W, H } = setupHiDPI(canvas);
+  ctx.clearRect(0,0,W,H);
+  const padL=44, padB=28, padT=14, padR=12;
+  const x0=padL, y0=H-padB, x1=W-padR, y1=padT;
+  const cpMin=1, cpMax=8;
+  const p = cur.p;
+  const yMax = Math.pow(cpMax,p);
+  // log scale on y
+  const yLogMax = Math.log10(yMax), yLogMin = 0; // 1 -> 0
+  const sx = v => x0 + (v-cpMin)/(cpMax-cpMin)*(x1-x0);
+  const sy = v => { const lv = Math.log10(Math.max(1,v)); return y0 - (lv-yLogMin)/(yLogMax-yLogMin)*(y0-y1); };
+  // axes
+  ctx.strokeStyle='#dee2e6'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x0,y1); ctx.lineTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke();
+  ctx.fillStyle='#6c757d'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  for (let cp=1;cp<=8;cp++){ ctx.fillText(cp, sx(cp), y0+14); }
+  ctx.fillText('C/P 比', (x0+x1)/2, H-4);
+  ctx.save(); ctx.translate(12,(y0+y1)/2); ctx.rotate(-Math.PI/2); ctx.fillText('L₁₀ [百万回転]',0,0); ctx.restore();
+  // gridlines (decades)
+  ctx.textAlign='right';
+  for (let d=0; d<=yLogMax; d++){
+    const yy=sy(Math.pow(10,d));
+    ctx.strokeStyle='rgba(0,0,0,0.06)'; ctx.beginPath(); ctx.moveTo(x0,yy); ctx.lineTo(x1,yy); ctx.stroke();
+    ctx.fillStyle='#6c757d'; ctx.fillText('1e'+d, x0-4, yy+3);
+  }
+  // curve
+  ctx.strokeStyle='#007BFF'; ctx.lineWidth=2.4; ctx.beginPath();
+  for (let i=0;i<=120;i++){
+    const cp=cpMin+(cpMax-cpMin)*i/120;
+    const L=Math.pow(cp,p);
+    const X=sx(cp), Y=sy(L);
+    if (i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+  }
+  ctx.stroke();
+  // operating point
+  const ocp=Math.max(cpMin,Math.min(cpMax,cur.cp));
+  const oL=Math.pow(ocp,p);
+  const OX=sx(ocp), OY=sy(oL);
+  ctx.strokeStyle='rgba(225,112,85,0.5)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(OX,y0); ctx.lineTo(OX,OY); ctx.lineTo(x0,OY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#e17055'; ctx.beginPath(); ctx.arc(OX,OY,6,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#e17055'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('運転点 L₁₀='+cur.L10.toFixed(0), Math.min(OX+8,x1-90), Math.max(OY-8,y1+10));
+}
+
+// ===== Controls =====
+function updatePlayBtn(){
+  const b=document.getElementById('playBtn');
+  if(!b) return;
+  b.innerHTML = animState.running ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+}
+function togglePlay(){ animState.running=!animState.running; if(animState.running) animState.last=0; updatePlayBtn(); }
+function resetAnim(){ animState.rev=0; animState.time=0; animState.last=0; if(!animState.running){animState.running=true;} updatePlayBtn(); }
+function applyPreset(name){
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el){ el.value=v; } };
+  if(name==='light'){ set('cLoad',30); set('pLoad',4); set('nSpeed',1500); }
+  else if(name==='heavy'){ set('cLoad',20); set('pLoad',12); set('nSpeed',1500); }
+  else if(name==='highspeed'){ set('cLoad',20); set('pLoad',5); set('nSpeed',8000); }
+  else if(name==='lowspeed'){ set('cLoad',20); set('pLoad',5); set('nSpeed',200); }
+  ['cLoad','pLoad','nSpeed','aiso'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    const valId= id==='cLoad'?'cVal':id==='pLoad'?'pVal':id==='nSpeed'?'nVal':'aisoVal';
+    if(window.syncToNum) syncToNum(id,valId);
+    const dec= id==='aiso'?2:id==='nSpeed'?0:1;
+    const unit= (id==='cLoad'||id==='pLoad')?'kN':id==='nSpeed'?'rpm':'';
+    if(window.updateSlider) updateSlider(el,valId,dec,unit);
+  });
+  resetAnim();
+  compute();
+}
+
+function drawL10Chart(C, P, p, currentL10){
   const labels = [], data = [];
   const pMin = C * 0.05, pMax = C * 1.2;
   for (let i = 0; i <= 80; i++) {
@@ -497,6 +730,14 @@ document.querySelectorAll('input[type=range]').forEach(el =>{
   if (valId) updateSlider(el, valId, dec, unit);
 });
 compute();
+// start animation (or render a single static frame if reduced motion)
+if (REDUCE_MOTION){
+  animState.running = false; updatePlayBtn();
+  drawBearing(Math.PI/6);
+} else {
+  animState.raf = requestAnimationFrame(animLoop);
+}
+window.addEventListener('resize', ()=>{ drawCurve(); if(!animState.running) drawBearing(animState.rev*0.7); });
 </script>
 
 <section class="explanation">
@@ -512,7 +753,7 @@ compute();
       <div class="bub">え、そうなんですか！でも、実際の機械はもっと長く使いたいですよね。90%しか壊れない保証だと心もとない気が…。</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">その通り！そこで「修正寿命」の出番だ。シミュレーターの「信頼性」スライダーを95%や99%に動かしてみて。寿命が大きく短くなるのがわかるかな？これは信頼性係数a₁を掛けているから。さらに「潤滑・汚染係数」も変えると、現実に近い寿命が見積もれるんだ。</div>
+      <div class="bub">その通り！そこで「修正寿命」の出番だ。シミュレーターの「信頼性」セレクトを95%や99%に変えてみて。寿命が大きく短くなるのがわかるかな？これは信頼性係数a₁を掛けているから。さらに「潤滑・汚染係数」も変えると、現実に近い寿命が見積もれるんだ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">なるほど！でも、この計算で一番難しい「等価動荷重P」って、どうやって決めるんですか？現場で多いのは？</div>
@@ -530,7 +771,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">グラフに表示されるL10寿命と修正寿命Lnmの違いは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">L10寿命は信頼性90%の基本寿命で、荷重のみから計算されます。修正寿命Lnmは、さらに信頼度、材料、潤滑条件、異物混入などの運転環境要因を加味した実用的な寿命です。本ツールではISO 281の修正係数a1, a2, a3を反映し、より現実に近い寿命評価が可能です。</div>
+    <div class="faq-a">L10寿命は信頼性90%の基本寿命で、荷重のみから計算されます。修正寿命Lnmは、信頼性係数a₁と潤滑・汚染を含むaISOを掛けた実用的な寿命です。本ツールではISO 281のa₁とaISOを反映し、より現実に近い寿命評価が可能です。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">玉軸受ところ軸受で寿命指数pが異なるのはなぜですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -558,6 +799,9 @@ compute();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="bearing-life.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -613,23 +857,33 @@ compute();
 <h3>使い方ガイド</h3>
 <ol>
 <li>基本動定格荷重C（kN）と等価動荷重P（kN）を入力し、C/P比を確認する</li>
-<li>回転速度n（rpm）と信頼性係数a₁、潤滑・材料係数aISO（通常0.9～1.5）を設定する</li>
+<li>回転速度n（rpm）と信頼性係数a₁、潤滑・汚染係数aISO（UI範囲0.1～4、標準1）を設定する</li>
 <li>L₁₀寿命（百万回転）、L₁₀h（時間）、修正寿命Lnm（時間）がリアルタイムで計算される</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>深溝玉軸受6205（C=12.7kN）を3000rpmで運転し、等価荷重P=4.2kNが作用する場合：C/P=3.02となり、ISO 281式により初期寿命L₁₀=（12.7/4.2）³×10⁶=55.8百万回転。回転速度3000rpmを適用するとL₁₀h=55.8×10⁶/(3000×60)=310時間。潤滑条件が良好（aISO=1.2）で信頼度90%（a₁=1.0）の場合、修正寿命Lnm=1.0×1.2×310=372時間となる。</p>
+<p>深溝玉軸受6205（C=12.7kN）を3000rpmで運転し、等価荷重P=4.2kNが作用する場合：C/P=3.02となり、ISO 281式により基本寿命L₁₀=（12.7/4.2）³=27.65百万回転。回転速度3000rpmを適用するとL₁₀h=27.65×10⁶/(3000×60)=153.6時間。潤滑条件が良好（aISO=1.2）で信頼度90%（a₁=1.0）の場合、修正寿命Lnm=1.0×1.2×153.6=184.3時間となる。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>C/P比が1.5未満の過負荷状態では、L₁₀寿命が急速に低下するため軸受サイズの見直しが必須。例：C/P=1.2の場合は=0.8）³に低減</li>
+<li>C/P比が1.5未満の過負荷状態では、L₁₀寿命が急速に低下するため軸受サイズの見直しが必須。寿命は(C/P)^pで効くため、玉軸受でC/P=1.2ならL₁₀は1.2³=1.728百万回転にとどまります</li>
 <li>回転速度が5000rpm以上の高速運転では、潤滑係数aISO を0.4～0.7に低下させる必要があり、実計算寿命は大幅削減される</li>
 <li>振動・衝撃荷重が発生する工作機械では安全係数を追加し、計算したLnmを1.5～2.0で除して実メンテナンス周期を決定する</li>
-<li>信頼度が99%（a₁=0.5）の場合、寿命は初期値の50%に縮小するため、重要機器では修正寿命の再計算が必須</li>
+<li>信頼度が99%（a₁=0.21）の場合、寿命は初期値の21%まで縮小するため、重要機器では修正寿命の再計算が必須</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4873117984?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4873117984.09._SCMZZZZZZ_.jpg" alt="機械学習の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">機械学習 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

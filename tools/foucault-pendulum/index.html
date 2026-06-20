@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "フーコー振り子 シミュレーター",
       "description": "緯度・振り子長さ・重力加速度・経過時間から、振動周期・歳差角速度・一回転時間・経過時の歳差角を Ω·sinφ の式でリアルタイムに計算・可視化する古典力学シミュレーター。",
       "url": "https://novasolver.jp/tools/foucault-pendulum.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["振動周期 T = 2π√(L/g) の計算","歳差角速度 Ω·sinφ と一回転時間の表示","上から見た振動面の回転（軌跡）の可視化","複数緯度の歳差角を時間軸で比較するグラフ"],
       "keywords": "フーコー振り子,歳差,自転,コリオリ力,振り子,周期,緯度依存,古典力学,ジャン・フーコー",
       "datePublished": "2026-05-15",
@@ -102,6 +102,23 @@
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #pendulumCanvas,#trajCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.62rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.03em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:5px 10px;font-size:0.74rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.speed-row{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){input[type=range]::-webkit-slider-thumb{transition:none}}
 </style>
 </head>
 <body>
@@ -131,48 +148,107 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setPreset('paris')">パリ 48.85°N → 約32h</button>
+        <button type="button" class="preset-btn" onclick="setPreset('pole')">北極 90° → 24h</button>
+        <button type="button" class="preset-btn" onclick="setPreset('equator')">赤道 0° → 回転なし</button>
+        <button type="button" class="preset-btn" onclick="setPreset('south')">南半球 → 逆回転</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">緯度 φ</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slLatVal" value="35" min="-89" max="89" step="1" oninput="syncFromNum('slLat','slLatVal')"><span class="num-unit">°</span></div>
+        <div class="num-wrap"><input type="number" class="num-input" id="slLatVal" value="48.85" min="-90" max="90" step="0.05" oninput="syncFromNum('slLat','slLatVal');compute()"><span class="num-unit">°</span></div>
       </div>
-      <input type="range" id="slLat" min="-89" max="89" step="1" value="35" oninput="syncToNum('slLat','slLatVal');updateSlider(this,'slLatVal',0,'');compute()">
+      <input type="range" id="slLat" min="-90" max="90" step="0.05" value="48.85" oninput="syncToNum('slLat','slLatVal');updateSlider(this,'slLatVal',2,'');compute()" aria-label="緯度 ファイ 度">
     </div>
 
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">振り子長さ L</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slLVal" value="20" min="0.5" max="70" step="0.5" oninput="syncFromNum('slL','slLVal')"><span class="num-unit">m</span></div>
+        <div class="num-wrap"><input type="number" class="num-input" id="slLVal" value="20" min="0.5" max="70" step="0.5" oninput="syncFromNum('slL','slLVal');compute()"><span class="num-unit">m</span></div>
       </div>
-      <input type="range" id="slL" min="0.5" max="70" step="0.5" value="20" oninput="syncToNum('slL','slLVal');updateSlider(this,'slLVal',1,'');compute()">
+      <input type="range" id="slL" min="0.5" max="70" step="0.5" value="20" oninput="syncToNum('slL','slLVal');updateSlider(this,'slLVal',1,'');compute()" aria-label="振り子長さ メートル">
     </div>
 
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">重力加速度 g</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slGVal" value="9.810" min="9.70" max="9.85" step="0.001" oninput="syncFromNum('slG','slGVal')"><span class="num-unit">m/s²</span></div>
+        <div class="num-wrap"><input type="number" class="num-input" id="slGVal" value="9.810" min="9.70" max="9.85" step="0.001" oninput="syncFromNum('slG','slGVal');compute()"><span class="num-unit">m/s²</span></div>
       </div>
-      <input type="range" id="slG" min="9.70" max="9.85" step="0.001" value="9.810" oninput="syncToNum('slG','slGVal');updateSlider(this,'slGVal',3,'');compute()">
+      <input type="range" id="slG" min="9.70" max="9.85" step="0.001" value="9.810" oninput="syncToNum('slG','slGVal');updateSlider(this,'slGVal',3,'');compute()" aria-label="重力加速度">
     </div>
 
-    <div class="param-group">
-      <div class="param-label">
-        <span class="param-name">経過時間 t</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="slTimeVal" value="6.0" min="0" max="36" step="0.1" oninput="syncFromNum('slTime','slTimeVal')"><span class="num-unit">h</span></div>
-      </div>
-      <input type="range" id="slTime" min="0" max="36" step="0.1" value="6.0" oninput="syncToNum('slTime','slTimeVal');updateSlider(this,'slTimeVal',1,'');compute()">
+    <div class="divider"></div>
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">時間加速</div>
+    <div class="preset-row" id="speedRow">
+      <button type="button" class="preset-btn speed-btn" data-speed="1" onclick="setSpeed(1)">1×（実時間）</button>
+      <button type="button" class="preset-btn speed-btn" data-speed="100" onclick="setSpeed(100)">100×</button>
+      <button type="button" class="preset-btn speed-btn active" data-speed="1000" onclick="setSpeed(1000)">1000×</button>
+      <button type="button" class="preset-btn speed-btn" data-speed="3600" onclick="setSpeed(3600)">時計（3600×）</button>
     </div>
 
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 時間をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">恒星日 86164.1 秒（地球の自転1回分）を基準に Ω_earth = 2π/T を用います。北半球では振動面が時計回り、南半球では反時計回りに見えます。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">恒星日 86164.1 秒（地球の自転1回分）を基準に Ω_earth = 2π/T を用います。北半球では振動面が時計回り、南半球では反時計回りに見えます。実際の歳差は数時間単位なので、時間加速で早送りしてください。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="振動工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">振動工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roElapsed">0.0</div><div class="rl">経過時間 [h]</div></div>
+        <div class="live-ro"><div class="rv" id="roAzim">0.0</div><div class="rl">振動面の方位 [°]</div></div>
+        <div class="live-ro"><div class="rv" id="roDth">0.0</div><div class="rl">歳差角 Δθ [°]</div></div>
+        <div class="live-ro"><div class="rv" id="roOmega">0.00</div><div class="rl">歳差速度 [°/h]</div></div>
+      </div>
+      <div class="live-readouts" style="margin-bottom:0">
+        <div class="live-ro"><div class="rv" id="roTpre">—</div><div class="rl">一回転の時間 [h]</div></div>
+        <div class="live-ro"><div class="rv" id="roTosc">—</div><div class="rl">振り子周期 [s]</div></div>
+        <div class="live-ro"><div class="rv" id="roDir">—</div><div class="rl">回転の向き</div></div>
+        <div class="live-ro"><div class="rv" id="roSpeed">1000×</div><div class="rl">時間加速</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-compass"></i> 上から見た振り子（ロゼット軌跡）</div>
+      <canvas id="pendulumCanvas" tabindex="0" role="img" aria-label="フーコー振り子を真上から見た図。錘が往復しながら振動面がゆっくり歳差し、星形のロゼット軌跡を描きます。"></canvas>
+      <p class="canvas-hint">黄点＝錘の現在位置／水色＝残像ロゼット軌跡／青実線＝現在の振動面／灰破線＝t=0 の振動面／橙弧＝歳差角 Δθ／N/E/S/W＝方位</p>
+      <div class="play-row">
+        <button type="button" class="btn" id="playBtn2" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+        <button type="button" class="btn secondary" onclick="clearTrace()"><i class="fas fa-eraser"></i> 軌跡を消去</button>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:#00B4D8"></i>振動面（慣性方向）</span>
+        <span><i class="swatch" style="background:#FF9F43"></i>歳差角 Δθ</span>
+        <span><i class="swatch" style="background:#FFD166"></i>錘・ロゼット</span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-line"></i> 歳差角の時間変化（緯度比較）</div>
+      <canvas id="trajCanvas" role="img" aria-label="歳差角の時間変化グラフ。緯度ごとの直線と現在地点を表示します。"></canvas>
+      <p class="canvas-hint">横軸＝経過時間 t (h)／縦軸＝歳差角 Δθ (°)／青＝現在の緯度／灰＝赤道 (0°)、35°、極 (90°)／黄点＝現在の (t, Δθ)</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -181,18 +257,6 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <div class="stat-card"><div class="sv" id="statOmega">—</div><div class="sl">歳差角速度</div></div>
         <div class="stat-card"><div class="sv" id="statAngle">—</div><div class="sl">経過時間での歳差角</div></div>
       </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-compass"></i> 上から見た振動面（床）</div>
-      <canvas id="pendulumCanvas"></canvas>
-      <p class="canvas-hint">中心＝振り子の真下／青実線＝現在の振動軸／灰破線＝t=0 の振動軸／橙弧＝歳差角 Δθ／N/E/S/W＝方位</p>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 歳差角の時間変化（緯度比較）</div>
-      <canvas id="trajCanvas"></canvas>
-      <p class="canvas-hint">横軸＝経過時間 t (h)／縦軸＝歳差角 Δθ (°)／青＝現在の緯度／灰＝赤道 (0°)、35°、極 (90°)／黄点＝現在の (t, Δθ)</p>
     </div>
 
     <div class="chart-card">
@@ -205,34 +269,61 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
       <p style="margin-top:6px;">一回転に要する時間と経過時間 $t$ における歳差角：</p>
       $$T_{\mathrm{pre}} = \dfrac{2\pi}{\Omega_{\mathrm{pre}}},\qquad \Delta\theta = \Omega_{\mathrm{pre}}\,t$$
       <p style="margin-top:8px;">$L$ は振り子長さ [m]、$g$ は重力加速度 [m/s²]。歳差は緯度の正弦のみに依存し、$L$ や質量に依存しません。北半球で時計回り、南半球で反時計回り、赤道で 0 です。</p>
+      <p style="margin-top:6px;font-size:.8rem;color:var(--muted);">検証例：パリ $\varphi=48.85^\circ$ → $T_{\mathrm{pre}}\approx 31.8$ h、北極 $90^\circ$ → $24.0$ h、$30^\circ$ → $48.0$ h、赤道 $0^\circ$ → ∞（回転なし）。</p>
     </div>
   </div>
 </div>
 
 <script>
-// ========== Foucault Pendulum (Earth Rotation Precession) Simulator ==========
+"use strict";
+// ========== Foucault Pendulum (Earth Rotation Precession) Simulator — v2 ==========
+var I18N = {
+  dirCW: '時計回り', dirCCW: '反時計回り', dirNone: '回転なし',
+  rotLabel: function(s){ return s; },
+  infTpre: '∞ (赤道)', equatorTag: '∞ (赤道)',
+  deltaTheta: 'Δθ', azimuth: '方位',
+  hintPlay: '<i class="fas fa-play"></i> 再生', hintPause: '<i class="fas fa-pause"></i> 一時停止',
+  curLat: 'lat', refLats: '0° / 35° / 90°',
+  axT: 't (h)', axD: 'Δθ (deg)',
+  reducedNote: 'アニメーション簡略化（prefers-reduced-motion）：代表的なロゼット軌跡を静止表示しています。',
+  speedSuffix: '×'
+};
+
 var pendulumCanvas = document.getElementById('pendulumCanvas');
 var pendulumCtx = pendulumCanvas.getContext('2d');
 var trajCanvas = document.getElementById('trajCanvas');
 var trajCtx = trajCanvas.getContext('2d');
-var playing = false;
-var animId = null;
 
-// Sidereal day in seconds (Earth rotation period relative to stars)
-var SIDEREAL_DAY = 86164.1;
+var SIDEREAL_DAY = 86164.1;                 // s
 var OMEGA_EARTH = 2 * Math.PI / SIDEREAL_DAY; // rad/s
 
-function getParams() {
-  var lat = parseFloat(document.getElementById('slLat').value);   // degrees
-  var L = parseFloat(document.getElementById('slL').value);       // m
-  var g = parseFloat(document.getElementById('slG').value);       // m/s^2
-  var tH = parseFloat(document.getElementById('slTime').value);   // hours
-  return { lat: lat, L: L, g: g, tH: tH };
+var playing = false;
+var animId = null;
+var lastTs = 0;
+var simTsec = 0;        // simulated elapsed time in SECONDS
+var timeAccel = 1000;   // time-acceleration multiplier
+var theta0 = -Math.PI / 2; // initial swing-plane azimuth (north = up) in canvas angle
+var trace = [];         // rosette points {x,y,age}
+var MAX_TRACE = 1400;
+
+var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function el(id){ return document.getElementById(id); }
+
+function getParams(){
+  var lat = parseFloat(el('slLat').value);
+  var L = parseFloat(el('slL').value);
+  var g = parseFloat(el('slG').value);
+  return { lat: lat, L: L, g: g };
 }
 
-function precessOmegaRadPerSec(latDeg) {
+function precessOmegaRadPerSec(latDeg){
   return OMEGA_EARTH * Math.sin(Math.abs(latDeg) * Math.PI / 180);
 }
+// signed precession: northern hemisphere clockwise (negative math angle), southern counterclockwise
+function precessSign(latDeg){ return latDeg >= 0 ? -1 : 1; }
+
+function oscOmega(L, g){ return 2 * Math.PI / (2 * Math.PI * Math.sqrt(L / g)); }
 
 function __novaCanvasCssW(canvas){
   return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
@@ -241,11 +332,11 @@ function __novaCanvasCssH(canvas){
   return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
 }
 
-function resizeCanvases() {
-  [pendulumCanvas, trajCanvas].forEach(function (cv) {
+function resizeCanvases(){
+  [pendulumCanvas, trajCanvas].forEach(function(cv){
     var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
     var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
+    var __novaH = (cv === pendulumCanvas) ? Math.round(Math.min(w, 460)) : Math.round(w * 0.5);
     var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
     cv.style.width = __novaW + 'px';
     cv.style.height = __novaH + 'px';
@@ -258,256 +349,315 @@ function resizeCanvases() {
   });
 }
 
-function drawPendulum(p) {
+// current swing-plane azimuth (canvas angle) after precession
+function planeAngle(p, tSec){
+  var omega = precessOmegaRadPerSec(p.lat);
+  var sign = precessSign(p.lat);
+  return theta0 + sign * omega * tSec;
+}
+
+function drawPendulum(p){
   var ctx = pendulumCtx, W = __novaCanvasCssW(pendulumCanvas), H = __novaCanvasCssH(pendulumCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
   var cx = W / 2, cy = H / 2;
-  var R = Math.min(W, H) / 2 - 28;
+  var R = Math.min(W, H) / 2 - 30;
 
-  // outer ring (floor circle)
+  // floor rings
   ctx.strokeStyle = 'rgba(143,184,224,0.45)';
   ctx.lineWidth = 1.4;
   ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-
-  // inner reference grid rings
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
+  ctx.strokeStyle = 'rgba(143,184,224,0.16)';
   ctx.lineWidth = 1;
-  for (var k = 1; k <= 3; k++) {
-    ctx.beginPath(); ctx.arc(cx, cy, R * k / 4, 0, Math.PI * 2); ctx.stroke();
-  }
+  for (var k = 1; k <= 3; k++){ ctx.beginPath(); ctx.arc(cx, cy, R * k / 4, 0, Math.PI * 2); ctx.stroke(); }
 
-  // compass labels (N at top, E right, S bottom, W left)
+  // compass
   ctx.fillStyle = '#cfe3f7';
   ctx.font = 'bold 12px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('N', cx, cy - R - 10);
-  ctx.fillText('S', cx, cy + R + 16);
-  ctx.textAlign = 'left';
-  ctx.fillText('E', cx + R + 6, cy + 4);
-  ctx.textAlign = 'right';
-  ctx.fillText('W', cx - R - 6, cy + 4);
+  ctx.fillText('N', cx, cy - R - 12);
+  ctx.fillText('S', cx, cy + R + 18);
+  ctx.textAlign = 'left'; ctx.fillText('E', cx + R + 6, cy + 4);
+  ctx.textAlign = 'right'; ctx.fillText('W', cx - R - 6, cy + 4);
 
-  // initial swing axis (t=0): along N-S (vertical)
+  // t=0 reference axis (dashed)
+  var u0x = Math.cos(theta0), u0y = Math.sin(theta0);
   ctx.strokeStyle = 'rgba(207,227,247,0.4)';
-  ctx.setLineDash([6, 5]);
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+  ctx.setLineDash([6, 5]); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(cx - R * u0x, cy - R * u0y); ctx.lineTo(cx + R * u0x, cy + R * u0y); ctx.stroke();
   ctx.setLineDash([]);
 
-  // current swing axis after precession by angle dtheta
-  var omega = precessOmegaRadPerSec(p.lat);                 // rad/s, magnitude
-  var tSec = p.tH * 3600;
-  // sign convention: northern hemisphere clockwise when viewed from above
-  // (positive lat -> clockwise -> negative angle in mathematical convention if x=E,y=N)
-  var sign = p.lat >= 0 ? -1 : 1; // mathematical angle sense
-  var dtheta = sign * omega * tSec; // signed
-  // initial axis points "north" = up. rotate by dtheta.
-  var ux = Math.sin(dtheta), uy = -Math.cos(dtheta); // unit vector for end "north" side
+  var ang = planeAngle(p, simTsec);
+  var ux = Math.cos(ang), uy = Math.sin(ang);
+
+  // rosette trace (fading)
+  ctx.lineWidth = 1.6;
+  for (var i = 1; i < trace.length; i++){
+    var a = trace[i-1], b = trace[i];
+    var alpha = Math.max(0, 1 - b.age / MAX_TRACE);
+    ctx.strokeStyle = 'rgba(0,180,216,' + (0.05 + 0.5 * alpha).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.moveTo(cx + a.x * R, cy + a.y * R);
+    ctx.lineTo(cx + b.x * R, cy + b.y * R);
+    ctx.stroke();
+  }
+
+  // current swing-plane line
   ctx.strokeStyle = '#00B4D8';
   ctx.lineWidth = 2.6;
   ctx.beginPath();
-  ctx.moveTo(cx + R * ux, cy + R * uy);
   ctx.moveTo(cx - R * ux, cy - R * uy);
   ctx.lineTo(cx + R * ux, cy + R * uy);
   ctx.stroke();
 
-  // pendulum bob position at the "north" end of current axis
+  // bob position along plane: amplitude cos(omega_osc t)
+  var wosc = oscOmega(p.L, p.g);
+  var amp = 0.92 * Math.cos(wosc * simTsec);
+  var bx = cx + amp * R * ux, by = cy + amp * R * uy;
   ctx.fillStyle = '#FFD166';
   ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 12;
-  ctx.beginPath(); ctx.arc(cx + R * ux, cy + R * uy, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(bx, by, 6, 0, Math.PI * 2); ctx.fill();
   ctx.shadowBlur = 0;
 
-  // arc showing precession angle Δθ from N (starting axis) to current axis
-  // In canvas coordinates angle 0 is along +x, increasing clockwise.
-  // initial axis "north" end is at angle -PI/2 (straight up).
-  var arcR = R * 0.32;
-  var startAng = -Math.PI / 2;
-  var endAng = startAng + dtheta; // in canvas frame: positive dtheta rotates clockwise when y is down
-  // For visual: with our ux/uy above, the new "north" angle in canvas = startAng + dtheta
+  // precession arc Δθ
+  var dtheta = ang - theta0;
+  var arcR = R * 0.3;
   ctx.strokeStyle = '#FF9F43';
   ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  if (Math.abs(dtheta) > 1e-4) {
-    ctx.arc(cx, cy, arcR, startAng, endAng, dtheta < 0);
+  if (Math.abs(dtheta) > 1e-4){
+    ctx.beginPath();
+    ctx.arc(cx, cy, arcR, theta0, ang, dtheta < 0);
     ctx.stroke();
   }
 
-  // center marker
+  // center
   ctx.fillStyle = '#cfe3f7';
   ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
 
-  // textual annotation of Δθ
+  // annotation
   var dthDeg = Math.abs(dtheta) * 180 / Math.PI;
-  var rotLabel = (p.lat === 0) ? '回転なし' : (p.lat > 0 ? '時計回り' : '反時計回り');
+  var rotLabel = (p.lat === 0) ? I18N.dirNone : (p.lat > 0 ? I18N.dirCW : I18N.dirCCW);
   ctx.fillStyle = '#FF9F43';
   ctx.font = '11px "Roboto Mono",monospace';
   ctx.textAlign = 'left';
-  ctx.fillText('Δθ = ' + dthDeg.toFixed(2) + '° (' + rotLabel + ')', 12, 18);
+  ctx.fillText('Δθ = ' + dthDeg.toFixed(1) + '° (' + rotLabel + ')', 12, 18);
+
+  return { bx: (amp * ux), by: (amp * uy) };
 }
 
-function drawTraj(p) {
+function pushTrace(rel){
+  for (var i = 0; i < trace.length; i++) trace[i].age++;
+  trace.push({ x: rel.bx, y: rel.by, age: 0 });
+  if (trace.length > MAX_TRACE) trace.shift();
+}
+
+function drawTraj(p){
   var ctx = trajCtx, W = __novaCanvasCssW(trajCanvas), H = __novaCanvasCssH(trajCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
   var mx = 56, my = 28;
   var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
   var gw = x1 - x0, gh = y0 - y1;
-  var XL = 0, XH = 36;            // hours
-  // Y range: max precession at 36 h at pole = 36h * 360deg/(23.93h) = ~541 deg
-  var YL = 0, YH = 540;
-  function px(t) { return x0 + (t - XL) / (XH - XL) * gw; }
-  function py(d) { return y0 - (d - YL) / (YH - YL) * gh; }
+  var XL = 0, XH = 36, YL = 0, YH = 540;
+  function px(t){ return x0 + (t - XL) / (XH - XL) * gw; }
+  function py(d){ return y0 - (d - YL) / (YH - YL) * gh; }
 
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(143,184,224,0.5)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
 
-  // grid + tick labels
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  for (var t = 0; t <= 36; t += 6) {
+  ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  for (var t = 0; t <= 36; t += 6){
     var xx = px(t);
-    ctx.beginPath();
     ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-    ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText(t.toString(), xx, y0 + 14);
+    ctx.beginPath(); ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
+    ctx.fillStyle = '#8fb8e0'; ctx.fillText(t.toString(), xx, y0 + 14);
   }
   ctx.textAlign = 'right';
-  for (var d = 0; d <= 540; d += 90) {
+  for (var d = 0; d <= 540; d += 90){
     var yy = py(d);
-    ctx.beginPath();
     ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-    ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText(d.toString(), x0 - 4, yy + 3);
+    ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
+    ctx.fillStyle = '#8fb8e0'; ctx.fillText(d.toString(), x0 - 4, yy + 3);
   }
 
-  // reference lines: equator (0), 35 deg, pole (90)
-  function drawLineForLat(latDeg, color, lw) {
+  function drawLineForLat(latDeg, color, lw){
     var omega = precessOmegaRadPerSec(latDeg);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lw;
+    ctx.strokeStyle = color; ctx.lineWidth = lw;
     ctx.beginPath();
     var first = true;
-    for (var i = 0; i <= 200; i++) {
+    for (var i = 0; i <= 200; i++){
       var th = XL + (XH - XL) * i / 200;
-      var ang = omega * (th * 3600) * 180 / Math.PI;
-      if (ang > YH) ang = YH;
-      var xv = px(th), yv = py(ang);
-      if (first) { ctx.moveTo(xv, yv); first = false; } else { ctx.lineTo(xv, yv); }
+      var aa = omega * (th * 3600) * 180 / Math.PI;
+      if (aa > YH) aa = YH;
+      var xv = px(th), yv = py(aa);
+      if (first){ ctx.moveTo(xv, yv); first = false; } else { ctx.lineTo(xv, yv); }
     }
     ctx.stroke();
   }
-  drawLineForLat(0, 'rgba(143,184,224,0.5)', 1.4);   // equator
-  drawLineForLat(35, 'rgba(143,184,224,0.5)', 1.4);  // 35 deg
-  drawLineForLat(90, 'rgba(143,184,224,0.5)', 1.4);  // pole
-
-  // current latitude curve
+  drawLineForLat(0, 'rgba(143,184,224,0.5)', 1.4);
+  drawLineForLat(35, 'rgba(143,184,224,0.5)', 1.4);
+  drawLineForLat(90, 'rgba(143,184,224,0.5)', 1.4);
   drawLineForLat(p.lat, '#00B4D8', 2.6);
 
-  // current marker (t, Δθ)
   var omegaNow = precessOmegaRadPerSec(p.lat);
-  var dthDeg = omegaNow * (p.tH * 3600) * 180 / Math.PI;
+  var tH = simTsec / 3600;
+  var dthDeg = omegaNow * simTsec * 180 / Math.PI;
   if (dthDeg > YH) dthDeg = YH;
-  var ox = px(p.tH), oy = py(dthDeg);
-  ctx.strokeStyle = 'rgba(255,209,102,0.6)';
-  ctx.lineWidth = 1;
+  var tClamp = Math.min(tH, XH);
+  var ox = px(tClamp), oy = py(dthDeg);
+  ctx.strokeStyle = 'rgba(255,209,102,0.6)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(ox, y0); ctx.lineTo(ox, oy); ctx.stroke();
   ctx.beginPath(); ctx.arc(ox, oy, 6, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFD166';
-  ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
-  ctx.fill();
-  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#FFD166'; ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
 
-  // axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('t (h)', (x0 + x1) / 2, H - 4);
-  ctx.save();
-  ctx.translate(12, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('Δθ (deg)', 0, 0);
-  ctx.restore();
+  ctx.fillStyle = '#cfe3f7'; ctx.font = '12px "Roboto Mono",monospace'; ctx.textAlign = 'center';
+  ctx.fillText(I18N.axT, (x0 + x1) / 2, H - 4);
+  ctx.save(); ctx.translate(12, (y0 + y1) / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText(I18N.axD, 0, 0); ctx.restore();
 
-  // legend (top right)
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#00B4D8';
-  ctx.fillText('lat = ' + p.lat.toFixed(0) + '°', x1 - 130, y1 + 12);
-  ctx.fillStyle = '#8fb8e0';
-  ctx.fillText('0° / 35° / 90°', x1 - 130, y1 + 26);
+  ctx.font = '10px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#00B4D8'; ctx.fillText(I18N.curLat + ' = ' + p.lat.toFixed(1) + '°', x1 - 140, y1 + 12);
+  ctx.fillStyle = '#8fb8e0'; ctx.fillText(I18N.refLats, x1 - 140, y1 + 26);
 }
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.lat) || !isFinite(p.L) || !isFinite(p.g) || !isFinite(p.tH)) return;
-  var Tosc = 2 * Math.PI * Math.sqrt(p.L / p.g);
+function updateReadouts(p){
   var omega = precessOmegaRadPerSec(p.lat);
-  var Tpre = (omega > 0) ? (2 * Math.PI / omega) : Infinity; // seconds
   var omegaDegPerHour = omega * 180 / Math.PI * 3600;
-  var dthDeg = omegaDegPerHour * p.tH; // deg
+  var Tosc = 2 * Math.PI * Math.sqrt(p.L / p.g);
+  var Tpre = (omega > 0) ? (2 * Math.PI / omega) : Infinity;
+  var ang = planeAngle(p, simTsec);
+  var azDeg = ((90 - ang * 180 / Math.PI) % 360 + 360) % 360; // compass azimuth from N, clockwise
+  var dthDeg = Math.abs(ang - theta0) * 180 / Math.PI;
 
-  document.getElementById('statTosc').textContent = Tosc.toFixed(3) + ' s';
-  if (isFinite(Tpre)) {
-    document.getElementById('statTpre').textContent = (Tpre / 3600).toFixed(2) + ' h';
-  } else {
-    document.getElementById('statTpre').textContent = '∞ (赤道)';
+  el('roElapsed').textContent = (simTsec / 3600).toFixed(2);
+  el('roAzim').textContent = azDeg.toFixed(1);
+  el('roDth').textContent = dthDeg.toFixed(1);
+  el('roOmega').textContent = omegaDegPerHour.toFixed(2);
+  el('roTpre').textContent = isFinite(Tpre) ? (Tpre / 3600).toFixed(1) : '∞';
+  el('roTosc').textContent = Tosc.toFixed(2);
+  el('roDir').textContent = (p.lat === 0) ? I18N.dirNone : (p.lat > 0 ? I18N.dirCW : I18N.dirCCW);
+  el('roSpeed').textContent = timeAccel + I18N.speedSuffix;
+
+  el('statTosc').textContent = Tosc.toFixed(3) + ' s';
+  el('statTpre').textContent = isFinite(Tpre) ? (Tpre / 3600).toFixed(2) + ' h' : I18N.infTpre;
+  el('statOmega').textContent = omegaDegPerHour.toFixed(2) + ' °/h';
+  el('statAngle').textContent = dthDeg.toFixed(2) + '°';
+}
+
+function compute(){
+  var p = getParams();
+  if (!isFinite(p.lat) || !isFinite(p.L) || !isFinite(p.g)) return;
+  var rel = drawPendulum(p);
+  drawTraj(p);
+  updateReadouts(p);
+  return rel;
+}
+
+function loop(ts){
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dtReal = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  simTsec += dtReal * timeAccel;
+  if (simTsec > 36 * 3600) simTsec = 36 * 3600; // cap at 36 h of sim
+  var p = getParams();
+  var rel = drawPendulum(p);
+  pushTrace(rel);
+  drawTraj(p);
+  updateReadouts(p);
+  if (simTsec >= 36 * 3600){ stopPlay(); return; }
+  animId = requestAnimationFrame(loop);
+}
+
+function startPlay(){
+  if (prefersReduced){ renderReducedFrame(); return; }
+  playing = true; lastTs = 0;
+  el('playBtn').innerHTML = I18N.hintPause;
+  el('playBtn2').innerHTML = I18N.hintPause;
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay(){
+  playing = false;
+  if (animId){ cancelAnimationFrame(animId); animId = null; }
+  el('playBtn').innerHTML = I18N.hintPlay;
+  el('playBtn2').innerHTML = I18N.hintPlay;
+}
+function togglePlay(){ playing ? stopPlay() : startPlay(); }
+
+function setSpeed(s){
+  timeAccel = s;
+  document.querySelectorAll('.speed-btn').forEach(function(b){
+    b.classList.toggle('active', parseFloat(b.dataset.speed) === s);
+  });
+  el('roSpeed').textContent = timeAccel + I18N.speedSuffix;
+}
+
+function clearTrace(){ trace = []; compute(); }
+
+function setPreset(name){
+  var P = {
+    paris:   { lat: 48.85, L: 67, g: 9.809 },
+    pole:    { lat: 90,    L: 20, g: 9.832 },
+    equator: { lat: 0,     L: 20, g: 9.780 },
+    south:   { lat: -33.87, L: 20, g: 9.797 }
+  }[name];
+  if (!P) return;
+  el('slLat').value = P.lat; el('slLatVal').value = P.lat;
+  el('slL').value = P.L; el('slLVal').value = P.L;
+  el('slG').value = P.g; el('slGVal').value = P.g;
+  updateSlider(el('slLat'), 'slLatVal', 2, '');
+  updateSlider(el('slL'), 'slLVal', 1, '');
+  updateSlider(el('slG'), 'slGVal', 3, '');
+  simTsec = 0; trace = [];
+  compute();
+}
+
+function resetParams(){
+  stopPlay();
+  simTsec = 0; trace = []; timeAccel = 1000;
+  el('slLat').value = 48.85; el('slLatVal').value = 48.85;
+  el('slL').value = 20; el('slLVal').value = 20;
+  el('slG').value = 9.810; el('slGVal').value = 9.810;
+  updateSlider(el('slLat'), 'slLatVal', 2, '');
+  updateSlider(el('slL'), 'slLVal', 1, '');
+  updateSlider(el('slG'), 'slGVal', 3, '');
+  setSpeed(1000);
+  compute();
+}
+
+// Static representative rosette frame for reduced-motion users
+function renderReducedFrame(){
+  var p = getParams();
+  trace = [];
+  var omega = precessOmegaRadPerSec(p.lat) || (OMEGA_EARTH * 0.5);
+  var sign = precessSign(p.lat);
+  var wosc = oscOmega(p.L, p.g);
+  // synthesize ~1.5 h of rosette so the star pattern is visible
+  var Tspan = 5400, N = 1200;
+  for (var i = 0; i <= N; i++){
+    var ts = Tspan * i / N;
+    var ang = theta0 + sign * omega * ts;
+    var amp = 0.92 * Math.cos(wosc * ts);
+    trace.push({ x: amp * Math.cos(ang), y: amp * Math.sin(ang), age: (N - i) });
   }
-  document.getElementById('statOmega').textContent = omegaDegPerHour.toFixed(2) + ' °/h';
-  document.getElementById('statAngle').textContent = dthDeg.toFixed(2) + '°';
-
+  simTsec = Tspan;
   drawPendulum(p);
   drawTraj(p);
+  updateReadouts(p);
 }
 
-function animationStep() {
-  if (!playing) return;
-  var sl = document.getElementById('slTime');
-  var v = parseFloat(sl.value) + 0.2;
-  if (v > 36) v = 0;
-  sl.value = v.toFixed(1);
-  updateSlider(sl, 'slTimeVal', 1, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
-}
-
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> 時間をスイープ';
-    if (animId) cancelAnimationFrame(animId);
-  }
-}
-
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> 時間をスイープ';
-  var defs = { slLat: 35, slL: 20, slG: 9.810, slTime: 6.0 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
+if (pendulumCanvas){
+  pendulumCanvas.addEventListener('keydown', function(e){
+    if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); togglePlay(); }
   });
-  updateSlider(document.getElementById('slLat'), 'slLatVal', 0, '');
-  updateSlider(document.getElementById('slL'), 'slLVal', 1, '');
-  updateSlider(document.getElementById('slG'), 'slGVal', 3, '');
-  updateSlider(document.getElementById('slTime'), 'slTimeVal', 1, '');
-  compute();
 }
 
-window.addEventListener('resize', function () { resizeCanvases(); compute(); });
+window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
 
 resizeCanvases();
-compute();
+setSpeed(1000);
+if (prefersReduced){ renderReducedFrame(); } else { compute(); }
 </script>
 
 <section class="explanation">
@@ -581,6 +731,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="foucault-pendulum.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -633,16 +786,26 @@ compute();
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>スライダー「緯度」で観測地点を設定します。北緯35度（東京付近）から北緯60度（札幌付近）の範囲で、地球自転の影響度が変わります</li><li>「振り子長さ」スライダーで2～5mの範囲を選択し、振り子周期T_osc = 2π√(L/g)を決定します</li><li>「重力加速度」は通常9.8m/s²に固定されていますが、高度による微細な変化（3000m高地では9.77m/s²）を入力可能です</li><li>「経過時間」スライダーで観測期間を0～24時間設定し、リアルタイムで歳差角θ = Ω·sin(φ)·tを計算・表示します</li></ol>
+<ol><li>スライダー「緯度」で観測地点を設定します。−89°〜+89°の範囲で、地球自転の影響度（歳差速度）が緯度の正弦に比例して変わります</li><li>「振り子長さ」スライダーで0.5〜70mの範囲を選択し、振り子周期T_osc = 2π√(L/g)を決定します（歳差速度自体は変わりません）</li><li>「重力加速度」スライダー（9.70〜9.85m/s²）で観測地の局所的なgを設定できます（高度3000m地点では約9.77m/s²）</li><li>「経過時間」スライダーで観測期間を0〜36時間設定し、リアルタイムで歳差角θ = Ω·sin(φ)·tを計算・表示します</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>北緯35度の京都でL=2.0mの振り子を設置した場合：振り子周期T_osc≈2.84秒、地球自転角速度Ω=7.27×10⁻⁵rad/s、歳差角速度ω_prec=5.95×10⁻⁵rad/s。24時間経過時の歳差角はθ≈5.14ラジアン≈294度となり、ほぼ1回転弱の振動面回転が観測されます。振り子長を5.0mに延長するとT_osc≈4.49秒となり、歳差速度は同じですが観測がより精密になります</p>
+<p>北緯35度の京都でL=2.0mの振り子を設置した場合：振り子周期T_osc≈2.84秒、地球自転角速度Ω=7.29×10⁻⁵rad/s、歳差角速度ω_prec=Ω·sin35°≈4.18×10⁻⁵rad/s。24時間経過時の歳差角はθ≈3.61ラジアン≈207度となり、半回転強の振動面回転が観測されます。振り子長を5.0mに延長するとT_osc≈4.49秒となり、歳差速度は同じですが観測がより精密になります</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol><li>赤道（緯度0度）ではsin(0)=0となり歳差が発生しません。南半球での測定は緯度負値を入力し、回転方向が反転することを確認してください</li><li>振り子の初期振動面をN-S方向に揃える必要があります。E-W方向スタートでは歳差の可視性が低下します</li><li>3m以上の長い振り子を使う場合、建物の揺れ（0.1Hz程度）による外乱除去が必須です。防震装置なしでは理論値との乖離が5～10%に達します</li><li>気温変化でワイヤ長が変わり（鋼線の線膨張係数α=12×10⁻⁶/℃）、数時間の観測では温度管理を±1℃以内に保ってください</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4627665423?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4627665423.09._SCMZZZZZZ_.jpg" alt="振動工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">振動工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

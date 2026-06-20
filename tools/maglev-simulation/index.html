@@ -40,7 +40,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "磁気浮上シミュレーター（PID制御）",
       "description": "磁気浮上のリアルタイムシミュレーション。受動浮上の不安定性とPID制御による能動安定化を体験。アーンショーの定理からリニアモーターカーの原理まで。",
       "url": "https://novasolver.jp/tools/maglev-simulation.html",
@@ -50,7 +50,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["PID制御によるリアルタイム磁気浮上シミュレーション","受動・能動浮上モード切替","ギャップ・電流・誤差信号のリアルタイム表示","アーンショーの定理の可視化"],
       "keywords": "磁気浮上,PID制御,アーンショーの定理,リニアモーターカー,電磁石,制御工学,CAEシミュレーター",
       "datePublished": "2026-04-08",
@@ -207,7 +207,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -286,7 +294,7 @@ function setMode(m){
 }function resetSim(){
   const p = getP();
   simGap = p.d0 * 1.5; // start from above setpoint
-  simVel = 0; simIntErr = 0; simPrevErr = 0;
+  simVel = 0; simIntErr = 0; simPrevErr = (simGap - p.d0) * 1000;
   tHistory = []; gapHistory = []; currentHistory = [];
   lastTs = 0;
 }function initCharts(){
@@ -317,18 +325,20 @@ function setMode(m){
   let i_coil = 0;
 
   if (mode === 'active') {
-    const err = simGap - p.d0; // positive = gap too large (need more pull up)
+    const err = (simGap - p.d0) * 1000; // mm, positive = gap too large
     simIntErr += err * dt;
     const dErr = (err - simPrevErr) / dt;
     simPrevErr = err;
-    i_coil = Math.max(0, p.Kp * err + p.Ki * simIntErr + p.Kd * dErr);
+    const i_eq = Math.sqrt(p.m * g * Math.pow(p.d0 * 1000, 2) / p.K);
+    i_coil = Math.max(0, i_eq + 0.001 * (p.Kp * err + p.Ki * simIntErr + p.Kd * dErr));
     i_coil = Math.min(i_coil, 50); // current limit
   }else{
     // Passive: constant current for equilibrium (unstable)
-    const i_eq = Math.sqrt(p.m * g * p.d0 * p.d0 / p.K);
+    const i_eq = Math.sqrt(p.m * g * Math.pow(p.d0 * 1000, 2) / p.K);
     i_coil = i_eq;
   }// Magnetic force: F = K * i^2 / d^2 (upward on object below electromagnet)
-  const Fmag = simGap > 0.001 ? p.K * i_coil * i_coil / (simGap * simGap) : 1000;
+  const gapMm = simGap * 1000;
+  const Fmag = gapMm > 1 ? p.K * i_coil * i_coil / (gapMm * gapMm) : 1000;
   const Fgrav = p.m * g;
   const a = (Fmag - Fgrav + p.Fext) / p.m;
 
@@ -537,6 +547,9 @@ window.addEventListener('resize', () =>{ const c=document.getElementById('animCa
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="maglev-simulation.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -607,6 +620,16 @@ window.addEventListener('resize', () =>{ const c=document.getElementById('animCa
 <li>シミュレーションの誤差±2mm以上での継続動作は、実際の磁気浮上システムでは転覆リスクとなるため、即座に制御系のリセットが必要です</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

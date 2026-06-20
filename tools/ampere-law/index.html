@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "アンペールの法則 シミュレーター",
       "description": "アンペールの法則を用いて、無限長直線電流が作る磁場、ソレノイド内部の一様磁場、平行電流間の力を実時間で計算・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/ampere-law.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["無限長直線電流の周囲磁束密度をアンペール則から計算","ソレノイド内部の一様磁場 B = μ₀nI を実時間で算出","平行電流間の単位長あたりの力 F/L を計算","円形磁力線とソレノイド断面の同時描画","B(r) ∝ 1/r の対数プロット表示"],
       "keywords": "アンペールの法則,直線電流,ソレノイド,磁束密度,真空透磁率,平行電流,磁場,周回積分,右ねじ則",
       "datePublished": "2026-05-15",
@@ -103,6 +103,27 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 #wireCanvas,#chartCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
 .aux-readout{ font-size:0.7rem; color:var(--muted); margin-top:2px; font-family:'Roboto Mono',monospace; }
+/* ===== v2 live readouts / controls ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.62rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.03em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(3,1fr)}}
+.scrub-row{display:flex;align-items:center;gap:10px;margin-top:12px}
+.scrub-row input[type=range]{flex:1}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.mode-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.mode-btn{flex:1;min-width:120px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:0.82rem;font-family:inherit;cursor:pointer;transition:all .2s}
+.mode-btn.active{background:rgba(0,123,255,.1);border-color:var(--accent);color:var(--accent);font-weight:600}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset-btn{padding:4px 10px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i.swatch{width:18px;height:3px;border-radius:2px;display:inline-block}
+canvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){ input[type=range]::-webkit-slider-thumb{transition:none} }
 </style>
 </head>
 <body>
@@ -131,6 +152,22 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 <div class="main">
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
+
+    <div class="mode-row" role="group" aria-label="表示モード切り替え">
+      <button type="button" class="mode-btn active" id="modeWire" onclick="setMode('wire')"><i class="fas fa-bolt"></i> 直線電流</button>
+      <button type="button" class="mode-btn" id="modeSol" onclick="setMode('sol')"><i class="fas fa-circle-dot"></i> ソレノイド</button>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setPreset('strong')">強電流</button>
+        <button type="button" class="preset-btn" onclick="setPreset('far')">遠方場</button>
+        <button type="button" class="preset-btn" onclick="setPreset('tight')">密巻ソレノイド</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
 
     <div class="param-group">
       <div class="param-label">
@@ -166,14 +203,51 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
-    <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> I をスイープ</button>
+    <div class="play-row">
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+      <div style="display:flex;gap:4px;margin-left:auto">
+        <button class="preset-btn speed-btn" type="button" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+        <button class="preset-btn speed-btn active" type="button" data-speed="1" onclick="setSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+        <button class="preset-btn speed-btn" type="button" data-speed="2" onclick="setSpeed(2)">2×</button>
+      </div>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">真空透磁率 μ₀ = 4π × 10⁻⁷ T·m/A を使用。直線電流の磁場は右ねじ則による円形磁力線、ソレノイドは内部で軸方向に一様。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roMode">直線電流</div><div class="rl">モード</div></div>
+        <div class="live-ro"><div class="rv" id="roI">10.0</div><div class="rl">電流 I [A]</div></div>
+        <div class="live-ro"><div class="rv" id="roR">5.0</div><div class="rl">距離 r [cm]</div></div>
+        <div class="live-ro accent"><div class="rv" id="roB">—</div><div class="rl" id="roBLabel">B(r) = μ₀I/2πr</div></div>
+        <div class="live-ro"><div class="rv" id="roMu">4π·10⁻⁷</div><div class="rl" id="roMuLabel">μ₀ [T·m/A]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-bolt"></i> 磁場アニメーション（右ねじ則・1/r 減衰）</div>
+      <canvas id="wireCanvas" tabindex="0" role="img" aria-label="アンペールの法則の磁場アニメーション。直線電流モードでは同心円形の磁力線と右ねじ則の方向、ソレノイドモードでは内部の一様磁場を描画します。"></canvas>
+      <p class="canvas-hint" id="wireHint">直線電流（赤●＝紙面外向き）の周囲を周回する同心円形磁力線／黄破線＝距離 r の観測円／橙矢印＝磁場方向（右ねじ則）。色の濃さは 1/r で減衰。</p>
+      <div class="legend">
+        <span><i class="swatch" style="background:#00B4D8"></i>磁力線</span>
+        <span><i class="swatch" style="background:#FFD166"></i>観測円 r</span>
+        <span><i class="swatch" style="background:#FF9F43"></i>B 方向</span>
+        <span><i class="swatch" style="background:#FF6B6B"></i>電流</span>
+      </div>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -182,12 +256,6 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <div class="stat-card"><div class="sv" id="statForce">—</div><div class="sl">平行電流間の力 F/L</div></div>
         <div class="stat-card"><div class="sv" id="statRatio">—</div><div class="sl">B_sol / B_wire</div></div>
       </div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-bolt"></i> 直線電流の磁力線とソレノイド断面</div>
-      <canvas id="wireCanvas"></canvas>
-      <p class="canvas-hint">左：直線電流（赤●＝紙面外向き）周囲の同心円形磁力線／黄破線＝距離 r の観測円／橙矢印＝磁場方向。右：ソレノイド断面（青楕円＝巻線、内部の橙矢印＝一様磁場 B = μ₀nI、外部はほぼゼロ）。</p>
     </div>
 
     <div class="chart-card">
@@ -212,7 +280,9 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Ampere Law (Straight Wire + Solenoid + Parallel Wires) Simulator ==========
+"use strict";
+// ========== Ampere Law v2 (Straight Wire + Solenoid + Parallel Wires) Simulator ==========
+(function(){
 var wireCanvas = document.getElementById('wireCanvas');
 var wireCtx = wireCanvas.getContext('2d');
 var chartCanvas = document.getElementById('chartCanvas');
@@ -220,6 +290,11 @@ var chartCtx = chartCanvas.getContext('2d');
 var playing = false;
 var animId = null;
 var MU0 = 4 * Math.PI * 1e-7; // T·m/A
+var MODE = 'wire';            // 'wire' | 'sol'
+var phase = 0;               // animation phase for circulating arrows
+var speedMult = 1;
+var lastTs = 0;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function fmtField(B) {
   if (!isFinite(B)) return '—';
@@ -288,140 +363,186 @@ function resizeCanvases() {
   });
 }
 
-function drawWireAndSolenoid(p, Bw, Bs) {
+function arrowHead(ctx, x, y, dx, dy, size) {
+  var ang = Math.atan2(dy, dx);
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x - size * Math.cos(ang - 0.45), y - size * Math.sin(ang - 0.45));
+  ctx.lineTo(x - size * Math.cos(ang + 0.45), y - size * Math.sin(ang + 0.45));
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Map a field strength (relative 0..1) to a cyan alpha for the 1/r falloff visual
+function fieldAlpha(rel) {
+  return Math.max(0.12, Math.min(0.9, rel));
+}
+
+function drawWire(p, Bw) {
   var ctx = wireCtx, W = __novaCanvasCssW(wireCanvas), H = __novaCanvasCssH(wireCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
 
-  // Layout: left half = straight wire, right half = solenoid
-  var midX = Math.floor(W / 2);
-
-  // Divider
-  ctx.strokeStyle = 'rgba(143,184,224,0.25)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(midX, 8); ctx.lineTo(midX, H - 8);
-  ctx.stroke();
-
-  // ---- Left: straight wire with circular field lines ----
-  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.font = '12px "Roboto Mono",monospace';
   ctx.fillStyle = '#cfe3f7';
   ctx.textAlign = 'left';
-  ctx.fillText('直線電流 I = ' + p.I.toFixed(1) + ' A', 14, 18);
+  ctx.fillText('直線電流 I = ' + p.I.toFixed(1) + ' A（紙面外向き）', 14, 20);
 
-  var cxL = midX / 2, cyL = H / 2;
-  // Pick scale: the slider r in cm should map within left half. Max r shown = 1.6 * r_cm or so
-  var maxR_cm = Math.max(p.r_cm * 1.8, 8);
-  var scaleL = Math.min((midX - 30) / 2, (H - 60) / 2) / maxR_cm;
+  var cx = W / 2, cy = H / 2;
+  var maxR_cm = Math.max(p.r_cm * 1.9, 10);
+  var scale = Math.min((W - 80) / 2, (H - 70) / 2) / maxR_cm; // px per cm
 
-  // Concentric field lines (a few representative radii)
-  var lineRs = [maxR_cm * 0.25, maxR_cm * 0.5, maxR_cm * 0.75];
-  ctx.strokeStyle = 'rgba(0,180,216,0.55)';
-  ctx.lineWidth = 1.4;
-  for (var i = 0; i < lineRs.length; i++) {
+  // Concentric field lines: strength (color/density) falls as 1/r
+  var nLines = 7;
+  for (var i = 1; i <= nLines; i++) {
+    var rc = maxR_cm * i / nLines;             // cm
+    var rad = rc * scale;                       // px
+    var rel = (maxR_cm / nLines) / rc;          // ∝ 1/r, =1 at innermost
+    ctx.strokeStyle = 'rgba(0,180,216,' + fieldAlpha(rel).toFixed(3) + ')';
+    ctx.lineWidth = 1.2 + 1.4 * rel;
     ctx.beginPath();
-    ctx.arc(cxL, cyL, lineRs[i] * scaleL, 0, Math.PI * 2);
+    ctx.arc(cx, cy, rad, 0, Math.PI * 2);
     ctx.stroke();
-    // Add small arrowhead on each circle (counter-clockwise as seen, current out of page)
-    var ang = -Math.PI / 4 - i * 0.3;
-    var ax = cxL + lineRs[i] * scaleL * Math.cos(ang);
-    var ay = cyL + lineRs[i] * scaleL * Math.sin(ang);
-    var tx = -Math.sin(ang), ty = Math.cos(ang);
-    ctx.fillStyle = 'rgba(0,180,216,0.85)';
-    ctx.beginPath();
-    ctx.moveTo(ax + tx * 6, ay + ty * 6);
-    ctx.lineTo(ax + tx * -3 + (-ty) * 4, ay + ty * -3 + (tx) * 4);
-    ctx.lineTo(ax + tx * -3 - (-ty) * 4, ay + ty * -3 - (tx) * 4);
-    ctx.closePath();
-    ctx.fill();
+    // circulating arrows (right-hand rule: current out of page => counter-clockwise)
+    var nArr = Math.max(3, Math.round(rad / 34));
+    for (var a = 0; a < nArr; a++) {
+      var ang = phase + a * (Math.PI * 2 / nArr) + i * 0.2;
+      var ax = cx + rad * Math.cos(ang);
+      var ay = cy + rad * Math.sin(ang);
+      // tangent direction for counter-clockwise motion: (sin, -cos)
+      var tx = Math.sin(ang), ty = -Math.cos(ang);
+      ctx.fillStyle = 'rgba(0,180,216,' + Math.min(0.95, fieldAlpha(rel) + 0.15).toFixed(3) + ')';
+      arrowHead(ctx, ax + tx * 5, ay + ty * 5, tx, ty, 7);
+    }
   }
 
-  // Observation circle at r
-  if (p.r_cm * scaleL > 2) {
+  // Observation circle at r (test point reading B)
+  var obsRad = p.r_cm * scale;
+  if (obsRad > 3 && obsRad < Math.min(W, H) / 2) {
     ctx.strokeStyle = '#FFD166';
-    ctx.lineWidth = 1.6;
-    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([6, 4]);
     ctx.beginPath();
-    ctx.arc(cxL, cyL, p.r_cm * scaleL, 0, Math.PI * 2);
+    ctx.arc(cx, cy, obsRad, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
-    // B vector arrow at top of the circle (tangent, pointing left → counter-clockwise)
-    var obsX = cxL, obsY = cyL - p.r_cm * scaleL;
+    // moving test point on the observation circle
+    var tAng = phase * 0.8;
+    var tpx = cx + obsRad * Math.cos(tAng);
+    var tpy = cy + obsRad * Math.sin(tAng);
+    var ttx = Math.sin(tAng), tty = -Math.cos(tAng);
+    // B vector (tangent) at test point
     ctx.strokeStyle = '#FF9F43';
     ctx.fillStyle = '#FF9F43';
-    ctx.lineWidth = 2.2;
-    var arrLen = 28;
+    ctx.lineWidth = 2.4;
+    var L = 30;
     ctx.beginPath();
-    ctx.moveTo(obsX, obsY); ctx.lineTo(obsX - arrLen, obsY);
+    ctx.moveTo(tpx, tpy);
+    ctx.lineTo(tpx + ttx * L, tpy + tty * L);
     ctx.stroke();
+    arrowHead(ctx, tpx + ttx * L, tpy + tty * L, ttx, tty, 9);
+    // test point marker
     ctx.beginPath();
-    ctx.moveTo(obsX - arrLen, obsY);
-    ctx.lineTo(obsX - arrLen + 7, obsY - 5);
-    ctx.lineTo(obsX - arrLen + 7, obsY + 5);
-    ctx.closePath();
+    ctx.arc(tpx, tpy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFD166';
+    ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 10;
     ctx.fill();
-    ctx.font = '10px "Roboto Mono",monospace';
+    ctx.shadowBlur = 0;
+    // readout near test point
+    ctx.font = '11px "Roboto Mono",monospace';
     ctx.fillStyle = '#FFD166';
     ctx.textAlign = 'center';
-    ctx.fillText('r = ' + p.r_cm.toFixed(1) + ' cm', cxL, cyL + p.r_cm * scaleL + 14);
+    ctx.fillText('r = ' + p.r_cm.toFixed(1) + ' cm', cx, cy + obsRad + 16);
     ctx.fillStyle = '#FF9F43';
-    ctx.textAlign = 'right';
-    ctx.fillText('B = ' + fmtField(Bw), obsX - arrLen - 4, obsY + 4);
+    ctx.fillText('B = ' + fmtField(Bw), tpx + ttx * (L + 4), tpy + tty * (L + 4) + (tty < 0 ? -4 : 12));
   }
 
   // Wire (current out of page = circle with dot)
   ctx.fillStyle = '#FF6B6B';
   ctx.beginPath();
-  ctx.arc(cxL, cyL, 7, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 8, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#fff';
   ctx.beginPath();
-  ctx.arc(cxL, cyL, 2.5, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 2.8, 0, Math.PI * 2);
   ctx.fill();
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.fillStyle = '#FF6B6B';
-  ctx.textAlign = 'center';
-  ctx.fillText('I (out of page)', cxL, cyL + 22);
 
-  // ---- Right: solenoid cross-section ----
-  ctx.font = '11px "Roboto Mono",monospace';
+  ctx.font = '10px "Roboto Mono",monospace';
+  ctx.fillStyle = '#8fb8e0';
+  ctx.textAlign = 'right';
+  ctx.fillText('B ∝ 1/r ・ 右ねじ則で反時計回り', W - 12, H - 12);
+}
+
+function drawSolenoid(p, Bs) {
+  var ctx = wireCtx, W = __novaCanvasCssW(wireCanvas), H = __novaCanvasCssH(wireCanvas);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.font = '12px "Roboto Mono",monospace';
   ctx.fillStyle = '#cfe3f7';
   ctx.textAlign = 'left';
-  ctx.fillText('ソレノイド  n = ' + p.n_per_cm.toFixed(0) + ' /cm', midX + 14, 18);
+  ctx.fillText('ソレノイド  n = ' + p.n_per_cm.toFixed(0) + ' /cm,  I = ' + p.I.toFixed(1) + ' A', 14, 20);
 
-  var solLeft = midX + 30, solRight = W - 30;
-  var solTop = H * 0.30, solBot = H * 0.70;
+  var solLeft = W * 0.16, solRight = W * 0.84;
+  var solTop = H * 0.32, solBot = H * 0.68;
   var solW = solRight - solLeft, solH = solBot - solTop;
 
-  // Background uniform field arrows inside solenoid
-  ctx.fillStyle = 'rgba(255,159,67,0.1)';
+  // Uniform interior field band
+  ctx.fillStyle = 'rgba(255,159,67,0.10)';
   ctx.fillRect(solLeft, solTop, solW, solH);
 
+  // Animated uniform interior field arrows (move along axis, left->right)
   ctx.strokeStyle = '#FF9F43';
   ctx.fillStyle = '#FF9F43';
-  ctx.lineWidth = 1.8;
-  var arrowsN = 5;
-  for (var k = 0; k < arrowsN; k++) {
-    var ay2 = solTop + (solH * (k + 0.5) / arrowsN);
-    var ax1 = solLeft + 16, ax2 = solRight - 24;
-    ctx.beginPath(); ctx.moveTo(ax1, ay2); ctx.lineTo(ax2, ay2); ctx.stroke();
+  ctx.lineWidth = 2;
+  var rows = 5;
+  var off = (phase * 22) % 40; // moving dashes effect via phase
+  for (var k = 0; k < rows; k++) {
+    var ay = solTop + (solH * (k + 0.5) / rows);
+    var ax1 = solLeft + 14, ax2 = solRight - 22;
+    ctx.beginPath(); ctx.moveTo(ax1, ay); ctx.lineTo(ax2, ay); ctx.stroke();
+    arrowHead(ctx, ax2, ay, 1, 0, 10);
+    // moving particle along the line
+    var pxm = ax1 + ((off + k * 8) % (ax2 - ax1));
     ctx.beginPath();
-    ctx.moveTo(ax2, ay2); ctx.lineTo(ax2 - 9, ay2 - 5); ctx.lineTo(ax2 - 9, ay2 + 5); ctx.closePath();
+    ctx.arc(pxm, ay, 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Coil cross-section: small ellipses on top and bottom edges (turns)
-  var nShow = Math.min(20, Math.max(6, Math.floor(solW / 18)));
-  ctx.strokeStyle = '#4ac6ff';
-  ctx.lineWidth = 1.8;
+  // Fringing field at the two ends (curving out)
+  ctx.strokeStyle = 'rgba(255,159,67,0.45)';
+  ctx.lineWidth = 1.4;
+  for (var s = -1; s <= 1; s += 2) {
+    var ex = (s < 0) ? solLeft : solRight;
+    for (var f = 0; f < 3; f++) {
+      var spread = 14 + f * 16;
+      ctx.beginPath();
+      ctx.moveTo(ex, solTop + solH * 0.5);
+      ctx.bezierCurveTo(
+        ex + s * 30, solTop - spread,
+        ex + s * 70, solTop - spread,
+        ex + s * 90, solTop + solH * 0.5
+      );
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ex, solTop + solH * 0.5);
+      ctx.bezierCurveTo(
+        ex + s * 30, solBot + spread,
+        ex + s * 70, solBot + spread,
+        ex + s * 90, solTop + solH * 0.5
+      );
+      ctx.stroke();
+    }
+  }
+
+  // Coil cross-section: top dots (out of page), bottom crosses (into page)
+  var nShow = Math.min(22, Math.max(6, Math.floor(solW / 18)));
   for (var t2 = 0; t2 < nShow; t2++) {
     var coilX = solLeft + (solW * (t2 + 0.5) / nShow);
-    // top wire: dot (current out of page)
     ctx.fillStyle = '#4ac6ff';
     ctx.beginPath(); ctx.arc(coilX, solTop, 4.5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#0a1929';
     ctx.beginPath(); ctx.arc(coilX, solTop, 1.6, 0, Math.PI * 2); ctx.fill();
-    // bottom wire: cross (current into page)
     ctx.fillStyle = '#4ac6ff';
     ctx.beginPath(); ctx.arc(coilX, solBot, 4.5, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#0a1929';
@@ -430,23 +551,27 @@ function drawWireAndSolenoid(p, Bw, Bs) {
     ctx.moveTo(coilX - 2.5, solBot - 2.5); ctx.lineTo(coilX + 2.5, solBot + 2.5);
     ctx.moveTo(coilX + 2.5, solBot - 2.5); ctx.lineTo(coilX - 2.5, solBot + 2.5);
     ctx.stroke();
-    ctx.strokeStyle = '#4ac6ff';
-    ctx.lineWidth = 1.8;
   }
 
-  // Solenoid outer rectangle (dashed)
+  // Outer rectangle (Amperian loop hint)
   ctx.strokeStyle = 'rgba(74,198,255,0.45)';
   ctx.setLineDash([5, 4]);
   ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.rect(solLeft, solTop, solW, solH);
-  ctx.stroke();
+  ctx.strokeRect(solLeft, solTop, solW, solH);
   ctx.setLineDash([]);
 
-  ctx.font = '10px "Roboto Mono",monospace';
+  ctx.font = '12px "Roboto Mono",monospace';
   ctx.fillStyle = '#FFD166';
   ctx.textAlign = 'center';
-  ctx.fillText('B = ' + fmtField(Bs), (solLeft + solRight) / 2, solBot + 18);
+  ctx.fillText('内部 B = μ₀nI = ' + fmtField(Bs) + '（一様）', (solLeft + solRight) / 2, solBot + 24);
+  ctx.font = '10px "Roboto Mono",monospace';
+  ctx.fillStyle = '#8fb8e0';
+  ctx.fillText('外部 ≈ 0 ・ 両端は漏れ磁場（フリンジング）', (solLeft + solRight) / 2, solBot + 40);
+}
+
+function drawHero(p, Bw, Bs) {
+  if (MODE === 'sol') drawSolenoid(p, Bs);
+  else drawWire(p, Bw);
 }
 
 function drawChart(p, Bw) {
@@ -582,37 +707,99 @@ function compute() {
   document.getElementById('statForce').textContent = fmtForce(Fp);
   document.getElementById('statRatio').textContent = (isFinite(ratio) ? String(Math.round(ratio)) : '—') + '×';
 
-  drawWireAndSolenoid(p, Bw, Bs);
+  // Live readouts
+  document.getElementById('roMode').textContent = (MODE === 'sol') ? 'ソレノイド' : '直線電流';
+  document.getElementById('roI').textContent = p.I.toFixed(1);
+  if (MODE === 'sol') {
+    document.getElementById('roR').textContent = p.n_per_cm.toFixed(0);
+    document.getElementById('roR').parentNode.querySelector('.rl').textContent = '巻数密度 n [/cm]';
+    document.getElementById('roB').textContent = fmtField(Bs);
+    document.getElementById('roBLabel').textContent = 'B = μ₀nI';
+    document.getElementById('roMu').textContent = p.I.toFixed(1);
+    document.getElementById('roMuLabel').textContent = '囲い込み電流 I_enc [A]';
+  } else {
+    document.getElementById('roR').textContent = p.r_cm.toFixed(1);
+    document.getElementById('roR').parentNode.querySelector('.rl').textContent = '距離 r [cm]';
+    document.getElementById('roB').textContent = fmtField(Bw);
+    document.getElementById('roBLabel').textContent = 'B(r) = μ₀I/2πr';
+    document.getElementById('roMu').textContent = '4π·10⁻⁷';
+    document.getElementById('roMuLabel').textContent = 'μ₀ [T·m/A]';
+  }
+
+  drawHero(p, Bw, Bs);
   drawChart(p, Bw);
 }
 
-function animationStep() {
-  if (!playing) return;
-  var sl = document.getElementById('slI');
-  var v = parseFloat(sl.value) + 0.5;
-  if (v > 100.0) v = 0.1;
-  sl.value = v;
-  updateSlider(sl, 'slIVal', 1, '');
+/* ===== Animation loop (rAF, 60fps) ===== */
+function loop(ts) {
+  if (!playing) { animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dt = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  phase += dt * speedMult * 1.4; // radians/sec base rate
+  if (phase > Math.PI * 200) phase -= Math.PI * 200;
   compute();
-  animId = requestAnimationFrame(animationStep);
+  animId = requestAnimationFrame(loop);
 }
 
 function togglePlay() {
-  playing = !playing;
   var btn = document.getElementById('playBtn');
   if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
+    playing = false;
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+    btn.innerHTML = '<i class="fas fa-play"></i> 再生';
   } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> I をスイープ';
-    if (animId) cancelAnimationFrame(animId);
+    if (reduceMotion) { compute(); return; } // static frame; do not auto-loop
+    playing = true; lastTs = 0;
+    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
+    animId = requestAnimationFrame(loop);
   }
+}
+
+function setSpeed(s) {
+  speedMult = s;
+  var btns = document.querySelectorAll('.speed-btn');
+  for (var i = 0; i < btns.length; i++) {
+    var on = parseFloat(btns[i].dataset.speed) === s;
+    btns[i].classList.toggle('active', on);
+    btns[i].style.borderColor = on ? 'var(--accent)' : '';
+    btns[i].style.color = on ? 'var(--accent)' : '';
+  }
+}
+
+function setMode(m) {
+  MODE = (m === 'sol') ? 'sol' : 'wire';
+  document.getElementById('modeWire').classList.toggle('active', MODE === 'wire');
+  document.getElementById('modeSol').classList.toggle('active', MODE === 'sol');
+  document.getElementById('wireHint').textContent = (MODE === 'sol')
+    ? 'ソレノイド断面（青○＝紙面外向き巻線、青×＝紙面内向き）／内部の橙矢印＝一様磁場 B=μ₀nI／両端の曲線＝漏れ磁場、外部はほぼ 0。'
+    : '直線電流（赤●＝紙面外向き）の周囲を周回する同心円形磁力線／黄破線＝距離 r の観測円／橙矢印＝磁場方向（右ねじ則）。色の濃さは 1/r で減衰。';
+  compute();
+}
+
+function setPreset(name) {
+  var P = {
+    strong: { mode: 'wire', I: 100.0, r_cm: 5.0, n_per_cm: 100, d_cm: 5.0 },
+    far:    { mode: 'wire', I: 10.0,  r_cm: 80.0, n_per_cm: 100, d_cm: 10.0 },
+    tight:  { mode: 'sol',  I: 2.0,   r_cm: 5.0,  n_per_cm: 1000, d_cm: 10.0 }
+  }[name];
+  if (!P) return;
+  document.getElementById('slI').value = P.I;
+  document.getElementById('slR_cm').value = P.r_cm;
+  document.getElementById('slN_per_cm').value = P.n_per_cm;
+  document.getElementById('slD_cm').value = P.d_cm;
+  updateSlider(document.getElementById('slI'), 'slIVal', 1, '');
+  updateSlider(document.getElementById('slR_cm'), 'slR_cmVal', 1, '');
+  updateSlider(document.getElementById('slN_per_cm'), 'slN_per_cmVal', 0, '');
+  updateSlider(document.getElementById('slD_cm'), 'slD_cmVal', 1, '');
+  setMode(P.mode);
 }
 
 function resetParams() {
   playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> I をスイープ';
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  phase = 0;
+  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> 再生';
   var defs = { slI: 10.0, slR_cm: 5.0, slN_per_cm: 100, slD_cm: 10.0 };
   Object.keys(defs).forEach(function (id) {
     document.getElementById(id).value = defs[id];
@@ -621,13 +808,27 @@ function resetParams() {
   updateSlider(document.getElementById('slR_cm'), 'slR_cmVal', 1, '');
   updateSlider(document.getElementById('slN_per_cm'), 'slN_per_cmVal', 0, '');
   updateSlider(document.getElementById('slD_cm'), 'slD_cmVal', 1, '');
-  compute();
+  setMode('wire');
 }
+
+// expose handlers used by inline onclick/oninput
+window.compute = compute;
+window.togglePlay = togglePlay;
+window.setSpeed = setSpeed;
+window.setMode = setMode;
+window.setPreset = setPreset;
+window.resetParams = resetParams;
+
+// keyboard: space/enter toggles animation when canvas focused
+wireCanvas.addEventListener('keydown', function (e) {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePlay(); }
+});
 
 window.addEventListener('resize', function () { resizeCanvases(); compute(); });
 
 resizeCanvases();
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -695,6 +896,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="ampere-law.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -748,23 +952,33 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>直線電流モード：スライダー「slIVal」で電流値（0～50A）を設定し、「slR_cmVal」で電流からの距離（1～20cm）を入力。リアルタイムでB = μ₀I/(2πr)を計算し、磁場強度をミリテスラ単位で表示。</li>
-<li>ソレノイドモード：「slN_per_cmVal」で巻き数密度（10～200 巻/cm）、「slD_cmVal」でコイル直径（1～10cm）を設定。内部磁場B = μ₀nIが均一磁場として可視化される。</li>
-<li>磁力線・ベクトル図タブで3D磁場分布、対数スケールプロット、平行電流間の力F/L = μ₀I₁I₂/(2πd)を相互作用力として表示。断面図では磁場の減衰挙動を確認。</li>
+<li>電流 I（0.1〜100 A）と直線電流からの距離 r（0.1〜100 cm）を設定すると、B = μ₀I/(2πr) がリアルタイム計算され、磁場強度は単位を自動切替（既定値では µT 表示）して示されます。</li>
+<li>ソレノイド巻数密度 n（1〜1000 /cm）を設定すると、内部の一様磁場 B = μ₀nI を算出。左キャンバスに磁力線、右キャンバスにソレノイド断面が同時描画されます。</li>
+<li>平行電流間距離 d（0.1〜100 cm）を設定すると、単位長あたりの力 F/L = μ₀I²/(2πd) を計算。両対数プロットで B(r) の傾き −1 の減衰挙動を確認できます。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>直線電流50Aが流れる銅導体から距離5cmの地点：B = (4π×10⁻⁷ × 50)/(2π × 0.05) = 200μT。ソレノイド（100巻/cm、直径5cm、電流10A）の内部磁場：B = 4π×10⁻⁷ × 10000 × 10 = 0.1256T（125.6mT）。平行導体2本（間隔10cm、各10A）の単位長あたりの力：F/L = (4π×10⁻⁷ × 10 × 10)/(2π × 0.1) = 2×10⁻⁵ N/m。</p>
+<p>直線電流50Aが流れる銅導体から距離5cmの地点：B = (4π×10⁻⁷ × 50)/(2π × 0.05) = 200μT。ソレノイド（100巻/cm、直径5cm、電流10A）の内部磁場：B = 4π×10⁻⁷ × 10000 × 10 = 0.1256T（125.6mT）。平行導体2本（間隔10cm、各10A）の単位長あたりの力：F/L = (4π×10⁻⁷ × 10 × 10)/(2π × 0.1) = 2×10⁻⁴ N/m。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
 <li>直線電流の磁場は距離に反比例し、1/rの減衰特性を持つため、シールド設計時は導体からの距離を意識的に確保（医療機器の磁気干渉防止では50cm以上が目安）。</li>
 <li>ソレノイド内部では磁場均一だが、端部では実際には約50%低下するため、シミュレーション結果と実測値の乖離を補正する係数0.85～0.9を適用。</li>
-<li>平行電流の相互作用力は距離の2乗に反比例し、クレーン用電源ケーブルなど高電流配置では機械的ストレス評価が必須。</li>
+<li>平行電流の相互作用力 F/L = μ₀I²/(2πd) は距離 d に反比例（電流の2乗に比例）し、クレーン用電源ケーブルなど高電流配置では機械的ストレス評価が必須。</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/427423407X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/427423407X.09._SCMZZZZZZ_.jpg" alt="電磁気学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">電磁気学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

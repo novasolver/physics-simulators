@@ -122,14 +122,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "数値積分法比較ツール",
       "description": "台形則・シンプソン則・ガウス求積法・ロンベルク積分を同時比較。真値との誤差・収束次数をlog-logスケールで可視化。数値解析の学習と精度検証に最適。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/numerical-integration.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -350,6 +350,12 @@ function trapezoid(f, a, b, n){
   const xs = [0.9061798459386640, 0.5384693101056831, 0, -0.5384693101056831, -0.9061798459386640];
   const ws = [0.2369268850561891, 0.4786286704993665, 0.5688888888888889, 0.4786286704993665, 0.2369268850561891];
   return r * xs.reduce((s,x,i) => s + ws[i]*f(c+r*x), 0);
+}function gaussComposite(rule, f, a, b, panels){
+  panels = Math.max(1, panels);
+  const h = (b-a)/panels;
+  let s = 0;
+  for (let k=0;k<panels;k++) s += rule(f, a+k*h, a+(k+1)*h);
+  return s;
 }function romberg(f, a, b, steps=6){
   const R = [];
   for (let i=0;i<=steps;i++) {
@@ -397,7 +403,7 @@ function getTrueVal(key, a, b){
   // Display true val
   document.getElementById('trueValDisplay').textContent = `真値: ${trueVal.toFixed(6)}`;
 
-  const methods = [{ name: '左矩形則', val: leftRect(f,a,b,n) },{ name: '中点則', val: midpoint(f,a,b,n) },{ name: '台形則', val: trapezoid(f,a,b,n) },{ name: "シンプソン 1/3", val: simpson(f,a,b,n%2===0?n:n+1) },{ name: "シンプソン 3/8", val: simpson38(f,a,b,n) },{ name: "ガウス 2点", val: gauss2(f,a,b)*Math.ceil(n/2) },{ name: "ガウス 3点", val: gauss3(f,a,b)*Math.ceil(n/3) },{ name: "ガウス 5点", val: gauss5(f,a,b) },{ name: "ロンベルク", val: romberg(f,a,b) },{ name: "適応シンプソン", val: adaptiveSimpson(f,a,b) }];
+  const methods = [{ name: '左矩形則', val: leftRect(f,a,b,n) },{ name: '中点則', val: midpoint(f,a,b,n) },{ name: '台形則', val: trapezoid(f,a,b,n) },{ name: "シンプソン 1/3", val: simpson(f,a,b,n%2===0?n:n+1) },{ name: "シンプソン 3/8", val: simpson38(f,a,b,n) },{ name: "ガウス 2点", val: gaussComposite(gauss2,f,a,b,Math.ceil(n/2)) },{ name: "ガウス 3点", val: gaussComposite(gauss3,f,a,b,Math.ceil(n/3)) },{ name: "ガウス 5点", val: gaussComposite(gauss5,f,a,b,Math.ceil(n/5)) },{ name: "ロンベルク", val: romberg(f,a,b) },{ name: "適応シンプソン", val: adaptiveSimpson(f,a,b) }];
 
   // Stat cards
   document.getElementById('statTrap').textContent = methods[2].val.toFixed(6);
@@ -458,7 +464,7 @@ function getTrueVal(key, a, b){
   const errTrap = nVals.map(nn => Math.abs(trapezoid(f,a,b,nn) - trueVal));
   const errSimp = nVals.map(nn => Math.abs(simpson(f,a,b,nn%2===0?nn:nn+1) - trueVal));
   const errMid  = nVals.map(nn => Math.abs(midpoint(f,a,b,nn) - trueVal));
-  const errG5   = nVals.map(nn => Math.abs(gauss5(f,a,b) - trueVal));
+  const errG5   = nVals.map(nn => Math.abs(gaussComposite(gauss5,f,a,b,Math.ceil(nn/5)) - trueVal));
 
   const errCtx = document.getElementById('errorChart').getContext('2d');
   if (errorChart) errorChart.destroy();
@@ -612,7 +618,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>関数f(x)=sin(x)を区間[0,π]で積分（解析解=2.0）する場合：n=16分割時、台形則の誤差は約1.2×10⁻³、シンプソン則は3.5×10⁻⁶、ガウス5点求積は2.1×10⁻⁷、ロンベルグ積分は4.8×10⁻⁸となります。分割数を倍にするとシンプソン則の誤差は1/16に削減されますが、台形則は1/4に留まり、理論次数O(h⁴)対O(h²)の差が明確に現れます。</p>
+<p>関数f(x)=sin(x)を区間[0,π]で積分（解析解=2.0）する場合：n=16分割時、台形則の誤差は約6.4×10⁻³、シンプソン則は約1.7×10⁻⁵、ガウス5点求積は約7×10⁻¹⁴、ロンベルグ積分は約1×10⁻¹⁵（ほぼ機械精度）となります。分割数を倍にするとシンプソン則の誤差は約1/16に減りますが、台形則は約1/4に留まり、理論次数O(h⁴)対O(h²)の差が明確に現れます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>

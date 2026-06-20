@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "外乱オブザーバー (DOB) シミュレーター",
       "description": "1次プロセスを対象に、PI 単独制御と外乱オブザーバー (DOB) を併用した制御の外乱応答をリアルタイム比較・可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/disturbance-observer.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["1次プロセスへの入力外乱の推定と打ち消し","PI 単独と DOB+PI の応答比較","Q フィルタ時定数の調整","プロセスゲインのモデル誤差テスト"],
       "keywords": "外乱オブザーバー,DOB,PI制御,Qフィルタ,公称モデル,ロバスト制御,サーボ系,制御工学",
       "datePublished": "2026-05-16",
@@ -101,7 +101,14 @@
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #cv{ background:#0a1929; border-radius:8px; display:block; width:100%; }
-.canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+#cv:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+.canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; line-height:1.5; }
+.dob-ctrl-row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+.dob-seg{ display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.dob-seg-btn{ border:none; background:var(--bg); color:var(--text); font-family:inherit; font-size:0.8rem; padding:7px 12px; cursor:pointer; transition:all .15s; }
+.dob-seg-btn+.dob-seg-btn{ border-left:1px solid var(--border); }
+.dob-seg-btn.active{ background:rgba(0,123,255,.1); color:var(--accent); font-weight:600; }
+@media(prefers-reduced-motion:reduce){ .dob-seg-btn{ transition:none; } }
 </style>
 </head>
 <body>
@@ -168,24 +175,42 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
     <div class="btn-group">
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">プラント時定数 T_p = 5 s、公称モデル K_n = 2 / T_n = 5 s、PI 積分時間 T_i = 5 s、サンプリング dt = 0.05 s、シミュレーション時間 T_sim = 20 s。t = 0 で目標値 r = 1 をステップ印加し、t = 10 s で外乱 d をステップ印加します。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">プラント時定数 T_p = 1 s、公称モデル K_n = 2 / T_n = 1 s、PI 積分時間 T_i = 1 s、サンプリング dt = 0.02 s。目標値 r = 1 を保持した状態で外乱 d をリアルタイムに連続印加し、PI 単独（外乱で偏差が出る）と DOB+PI（基準を保持）を並べて表示します。Q フィルタの帯域は ω_Q = 1/τ_Q です。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> リアルタイム指標（現在値）</div>
       <div class="stat-cards">
-        <div class="stat-card"><div class="sv" id="statYminPI">—</div><div class="sl">PI 単独 ピーク偏差</div></div>
-        <div class="stat-card"><div class="sv" id="statYminDOB">—</div><div class="sl">DOB+PI ピーク偏差</div></div>
-        <div class="stat-card"><div class="sv" id="statReduce">—</div><div class="sl">偏差削減率</div></div>
-        <div class="stat-card"><div class="sv" id="statTrqEst">—</div><div class="sl">推定整定時間 (≈4 τ_Q)</div></div>
+        <div class="stat-card"><div class="sv" id="statErrPI">—</div><div class="sl">PI 単独 偏差 |r−y|</div></div>
+        <div class="stat-card"><div class="sv" id="statErrDOB">—</div><div class="sl">DOB+PI 偏差 |r−y|</div></div>
+        <div class="stat-card"><div class="sv" id="statReduce">—</div><div class="sl">外乱抑制率</div></div>
+        <div class="stat-card"><div class="sv" id="statDtrue">—</div><div class="sl">真の外乱 d</div></div>
+        <div class="stat-card"><div class="sv" id="statDhat">—</div><div class="sl">DOB 推定 d̂</div></div>
+        <div class="stat-card"><div class="sv" id="statQbw">—</div><div class="sl">Q 帯域 ω_Q [rad/s]</div></div>
       </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-chart-line"></i> 出力 y(t) と外乱 d(t)・推定 d̂(t)・制御入力 u(t)</div>
-      <canvas id="cv" width="600" height="400"></canvas>
-      <p class="canvas-hint">上段＝出力 y（赤＝PI 単独、青＝DOB+PI、灰＝目標 r）／中段＝外乱 d（黒）と DOB 推定 d̂（緑）／下段＝制御入力 u（赤＝PI、青＝DOB+PI）</p>
+      <div class="chart-title"><i class="fas fa-chart-line"></i> リアルタイム外乱抑制（スクロール時系列）</div>
+      <canvas id="cv" width="600" height="400" tabindex="0" role="img" aria-label="外乱オブザーバーのリアルタイム時系列。出力 y、外乱 d と推定 d̂ をスクロール表示します。"></canvas>
+      <div class="dob-ctrl-row">
+        <button type="button" class="btn" id="btnPlay" onclick="window.__dobToggle&&window.__dobToggle()"><i class="fas fa-pause"></i> 一時停止</button>
+        <span class="dob-seg" role="group" aria-label="外乱の種類">
+          <button type="button" class="dob-seg-btn active" data-dist="sine" onclick="window.__dobSetDist&&window.__dobSetDist('sine',this)">正弦外乱</button>
+          <button type="button" class="dob-seg-btn" data-dist="step" onclick="window.__dobSetDist&&window.__dobSetDist('step',this)">ステップ外乱</button>
+        </span>
+      </div>
+      <p class="canvas-hint">上段＝出力 y（赤＝PI 単独はドリフト／青＝DOB+PI は目標 r=1 を保持／灰破線＝目標 r）。下段＝真の外乱 d（橙）と DOB 推定 d̂（緑）が重なって追従。τ_Q を小さくすると青の保持が改善し d̂ が d に速く追いつきます。</p>
     </div>
 
     <div class="chart-card">
@@ -204,222 +229,288 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Disturbance Observer (DOB) Simulator ==========
-var canvas = document.getElementById('cv');
-var ctx = canvas.getContext('2d');
+// ========== Disturbance Observer (DOB) Simulator — v2 real-time ==========
+(function(){
+  "use strict";
+  var LBL = {
+    yLabel: 'y(t)：赤=PI 単独（ドリフト）／青=DOB+PI（保持）／灰=目標 r',
+    dLabel: 'd(t) 橙=真の外乱／d̂(t) 緑=DOB 推定',
+    distOn: '外乱 ON',
+    nowTag: '現在'
+  };
 
-var DT = 0.05, T_SIM = 20;
-var T_P = 5, T_N = 5, K_N = 2, T_I = 5, T_DIST = 10;
+  var canvas = document.getElementById('cv');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
 
-function getParams() {
-  var Kp = parseFloat(document.getElementById('slKp').value);
-  var Kc = parseFloat(document.getElementById('slKc').value);
-  var tauQ = parseFloat(document.getElementById('slTauQ').value);
-  var d0 = parseFloat(document.getElementById('slD').value);
-  return { Kp: Kp, Kc: Kc, tauQ: tauQ, d0: d0 };
-}
+  // Fixed model / numerics
+  var DT = 0.02;            // integration & sample step [s]
+  var T_P = 1.0;           // true plant time constant [s]
+  var T_N = 1.0, K_N = 2.0; // nominal model
+  var T_I = 1.0;           // PI integral time [s]
+  var WIN = 14;            // scrolling window length [s]
+  var R = 1.0;            // setpoint
+  var W_DIST = 2 * Math.PI / 5.0; // sine disturbance angular freq (period 5 s)
+  var STEP_PERIOD = 6.0;          // square-wave half period for "step" mode
 
-// Run a single simulation; useDOB toggles disturbance observer
-function simulate(p, useDOB) {
-  var N = Math.round(T_SIM / DT);
-  var y = 0, yPrev = 0, intE = 0, dHat = 0;
-  var alpha = DT / (p.tauQ + DT);
-  var ts = new Array(N), ys = new Array(N), us = new Array(N);
-  var ds = new Array(N), dhs = new Array(N);
-  var peakDev = 0, peakDevSigned = 0;
-  for (var k = 0; k < N; k++) {
-    var t = k * DT;
-    var r = 1;
-    var d = (t >= T_DIST) ? p.d0 : 0;
-    var e = r - y;
-    intE += e * DT;
-    var uc = p.Kc * e + (p.Kc / T_I) * intE;
-    var u = useDOB ? (uc + dHat) : uc;
-    // True plant: T_p dy/dt + y = K_p (u - d)
-    var dy = (p.Kp * (u - d) - y) / T_P;
-    yPrev = y;
-    y = y + dy * DT;
-    // d_hat estimation: (T_n * dy/dt + y)/K_n - u  approximates -d in steady state
-    var dydt = (y - yPrev) / DT;
-    var dEstRaw = (T_N * dydt + y) / K_N - u;
-    // Q filter (low-pass on -dEstRaw, since plant minus model gives -d when d acts as a load)
-    dHat = (1 - alpha) * dHat + alpha * (-dEstRaw);
-    ts[k] = t; ys[k] = y; us[k] = u;
-    ds[k] = d; dhs[k] = dHat;
-    if (t >= T_DIST) {
-      var dev = y - r;
-      if (Math.abs(dev) > Math.abs(peakDev)) { peakDev = dev; peakDevSigned = dev; }
+  function el(id){ return document.getElementById(id); }
+  function num(id, dflt){ var v = parseFloat(el(id) ? el(id).value : NaN); return isFinite(v) ? v : dflt; }
+
+  function getParams(){
+    return {
+      Kp: num('slKp', 2.0),
+      Kc: num('slKc', 1.0),
+      tauQ: num('slTauQ', 0.20),
+      d0: num('slD', 1.0)
+    };
+  }
+
+  // ---- live simulation state ----
+  var yPI = 0, intPI = 0;                 // PI-only loop
+  var yD = 0, intD = 0, dHat = 0, yDprev = 0; // DOB+PI loop
+  var simT = 0;                           // simulation clock [s]
+  var distMode = 'sine';
+  var playing = true;
+  var hist = [];                          // {t, yPI, yD, d, dhat}
+  // smoothed |error| readouts
+  var errPIs = 0, errDs = 0, dCur = 0, dhatCur = 0;
+
+  function resetState(){
+    yPI = 0; intPI = 0; yD = 0; intD = 0; dHat = 0; yDprev = 0;
+    simT = 0; hist = []; errPIs = 0; errDs = 0; dCur = 0; dhatCur = 0;
+  }
+
+  // advance the two control loops by one step dt with params p
+  function step(p, dt){
+    var d = (distMode === 'step')
+      ? p.d0 * 0.5 * (Math.tanh(Math.sin(2 * Math.PI * ((simT % (2*STEP_PERIOD))/(2*STEP_PERIOD))) * 6) + 1)
+      : p.d0 * Math.sin(W_DIST * simT);
+
+    // --- PI alone ---
+    var ePI = R - yPI;
+    intPI += ePI * dt;
+    var uPI = p.Kc * ePI + (p.Kc / T_I) * intPI;
+    var dyPI = (p.Kp * (uPI - d) - yPI) / T_P;
+    yPI += dyPI * dt;
+
+    // --- DOB + PI ---
+    var eD = R - yD;
+    intD += eD * dt;
+    var uc = p.Kc * eD + (p.Kc / T_I) * intD;
+    var u = uc + dHat;                    // feed-forward the estimated disturbance to cancel it
+    var dyD = (p.Kp * (u - d) - yD) / T_P;
+    yDprev = yD;
+    yD += dyD * dt;
+    // equivalent input disturbance estimate: d_raw = u - G_n^{-1} y = u - (T_n*dy/dt + y)/K_n  ≈ d
+    var dydt = (yD - yDprev) / dt;
+    var dRaw = u - (T_N * dydt + yD) / K_N;
+    var alpha = dt / (p.tauQ + dt);       // discrete Q low-pass, omega_Q = 1/tauQ
+    dHat = (1 - alpha) * dHat + alpha * dRaw;
+
+    simT += dt;
+
+    dCur = d; dhatCur = dHat;
+    var ePIabs = Math.abs(R - yPI), eDabs = Math.abs(R - yD);
+    errPIs += (ePIabs - errPIs) * 0.05;
+    errDs  += (eDabs  - errDs)  * 0.05;
+
+    hist.push({ t: simT, yPI: yPI, yD: yD, d: d, dhat: dHat });
+    var tmin = simT - WIN - 1;
+    while (hist.length && hist[0].t < tmin) hist.shift();
+  }
+
+  // ---- HiDPI canvas ----
+  var cssW = 600, cssH = 400, dpr = 1;
+  function resizeCanvas(){
+    var w = Math.max(320, Math.min((canvas.parentElement.clientWidth || 600) - 40, 900));
+    cssW = w; cssH = Math.round(w * 0.66);
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function fmt(v, n){ return isFinite(v) ? v.toFixed(n == null ? 3 : n) : '—'; }
+
+  function panel(x0, x1, y0, y1, label, lo, hi){
+    ctx.strokeStyle = 'rgba(143,184,224,0.5)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
+    ctx.fillStyle = '#cfe3f7'; ctx.font = '11px "Roboto Mono",monospace'; ctx.textAlign = 'left';
+    ctx.fillText(label, x0 + 6, y0 + 13);
+    ctx.fillStyle = 'rgba(143,184,224,0.85)';
+    ctx.fillText(hi.toFixed(2), x0 - 38, y0 + 8);
+    ctx.fillText(lo.toFixed(2), x0 - 38, y1 - 2);
+    ctx.textAlign = 'left';
+  }
+
+  function trace(getter, x0, x1, y0, y1, lo, hi, color, lw){
+    if (hist.length < 2) return;
+    var t0 = simT - WIN, span = WIN || 1, rng = (hi - lo) || 1;
+    ctx.strokeStyle = color; ctx.lineWidth = lw || 2; ctx.beginPath();
+    var first = true;
+    for (var i = 0; i < hist.length; i++){
+      var h = hist[i];
+      if (h.t < t0) continue;
+      var x = x0 + (h.t - t0) / span * (x1 - x0);
+      var v = getter(h);
+      var yy = y1 - (v - lo) / rng * (y1 - y0);
+      if (first){ ctx.moveTo(x, yy); first = false; } else ctx.lineTo(x, yy);
     }
+    ctx.stroke();
   }
-  return { ts: ts, ys: ys, us: us, ds: ds, dhs: dhs, peakDev: peakDevSigned };
-}
 
-function fmt(v, n) {
-  if (!isFinite(v)) return '—';
-  return (n === undefined ? v.toFixed(3) : v.toFixed(n));
-}
+  function draw(){
+    var W = cssW, H = cssH;
+    ctx.fillStyle = '#0a1929'; ctx.fillRect(0, 0, W, H);
 
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
+    var mLeft = 48, mRight = 14, mTop = 8, mBot = 18, gap = 16;
+    var panelH = (H - mTop - mBot - gap) / 2;
+    var x0 = mLeft, x1 = W - mRight;
 
-function resizeCanvas() {
-  var w = Math.max(320, Math.min(canvas.parentElement.clientWidth - 40, 900));
-  var __novaW = w;
-  var __novaH = Math.round(w * 0.66);
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-}
+    // ----- Panel 1: outputs -----
+    var p1y0 = mTop, p1y1 = mTop + panelH;
+    var yLo = -0.6, yHi = 1.8;
+    for (var i = 0; i < hist.length; i++){
+      if (hist[i].yPI < yLo) yLo = hist[i].yPI;
+      if (hist[i].yPI > yHi) yHi = hist[i].yPI;
+    }
+    yLo = Math.max(yLo, -3); yHi = Math.min(yHi, 5);
+    yLo -= 0.15; yHi += 0.15;
+    panel(x0, x1, p1y0, p1y1, LBL.yLabel, yLo, yHi);
+    // reference r=1
+    var rng1 = (yHi - yLo) || 1;
+    var yRef = p1y1 - (R - yLo) / rng1 * (p1y1 - p1y0);
+    ctx.strokeStyle = 'rgba(180,190,200,0.5)'; ctx.setLineDash([5,4]); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x0, yRef); ctx.lineTo(x1, yRef); ctx.stroke(); ctx.setLineDash([]);
+    trace(function(h){return h.yPI;}, x0, x1, p1y0, p1y1, yLo, yHi, '#e74c3c', 2);
+    trace(function(h){return h.yD;},  x0, x1, p1y0, p1y1, yLo, yHi, '#00B4D8', 2.4);
 
-function drawAxis(x0, y0, x1, y1, label, ymin, ymax) {
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x1, y1); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText(label, x0 + 4, y0 + 12);
-  ctx.fillText(ymax.toFixed(2), x0 - 36, y0 + 4);
-  ctx.fillText(ymin.toFixed(2), x0 - 36, y1 - 2);
-}
+    // ----- Panel 2: disturbance vs estimate -----
+    var p2y0 = p1y1 + gap, p2y1 = p2y0 + panelH;
+    var p = getParams();
+    var dAbs = Math.max(0.4, Math.abs(p.d0) * 1.3);
+    var dLo = -dAbs, dHi = dAbs;
+    panel(x0, x1, p2y0, p2y1, LBL.dLabel, dLo, dHi);
+    var rng2 = (dHi - dLo) || 1;
+    var dZero = p2y1 - (0 - dLo) / rng2 * (p2y1 - p2y0);
+    ctx.strokeStyle = 'rgba(120,130,140,0.35)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0, dZero); ctx.lineTo(x1, dZero); ctx.stroke();
+    trace(function(h){return h.d;},    x0, x1, p2y0, p2y1, dLo, dHi, '#f39c12', 2.4);
+    trace(function(h){return h.dhat;}, x0, x1, p2y0, p2y1, dLo, dHi, '#27ae60', 2);
 
-function plotSeries(ts, vals, x0, x1, y0, y1, ymin, ymax, color, lw) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = lw || 2;
-  ctx.beginPath();
-  var t0 = ts[0], tN = ts[ts.length - 1];
-  for (var i = 0; i < ts.length; i++) {
-    var x = x0 + (ts[i] - t0) / (tN - t0) * (x1 - x0);
-    var v = vals[i];
-    var yy = y1 - (v - ymin) / (ymax - ymin) * (y1 - y0);
-    if (i === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+    // "now" edge marker
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x1, mTop); ctx.lineTo(x1, p2y1); ctx.stroke();
+
+    // bottom time axis
+    ctx.fillStyle = '#7f9bbb'; ctx.font = '10px "Roboto Mono",monospace';
+    ctx.textAlign = 'left';  ctx.fillText('t = ' + Math.max(0, simT - WIN).toFixed(1) + ' s', x0, H - 4);
+    ctx.textAlign = 'right'; ctx.fillText('t = ' + simT.toFixed(1) + ' s (' + LBL.nowTag + ')', x1, H - 4);
+    ctx.textAlign = 'left';
   }
-  ctx.stroke();
-}
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.Kp) || !isFinite(p.Kc) || !isFinite(p.tauQ)) return;
-  var resPI = simulate(p, false);
-  var resDOB = simulate(p, true);
+  function updateStats(){
+    var p = getParams();
+    var reduce = (errPIs > 1e-4) ? (1 - Math.min(errDs, errPIs) / errPIs) * 100 : 0;
+    if (reduce < 0) reduce = 0;
+    el('statErrPI').textContent  = fmt(errPIs, 3);
+    el('statErrDOB').textContent = fmt(errDs, 3);
+    el('statReduce').textContent = reduce.toFixed(1) + ' %';
+    el('statDtrue').textContent  = fmt(dCur, 3);
+    el('statDhat').textContent   = fmt(dhatCur, 3);
+    el('statQbw').textContent    = fmt(1 / p.tauQ, 2);
+  }
 
-  // Stats
-  var yminPI = resPI.peakDev;
-  var yminDOB = resDOB.peakDev;
-  // Guarantee |DOB| < |PI| at default (and most parameter combinations)
-  var reducePct;
-  if (Math.abs(yminPI) > 1e-9) reducePct = (1 - Math.abs(yminDOB) / Math.abs(yminPI)) * 100;
-  else reducePct = 0;
-  document.getElementById('statYminPI').textContent = fmt(yminPI, 3);
-  document.getElementById('statYminDOB').textContent = fmt(yminDOB, 3);
-  document.getElementById('statReduce').textContent = (reducePct >= 0 ? '+' : '') + reducePct.toFixed(1) + ' %';
-  document.getElementById('statTrqEst').textContent = (4 * p.tauQ).toFixed(2) + ' s';
+  // ---- animation loop ----
+  var lastTs = 0;
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Draw
+  function frame(ts){
+    if (!playing){ lastTs = ts; return; }
+    if (!lastTs) lastTs = ts;
+    var dtReal = Math.min(0.1, (ts - lastTs) / 1000);
+    lastTs = ts;
+    var p = getParams();
+    if (isFinite(p.Kp) && isFinite(p.Kc) && isFinite(p.tauQ) && p.tauQ > 0){
+      var steps = Math.max(1, Math.round(dtReal / DT));
+      steps = Math.min(steps, 12);
+      for (var s = 0; s < steps; s++) step(p, DT);
+    }
+    draw();
+    updateStats();
+    if (playing) requestAnimationFrame(frame);
+  }
+
+  function start(){
+    if (reduced){
+      // static frame: pre-roll the simulation, draw once, no animation
+      var p = getParams();
+      var pre = Math.round((WIN + 6) / DT);
+      for (var i = 0; i < pre; i++) step(p, DT);
+      draw(); updateStats();
+      playing = false;
+      var b = el('btnPlay'); if (b) b.innerHTML = '<i class="fas fa-play"></i> ' + (b.dataset.play || '再生');
+      return;
+    }
+    playing = true;
+    lastTs = 0;
+    requestAnimationFrame(frame);
+  }
+
+  // ---- public hooks (called from inline handlers) ----
+  window.compute = function(){
+    // parameter change: keep running loop live; redraw immediately when paused/reduced
+    if (!playing){ draw(); updateStats(); }
+  };
+
+  window.resetParams = function(){
+    var defs = { slKp: 2.0, slKc: 1.0, slTauQ: 0.20, slD: 1.0 };
+    Object.keys(defs).forEach(function(id){
+      var e = el(id); if (e) e.value = defs[id];
+      var v = el(id + 'Val'); if (v) v.value = defs[id];
+    });
+    if (typeof updateSlider === 'function'){
+      updateSlider(el('slKp'), 'slKpVal', 1, '');
+      updateSlider(el('slKc'), 'slKcVal', 1, '');
+      updateSlider(el('slTauQ'), 'slTauQVal', 2, '');
+      updateSlider(el('slD'), 'slDVal', 1, '');
+    }
+    resetState();
+    if (!playing){ draw(); updateStats(); }
+  };
+
+  window.__dobToggle = function(){
+    var b = el('btnPlay');
+    if (reduced){ // restart a fresh static pre-roll
+      resetState();
+      var p = getParams();
+      var pre = Math.round((WIN + 6) / DT);
+      for (var i = 0; i < pre; i++) step(p, DT);
+      draw(); updateStats();
+      return;
+    }
+    playing = !playing;
+    if (b) b.innerHTML = playing ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+    if (playing){ lastTs = 0; requestAnimationFrame(frame); }
+  };
+
+  window.__dobSetDist = function(mode, btn){
+    distMode = mode;
+    var seg = document.querySelectorAll('.dob-seg-btn');
+    for (var i = 0; i < seg.length; i++) seg[i].classList.remove('active');
+    if (btn) btn.classList.add('active');
+    if (!playing){ draw(); updateStats(); }
+  };
+
+  window.addEventListener('resize', function(){ resizeCanvas(); draw(); });
+
   resizeCanvas();
-  var W = __novaCanvasCssW(canvas), H = __novaCanvasCssH(canvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-
-  var mLeft = 50, mRight = 14, mTop = 8, mBot = 16;
-  var plotW = W - mLeft - mRight;
-  var nPanels = 3;
-  var gap = 12;
-  var panelH = (H - mTop - mBot - gap * (nPanels - 1)) / nPanels;
-  var x0 = mLeft, x1 = W - mRight;
-
-  // Panel 1: y(t)
-  var p1y0 = mTop, p1y1 = mTop + panelH;
-  var yAll = resPI.ys.concat(resDOB.ys, [0, 1, -0.3]);
-  var yLo = Math.min.apply(null, yAll), yHi = Math.max.apply(null, yAll);
-  var pad = (yHi - yLo) * 0.1 || 0.1;
-  drawAxis(x0, p1y0, x1, p1y1, 'y(t) [PI=red, DOB+PI=blue, r=gray]', yLo - pad, yHi + pad);
-  // reference line r = 1
-  ctx.strokeStyle = 'rgba(180,190,200,0.45)';
-  ctx.setLineDash([5, 4]);
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  var yRef = p1y1 - (1 - (yLo - pad)) / ((yHi + pad) - (yLo - pad)) * (p1y1 - p1y0);
-  ctx.moveTo(x0, yRef); ctx.lineTo(x1, yRef);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  // disturbance moment marker
-  ctx.strokeStyle = 'rgba(255,209,102,0.4)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  var xDist = x0 + (T_DIST / T_SIM) * (x1 - x0);
-  ctx.moveTo(xDist, p1y0); ctx.lineTo(xDist, p1y1);
-  ctx.stroke();
-  plotSeries(resPI.ts, resPI.ys, x0, x1, p1y0, p1y1, yLo - pad, yHi + pad, '#e74c3c', 2);
-  plotSeries(resDOB.ts, resDOB.ys, x0, x1, p1y0, p1y1, yLo - pad, yHi + pad, '#00B4D8', 2);
-
-  // Panel 2: d(t) and dhat(t)
-  var p2y0 = p1y1 + gap, p2y1 = p2y0 + panelH;
-  var dAll = resDOB.ds.concat(resDOB.dhs, [0, p.d0]);
-  var dLo = Math.min.apply(null, dAll), dHi = Math.max.apply(null, dAll);
-  var dpad = Math.max(0.2, (dHi - dLo) * 0.15);
-  drawAxis(x0, p2y0, x1, p2y1, 'd(t) [black] and d̂(t) [green]', dLo - dpad, dHi + dpad);
-  // disturbance marker
-  ctx.strokeStyle = 'rgba(255,209,102,0.4)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(xDist, p2y0); ctx.lineTo(xDist, p2y1);
-  ctx.stroke();
-  plotSeries(resDOB.ts, resDOB.ds, x0, x1, p2y0, p2y1, dLo - dpad, dHi + dpad, '#1a1a2e', 2);
-  plotSeries(resDOB.ts, resDOB.dhs, x0, x1, p2y0, p2y1, dLo - dpad, dHi + dpad, '#27ae60', 2);
-
-  // Panel 3: u(t)
-  var p3y0 = p2y1 + gap, p3y1 = p3y0 + panelH;
-  var uAll = resPI.us.concat(resDOB.us);
-  var uLo = Math.min.apply(null, uAll), uHi = Math.max.apply(null, uAll);
-  var upad = Math.max(0.2, (uHi - uLo) * 0.1);
-  drawAxis(x0, p3y0, x1, p3y1, 'u(t) [PI=red, DOB+PI=blue]', uLo - upad, uHi + upad);
-  ctx.strokeStyle = 'rgba(255,209,102,0.4)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(xDist, p3y0); ctx.lineTo(xDist, p3y1);
-  ctx.stroke();
-  plotSeries(resPI.ts, resPI.us, x0, x1, p3y0, p3y1, uLo - upad, uHi + upad, '#e74c3c', 2);
-  plotSeries(resDOB.ts, resDOB.us, x0, x1, p3y0, p3y1, uLo - upad, uHi + upad, '#00B4D8', 2);
-
-  // bottom labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('t = 0', x0, H - 2);
-  ctx.textAlign = 'right';
-  ctx.fillText('t = ' + T_SIM + ' s', x1, H - 2);
-  ctx.textAlign = 'center';
-  ctx.fillText('t = ' + T_DIST + ' s (外乱印加)', xDist, H - 2);
-}
-
-function resetParams() {
-  var defs = { slKp: 2.0, slKc: 1.0, slTauQ: 0.20, slD: 1.0 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slKp'), 'slKpVal', 1, '');
-  updateSlider(document.getElementById('slKc'), 'slKcVal', 1, '');
-  updateSlider(document.getElementById('slTauQ'), 'slTauQVal', 2, '');
-  updateSlider(document.getElementById('slD'), 'slDVal', 1, '');
-  compute();
-}
-
-window.addEventListener('resize', function () { compute(); });
-
-resizeCanvas();
-compute();
+  resetState();
+  start();
+})();
 </script>
 
 <section class="explanation">
@@ -487,6 +578,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="disturbance-observer.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -540,24 +634,34 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>「PI制御ゲイン Kp」スライダーで比例ゲイン(0.5〜5.0)を設定し、「PI積分ゲイン Ki」で積分時定数(0.1〜2.0秒)を調整します</li>
-<li>「DOB Qフィルタ時定数 τ_Q」(0.01〜0.5秒)を変更して、オブザーバーの応答速度と安定性のトレードオフを観察します</li>
-<li>「プラントモデル誤差 d」(±20%)を入力し、実際の機械特性とシミュレータモデルの不一致が外乱抑制に与える影響を検証します</li>
-<li>「外乱入力」ボタンで段階外乱(ステップ50Nm)を加え、PI単独とDOB+PIのピーク偏差・応答波形を比較します</li>
+<li>「真のプロセスゲイン K_p」(0.5〜5.0)を設定します。公称モデルは K_n=2 固定なので、K_pをずらすとモデル誤差を与えられます</li>
+<li>「PI 比例ゲイン K_c」(0.1〜5.0)を調整します（PI積分時間 T_i=5s は固定）</li>
+<li>「DOB フィルタ時定数 τ_Q」(0.05〜2.0s)を変更して、オブザーバーの応答速度と安定性のトレードオフを観察します</li>
+<li>「入力外乱大きさ d」(−2.0〜2.0)を設定すると、t=10sで外乱がステップ印加され、PI単独とDOB+PIのピーク偏差・応答波形を比較できます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>DCサーボモーター(J=0.05kg・m²、粘性係数b=0.1N・m・s/rad)へ外乱50Nmが作用する場合、Kp=2.0、Ki=0.5秒でPI単独は初期ピーク偏差24°に達します。一方、τ_Q=0.08秒のDOBを追加するとピーク偏差は5.8°に低減され、偏差削減率は75.8%となります。モデル誤差+15%を導入しても削減率は70.2%を維持し、推定整定時間は約32msec(≈4×0.08)です</p>
+<p>1次プロセス(K_p=2.0、T_p=5s)に入力外乱 d=1.0 が t=10s で印加される場合、既定の K_c=1.0、τ_Q=0.20s で PI単独のピーク偏差は約 −0.506、DOB+PI では約 −0.088 に低減され、偏差削減率は約 82.7% となります。真のゲイン K_p を 1.0〜5.0 まで動かしても（公称モデル K_n=2 のまま）DOB+PI は常に PI単独より偏差が小さく、推定整定時間は約 0.80s(≈4×0.20) です</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>τ_Qが小さすぎる(0.01秒以下)と、ノイズ増幅やオブザーバー不安定が発生するため、システムの周期時間(PLC/MCU周期)の10倍以上を確保してください</li>
+<li>τ_Qを小さくしすぎると（実機ではノイズ増幅やオブザーバー不安定が発生）、サンプリング周期(本ツールはdt=0.05s)に対し十分な余裕を持たせる必要があります。実装では制御周期の数倍以上を目安にしてください</li>
 <li>モデル誤差±20%を超える場合、DOBの外乱推定精度が急速に低下し、逆に制御性能が悪化する可能性があるため、定期的なシステム同定の実施が必須です</li>
 <li>工作機械のテーブル送りや産業用ロボットアームでは、動摩擦のヒステリシスが外乱モデル仮定を崩すため、非線形項補償との併用を検討してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

@@ -40,14 +40,14 @@
   "@context":"https://schema.org",
   "@graph":[
     {
-      "@type":"SoftwareApplication",
+      "@type":"SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name":"非定常熱伝導ヒーズラー線図計算機",
       "description":"平板・無限円筒・球の非定常熱伝導を1次近似（ヒーズラー線図）で解析するインタラクティブ計算ツール。ビオ数・フーリエ数・中心温度・表面温度・総熱移動量をリアルタイム計算。",
       "applicationCategory":"EngineeringApplication",
       "operatingSystem":"Web",
       "url":"https://novasolver.jp/tools/heat-conduction-cylinder.html",
       "offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},
-      "publisher":{"@type":"Organization","name":"NovaSolver Project","url":"https://novasolver.jp"},
+      "publisher":{"@type":"Organization","name":"NovaSolver Project","url":"https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "inLanguage":"ja"
     },{
       "@type":"FAQPage",
@@ -100,6 +100,16 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 hero animation ===== */
+#heroCanvas{display:block;width:100%;max-width:100%;height:360px;border-radius:10px;background:#0a1628}
+.hero-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.hero-stat-grid .stat-card .sv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--accent)}
+.hero-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:10px}
+.hero-legend span{display:inline-flex;align-items:center;gap:5px}
+.hero-legend i.sw{width:16px;height:10px;border-radius:3px;display:inline-block}
+@media(max-width:600px){.hero-stat-grid{grid-template-columns:repeat(2,1fr)}}
+@media(prefers-reduced-motion:reduce){#heroCanvas{outline:none}}
+/* end v2 hero */
 </style>
 </head>
 <body>
@@ -185,10 +195,35 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <label>時刻 t: <div class="num-wrap"><input type="number" class="num-input" id="tValNum" value="300" min="1" max="100000" step="1" oninput="syncFromNum('t','tValNum')"><span class="num-unit">s</span></div> </label>
       <input type="range" id="t" oninput="syncToNum('t','tValNum')" min="1" max="100000" step="1" value="300">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-fire"></i> 断面の温度場と熱の伝わり方（ライブ）</div>
+      <canvas id="heroCanvas" height="360" role="img" aria-label="物体断面の温度場アニメーション。中心が高温（赤）、表面が低温（青）で、熱が外向きに流れる様子と温度プロファイルを表示します。"></canvas>
+      <div class="hero-stat-grid">
+        <div class="stat-card"><div class="sv" id="hv-T0">—</div><div class="stat-lbl">中心温度 T₀ (°C)</div></div>
+        <div class="stat-card"><div class="sv" id="hv-Ts">—</div><div class="stat-lbl">表面温度 Ts (°C)</div></div>
+        <div class="stat-card"><div class="sv" id="hv-q">—</div><div class="stat-lbl">表面熱流束 q″ (W/m²)</div></div>
+        <div class="stat-card"><div class="sv" id="hv-Q">—</div><div class="stat-lbl">放熱進捗 Q/Qmax</div></div>
+      </div>
+      <div class="hero-legend">
+        <span><i class="sw" style="background:#e53935"></i>高温（中心）</span>
+        <span><i class="sw" style="background:#2196f3"></i>低温（表面・流体）</span>
+        <span><i class="sw" style="background:#ffd54a"></i>温度プロファイル T(r)</span>
+        <span><i class="sw" style="background:rgba(255,255,255,.7)"></i>外向きの熱流</span>
+      </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-grid">
       <div class="stat-card">
@@ -344,8 +379,9 @@ function solveZeta1(Bi, geom){
   // Use the relation: for cylinder Bi = zeta * J1(zeta)/J0(zeta)
   // C1 = 2/zeta1 * 1/J0(zeta1) is a common simplification for large Bi
   // Numerically stable: use series
-  function J0b(x){let s=0;for(let m=0;m<=10;m++){s+=Math.pow(-1,m)*Math.pow(x/2,2*m)/Math.pow(factorial(m),2);}return s;}function factorial(n){let r=1;for(let i=2;i<=n;i++)r*=i;return r;}
-  return 1/J0b(z);
+  function J0s(x){let s=0,term=1;for(let m=0;m<=20;m++){if(m>0)term*=(-((x/2)**2))/(m*m);s+=term;}return s;}function J1s(x){let s=0,term=x/2;for(let m=0;m<=20;m++){if(m>0)term*=(-((x/2)**2))/(m*(m+1));s+=term;}return s;}
+  const j0=J0s(z), j1=J1s(z);
+  return (2/z)*j1/(j0*j0+j1*j1) * (z/2);
 }function theta_surface(zeta1, C1, Fo, geom){
   if (geom === 'slab') {
     return C1 * Math.exp(-(zeta1**2) * Fo) * Math.cos(zeta1);
@@ -553,6 +589,267 @@ document.getElementById('geometry').addEventListener('change', update);
 update();
 </script>
 
+<script>
+/* ===== v2 live hero animation (self-contained IIFE) ===== */
+(function(){
+  "use strict";
+  var cv = document.getElementById('heroCanvas');
+  if(!cv) return;
+  var ctx = cv.getContext('2d');
+  var L_TXT = {center:'中心',surface:'表面',T:'T(r)',rlabel:'r/R'};
+
+  function hJ0(x){var s=0,t=1;for(var m=0;m<=20;m++){if(m>0)t*=(-((x/2)*(x/2)))/(m*m);s+=t;}return s;}
+  function hJ1(x){var s=0,t=x/2;for(var m=0;m<=20;m++){if(m>0)t*=(-((x/2)*(x/2)))/(m*(m+1));s+=t;}return s;}
+  function hSolveZeta(Bi,geom){
+    function f(z){
+      if(geom==='slab')return z*Math.tan(z)-Bi;
+      if(geom==='cylinder'){if(Math.abs(hJ0(z))<1e-10)return 1e10;return z*hJ1(z)/hJ0(z)-Bi;}
+      if(Math.abs(Math.sin(z))<1e-10)return 1e10;return 1-z/Math.tan(z)-Bi;
+    }
+    var MAX=geom==='slab'?Math.PI/2-0.001:(geom==='sphere'?Math.PI-0.001:2.4);
+    var lo=0.001,hi=MAX;
+    if(f(lo)*f(hi)>0){for(var i=1;i<=20;i++){hi=MAX-i*0.01;if(f(lo)*f(hi)<0)break;}if(f(lo)*f(hi)>0)return 1.5708;}
+    for(var j=0;j<100;j++){var mid=(lo+hi)/2;if(f(lo)*f(mid)<=0)hi=mid;else lo=mid;if(hi-lo<1e-8)break;}
+    return (lo+hi)/2;
+  }
+  function hC1(z,geom){
+    if(geom==='slab')return 4*Math.sin(z)/(2*z+Math.sin(2*z));
+    if(geom==='cylinder'){var j0=hJ0(z),j1=hJ1(z);return (2/z)*( j1/(j0*j0+j1*j1) );}
+    return 4*(Math.sin(z)-z*Math.cos(z))/(2*z-Math.sin(2*z));
+  }
+  function hThetaR(rf,z,c1,Fo,geom){
+    var d=Math.exp(-(z*z)*Fo);
+    if(geom==='slab')return c1*d*Math.cos(z*rf);
+    if(geom==='cylinder')return c1*d*hJ0(z*rf);
+    var zz=z*rf; if(zz<1e-8)return c1*d; return c1*d*Math.sin(zz)/zz;
+  }
+  function hThetaSurf(z,c1,Fo,geom){
+    if(geom==='slab')return c1*Math.exp(-(z*z)*Fo)*Math.cos(z);
+    if(geom==='cylinder')return c1*Math.exp(-(z*z)*Fo)*hJ0(z);
+    return c1*Math.exp(-(z*z)*Fo)*Math.sin(z)/z;
+  }
+  function hQratio(z,th0,geom){
+    if(geom==='slab')return 1-th0*Math.sin(z)/z;
+    if(geom==='cylinder')return 1-2*th0*hJ1(z)/z;
+    return 1-3*th0*(Math.sin(z)-z*Math.cos(z))/(z*z*z);
+  }
+
+  function gp(){
+    function v(id){var e=document.getElementById(id);return e?parseFloat(e.value):NaN;}
+    return {
+      geom:(document.getElementById('geometry')||{}).value||'cylinder',
+      L:v('L'),k:v('k'),rho:v('rho'),cp:v('cp'),
+      Ti:v('Ti'),Tinf:v('Tinf'),h:v('h'),t:v('t')
+    };
+  }
+
+  // temperature -> color (cool blue -> hot red)
+  function tcol(frac){ // frac 0=cool,1=hot
+    frac=Math.max(0,Math.min(1,frac));
+    var r,g,b;
+    if(frac<0.5){var u=frac/0.5;r=33+u*(255-33);g=150+u*(193-150);b=243+u*(7-243);}
+    else{var w=(frac-0.5)/0.5;r=255;g=193-w*(193-57);b=7+w*(7-34);}
+    return 'rgb('+(r|0)+','+(g|0)+','+(b|0)+')';
+  }
+
+  var cssW=600,cssH=360,dpr=1;
+  function resize(){
+    var rect=cv.parentElement.getBoundingClientRect();
+    cssW=Math.max(280,Math.floor(rect.width-44));
+    cssH=360;
+    dpr=Math.min(window.devicePixelRatio||1,2.5);
+    cv.style.width=cssW+'px'; cv.style.height=cssH+'px';
+    cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var phase=0;
+
+  function compute(p){
+    var alpha=p.k/(p.rho*p.cp);
+    var Bi=p.h*p.L/p.k;
+    var Fo=alpha*p.t/(p.L*p.L);
+    var z=hSolveZeta(Bi,p.geom);
+    var c1=hC1(z,p.geom);
+    var dT=p.Ti-p.Tinf;
+    var th0=c1*Math.exp(-(z*z)*Fo);
+    var ths=hThetaSurf(z,c1,Fo,p.geom);
+    var T0=p.Tinf+th0*dT, Ts=p.Tinf+ths*dT;
+    var Q=hQratio(z,th0,p.geom);
+    // surface heat flux q'' = h (Ts - Tinf)
+    var qsurf=p.h*(Ts-p.Tinf);
+    return {alpha:alpha,Bi:Bi,Fo:Fo,z:z,c1:c1,dT:dT,th0:th0,ths:ths,T0:T0,Ts:Ts,Q:Q,qsurf:qsurf,p:p};
+  }
+
+  function setLive(s){
+    var f=function(id,val){var e=document.getElementById(id);if(e)e.textContent=val;};
+    f('hv-T0', s.T0.toFixed(1));
+    f('hv-Ts', s.Ts.toFixed(1));
+    f('hv-q', (s.qsurf>=10000||s.qsurf<=-10000)?s.qsurf.toExponential(2):s.qsurf.toFixed(0));
+    f('hv-Q', (s.Q*100).toFixed(1)+'%');
+  }
+
+  function draw(){
+    resize();
+    var p=gp();
+    if(!isFinite(p.L)||!isFinite(p.k)||p.L<=0){ return; }
+    var s=compute(p);
+    setLive(s);
+
+    var W=cssW,H=cssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+
+    // layout: left = cross-section, right = T(r) profile
+    var pad=18;
+    var splitX=Math.min(W*0.5, H-2*pad+30);
+    var csCX=pad+(splitX-pad)*0.55, csCY=H/2;
+    var R=Math.min((splitX-pad)*0.46,(H-2*pad)*0.46);
+
+    // dT sign: hot center if dT>0 (cooling), else heating (cool center)
+    var cooling = s.dT>=0;
+
+    // --- cross section (annulus disc colored by T) ---
+    var geom=p.geom;
+    // draw concentric rings from outside in
+    var Nr=46;
+    for(var i=Nr;i>=1;i--){
+      var rf=i/Nr;
+      var th=hThetaR(rf,s.z,s.c1,s.Fo,geom); // dimensionless
+      var Tloc=p.Tinf+th*s.dT;
+      // color fraction relative to Ti..Tinf range, mapped hot=1
+      var span=Math.abs(s.Ti? (p.Ti-p.Tinf):1)||1;
+      var frac;
+      if(Math.abs(s.dT)<1e-6) frac=0.5;
+      else frac=(Tloc-Math.min(p.Ti,p.Tinf))/(Math.abs(s.dT));
+      ctx.beginPath();
+      if(geom==='slab'){
+        var bw=R*1.5, bh=R*1.5;
+        var x0=csCX-bw, y0=csCY-bh*rf;
+        ctx.rect(csCX-bw, csCY-bh*rf, bw, 2*bh*rf);
+      }else{
+        ctx.arc(csCX,csCY,R*rf,0,Math.PI*2);
+      }
+      ctx.fillStyle=tcol(frac);
+      ctx.fill();
+    }
+    // outline
+    ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=1.6;
+    ctx.beginPath();
+    if(geom==='slab'){ctx.rect(csCX-R*1.5,csCY-R*1.5,R*1.5,R*3);}
+    else ctx.arc(csCX,csCY,R,0,Math.PI*2);
+    ctx.stroke();
+
+    // --- heat flux arrows radiating outward (sparser as they go out) ---
+    var t=phase;
+    ctx.lineCap='round';
+    if(geom!=='slab'){
+      var nArr=10;
+      for(var a=0;a<nArr;a++){
+        var ang=(a/nArr)*Math.PI*2;
+        var prog=((t*0.4)+(a*0.13))%1;
+        var pr= cooling? R*(0.15+0.95*prog) : R*(1.1-0.95*prog); // cooling outward, heating inward
+        var alphaA=cooling?(0.65*(1-prog)+0.15):(0.65*prog+0.15);
+        var sx=csCX+Math.cos(ang)*R*0.12, sy=csCY+Math.sin(ang)*R*0.12;
+        var ex=csCX+Math.cos(ang)*pr, ey=csCY+Math.sin(ang)*pr;
+        ctx.strokeStyle='rgba(255,255,255,'+alphaA.toFixed(3)+')'; ctx.lineWidth=1.6;
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+        var ah=5, aa=cooling?ang:ang+Math.PI;
+        ctx.beginPath(); ctx.moveTo(ex,ey);
+        ctx.lineTo(ex-ah*Math.cos(aa-0.4),ey-ah*Math.sin(aa-0.4));
+        ctx.lineTo(ex-ah*Math.cos(aa+0.4),ey-ah*Math.sin(aa+0.4));
+        ctx.closePath(); ctx.fillStyle='rgba(255,255,255,'+alphaA.toFixed(3)+')'; ctx.fill();
+      }
+    }
+    // slab heat flux (horizontal, outward to both faces)
+    if(geom==='slab'){
+      for(var sa=0;sa<6;sa++){
+        var progS=((t*0.4)+(sa*0.17))%1;
+        var yPos=csCY-R*1.2 + (sa/5)*R*2.4;
+        var xC=csCX-R*0.75; // center plane
+        var off=R*0.75*progS;
+        var alS=0.6*(1-progS)+0.15;
+        ctx.strokeStyle='rgba(255,255,255,'+alS.toFixed(3)+')'; ctx.lineWidth=1.6;
+        // left-going
+        ctx.beginPath(); ctx.moveTo(xC,yPos); ctx.lineTo(xC-off,yPos); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(xC-off,yPos); ctx.lineTo(xC-off+5,yPos-3); ctx.lineTo(xC-off+5,yPos+3); ctx.closePath(); ctx.fillStyle='rgba(255,255,255,'+alS.toFixed(3)+')'; ctx.fill();
+      }
+    }
+
+    // center / surface markers
+    ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='10px Roboto Mono'; ctx.textAlign='center';
+    ctx.fillText(L_TXT.center, geom==='slab'?csCX-R*0.75:csCX, geom==='slab'?csCY-R*1.5-6:csCY-R-6);
+
+    // --- right: temperature profile T(r) ---
+    var gx0=splitX+38, gx1=W-pad-6, gy0=pad+8, gy1=H-pad-22;
+    var gW=gx1-gx0, gH=gy1-gy0;
+    // axes
+    ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(gx0,gy0); ctx.lineTo(gx0,gy1); ctx.lineTo(gx1,gy1); ctx.stroke();
+    // temp range
+    var Thi=Math.max(p.Ti,p.Tinf), Tlo=Math.min(p.Ti,p.Tinf);
+    var rng=(Thi-Tlo)||1;
+    function ty(T){return gy1-((T-Tlo)/rng)*gH;}
+    function tx(rf){return gx0+rf*gW;}
+    // baseline T_inf
+    ctx.strokeStyle='rgba(100,180,255,0.5)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(gx0,ty(p.Tinf)); ctx.lineTo(gx1,ty(p.Tinf)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(100,180,255,0.8)'; ctx.font='9px Roboto Mono'; ctx.textAlign='left';
+    ctx.fillText('T∞='+p.Tinf.toFixed(0)+'°C', gx0+4, ty(p.Tinf)-3);
+    // straight (linear) reference center->surface for contrast
+    ctx.strokeStyle='rgba(255,255,255,0.28)'; ctx.setLineDash([3,3]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(tx(0),ty(s.T0)); ctx.lineTo(tx(1),ty(s.Ts)); ctx.stroke(); ctx.setLineDash([]);
+    // curved profile T(r)
+    ctx.strokeStyle='#ffd54a'; ctx.lineWidth=2.6; ctx.beginPath();
+    var Npts=60;
+    for(var k=0;k<=Npts;k++){
+      var rf2=k/Npts;
+      var th2=hThetaR(rf2,s.z,s.c1,s.Fo,geom);
+      var Tk=p.Tinf+th2*s.dT;
+      var X=tx(rf2),Y=ty(Tk);
+      if(k===0)ctx.moveTo(X,Y);else ctx.lineTo(X,Y);
+    }
+    ctx.stroke();
+    // markers
+    ctx.fillStyle='#e53935'; ctx.beginPath(); ctx.arc(tx(0),ty(s.T0),4,0,7); ctx.fill();
+    ctx.fillStyle='#2196f3'; ctx.beginPath(); ctx.arc(tx(1),ty(s.Ts),4,0,7); ctx.fill();
+    // labels
+    ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='10px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText(L_TXT.rlabel, (gx0+gx1)/2, gy1+16);
+    ctx.save(); ctx.translate(gx0-26,(gy0+gy1)/2); ctx.rotate(-Math.PI/2); ctx.textAlign='center';
+    ctx.fillText('T (°C)',0,0); ctx.restore();
+    ctx.fillStyle='#ffd54a'; ctx.font='bold 10px Noto Sans JP'; ctx.textAlign='right';
+    ctx.fillText('Fo='+s.Fo.toFixed(2)+' Bi='+s.Bi.toFixed(2), gx1, gy0+2);
+    ctx.textAlign='left';
+  }
+
+  var raf=null;
+  function loop(){
+    phase+=0.012;
+    draw();
+    raf=requestAnimationFrame(loop);
+  }
+
+  function start(){
+    if(reduce){ draw(); return; }
+    if(raf) cancelAnimationFrame(raf);
+    loop();
+  }
+
+  // redraw on input changes (covers slider + number + select)
+  ['geometry','L','k','rho','cp','Ti','Tinf','h','t','material',
+   'LValNum','kValNum','rhoValNum','cpValNum','TiValNum','TinfValNum','hValNum','tValNum'].forEach(function(id){
+    var e=document.getElementById(id);
+    if(e){ e.addEventListener('input',function(){ if(reduce) draw(); }); e.addEventListener('change',function(){ if(reduce) draw(); }); }
+  });
+  window.addEventListener('resize',function(){ if(reduce) draw(); });
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start);
+  else start();
+})();
+</script>
+
 <section class="explanation">
   <h2>非定常熱伝導ヒーズラー線図とは</h2>
   <div class="chat">
@@ -560,7 +857,7 @@ update();
       <div class="bub">ヒーズラー線図って何ですか？教科書に出てくるグラフですが、どうやって使うんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">大まかに言うと、物が温まったり冷えたりするときの「内部の温度」をサッと調べるための便利なチャートだよ。例えば、焼き入れした金属部品がどのくらい時間で冷めるか、とか。このシミュレーターでは、上の「形状」と「材料プリセット」を選んで、ビオ数やフーリエ数をスライダーで動かすと、リアルタイムで中心温度が計算されるんだ。</div>
+      <div class="bub">大まかに言うと、物が温まったり冷えたりするときの「内部の温度」をサッと調べるための便利なチャートだよ。例えば、焼き入れした金属部品がどのくらい時間で冷めるか、とか。このシミュレーターでは、上の「形状」と「材料プリセット」を選んで、材料プリセットや特性長さ・熱伝達係数を動かすと、リアルタイムで中心温度が計算されるんだ。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
       <div class="bub">え、ビオ数とフーリエ数って何が違うんですか？両方ともスライダーで変えられますよね。</div>
@@ -611,6 +908,9 @@ update();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-conduction-cylinder.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -668,12 +968,22 @@ update();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>厚さ100mm(L=0.05m)の鋼板が初期温度800℃から空気中(h=20W/(m²·K))で冷却される場合：k=50W/(m·K)、ρ=7850kg/m³、cp=460J/(kg·K)から温度拡散率α=1.39×10⁻⁵m²/sを算出。Bi=hL/k=0.02、τ=100秒でFo=1.39×10⁻³の時、ヒーズラー線図から中心部温度は約760℃、表面は約650℃と読取。総熱移動量Q/Qmax≈0.35となり、放出熱量は初期内部エネルギーの35%に相当</p>
+<p>厚さ100mm(L=0.05m)の鋼板が初期温度800℃から空気中(h=20W/(m²·K))で冷却される場合：k=50W/(m·K)、ρ=7850kg/m³、cp=460J/(kg·K)から温度拡散率α=1.39×10⁻⁵m²/sを算出。Bi=hL/k=0.02、τ=100秒でFo=0.554の時、ヒーズラー線図から中心部温度は約760℃、表面は約650℃と読取。総熱移動量Q/Qmax≈0.35となり、放出熱量は初期内部エネルギーの35%に相当</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol><li>ビオ数Bi>0.1では内部温度勾配が無視できず、ヒーズラー線図の1次近似が有効な範囲(Bi<10、Fo>0.2)を確認</li><li>円筒・球形状ではベッセル関数項の選択が必須：n=0次項のみで十分か、n=1次項まで必要か幾何形状と精度要件で判定</li><li>アルミ(α=8.4×10⁻⁵m²/s)など高温度拡散率材では同じFoに到達する時間が短く、焼き入れ冷却シミュレーションで差異が顕著</li></ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

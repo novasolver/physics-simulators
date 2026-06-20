@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "抗力・揚力計算機",
       "description": "球・円柱・平板・流線形物体の抗力係数CdをReynolds数依存曲線から算出し、抗力・揚力・終端速度・カルマン渦周波数をリアルタイム計算するツール。",
       "url": "https://novasolver.jp/tools/drag-calculation.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Cd vs Re チャート（対数スケール）","抗力・揚力・終端速度の計算","カルマン渦周波数・Strouhal数の算出"],
       "keywords": "抗力係数,揚力係数,Reynolds数,Stokes流れ,流体抵抗,CFD,カルマン渦",
       "datePublished": "2026-04-08",
@@ -174,7 +174,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="param-group">
-      <div class="param-label"><span class="param-name">流速 U</span></div>
+      <div class="param-label"><span class="param-name">流速 U</span><span class="param-value" id="valU">10.00 m/s</span></div>
       <input type="range" id="U" min="-2" max="2" step="0.01" value="1" oninput="calculate()"></div>
 
     <div class="param-group" id="lengthGroup">
@@ -198,25 +198,37 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div id="customFluid" style="display:none">
       <div class="param-group">
-        <div class="param-label"><span class="param-name">密度 ρ (kg/m³)</span><div class="num-wrap"><input type="number" class="num-input" id="rhoNum" value="0.079" min="0" max="3" step="0.01" oninput="syncFromNum('rho','rhoNum')"></div></div>
-        <input type="range" id="rho" min="0" max="3" step="0.01" value="0.079" oninput="syncToNum('rho','rhoNum');calculate()">
+        <div class="param-label"><span class="param-name">密度 ρ (kg/m³)</span><div class="num-wrap"><input type="number" class="num-input" id="rhoNum" value="1.20" min="0.01" max="2000" step="0.01" oninput="syncRhoFromNum()"></div></div>
+        <input type="range" id="rho" min="-2" max="3.30103" step="0.01" value="0.07918" oninput="syncRhoToNum();calculate()">
       </div>
       <div class="param-group">
         <div class="param-label"><span class="param-name">動粘度 ν (m²/s, 対数)</span><span class="param-value" id="valNu">1.5e-5</span></div>
         <input type="range" id="nu" min="-6" max="-2" step="0.01" value="-4.82" oninput="calculate()"></div>
     </div>
 
-    <div class="param-group">
+    <div class="param-group" id="epsGroup">
       <div class="param-label"><span class="param-name">表面粗さ ε/D</span><div class="num-wrap"><input type="number" class="num-input" id="epsNum" value="0" min="0" max="0.05" step="0.001" oninput="syncFromNum('eps','epsNum');calculate()"><span class="num-unit"></span></div></div>
       <input type="range" id="eps" min="0" max="0.05" step="0.001" value="0" oninput="syncToNum('eps','epsNum');calculate()">
     </div>
 
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-wind"></i> 流れの可視化 — 物体まわりの流線・後流・抗力</div>
+    <canvas id="flowCanvas" style="width:100%;border-radius:8px;background:#0a1628;display:block"></canvas>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（リアルタイム）</div>
     <div class="stat-cards">
       <div class="stat-card">
         <div class="sv" id="resRe">—</div><div class="sl">Reynolds数 Re</div>
@@ -226,6 +238,12 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <div class="stat-card">
         <div class="sv" id="resFD">—</div><div class="sl">抗力 FD (N)</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="resq">—</div><div class="sl">動圧 q=½ρU² (Pa)</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="resP">—</div><div class="sl">抗力克服パワー P (W)</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="resFL">—</div><div class="sl">揚力 FL (N)</div>
@@ -263,7 +281,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <script src="/assets/vendor/chart.js/chart.umd.min.js"></script>
 <script src="/tools/tools-common.js?v20260511r13"></script>
 <script>
-
+(function(){
 // ---- fluid properties ----
 
 const FLUIDS = {
@@ -329,7 +347,27 @@ function logSlider(id, lo, hi){
   if(v >= 1000) return v.toExponential(2);
   if(v >= 1) return v.toFixed(2);
   return v.toExponential(2);
-}// ---- charts ----
+}
+function fmtLinearRho(v){
+  if(v >= 100) return v.toFixed(0);
+  if(v >= 10) return v.toFixed(1);
+  return v.toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
+}
+function syncRhoToNum(){
+  const sl=document.getElementById('rho'), num=document.getElementById('rhoNum');
+  if(!sl||!num)return;
+  num.value=fmtLinearRho(Math.pow(10, parseFloat(sl.value)));
+}
+function syncRhoFromNum(){
+  const sl=document.getElementById('rho'), num=document.getElementById('rhoNum');
+  if(!sl||!num)return;
+  const raw=parseFloat(num.value);
+  const rho=Math.max(0.01, Math.min(2000, isFinite(raw)?raw:1.204));
+  num.value=fmtLinearRho(rho);
+  sl.value=Math.log10(rho);
+  calculate();
+}
+// ---- charts ----
 
 let chartCd, chartFD;
 
@@ -371,7 +409,7 @@ function initCharts(){
   const eps = parseFloat(document.getElementById('eps').value);
 
   document.getElementById('valD').textContent = D.toFixed(D<0.01?4:D<1?3:2)+' m';
-  document.getElementById('alphaNum').textContent = U.toFixed(2)+' m/s';
+  document.getElementById('valU').textContent = U.toFixed(2)+' m/s';
   document.getElementById('valL').textContent = L.toFixed(3)+' m';
   var _an=document.getElementById('alphaNum');if(_an)_an.value=alpha;
   var _en=document.getElementById('epsNum');if(_en)_en.value=eps;
@@ -390,6 +428,7 @@ function initCharts(){
   document.getElementById('lengthGroup').style.display = showL ? '' : 'none';
   const showAlpha = (shape==='flatplate'||shape==='streamlined');
   document.getElementById('alphaGroup').style.display = showAlpha ? '' : 'none';
+  document.getElementById('epsGroup').style.display = shape==='sphere' ? '' : 'none';
 
   const mu = nu * rho;
   const Re = U * D / nu;
@@ -403,30 +442,42 @@ function initCharts(){
 
   const Cd = getCd(shape, Re, alpha, eps);
   const Cl = getCl(shape, Re, alpha);
-  const FD = 0.5 * rho * U*U * Cd * A;
-  const FL = 0.5 * rho * U*U * Cl * A;
+  const q  = 0.5 * rho * U*U;          // dynamic pressure
+  const FD = q * Cd * A;
+  const FL = q * Cl * A;
+  const Pwr = FD * U;                    // power to overcome drag
+
+  // share state with the flow animation
+  flow.shape = shape; flow.U = U; flow.Cd = Cd; flow.FD = FD; flow.q = q;
+  flow.alpha = alpha; flow.Re = Re; flow.Cl = Cl;
 
   // terminal velocity for sphere only
   let Vt = '—';
   if(shape==='sphere'){
     const rho_p = 7800; // steel
     // iterative solve
-    let vt = Math.sqrt(4*rho_p*9.81*D/(3*rho*0.44));
+    let vt = Math.sqrt(4*Math.max(rho_p-rho,0)*9.81*D/(3*rho*0.44));
     for(let i=0;i<20;i++) {
       const ReT = vt*D/nu;
       const cdt = getCd('sphere', ReT, 0, eps);
-      vt = Math.sqrt(4*rho_p*9.81*D/(3*rho*cdt));
+      vt = Math.sqrt(4*Math.max(rho_p-rho,0)*9.81*D/(3*rho*cdt));
     }
     Vt = vt.toFixed(2)+' m/s';
   }// Strouhal for cylinder
   let StStr = '—';
   if(shape==='cylinder'){
-    const St = Re > 500 ? 0.2 : 0.212 - 4.45/Re;
-    const fv = St * U / D;
-    StStr = `St=${St.toFixed(3)}/ ${fmtE(fv)} Hz`;
+    if(Re < 47){
+      StStr = '— / 渦放出なし';
+    }else{
+      const St = Re > 500 ? 0.2 : 0.212 - 4.45/Re;
+      const fv = St * U / D;
+      StStr = `St=${St.toFixed(3)}/ ${fmtE(fv)} Hz`;
+    }
   }document.getElementById('resRe').textContent = Re.toExponential(2);
   document.getElementById('resCd').textContent = Cd.toFixed(3);
   document.getElementById('resFD').textContent = fmtE(FD)+' N';
+  document.getElementById('resq').textContent  = fmtE(q)+' Pa';
+  document.getElementById('resP').textContent  = fmtE(Pwr)+' W';
   document.getElementById('resFL').textContent = Cl > 0 ? fmtE(FL)+' N' : '—';
   document.getElementById('resVt').textContent = Vt;
   document.getElementById('resSt').textContent = StStr;
@@ -449,7 +500,183 @@ function initCharts(){
   });
   chartFD.data.datasets[1].data = [{x:U, y:FD}];
   chartFD.update('none');
-}window.addEventListener('DOMContentLoaded', ()=>{ initCharts(); calculate(); });
+}
+
+/* ===================== Flow visualization (hero animation) ===================== */
+const flow = { shape:'sphere', U:10, Cd:0.44, FD:0, q:0, alpha:0, Re:0, Cl:0 };
+const particles = [];
+let fCanvas, fctx, fW=0, fH=0, animId=null;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function sizeFlow(){
+  if(!fCanvas) return;
+  const rect = fCanvas.parentElement.getBoundingClientRect();
+  fW = Math.max(280, Math.floor(rect.width - 36));
+  fH = 300;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  fCanvas.style.height = fH + 'px';
+  fCanvas.width = Math.round(fW * dpr);
+  fCanvas.height = Math.round(fH * dpr);
+  fctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+// body geometry in canvas space (center cy, half-width hw, half-height hh)
+function bodyMetrics(){
+  const cx = fW*0.34, cy = fH*0.5;
+  const base = Math.min(fW, fH)*0.16;
+  const a = flow.alpha*Math.PI/180;
+  let hw=base, hh=base;
+  if(flow.shape==='cylinder'){ hw=base*0.85; hh=base*0.85; }
+  else if(flow.shape==='flatplate'){ hw=base*0.18; hh=base*1.25; }
+  else if(flow.shape==='streamlined'){ hw=base*1.7; hh=base*0.55; }
+  return {cx, cy, hw, hh, a};
+}
+
+// is point inside the body silhouette (used to deflect streamlines)
+function insideBody(x,y,bm){
+  const dx=x-bm.cx, dy=y-bm.cy;
+  // rotate by -alpha for plate/streamlined
+  const ca=Math.cos(-bm.a), sa=Math.sin(-bm.a);
+  const rx=dx*ca - dy*sa, ry=dx*sa + dy*ca;
+  if(flow.shape==='flatplate'){
+    return Math.abs(rx)<bm.hw && Math.abs(ry)<bm.hh;
+  }
+  return (rx*rx)/(bm.hw*bm.hw) + (ry*ry)/(bm.hh*bm.hh) < 1;
+}
+
+function drawBody(bm){
+  fctx.save();
+  fctx.translate(bm.cx, bm.cy);
+  fctx.rotate(bm.a);
+  const grad = fctx.createLinearGradient(-bm.hw,0,bm.hw,0);
+  grad.addColorStop(0,'#3aa0ff'); grad.addColorStop(1,'#1f6fd0');
+  fctx.fillStyle = grad;
+  fctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  fctx.lineWidth = 1.5;
+  fctx.beginPath();
+  if(flow.shape==='flatplate'){
+    fctx.rect(-bm.hw, -bm.hh, bm.hw*2, bm.hh*2);
+  } else {
+    fctx.ellipse(0,0,bm.hw,bm.hh,0,0,Math.PI*2);
+  }
+  fctx.fill(); fctx.stroke();
+  fctx.restore();
+}
+
+function flowArrow(x0,y0,x1,y1,color,width){
+  fctx.strokeStyle=color; fctx.fillStyle=color; fctx.lineWidth=width;
+  fctx.beginPath(); fctx.moveTo(x0,y0); fctx.lineTo(x1,y1); fctx.stroke();
+  const ang=Math.atan2(y1-y0,x1-x0), h=8+width;
+  fctx.beginPath(); fctx.moveTo(x1,y1);
+  fctx.lineTo(x1-h*Math.cos(ang-0.4), y1-h*Math.sin(ang-0.4));
+  fctx.lineTo(x1-h*Math.cos(ang+0.4), y1-h*Math.sin(ang+0.4));
+  fctx.closePath(); fctx.fill();
+}
+
+function spawnParticle(){
+  return { x:-10, y:Math.random()*fH, seed:Math.random()*Math.PI*2, life:0 };
+}
+
+function stepParticle(p, bm, speedPx){
+  // base rightward flow; deflect around the body, swirl in wake
+  let vx = speedPx, vy = 0;
+  const dx = p.x - bm.cx, dy = p.y - bm.cy;
+  const dist = Math.hypot(dx, dy) + 1e-3;
+  const reach = Math.max(bm.hw, bm.hh)*2.4;
+  if(p.x < bm.cx && dist < reach){
+    // push streamline around body (vertical deflection grows near body)
+    const push = (1 - dist/reach) * speedPx * 0.9;
+    vy += (dy>=0?1:-1) * push * (Math.abs(dy)/(Math.abs(dx)+8));
+  }
+  // wake: behind the body, add oscillating vortex shedding (von Karman)
+  if(p.x > bm.cx && Math.abs(dy) < bm.hh*2.2 && p.x < bm.cx + reach*1.8){
+    const wakeAmt = speedPx*0.5;
+    vy += Math.sin(p.x*0.06 - performance.now()*0.004*Math.max(0.4,flow.U/10) + p.seed) * wakeAmt
+          * (flow.shape==='streamlined'?0.25:1);
+    vx *= 0.82; // velocity deficit in wake
+  }
+  p.x += vx; p.y += vy; p.life++;
+  if(p.x > fW+10 || p.y < -10 || p.y > fH+10) Object.assign(p, spawnParticle(), {x:-Math.random()*30});
+}
+
+function renderFlow(){
+  sizeFlow();
+  fctx.clearRect(0,0,fW,fH);
+  fctx.fillStyle='#0a1628'; fctx.fillRect(0,0,fW,fH);
+  const bm = bodyMetrics();
+  // dynamic-pressure field hint: stagnation glow ahead of body grows with q
+  const qNorm = Math.min(1, flow.q/1500);
+  const stagG = fctx.createRadialGradient(bm.cx-bm.hw, bm.cy, 2, bm.cx-bm.hw, bm.cy, bm.hw*2.5);
+  stagG.addColorStop(0,`rgba(255,90,70,${0.10+0.45*qNorm})`);
+  stagG.addColorStop(1,'rgba(255,90,70,0)');
+  fctx.fillStyle=stagG;
+  fctx.beginPath(); fctx.arc(bm.cx-bm.hw, bm.cy, bm.hw*2.5, 0, Math.PI*2); fctx.fill();
+
+  const speedPx = Math.max(0.6, Math.min(6, 0.6 + flow.U*0.16));
+  // ensure particle population
+  while(particles.length < 150) particles.push(spawnParticle());
+  fctx.lineWidth=1.4;
+  for(const p of particles){
+    const px=p.x, py=p.y;
+    if(!reduceMotion) stepParticle(p, bm, speedPx);
+    else { p.x += 0; }
+    if(insideBody(p.x,p.y,bm)) continue;
+    // streak proportional to local speed
+    const dx=p.x-px, dy=p.y-py;
+    const inWake = p.x>bm.cx && Math.abs(p.y-bm.cy)<bm.hh*2.2;
+    fctx.strokeStyle = inWake ? 'rgba(0,180,216,0.55)' : 'rgba(120,190,255,0.65)';
+    fctx.beginPath();
+    fctx.moveTo(px,py);
+    fctx.lineTo(px - (reduceMotion?6:dx*3) , py - (reduceMotion?0:dy*3));
+    fctx.stroke();
+  }
+
+  drawBody(bm);
+
+  // drag force arrow: length ∝ FD (log-compressed so it stays on screen)
+  const Lmax = fW*0.30;
+  const fLen = Math.max(8, Math.min(Lmax, 18*Math.log10(1+flow.FD*40)));
+  const ay = bm.cy;
+  flowArrow(bm.cx, ay, bm.cx + fLen, ay, '#ff5a46', 3.5);
+  fctx.fillStyle='#ff5a46'; fctx.font='bold 12px Roboto Mono'; fctx.textAlign='left';
+  fctx.fillText('F_D = '+fmtE(flow.FD)+' N', bm.cx + fLen + 8, ay+4);
+
+  // lift arrow (if any)
+  if(flow.Cl>0.01){
+    const lLen = Math.max(6, Math.min(fH*0.28, 18*Math.log10(1+Math.abs(flow.q*flow.Cl*0.04*40))));
+    flowArrow(bm.cx, bm.cy, bm.cx, bm.cy - lLen, '#00e6a8', 3);
+    fctx.fillStyle='#00e6a8'; fctx.textAlign='center';
+    fctx.fillText('F_L', bm.cx, bm.cy - lLen - 6);
+  }
+
+  // labels
+  fctx.fillStyle='rgba(255,255,255,0.85)'; fctx.font='12px Noto Sans JP'; fctx.textAlign='left';
+  fctx.fillText('U = '+flow.U.toFixed(1)+' m/s  →', 10, 20);
+  fctx.fillStyle='rgba(255,180,120,0.95)'; fctx.textAlign='right';
+  fctx.fillText('動圧 q = '+fmtE(flow.q)+' Pa', fW-10, 20);
+  fctx.fillStyle='rgba(0,180,216,0.9)'; fctx.textAlign='left';
+  fctx.fillText('後流（ウェイク）', bm.cx+bm.hw+6, fH-12);
+}
+
+function flowLoop(){ renderFlow(); animId = requestAnimationFrame(flowLoop); }
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  fCanvas = document.getElementById('flowCanvas');
+  if(fCanvas){ fctx = fCanvas.getContext('2d'); sizeFlow(); }
+  initCharts();
+  calculate();
+  if(fCanvas){
+    if(reduceMotion) renderFlow();          // single static frame
+    else flowLoop();
+  }
+});
+window.addEventListener('resize', ()=>{ if(reduceMotion && fCanvas) renderFlow(); });
+
+// expose handlers referenced by inline HTML attributes
+window.calculate = calculate;
+window.syncRhoToNum = syncRhoToNum;
+window.syncRhoFromNum = syncRhoFromNum;
+})();
 </script>
 
 <section class="explanation">
@@ -511,6 +738,9 @@ function initCharts(){
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="drag-calculation.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -562,25 +792,31 @@ function initCharts(){
 <!-- codex-static-related-tools:end -->
 
 <div class="howto-card howto-guide">
-<h3>使い方ガイド</h3>
-<ol>
-<li>球・円柱・平板から対象形状を選択し、代表寸法D(mm)を入力します。例：球径50mm、円柱直径25mm</li>
-<li>流体種(空気・水・油)を選択するか、密度ρ(kg/m³)と動粘性係数ν(m²/s)を直接指定します。水の場合ρ=1000kg/m³、ν=1.0×10⁻⁶m²/s</li>
-<li>流速U(m/s)と迎え角α(°)を入力すると、Reynolds数Re、抗力係数Cd、抗力FD、揚力FL、カルマン渦周波数をリアルタイム計算します</li>
-</ol>
+<h3>使い方</h3>
+<p>形状、流体、代表長さ、流速を選ぶと、抗力・レイノルズ数・抗力係数・終端速度がリアルタイムで更新されます。カスタム流体の密度は線形値（kg/m³）として入力し、内部スライダーは対数目盛りで広い範囲を扱います。</p>
 </div>
 <div class="howto-card howto-example">
-<h3>具体的な計算例</h3>
-<p>直径50mmの球が20℃の水中で流速3.0m/sで流動される場合：Re=150,000、Cd=0.47、抗力FD≈106N。同じ球が空気中(ρ=1.2kg/m³)で風速20m/sの場合：Re=67,000、Cd=0.41、抗力FD≈2.1N。直径20mmの円柱が垂直配置(α=90°)で同一風速時：Re=26,800、Cd=1.2、抗力FD≈0.86N、Strouhal数St=0.21からカルマン渦周波数f=210Hzが算出されます。</p>
+<h3>計算例</h3>
+<p>水中の直径50 mm球、U=3 m/s、Cd≈0.44なら抗力は約3.88 Nです。空気中の直径50 mm球、U=20 m/sでは約0.208 Nです。空気中の直径20 mm・長さ1 mの円柱をU=20 m/s、Cd=1.0とすると抗力は約4.82 N、渦放出周波数は約200 Hzです。</p>
 </div>
 <div class="howto-card howto-notes">
-<h3>実務での注意点</h3>
-<ol>
-<li>Re&lt;1(Stokes領域)では式Cd=24/Reを用いて精密計算；Re=100～10⁵ではCd値の非線形性が顕著で、迎え角変化時に揚力が急激に増減するため設計マージンを確保してください</li>
-<li>円柱のカルマン渦周波数は共振を引き起こしやすく、スタックスが低周波(5～50Hz)の場合は機械疲労を検討します</li>
-<li>粘度が大きい油(ν=100×10⁻⁶m²/s)での計算では、層流支配的となりCd値が単調減少するため、乱流係数表を参照せず本ツールの曲線依存設定で検証してください</li>
-</ol>
+<h3>注意点</h3>
+<ul>
+<li>球の粗さ入力は球形状のときだけ有効です。</li>
+<li>終端速度は鋼球密度7800 kg/m³を仮定し、浮力を差し引いて概算します。</li>
+<li>レイノルズ数が約47未満の円柱では安定したカルマン渦放出を表示しません。</li>
+</ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

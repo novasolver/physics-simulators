@@ -38,7 +38,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "斜張橋ケーブル張力計算ツール",
       "description": "斜張橋のケーブル張力をリアルタイム計算。スパン・タワー高さ・ケーブル本数・死荷重・活荷重を入力し、各ケーブルの張力・必要断面積を算出。",
       "url": "https://novasolver.jp/tools/cable-stayed-bridge.html",
@@ -48,7 +48,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ケーブル角度・張力の自動計算","ブリッジ立面図の色分け表示","必要ケーブル断面積の算出"],
       "keywords": "斜張橋,ケーブル張力,橋梁設計,構造解析,CAE",
       "datePublished": "2026-04-08",
@@ -167,6 +167,10 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="param-label"><span class="param-name">活荷重 q (kN/m)</span><div class="num-wrap"><input type="number" class="num-input" id="vQ" value="20" min="0" max="100" step="5" oninput="syncFromNum('sQ','vQ')"><span class="num-unit">kN/m</span></div></div>
       <input type="range" id="sQ" min="0" max="100" value="20" oninput="syncToNum('sQ','vQ');updateSlider(this,'vQ',0,'');calc()">
     </div>
+    <div class="param-group">
+      <div class="param-label"><span class="param-name">移動荷重 P (kN)</span><div class="num-wrap"><input type="number" class="num-input" id="vP" value="600" min="0" max="2000" step="50" oninput="syncFromNum('sP','vP')"><span class="num-unit">kN</span></div></div>
+      <input type="range" id="sP" min="0" max="2000" value="600" oninput="syncToNum('sP','vP');updateSlider(this,'vP',0,'');calc()">
+    </div>
 
     <div class="divider"></div>
     <div class="panel-title">ケーブル鋼材</div>
@@ -180,22 +184,48 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
+    <div class="panel-title">アニメーション</div>
+    <div class="btn-group" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button type="button" class="btn" id="btnPlay" onclick="togglePlay()" aria-label="再生 / 一時停止">⏸ 一時停止</button>
+      <button type="button" class="btn" onclick="resetAnim()" aria-label="最初から">⟲ 最初から</button>
+    </div>
+    <div class="param-group">
+      <span class="param-name" style="display:block;margin-bottom:6px">プリセット</span>
+      <div class="btn-group" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" class="preset-btn" onclick="preset('fan')" aria-label="ファン配置">ファン配置</button>
+        <button type="button" class="preset-btn" onclick="preset('harp')" aria-label="ハープ配置">ハープ配置</button>
+        <button type="button" class="preset-btn" onclick="preset('heavy')" aria-label="大型車両通過">大型車両通過</button>
+      </div>
+    </div>
 
+    <div class="divider"></div>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（ライブ）</div>
     <div class="stat-cards">
-      <div class="stat-card"><div class="sv" id="sMaxT">—</div><div class="sl">最大張力 (kN)</div></div>
-      <div class="stat-card"><div class="sv" id="sMaxDef">—</div><div class="sl">最大たわみ推定 (mm)</div></div>
+      <div class="stat-card"><div class="sv" id="sMaxT">—</div><div class="sl">最大ケーブル張力 (kN)</div></div>
+      <div class="stat-card"><div class="sv" id="sTower">—</div><div class="sl">タワー圧縮 軸力 (kN)</div></div>
+      <div class="stat-card"><div class="sv" id="sMaxDef">—</div><div class="sl">桁たわみ (mm)</div></div>
+      <div class="stat-card"><div class="sv" id="sNCab">—</div><div class="sl">ケーブル本数</div></div>
+      <div class="stat-card"><div class="sv" id="sLoad">—</div><div class="sl">移動荷重位置 (kN)</div></div>
       <div class="stat-card"><div class="sv" id="sTotalW">—</div><div class="sl">総ケーブル重量 (t)</div></div>
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 橋梁</div><canvas id="bridgeCanvas" height="400"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 斜張橋ライブアニメーション</div><canvas id="bridgeCanvas" height="400" role="img" aria-label="斜張橋の立面図。タワーから伸びるステイケーブルが張力で色分けされ、移動荷重が桁上を進むとケーブル力が再配分される様子をリアルタイム表示。"></canvas></div>
     <div style="margin-top:16px;overflow-x:auto">
       <table class="cable-table" id="cableTable">
-        <thead><tr><th>#</th><th>角度 (°)</th><th>張力 (kN)</th><th>必要断面積 (mm²)</th><th>利用率 (%)</th></tr></thead>
+        <thead><tr><th>#</th><th>角度 (°)</th><th>張力 (kN)</th><th>必要断面積 (mm²)</th><th>利用率 (%)<sup>※</sup></th></tr></thead>
         <tbody id="cableBody"></tbody>
       </table>
     </div>
@@ -230,156 +260,238 @@ function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
 }
 
 
-function calc(){
-  const L=parseFloat(document.getElementById('sL').value);
-  const H=parseFloat(document.getElementById('sH').value);
-  const N=parseInt(document.getElementById('sN').value);
-  const w=parseFloat(document.getElementById('sW').value);
-  const q=parseFloat(document.getElementById('sQ').value);
-  const fpu=parseFloat(document.getElementById('sFpu').value);
-  const halfL=L/2;
-  const dL=halfL/N; // segment length per cable
-  const totalLoad=(w+q);
-  const cables=[];
-  let maxT=0,totalA=0;
-  for(let i=1;i<=N;i++){
-    const x=i*dL; // horizontal dist from tower
-    const theta=Math.atan(H/x);
-    const V=totalLoad*dL;
-    const T=V/Math.sin(theta);
-    const A=T*1000/(0.6*fpu); // mm²
-    const util=(T*1000/(A*0.6*fpu))*100;
+/* ===== v2 cable-stayed bridge: live rAF animation, physics visible ===== */
+var ANIM = { playing:true, raf:0, t0:0, loadX:0, last:null, layout:'fan' };
+function FIN(x){ return typeof x==='number' && isFinite(x); }
+
+// Read inputs and compute the full structural state, optionally with a moving
+// point load P located at fraction px of the half-span on the right side.
+function computeState(px){
+  var L=parseFloat(document.getElementById('sL').value);
+  var H=parseFloat(document.getElementById('sH').value);
+  var N=parseInt(document.getElementById('sN').value);
+  var w=parseFloat(document.getElementById('sW').value);
+  var q=parseFloat(document.getElementById('sQ').value);
+  var P=parseFloat(document.getElementById('sP').value);
+  var fpu=parseFloat(document.getElementById('sFpu').value);
+  if(!FIN(L))L=200; if(!FIN(H))H=50; if(!FIN(N)||N<1)N=6;
+  if(!FIN(w))w=50; if(!FIN(q))q=0; if(!FIN(P))P=0; if(!FIN(fpu)||fpu<=0)fpu=1860;
+  var halfL=L/2, dL=halfL/N, totalLoad=w+q;
+  // absolute horizontal position (m, from tower) of the moving point load on right side
+  var loadPos = (FIN(px)?Math.max(0,Math.min(1,px)):0)*halfL;
+  // which cable picks up the moving load: the nearest cable anchor
+  var loadCable = Math.max(1,Math.min(N, Math.round(loadPos/dL)));
+  var cables=[], maxT=0, totalWt=0, towerV=0;
+  for(var i=1;i<=N;i++){
+    var x=i*dL;                       // anchor horizontal dist from tower
+    var theta=Math.atan(H/Math.max(x,1e-6));
+    var V=totalLoad*dL;               // tributary distributed vertical load
+    if(i===loadCable) V+=P;           // moving point load adds to nearest cable
+    var T=V/Math.sin(theta);          // cable tension from vertical equilibrium
+    var A=T*1000/(0.6*fpu);           // mm² required area
     if(T>maxT)maxT=T;
-    // cable weight approx: steel density 7850 kg/m³, length = H/sin(theta)
-    const cLen=H/Math.sin(theta);
-    totalA+=A*cLen*7850e-9; // tonnes
-    cables.push({i,x,theta:theta*180/Math.PI,T,A,util:100});
+    var cLen=H/Math.sin(theta);
+    totalWt+=A*cLen*7850e-9;          // tonnes (one side, one set)
+    // tower axial: vertical component of every cable both sides. Horizontal
+    // components from the two symmetric stays cancel at the tower head.
+    towerV += 2*T*Math.sin(theta);    // both sides => 2 * V_i
+    cables.push({i:i,x:x,theta:theta,T:T,A:A,load:(i===loadCable&&P>0)});
   }
-  // deflection estimate: 5qL^4/384EI, assume EI from cable stiffness factor
-  const EI=1e8*(N/6); // rough
-  const defMm=5*totalLoad*1e3*Math.pow(L,4)/(384*EI)*1000*0.3; // rough reduction
-  document.getElementById('sMaxT').textContent=maxT.toFixed(0);
-  document.getElementById('sMaxDef').textContent=Math.max(5,defMm).toFixed(0);
-  document.getElementById('sTotalW').textContent=(totalA*2).toFixed(1);
+  // PRESERVED bounded deflection heuristic (naive L^4 form gives km-scale,
+  // non-physical deflection). Baseline ~L/400 at N=6,total=70; stiffer with
+  // more cables, larger with more load. Moving load adds a small live term.
+  var kDef = 400*Math.sqrt(N/6)*Math.pow(70/Math.max(totalLoad,1),0.4);
+  var defMm = L/kDef*1000;
+  defMm *= (1 + 0.15*(P/Math.max(totalLoad*halfL,1)));
+  defMm = Math.max(5, defMm);
+  return { L:L,H:H,N:N,w:w,q:q,P:P,fpu:fpu, halfL:halfL, dL:dL, totalLoad:totalLoad,
+           cables:cables, maxT:maxT, towerAxial:towerV, defMm:defMm, totalWt:totalWt*2,
+           loadPos:loadPos, loadCable:loadCable };
+}
 
-  // table
-  const tbody=document.getElementById('cableBody');
-  tbody.innerHTML='';
-  for(const c of cables){
-    const row=document.createElement('tr');
-    row.innerHTML=`<td style="text-align:center">${c.i}</td><td>${c.theta.toFixed(1)}</td><td>${c.T.toFixed(0)}</td><td>${c.A.toFixed(0)}</td><td>${c.util.toFixed(0)}</td>`;
-    tbody.appendChild(row);
+function updateStats(s){
+  function set(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
+  set('sMaxT', FIN(s.maxT)?s.maxT.toFixed(0):'—');
+  set('sTower', FIN(s.towerAxial)?s.towerAxial.toFixed(0):'—');
+  set('sMaxDef', FIN(s.defMm)?s.defMm.toFixed(0):'—');
+  set('sNCab', String(s.N));
+  set('sLoad', FIN(s.P)?s.P.toFixed(0):'—');
+  set('sTotalW', FIN(s.totalWt)?s.totalWt.toFixed(1):'—');
+  var tbody=document.getElementById('cableBody');
+  if(tbody){
+    var html='';
+    for(var k=0;k<s.cables.length;k++){
+      var c=s.cables[k];
+      html+='<tr'+(c.load?' style="background:rgba(255,180,0,.18)"':'')+'><td style="text-align:center">'+c.i+(c.load?' ▼':'')+'</td><td>'+(c.theta*180/Math.PI).toFixed(1)+'</td><td>'+c.T.toFixed(0)+'</td><td>'+c.A.toFixed(0)+'</td><td>100</td></tr>';
+    }
+    tbody.innerHTML=html;
   }
-  drawBridge(L,H,N,cables,w+q);
-}function drawBridge(L,H,N,cables,totalLoad){
-  const cv=document.getElementById('bridgeCanvas');
-  const ctx=cv.getContext('2d');
-  const W=cv.offsetWidth||800;
-  __novaHiDpiCanvas(cv, W, Math.max(300,W*0.45), ctx);
-  const cw=__novaCanvasCssW(cv),ch=__novaCanvasCssH(cv);
+}
+
+function tensionColor(r){
+  r=Math.max(0,Math.min(1,r));
+  var R=Math.round(255*r);
+  var G=Math.round(255*(1-r)*0.7+50);
+  var B=Math.round(255*(1-r));
+  return 'rgb('+R+','+G+','+B+')';
+}
+
+function drawBridge(s){
+  var cv=document.getElementById('bridgeCanvas'); if(!cv) return;
+  var ctx=cv.getContext('2d');
+  var W=cv.clientWidth||cv.offsetWidth||800;
+  if(!FIN(W)||W<10)W=800;
+  var dim=__novaHiDpiCanvas(cv, W, Math.max(300,W*0.5), ctx);
+  var cw=dim.w, ch=dim.h;
+  if(!FIN(cw)||!FIN(ch))return;
   ctx.clearRect(0,0,cw,ch);
-  ctx.fillStyle='#020d1a';
-  ctx.fillRect(0,0,cw,ch);
+  ctx.fillStyle='#020d1a'; ctx.fillRect(0,0,cw,ch);
 
-  const margin=40;
-  const drawW=cw-margin*2;
-  const drawH=ch-margin*2;
-  const cx=cw/2;
-  // bridge deck y
-  const deckY=ch-margin-30;
-  // tower top y
-  const scaleY=drawH/(H*1.3);
-  const towerTopY=deckY-H*scaleY;
-  // scale x: L fits in drawW
-  const scaleX=drawW/L;
+  var margin=44;
+  var drawH=ch-margin*2;
+  var cx=cw/2;
+  var deckY=ch-margin-30;
+  var L=s.L, H=s.H;
+  var scaleY=drawH/(H*1.35);
+  var towerTopY=deckY-H*scaleY;
+  var scaleX=(cw-margin*2)/L;
+  var cMaxT=s.maxT||1;
 
-  // draw water
-  ctx.fillStyle='rgba(0,100,180,0.2)';
-  ctx.fillRect(0,deckY+8,cw,ch-deckY-8);
+  // water
+  ctx.fillStyle='rgba(0,100,180,0.18)';
+  ctx.fillRect(0,deckY+10,cw,ch-deckY-10);
 
-  // draw deck
-  ctx.strokeStyle='#aaa';
+  // deflected deck (sag scaled visually from defMm, exaggerated for clarity)
+  var sagPx=Math.min(deckY*0.5, (s.defMm/1000)*scaleY*60);
+  ctx.strokeStyle='#9fb0c0'; ctx.lineWidth=3;
+  ctx.beginPath();
+  for(var px2=-L/2; px2<=L/2; px2+=L/60){
+    var sx=cx+px2*scaleX;
+    // parabolic sag profile, max at mid of each half-span
+    var f=Math.cos(Math.PI*px2/L);              // 1 at center, 0 at ends
+    var dy=sagPx*(1-Math.abs(px2)/(L/2))*Math.max(0,f);
+    if(px2===-L/2) ctx.moveTo(sx,deckY+dy); else ctx.lineTo(sx,deckY+dy);
+  }
+  ctx.stroke();
+
+  // tower (compression member) — thickness/shade hints axial magnitude
+  var towerLw=Math.max(4,Math.min(12,4+s.towerAxial/4000));
+  ctx.strokeStyle='#d7dee6'; ctx.lineWidth=towerLw;
+  ctx.beginPath(); ctx.moveTo(cx,deckY+4); ctx.lineTo(cx,towerTopY); ctx.stroke();
   ctx.lineWidth=3;
   ctx.beginPath();
-  ctx.moveTo(margin,deckY);
-  ctx.lineTo(cw-margin,deckY);
+  ctx.moveTo(cx-10,towerTopY+H*scaleY*0.32);
+  ctx.lineTo(cx+10,towerTopY+H*scaleY*0.32);
   ctx.stroke();
+  // tower compression arrow (downward)
+  ctx.strokeStyle='#ff6b3d'; ctx.fillStyle='#ff6b3d'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(cx+towerLw+6,towerTopY+16); ctx.lineTo(cx+towerLw+6,towerTopY+40); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx+towerLw+2,towerTopY+34); ctx.lineTo(cx+towerLw+6,towerTopY+40); ctx.lineTo(cx+towerLw+10,towerTopY+34); ctx.fill();
 
-  // draw tower
-  ctx.strokeStyle='#e0e0e0';
-  ctx.lineWidth=4;
-  ctx.beginPath();
-  ctx.moveTo(cx,deckY);
-  ctx.lineTo(cx,towerTopY);
-  ctx.stroke();
-  // tower crossbar
-  ctx.lineWidth=3;
-  ctx.beginPath();
-  ctx.moveTo(cx-10,towerTopY+H*scaleY*0.35);
-  ctx.lineTo(cx+10,towerTopY+H*scaleY*0.35);
-  ctx.stroke();
-
-  // max tension for color mapping
-  const maxT=cables[cables.length-1]?cables[cables.length-1].T:1;
-  const cMaxT=Math.max(...cables.map(c=>c.T));
-
-  // color by tension
-  function tensionColor(T){
-    const r=T/cMaxT;
-    const R=Math.round(255*r);
-    const G=Math.round(255*(1-r)*0.7+50);
-    const B=Math.round(255*(1-r));
-    return `rgb(${R},${G},${B})`;
-  }// draw cables both sides
-  const halfL=L/2;
-  const dL=halfL/cables.length;
-  for(const c of cables){
-    const x=c.x*scaleX;
-    const y=deckY;
-    const color=tensionColor(c.T);
-    ctx.strokeStyle=color;
-    ctx.lineWidth=1.5;
-    // right side
-    ctx.beginPath();
-    ctx.moveTo(cx,towerTopY);
-    ctx.lineTo(cx+x,y);
-    ctx.stroke();
-    // left side
-    ctx.beginPath();
-    ctx.moveTo(cx,towerTopY);
-    ctx.lineTo(cx-x,y);
-    ctx.stroke();
+  // cables, colored & thickness by tension
+  for(var k=0;k<s.cables.length;k++){
+    var c=s.cables[k];
+    var ax=c.x*scaleX;
+    var r=c.T/cMaxT;
+    var col=tensionColor(r);
+    var lw=1+3*r;
+    // anchor y on the deflected deck
+    function anchorY(xm){ var f=Math.cos(Math.PI*xm/L); return deckY+sagPx*(1-Math.abs(xm)/(L/2))*Math.max(0,f); }
+    // right
+    ctx.strokeStyle=col; ctx.lineWidth=lw;
+    ctx.beginPath(); ctx.moveTo(cx,towerTopY+4); ctx.lineTo(cx+ax,anchorY(c.x)); ctx.stroke();
+    // left
+    ctx.beginPath(); ctx.moveTo(cx,towerTopY+4); ctx.lineTo(cx-ax,anchorY(-c.x)); ctx.stroke();
+    // tension label on the highest-tension (outermost) cable
+    if(k===s.cables.length-1){
+      ctx.fillStyle='#ffcaa8'; ctx.font='10px Roboto Mono, monospace';
+      ctx.fillText(c.T.toFixed(0)+' kN', cx+ax*0.5+4, anchorY(c.x*0.5)-6);
+    }
   }
 
-  // labels
-  ctx.fillStyle='#fff';
-  ctx.font='12px Roboto Mono, monospace';
-  ctx.fillText('TOWER',cx+6,towerTopY+10);
-  ctx.fillStyle='rgba(255,255,255,0.5)';
-  ctx.font='10px Roboto Mono, monospace';
-  ctx.fillText('L = '+cables[cables.length-1]?.x.toFixed(0)*2+'m →',cx+4,deckY+22);
+  // moving load marker (a crossing vehicle) on the right half
+  var lx=cx+s.loadPos*scaleX;
+  var ly=deckY+sagPx*(1-Math.abs(s.loadPos)/(L/2))*Math.max(0,Math.cos(Math.PI*s.loadPos/L));
+  if(s.P>0){
+    ctx.fillStyle='#ffd23f';
+    ctx.fillRect(lx-9,ly-12,18,9);
+    ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(lx-5,ly-2,2.4,0,Math.PI*2); ctx.arc(lx+5,ly-2,2.4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffd23f'; ctx.font='10px Roboto Mono, monospace';
+    ctx.fillText(s.P.toFixed(0)+' kN', lx+12, ly-6);
+    // load downward arrow
+    ctx.strokeStyle='#ffd23f'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(lx,ly+2); ctx.lineTo(lx,ly+18); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx-3,ly+13); ctx.lineTo(lx,ly+18); ctx.lineTo(lx+3,ly+13); ctx.fillStyle='#ffd23f'; ctx.fill();
+  }
+
+  // overlays / labels
+  ctx.fillStyle='#fff'; ctx.font='12px Roboto Mono, monospace';
+  ctx.fillText('TOWER', cx+towerLw+6, towerTopY+10);
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='10px Roboto Mono, monospace';
+  ctx.fillText('L = '+L.toFixed(0)+' m', cx-22, deckY+24);
+  ctx.fillText('H = '+H.toFixed(0)+' m', cx+towerLw+6, towerTopY-6);
 
   // color legend
-  const lgX=cw-margin-80;
-  const lgY=towerTopY+10;
-  const grad=ctx.createLinearGradient(lgX,lgY,lgX+60,lgY);
-  grad.addColorStop(0,'rgb(0,178,255)');
-  grad.addColorStop(1,'rgb(255,50,0)');
-  ctx.fillStyle=grad;
-  ctx.fillRect(lgX,lgY,60,8);
-  ctx.fillStyle='rgba(255,255,255,0.6)';
-  ctx.font='9px sans-serif';
-  ctx.fillText('低',lgX,lgY+20);
-  ctx.fillText('高',lgX+52,lgY+20);
-  ctx.fillText('張力',lgX+20,lgY+20);
-}window.addEventListener('load',()=>{
-  document.querySelectorAll('input[type=range]').forEach(el=>{
-    const mn=parseFloat(el.min),mx=parseFloat(el.max),v=parseFloat(el.value);
+  var lgX=cw-margin-78, lgY=towerTopY+8;
+  var grad=ctx.createLinearGradient(lgX,lgY,lgX+60,lgY);
+  grad.addColorStop(0,'rgb(0,178,255)'); grad.addColorStop(1,'rgb(255,50,0)');
+  ctx.fillStyle=grad; ctx.fillRect(lgX,lgY,60,8);
+  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='9px sans-serif';
+  ctx.fillText('低', lgX, lgY+20); ctx.fillText('張力', lgX+22, lgY+20); ctx.fillText('高', lgX+52, lgY+20);
+}
+
+// Called on any input change: recompute static (load at rest) and redraw.
+function calc(){
+  var s=computeState(ANIM.last!==null?ANIM.last:0);
+  ANIM.cacheStatic=s;
+  updateStats(s); drawBridge(s);
+}
+
+function frame(ts){
+  if(!ANIM.playing){ ANIM.raf=0; return; }
+  if(!ANIM.t0) ANIM.t0=ts;
+  var elapsed=(ts-ANIM.t0)/1000;
+  // load sweeps 0..1 across the right half-span and back, ~8s period
+  var ph=(elapsed/8)%1;
+  var px=ph<0.5 ? ph*2 : (1-ph)*2;
+  ANIM.last=px;
+  var s=computeState(px);
+  updateStats(s); drawBridge(s);
+  ANIM.raf=requestAnimationFrame(frame);
+}
+
+function startAnim(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    ANIM.playing=false; var b=document.getElementById('btnPlay'); if(b)b.textContent='▶ 再生';
+    ANIM.last=0.5; calc(); return;
+  }
+  if(!ANIM.raf){ ANIM.t0=0; ANIM.raf=requestAnimationFrame(frame); }
+}
+function togglePlay(){
+  ANIM.playing=!ANIM.playing;
+  var b=document.getElementById('btnPlay');
+  if(ANIM.playing){ if(b)b.textContent='⏸ 一時停止'; ANIM.t0=0; if(!ANIM.raf)ANIM.raf=requestAnimationFrame(frame); }
+  else { if(b)b.textContent='▶ 再生'; }
+}
+function resetAnim(){ ANIM.t0=0; ANIM.last=0; calc(); if(ANIM.playing && !ANIM.raf) ANIM.raf=requestAnimationFrame(frame); }
+
+function _setRange(id,val){ var e=document.getElementById(id); if(e){ e.value=val; var n=parseFloat(e.min),x=parseFloat(e.max); e.style.setProperty('--pct',((val-n)/(x-n)*100)+'%'); } var v=document.getElementById('v'+id.slice(1)); if(v)v.value=val; }
+function preset(kind){
+  if(kind==='fan'){ _setRange('sL',200); _setRange('sH',70); _setRange('sN',8); _setRange('sW',50); _setRange('sQ',20); _setRange('sP',600); }
+  else if(kind==='harp'){ _setRange('sL',300); _setRange('sH',50); _setRange('sN',12); _setRange('sW',60); _setRange('sQ',20); _setRange('sP',400); }
+  else if(kind==='heavy'){ _setRange('sL',250); _setRange('sH',60); _setRange('sN',8); _setRange('sW',60); _setRange('sQ',30); _setRange('sP',1600); }
+  calc();
+}
+
+window.addEventListener('load',function(){
+  document.querySelectorAll('input[type=range]').forEach(function(el){
+    var mn=parseFloat(el.min),mx=parseFloat(el.max),v=parseFloat(el.value);
     el.style.setProperty('--pct',((v-mn)/(mx-mn)*100)+'%');
   });
   calc();
+  startAnim();
 });
-window.addEventListener('resize',calc);
+window.addEventListener('resize',function(){ var s=computeState(ANIM.last!==null?ANIM.last:0); drawBridge(s); });
 </script>
 
 <section class="explanation">
@@ -441,6 +553,9 @@ window.addEventListener('resize',calc);
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="cable-stayed-bridge.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -494,14 +609,14 @@ window.addEventListener('resize',calc);
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>主塔高さ(vH)と主スパン長(vL)を入力します。例：主塔高さ120m、主スパン550mの場合</li>
-<li>副塔高さ(sH)と副スパン長(sL)を設定し、ケーブル本数(vN、sN)を指定します</li>
+<li>タワー高(vH/sH)と主スパン長(vL/sL)を入力します。例：タワー高120m、主スパン480mの場合（主スパンは50〜500m）</li>
+<li>ケーブル本数(vN/sN、片側4〜20本)を指定し、死荷重w(vW/sW)・活荷重q(vQ/sQ)をkN/mで入力します</li>
 <li>設計荷重(vW、sW)をkN/mで入力すると、最大張力(kN)・最大たわみ推定(mm)・総ケーブル重量(t)がリアルタイム算出されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>主スパン450m、主塔高さ100m、ケーブル本数52本、設計荷重12kN/mの斜張橋を想定します。各ケーブルの張力は水平成分Hと鉛直成分Vに分解され、H≒2,850kN、V≒270kNとなります。ケーブル径はφ91mm(素線29本、公称面積6,510mm²)でSM1670級高強度鋼を採用した場合、許容張力は約10,900kNです。このとき最大張力は3,100kN程度、最大たわみ推定は65mm、総ケーブル重量は約180tと計算されます。</p>
+<p>主スパン200m、タワー高50m、ケーブル本数6本（片側）、死荷重50kN/m・活荷重20kN/mを入力した場合を考えます。各ケーブルはタワーからの水平距離が近いほど角度が急で張力が小さく、遠いほど緩く張力が大きくなり、本ツールでは内側#1（角度71.6°）の約1,230kNから外側#6（角度26.6°）の約2,609kNまで分布します。したがって最大張力は約2,609kN、各ケーブルの必要断面積は張力÷(0.6×fpu)で算出され、総ケーブル重量は約13.2t、最大たわみ推定は約500mm（≒スパンの1/400）となります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -511,6 +626,16 @@ window.addEventListener('resize',calc);
 <li>既設橋梁の張力測定は弦振動式センサで検証し、計算値との乖離が5%を超える場合は構造安全性評価を実施してください</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

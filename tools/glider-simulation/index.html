@@ -116,14 +116,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "グライダー滑空比・熱気流シミュレーター",
       "description": "グライダーの極曲線・最良滑空速度・最小沈下速度・マクレディ速度をリアルタイム計算。サーマル強度・風速の影響を考慮したクロスカントリー速度をシミュレート。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/glider-simulation.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -281,7 +281,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="slAlt" min="500" max="3000" step="100" value="1500" oninput="syncToNum('slAlt','altNum');updateSlider(this);compute()">
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
 <div class="viz-panel">
@@ -311,10 +319,18 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="sv" id="statXC">—</div>
         <div class="sl">XC速度 [km/h]</div>
       </div>
+      <div class="stat-card">
+        <div class="sv" id="statAngle">—</div>
+        <div class="sl">滑空角 θ [°]</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statRange">—</div>
+        <div class="sl">滑空到達距離 [km]</div>
+      </div>
     </div>
     </div>
 
-      <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> グライダー</div><canvas id="cvGlider" height="280"></canvas></div>
+      <div class="chart-card"><div class="chart-title"><i class="fas fa-paper-plane"></i> 滑空経路ライブアニメーション（滑空角・揚力/抗力/重力ベクトル）</div><canvas id="cvGlider" height="300"></canvas></div>
 
       <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 極線図</div><canvas class="ux-chartjs-canvas" id="chartPolar" height="200"></canvas></div>
     
@@ -330,6 +346,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
+(function(){
+'use strict';
+var L = {
+  vmc:'Vmc', sink:'沈下', ld:'L/D', angle:'滑空角', range:'到達距離',
+  lift:'揚力 L', drag:'抗力 D', weight:'重力 W', path:'滑空経路',
+  ground:'地面', hint:'滑空角 θ = arctan(1/(L/D)) — L/Dが大きいほど経路は浅く、遠くまで滑空',
+  altLabel:'高度', perKm:'km'
+};
+
 function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   canvas.setAttribute('data-ux-no-scale', '1');
@@ -448,118 +473,164 @@ function sinkRate(V, ws, CD0, k){
       }
     }
   });
-}function drawFlight(ws, CD0, k, wt, wind, Vmc, mcSink, startAlt, thermSpacing){
-  const cv = document.getElementById('cvGlider');
-  const ctx = cv.getContext('2d');
-const W = cv.parentElement.getBoundingClientRect().width - 44;
-const cw = Math.floor(W);
-const ch = 280;
-__novaHiDpiCanvas(cv, cw, ch, ctx);
+}
 
-  // Sky
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, ch);
-  skyGrad.addColorStop(0, '#0a1628');
-  skyGrad.addColorStop(0.7, '#1a4a8a');
-  skyGrad.addColorStop(1, '#2a5a3a');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, cw, ch);
+/* ===== V2 live glide-path animation ===== */
+var __glState = null;   // {LDmax, Vmc, mcSink, startAlt, theta, range}
+var __glAnim = null, __glLastTs = 0, __glProg = 0;
+var __glReduced = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-  // Ground
-  ctx.fillStyle = '#2a5a3a';
-  ctx.fillRect(0, ch - 20, cw, 20);
-
-  const maxDist = thermSpacing * 3;
-  const maxAlt = startAlt * 1.2;
-  const padL = 40, padR = 20, padB = 30, padT = 20;
-
-  function tx(x) { return padL + (x / maxDist) * (cw - padL - padR); }function ty(y){ return ch - padB - (y / maxAlt) * (ch - padT - padB); }// Grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++){
-    const yg = maxAlt * i / 4;
-    ctx.beginPath(); ctx.moveTo(padL, ty(yg)); ctx.lineTo(cw - padR, ty(yg)); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '9px Roboto Mono';
-    ctx.textAlign = 'right'; ctx.fillText((yg / 1000).toFixed(1) + 'km', padL - 3, ty(yg) + 4);
-  }ctx.textAlign = 'left';
-
-  // Simulate flight
-  let x = 0, alt = startAlt;
-  const pts = [{ x, alt }];
-  const thermals = [];
-
-  while (x < maxDist && alt > 0){
-    // Glide to next thermal
-    const dt = 5; // 5 seconds
-    const Vground = Vmc + wind;
-    const dxdt = Vground > 0 ? Vground : 1;
-    const dalt = -mcSink * dt;
-    x += dxdt * dt;
-    alt += dalt;
-    if (alt < 0) alt = 0;
-    pts.push({ x, alt });
-
-    // Check if near thermal
-    const nextTherm = Math.ceil(x / thermSpacing) * thermSpacing;
-    if (x >= nextTherm - 5 && alt > 100 && wt > 0){
-      thermals.push({ x, alt });
-      // Climb
-      const maxClimb = startAlt - alt;
-      const climbTime = maxClimb / Math.max(wt, 0.1);
-      alt = Math.min(alt + wt * climbTime, startAlt);
-      pts.push({ x, alt });
-    }
-  }// Draw thermals (spirals)
-  thermals.forEach(th =>{
-    ctx.beginPath();
-    ctx.arc(tx(th.x), ty(th.alt / 2), 18, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(243,156,18,0.2)';
-    ctx.setLineDash([3, 3]);
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.setLineDash([]);
-    // Thermal updraft arrow
-    ctx.beginPath();
-    ctx.moveTo(tx(th.x), ty(0));
-    ctx.lineTo(tx(th.x), ty(startAlt * 0.9));
-    ctx.strokeStyle = 'rgba(243,156,18,0.4)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 4]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(243,156,18,0.8)';
-    ctx.font = '10px Roboto Mono';
-    ctx.textAlign = 'center';
-    ctx.fillText('↑', tx(th.x), ty(startAlt * 0.95));
-  });
-
-  // Flight path
-  if (pts.length > 1){
-    ctx.beginPath();
-    ctx.moveTo(tx(pts[0].x), ty(pts[0].alt));
-    pts.forEach(pt => ctx.lineTo(tx(pt.x), ty(pt.alt)));
-    ctx.strokeStyle = '#00B4D8';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-    ctx.stroke();
-  }// Glider icon at last point
-  const last = pts[pts.length - 1];
-  const gx = tx(last.x), gy = ty(last.alt);
-  ctx.save();
-  ctx.translate(gx, gy);
+function drawArrow(ctx, x0, y0, x1, y1, color, width){
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  var ang = Math.atan2(y1 - y0, x1 - x0), h = 6 + width;
   ctx.beginPath();
-  ctx.moveTo(-12, 0); ctx.lineTo(12, 0); // fuselage
-  ctx.moveTo(-3, 0); ctx.lineTo(-3, -20); ctx.lineTo(3, -20); ctx.lineTo(3, 0); // vertical tail
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1.5;
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - h * Math.cos(ang - 0.4), y1 - h * Math.sin(ang - 0.4));
+  ctx.lineTo(x1 - h * Math.cos(ang + 0.4), y1 - h * Math.sin(ang + 0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+function drawFlight(ws, CD0, k, wt, wind, Vmc, mcSink, startAlt, thermSpacing){
+  // store equilibrium-glide state for the live loop
+  var LDeff = Vmc / Math.max(mcSink, 1e-6);       // current glide ratio at MC speed (Vmc, mcSink in SI)
+  var LDmax = 1 / (2 * Math.sqrt(CD0 * k));
+  var theta = Math.atan(1 / LDeff);                // glide angle, rad
+  var range = startAlt * LDeff;                    // horizontal range from altitude (no wind)
+  __glState = {
+    LDeff: LDeff, LDmax: LDmax, Vmc: Vmc, mcSink: mcSink,
+    startAlt: startAlt, theta: theta, range: range
+  };
+  // live readouts that must never show '—'
+  var aEl = document.getElementById('statAngle'); if (aEl) aEl.textContent = (theta * 180 / Math.PI).toFixed(2);
+  var rEl = document.getElementById('statRange'); if (rEl) rEl.textContent = (range / 1000).toFixed(1);
+
+  if (!__glAnim){
+    if (__glReduced){ renderGlide(0.62); }     // single static frame
+    else { __glLastTs = 0; __glAnim = requestAnimationFrame(glideLoop); }
+  }
+}
+
+function glideLoop(ts){
+  if (!__glState){ __glAnim = null; return; }
+  if (!__glLastTs) __glLastTs = ts;
+  var dt = Math.min(0.05, (ts - __glLastTs) / 1000);
+  __glLastTs = ts;
+  __glProg += dt * 0.28;                 // sweep speed along the path
+  if (__glProg > 1) __glProg -= 1;       // loop
+  renderGlide(__glProg);
+  __glAnim = requestAnimationFrame(glideLoop);
+}
+
+function renderGlide(prog){
+  var st = __glState; if (!st) return;
+  var cv = document.getElementById('cvGlider'); if (!cv) return;
+  var ctx = cv.getContext('2d');
+  var cw = Math.floor(cv.parentElement.getBoundingClientRect().width - 44);
+  var ch = 300;
+  __novaHiDpiCanvas(cv, cw, ch, ctx);
+
+  // sky + ground
+  var sky = ctx.createLinearGradient(0, 0, 0, ch);
+  sky.addColorStop(0, '#0a1628'); sky.addColorStop(0.75, '#16335e'); sky.addColorStop(1, '#1d4e6e');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
+  var groundY = ch - 22;
+  ctx.fillStyle = '#244a30'; ctx.fillRect(0, groundY, cw, 22);
+  ctx.strokeStyle = 'rgba(120,200,120,0.5)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(cw, groundY); ctx.stroke();
+
+  var padL = 44, padR = 24, padT = 26;
+  var x0 = padL, y0 = padT;                       // start (top-left = release point, full altitude)
+  // glide path slope: drop dy per dx = 1 / LDeff. Fit the path inside the box.
+  var availW = cw - padL - padR;
+  var availH = groundY - padT - 6;
+  var slope = 1 / Math.max(st.LDeff, 0.5);        // vertical/horizontal ratio
+  var pathW = availW, pathH = pathW * slope;
+  if (pathH > availH){ pathH = availH; pathW = pathH / slope; }
+  var x1 = x0 + pathW, y1 = y0 + pathH;           // landing point of drawn path
+
+  // altitude grid (left axis)
+  ctx.font = '9px Roboto Mono'; ctx.textAlign = 'right';
+  for (var i = 0; i <= 4; i++){
+    var gy = padT + (groundY - padT) * i / 4;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(cw - padR, gy); ctx.stroke();
+    var altv = st.startAlt * (1 - i / 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText((altv / 1000).toFixed(1) + 'km', padL - 4, gy + 3);
+  }
+  ctx.textAlign = 'left';
+
+  // full glide path (faded) + height-lost / distance-gained reference triangle
+  ctx.strokeStyle = 'rgba(0,180,216,0.28)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.setLineDash([]);
+  // reference right-triangle: horizontal (range) + vertical (height lost)
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.lineTo(x1, y1); ctx.stroke();
+
+  // traced portion up to glider
+  var gx = x0 + (x1 - x0) * prog, gy = y0 + (y1 - y0) * prog;
+  ctx.strokeStyle = '#00B4D8'; ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(gx, gy); ctx.stroke();
+
+  // release marker
+  ctx.beginPath(); ctx.arc(x0, y0, 4, 0, 7); ctx.fillStyle = '#2ecc71'; ctx.fill();
+
+  // glide-angle arc at release
+  ctx.strokeStyle = 'rgba(255,213,74,0.7)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(x0, y0, 30, 0, st.theta); ctx.stroke();
+  ctx.fillStyle = '#ffd54a'; ctx.font = 'bold 11px Roboto Mono'; ctx.textAlign = 'left';
+  ctx.fillText('θ = ' + (st.theta * 180 / Math.PI).toFixed(2) + '°', x0 + 34, y0 + 16);
+
+  // ----- force vectors on the glider (equilibrium glide) -----
+  // flight-path direction (down-forward), unit vector in screen coords
+  var ux = Math.cos(st.theta), uy = Math.sin(st.theta);   // along path (screen y down = descending)
+  // perpendicular (lift, points up-and-slightly-forward, perpendicular to path)
+  var pxn = uy, pyn = -ux;                                  // rotate path dir by -90°
+  var Lmag = 46, Dmag = 46 / Math.max(st.LDeff, 0.5) * 6 + 14; // drag scaled but visible
+  Dmag = Math.min(Dmag, 38);
+  var Wmag = 50;
+  // weight (down)
+  drawArrow(ctx, gx, gy, gx, gy + Wmag, '#ff5252', 2.4);
+  // lift (perpendicular to path)
+  drawArrow(ctx, gx, gy, gx + pxn * Lmag, gy + pyn * Lmag, '#42a5f5', 2.4);
+  // drag (along path, backward = up-and-back relative to motion)
+  drawArrow(ctx, gx, gy, gx - ux * Dmag, gy - uy * Dmag, '#ff9f43', 2.4);
+
+  // labels
+  ctx.font = 'bold 10px Roboto Mono';
+  ctx.fillStyle = '#42a5f5'; ctx.fillText(L.lift, gx + pxn * Lmag + 4, gy + pyn * Lmag);
+  ctx.fillStyle = '#ff5252'; ctx.fillText(L.weight, gx + 5, gy + Wmag + 4);
+  ctx.fillStyle = '#ff9f43'; ctx.fillText(L.drag, gx - ux * Dmag - 30, gy - uy * Dmag - 4);
+
+  // glider body (rotated to flight-path angle)
+  ctx.save();
+  ctx.translate(gx, gy); ctx.rotate(st.theta);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6; ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(-13, 0); ctx.lineTo(13, 0);                  // fuselage
+  ctx.moveTo(-2, 0); ctx.lineTo(-8, -7); ctx.moveTo(-2, 0); ctx.lineTo(-8, 7); // wings
+  ctx.moveTo(-11, 0); ctx.lineTo(-13, -5);                // tail
   ctx.stroke();
   ctx.restore();
 
-  // Info
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.font = '11px Noto Sans JP';
+  // live overlay numbers (never blank)
+  ctx.textAlign = 'left'; ctx.font = '11px Noto Sans JP';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(L.ld + ' = ' + st.LDeff.toFixed(1)
+    + '   ' + L.angle + ' = ' + (st.theta * 180 / Math.PI).toFixed(2) + '°'
+    + '   ' + L.sink + ' = ' + st.mcSink.toFixed(2) + ' m/s', padL, 16);
+  ctx.fillStyle = 'rgba(0,180,216,0.95)';
+  ctx.fillText(L.range + ' = ' + (st.range / 1000).toFixed(1) + ' km  ('
+    + (st.startAlt / 1000).toFixed(1) + 'km × ' + st.LDeff.toFixed(0) + ')', padL, ch - 6);
+
+  // hint along path
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '10px Noto Sans JP'; ctx.textAlign = 'right';
+  ctx.fillText(L.hint, cw - padR, padT - 10 < 12 ? 12 : padT + 14);
   ctx.textAlign = 'left';
-  ctx.fillText(`Vmc = ${(Vmc * 3.6).toFixed(0)}km/h  |  沈下 ${mcSink.toFixed(2)}m/s  |  サーマル間隔 ${(thermSpacing / 1000).toFixed(0)} km`, padL, ch - 5);
-}function setPreset(name){
+}
+
+function setPreset(name){
   const presets = {
     std:    { ws: 35, CD0: 0.012, k: 0.018, wt: 2.0 },
     open:{ ws: 45, CD0: 0.008, k: 0.010, wt: 2.5 },
@@ -580,8 +651,10 @@ __novaHiDpiCanvas(cv, cw, ch, ctx);
   if (m[id]){ const [vid, dec, unit] = m[id]; updateSlider(el, vid, dec, unit); }
 });
 
-window.addEventListener('resize', compute);
+window.setPreset = setPreset;
+window.addEventListener('resize', function(){ if (__glAnim){ cancelAnimationFrame(__glAnim); __glAnim = null; } compute(); });
 compute();
+})();
 </script>
 
 <section class="explanation">
@@ -622,7 +695,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">翼面荷重や抗力係数を変更してもグラフが変わらないのですが。 <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">数値を変更した後、必ず「計算実行」または「更新」ボタンを押してください。また、極端な値（例：翼面荷重が現実的でない数値）を入力すると計算が破綻する場合があります。標準的なグライダーの値（翼面荷重300〜500N/m²、アスペクト比15〜30程度）から試すことをおすすめします。</div>
+    <div class="faq-a">本ツールは数値を変えると即座に再計算されるため、実行ボタンの操作は不要です。極端な値を入力すると計算が破綻する場合があります。標準的なグライダーの値（翼面荷重35〜45 kg/m²、CD0 0.008〜0.012、k 0.010〜0.018 程度）から試すことをおすすめします。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">翼面荷重（翼荷重）を重くすると滑空比はどう変わりますか？高高度飛行との関係は？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -630,7 +703,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">オズワルド効率係数eとはどんな意味で、実際の翼設計でどう重要ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">eは翼の揚力分布の楕円分布からの乖離を表す係数（0＜e≦1）で、e=1が理想的な楕円翼、直角翼端の翼はe≈0.8〜0.9程度になります。eが大きいほど誘導抗力が小さく、同じアスペクト比でも滑空比が良くなります。競技グライダーはウィングレットや翼端の精密な形状管理でeを0.9〜0.95に近づけています。本シミュレーターでeを0.7から1.0まで変化させると、最良滑空比が顕著に変化します。</div>
+    <div class="faq-a">eは翼の揚力分布の楕円分布からの乖離を表す係数（0＜e≦1）で、e=1が理想的な楕円翼、直角翼端の翼はe≈0.8〜0.9程度になります。eが大きいほど誘導抗力が小さく、同じアスペクト比でも滑空比が良くなります。競技グライダーはウィングレットや翼端の精密な形状管理でeを0.9〜0.95に近づけています。本シミュレーターでは e は誘導抗力係数 k=1/(πARe) に織り込まれており、k を 0.005〜0.040 で変化させると（e の変化に相当）、最良滑空比 L/D_max=1/(2√(CD0·k)) が顕著に変わります。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">「最小沈下速度」と「最良滑空速度」は何が違い、どちらをいつ使いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -638,7 +711,7 @@ compute();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">現代の競技グライダーの滑空比はどのくらいで、その限界を決めるのは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">現代の最高性能グライダー（SchemppーHirth Ventus3、DG-1001Mなど）の最良滑空比は60〜70程度で、10kmの高度から600〜700km飛行できる計算になります。この限界は主に「翼の表面摩擦抗力」と「構造重量に起因する翼面荷重」で決まります。翼弦長を短くするとRe数が下がりCDが増加し、翼弦長を長くすると重量増で翼面荷重が上がります。本シミュレーターでCDminを0.003（競技機）から0.010（練習機）まで変えると、この差が滑空比に与える影響を体感できます。</div>
+    <div class="faq-a">現代の最高性能グライダー（SchemppーHirth Ventus3、DG-1001Mなど）の最良滑空比は60〜70程度で、10kmの高度から600〜700km飛行できる計算になります。この限界は主に「翼の表面摩擦抗力」と「構造重量に起因する翼面荷重」で決まります。翼弦長を短くするとRe数が下がりCDが増加し、翼弦長を長くすると重量増で翼面荷重が上がります。本シミュレーターで零揚力抗力 CD0 を 0.005（競技機）から 0.030（練習機）まで変えると、この差が滑空比に与える影響を体感できます。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -658,6 +731,9 @@ compute();
 <p>「極曲線は機体ごとに固定された絶対的な性能値」と思いがちですが、実際は翼の汚れやフラップ設定、気温・高度による空気密度変化で大きく変動します。特に実機では虫の付着や表面の劣化により沈下率が悪化するため、理論値と実測値に乖離があることを常に意識する必要があります。</p>
 </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="glider-simulation.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -712,15 +788,15 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>翼面荷重(Wing Loading)を入力：グライダーの自重と乗員質量の合計を翼面積で割った値をkg/m²で設定します。例：ASW28の場合、自重340kg＋パイロット90kg=430kg、翼面積10.5m²なら41kg/m²</li>
-<li>無風時沈下率(Sink Rate at 0 knots)と極曲線データを設定：機体の設計仕様から、最小沈下速度時の沈下率(例：0.54m/s)と対応する速度を入力します</li>
-<li>極曲線係数k(Polar Coefficient)を調整：沈下率=k×速度²の二次関数で機体特性を定義。通常は0.008～0.012の範囲です</li>
-<li>サーマル強度とMC値を設定後、計算実行：最良滑空比・最小沈下速度・マクレディ速度・クロスカントリー速度がリアルタイム計算されます</li>
+<li>翼面荷重 W/S を入力：機体総重量を翼面積で割った値を kg/m² で設定します（既定35、範囲20〜80）。プリセット（標準クラス／オープン／ASW-28／Discus）で代表値を一括設定できます</li>
+<li>零揚力抗力 CD0 を設定：機体の寄生抗力（既定0.010、範囲0.005〜0.030）。小さいほど高速側で有利です</li>
+<li>誘導抗力係数 k=1/(πARe) を設定：アスペクト比とオズワルド効率で決まる値（既定0.014、範囲0.005〜0.040）。最良滑空比は L/D_max=1/(2√(CD0·k)) で決まります</li>
+<li>サーマル上昇速度 w・風速・サーマル間隔・出発高度を設定すると、最良滑空比・最小沈下速度・マクレディ速度・クロスカントリー速度がリアルタイムに計算されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>LS6(18m)の場合：翼面積22.5m²、自重290kg、パイロット75kg→翼面荷重16.2kg/m²。無風沈下率0.43m/s(速度70km/h)、k=0.0085と設定。計算結果は最良滑空比40.5、最良滑空速度85km/h、最小沈下率0.39m/s、MC速度(上昇1.5m/s想定)110km/h、クロスカントリー速度105km/hとなります</p>
+<p>本ツールの既定パラメータ（翼面荷重 W/S=35 kg/m²、零揚力抗力 CD0=0.010、誘導抗力係数 k=0.014、サーマル上昇速度 w=2.0 m/s、無風、サーマル間隔30km）で計算すると、最良滑空比 L/D=42.3、最良滑空速度 Vbg≈93 km/h、最小沈下率≈0.53 m/s（最小沈下速度≈70 km/h）、マクレディ最適速度≈146 km/h となります。サーマル w を上げるほどMC速度が上がり、向かい風を入れると最適対気速度がさらに上がるのが確認できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -731,6 +807,16 @@ compute();
 <li>低高度でのXC速度計算は信頼性低下：地面効果や風の乱流の影響で沈下率が理論値の120～140%に悪化するため、高度2000m以上での使用推奨</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

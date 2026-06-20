@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "歯車列シミュレーター",
       "description": "歯車対・複式歯車列・遊星歯車のアニメーションシミュレーター。歯数比・回転速度・トルク比・ピッチ円径をリアルタイム計算。",
       "url": "https://novasolver.jp/tools/gear-train.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["平歯車対のリアルタイムアニメーション","複式歯車列の多段減速計算","遊星歯車の速度計算（固定部材選択）","ピッチ円径・中心間距離・トルク比の自動計算"],
       "keywords": "歯車,ギア比,遊星歯車,減速機,ピッチ円,モジュール,機械設計,CAEシミュレーター",
       "datePublished": "2026-04-08",
@@ -62,7 +62,7 @@
         {
           "@type": "Question",
           "name": "歯車比（ギア比）はどのように計算しますか？",
-          "acceptedAnswer": {"@type": "Answer", "text": "単純歯車対の場合、速度比 i = N2/N1（N1：駆動歯車の歯数、N2：被動歯車の歯数）で求められます。複式歯車列では各段の歯車比を乗算します。遊星歯車は固定部材によって計算式が異なり、サン固定ではiキャリア = 1 + Zリング/Zサンとなります。"}
+          "acceptedAnswer": {"@type": "Answer", "text": "単純歯車対の場合、速度比 i = N2/N1（N1：駆動歯車の歯数、N2：被動歯車の歯数）で求められます。複式歯車列では各段の歯車比を乗算します。遊星歯車は固定部材によって計算式が異なり、リング固定ではiキャリア = 1 + Zリング/Zサンとなります。"}
         },{
           "@type": "Question",
           "name": "ピッチ円径とモジュールの関係は？",
@@ -157,6 +157,28 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
       <button class="tab-btn" onclick="setMode(2,this)">遊星歯車</button>
     </div>
 
+    <div class="gt-controls" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" id="btnPlay" class="btn" onclick="togglePlay()" aria-label="再生／一時停止"><i class="fas fa-pause"></i> 一時停止</button>
+      <button type="button" class="btn secondary" onclick="resetSim()" aria-label="リセット"><i class="fas fa-rotate-left"></i> リセット</button>
+    </div>
+    <div class="preset-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px" role="group" aria-label="プリセット">
+      <button type="button" class="preset-btn" onclick="setPreset('reduce2')">2:1 減速</button>
+      <button type="button" class="preset-btn" onclick="setPreset('idler')">アイドラで逆転</button>
+      <button type="button" class="preset-btn" onclick="setPreset('planetary')">遊星 リング固定 高減速</button>
+      <button type="button" class="preset-btn" onclick="setPreset('overdrive')">増速（オーバードライブ）</button>
+    </div>
+    <div class="preset-row" style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+      <span style="font-size:.75rem;color:var(--muted)">速度</span>
+      <button type="button" class="preset-btn speed-btn" data-speed="0.25" onclick="setSpeed(0.25)">0.25×</button>
+      <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="setSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+      <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+    </div>
+    <div id="idlerRow" class="param-group" style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:.82rem;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="chkIdler" onchange="compute()"> アイドラ歯車を挿入（方向反転・比は不変）
+      </label>
+    </div>
+
     <div id="paneSimple">
       <div class="param-group">
         <div class="param-label"><span class="param-name">駆動歯車 歯数 N₁</span><div class="num-wrap"><input type="number" class="num-input" id="vN1Num" value="20" min="8" max="80" step="1" oninput="syncFromNum('sN1','vN1Num')"><span class="num-unit"></span></div></div>
@@ -224,27 +246,37 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
     <div class="results-grid">
-      
+
       <div class="result-card"><div class="result-label">出力回転数</div><div class="result-value" id="rOutRPM">500<span class="result-unit">RPM</span></div></div>
       <div class="result-card"><div class="result-label">トルク比</div><div class="result-value" id="rTorque">1.96×</div></div>
+      <div class="result-card"><div class="result-label">出力方向</div><div class="result-value" id="rDir">CCW（逆転）</div></div>
+      <div class="result-card"><div class="result-label">機械的利得</div><div class="result-value" id="rMA">2.00×</div></div>
       <div class="result-card"><div class="result-label">総合効率</div><div class="result-value" id="rEff">98.0<span class="result-unit">%</span></div></div>
+      <div class="result-card"><div class="result-label">入力／出力／固定</div><div class="result-value" id="rMembers" style="font-size:.8rem">駆動→従動</div></div>
     </div>
     <div class="results-grid" style="margin-top:8px">
       <div class="result-card"><div class="result-label">d₁ ピッチ円径</div><div class="result-value" id="rD1">40<span class="result-unit">mm</span></div></div>
       <div class="result-card"><div class="result-label">d₂ ピッチ円径</div><div class="result-value" id="rD2">80<span class="result-unit">mm</span></div></div>
       <div class="result-card" style="grid-column:span 2"><div class="result-label">中心間距離</div><div class="result-value" id="rCenter">60.0<span class="result-unit">mm</span></div></div>
     </div>
-
-    
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
 <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
 <div class="result-card"><div class="result-label">速度比 i</div><div class="result-value" id="rRatio">2.000</div></div>
 </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> ギア</div><canvas id="gearCanvas" width="760" height="480"></canvas></div>
-    <p style="font-size:.75rem;color:var(--muted);margin-top:8px;text-align:center">アニメーション: 各歯車は正確な角速度比で回転します</p>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> ライブ・アニメーション（実寸の歯がかみ合って回転）</div>
+    <div class="canvas-wrap"><canvas id="gearCanvas" width="760" height="480" role="img" aria-label="平歯車・遊星歯車のかみ合いと回転を示すアニメーション。各歯車は正しい角速度比と回転方向で動きます。"></canvas></div></div>
+    <p style="font-size:.75rem;color:var(--muted);margin-top:8px;text-align:center">青＝駆動歯車、シアン以降＝従動歯車。かみ合い点は白丸で注釈。各歯車は正確な角速度比・正しい回転方向で動きます。</p>
   
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 <div class="theory-box" style="margin-top:16px">
@@ -260,274 +292,380 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
 </div>
 
 <script>
-
-
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || parseFloat(canvas.getAttribute("width")) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || parseFloat(canvas.getAttribute("height")) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
+const GT = {
+  play: '再生',
+  pause: '一時停止',
+  dirSame: 'CW（同方向）',
+  dirOpp: 'CCW（逆転）',
+  driverDriven: '駆動→従動',
+  idler: 'アイドラ',
+  compoundRoles: '入力→2段→出力（同方向）',
+  planRing: '入力:サン／固定:リング／出力:キャリア',
+  planCarrier: '入力:サン／固定:キャリア／出力:リング',
+  mesh: 'かみ合い',
+  ratio: '比',
+  reduced: '※モーション低減：静止フレーム表示',
+  sunIn: '入力:サン',
+  ringFix: '固定:リング → 出力:キャリア',
+  carrierFix: '固定:キャリア → 出力:リング'
+};
 function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   canvas.setAttribute('data-ux-no-scale', '1');
   var attrW = parseFloat(canvas.getAttribute("width")) || 0;
   var attrH = parseFloat(canvas.getAttribute("height")) || 0;
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || attrW || canvas.width / dpr || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || attrH || canvas.height / dpr || 320));
+  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || attrW || 600));
+  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || attrH || 320));
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
-  var bw = Math.round(w * dpr);
-  var bh = Math.round(h * dpr);
-  if (canvas.width !== bw || canvas.height !== bh) {
-    canvas.width = bw;
-    canvas.height = bh;
-  }
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
+  var bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+  if (canvas.width !== bw || canvas.height !== bh){ canvas.width = bw; canvas.height = bh; }
   if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { w: w, h: h, dpr: dpr };
 }
 const canvas = document.getElementById('gearCanvas');
 const ctx = canvas.getContext('2d');
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let mode = 0;
-let animId;
-let angle = 0;
+let animId = null;
+let phase = 0;
+let lastTs = 0;
+let speedMul = 1;
+let playing = !reduceMotion;
+const TWO_PI = Math.PI * 2;
 
-function sliderUpdate(sid, vid, val, unit) {
-  const _eGTr=document.getElementById(vid);if(_eGTr){if(_eGTr.tagName==='INPUT')_eGTr.value=val;else _eGTr.textContent=val;}
+function sliderUpdate(sid, vid, val){
+  const e = document.getElementById(vid);
+  if (e){ if (e.tagName === 'INPUT') e.value = val; else e.textContent = val; }
   const s = document.getElementById(sid);
-  const pct = (val - s.min) / (s.max - s.min) * 100;
-  s.style.setProperty('--pct', pct + '%');
-}function setMode(m, btn){
+  if (s){ const pct = (val - s.min) / (s.max - s.min) * 100; s.style.setProperty('--pct', pct + '%'); }
+}
+function setMode(m, btn){
   mode = m;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
   document.getElementById('paneSimple').style.display = m === 0 ? '' : 'none';
   document.getElementById('paneCompound').style.display = m === 1 ? '' : 'none';
   document.getElementById('panePlanetary').style.display = m === 2 ? '' : 'none';
+  const ir = document.getElementById('idlerRow'); if (ir) ir.style.display = m === 0 ? '' : 'none';
+  phase = 0;
   compute();
-}function getV(id){ return parseFloat(document.getElementById(id).value) || 0; }
-function fmtGT(v, d){ return isFinite(v) && !isNaN(v) ? v.toFixed(d) : '—'; }
+  drawFrame();
+}
+function getV(id){ const e = document.getElementById(id); return e ? (parseFloat(e.value) || 0) : 0; }
+function fmtGT(v, d){ return (isFinite(v) && !isNaN(v)) ? v.toFixed(d) : '—'; }
+function setHTML(id, html){ const e = document.getElementById(id); if (e) e.innerHTML = html; }
+function setTxt(id, t){ const e = document.getElementById(id); if (e) e.textContent = t; }
+function idlerOn(){ const c = document.getElementById('chkIdler'); return !!(c && c.checked); }
+
 function compute(){
-  if (mode === 0) {
+  if (mode === 0){
     const N1 = getV('sN1'), N2 = getV('sN2'), rpm1 = getV('sRPM1'), m = getV('sMod');
     const i = N1 > 0 ? N2 / N1 : 0;
     const rpm2 = i > 0 ? rpm1 / i : 0;
     const d1 = m * N1, d2 = m * N2;
     const center = m * (N1 + N2) / 2;
-    document.getElementById('rRatio').textContent = fmtGT(i, 3);
-    document.getElementById('rOutRPM').innerHTML = fmtGT(rpm2, 0) + '<span class="result-unit">RPM</span>';
-    document.getElementById('rTorque').textContent = fmtGT(i * 0.98, 2) + '×';
-    document.getElementById('rEff').innerHTML = '98.0<span class="result-unit">%</span>';
-    document.getElementById('rD1').innerHTML = d1.toFixed(1) + '<span class="result-unit">mm</span>';
-    document.getElementById('rD2').innerHTML = d2.toFixed(1) + '<span class="result-unit">mm</span>';
-    document.getElementById('rCenter').innerHTML = center.toFixed(1) + '<span class="result-unit">mm</span>';
-  }else if (mode === 1){
+    const idler = idlerOn();
+    const outOpposite = idler ? false : true;
+    setTxt('rRatio', fmtGT(i, 3));
+    setHTML('rOutRPM', fmtGT(rpm2, 0) + '<span class="result-unit">RPM</span>');
+    setTxt('rTorque', fmtGT(i * 0.98, 2) + '×');
+    setHTML('rEff', '98.0<span class="result-unit">%</span>');
+    setTxt('rMA', fmtGT(i, 2) + '×');
+    setTxt('rDir', outOpposite ? GT.dirOpp : GT.dirSame);
+    setTxt('rMembers', GT.driverDriven + (idler ? ' (' + GT.idler + ')' : ''));
+    setHTML('rD1', d1.toFixed(1) + '<span class="result-unit">mm</span>');
+    setHTML('rD2', d2.toFixed(1) + '<span class="result-unit">mm</span>');
+    setHTML('rCenter', center.toFixed(1) + '<span class="result-unit">mm</span>');
+  } else if (mode === 1){
     const N1 = getV('sCN1'), N2 = getV('sCN2'), N3 = getV('sCN3'), N4 = getV('sCN4');
     const rpm = getV('sCRPM');
-    const i1 = N1 > 0 ? N2/N1 : 0, i2 = N3 > 0 ? N4/N3 : 0, iTotal = i1*i2;
+    const i1 = N1 > 0 ? N2 / N1 : 0, i2 = N3 > 0 ? N4 / N3 : 0, iTotal = i1 * i2;
     const rpmOut = iTotal > 0 ? rpm / iTotal : 0;
     const eff = Math.pow(0.98, 2);
-    document.getElementById('rRatio').textContent = fmtGT(iTotal, 3);
-    document.getElementById('rOutRPM').innerHTML = fmtGT(rpmOut, 1) + '<span class="result-unit">RPM</span>';
-    document.getElementById('rTorque').textContent = fmtGT(iTotal * eff, 2) + '×';
-    document.getElementById('rEff').innerHTML = (eff*100).toFixed(1) + '<span class="result-unit">%</span>';
-    document.getElementById('rD1').innerHTML = (2*N1).toFixed(0) + '<span class="result-unit">mm</span>';
-    document.getElementById('rD2').innerHTML = (2*N2).toFixed(0) + '<span class="result-unit">mm</span>';
-    document.getElementById('rCenter').innerHTML = (N1+N2).toFixed(0) + '<span class="result-unit">mm</span>';
-  }else{
+    setTxt('rRatio', fmtGT(iTotal, 3));
+    setHTML('rOutRPM', fmtGT(rpmOut, 1) + '<span class="result-unit">RPM</span>');
+    setTxt('rTorque', fmtGT(iTotal * eff, 2) + '×');
+    setHTML('rEff', (eff * 100).toFixed(1) + '<span class="result-unit">%</span>');
+    setTxt('rMA', fmtGT(iTotal, 2) + '×');
+    setTxt('rDir', GT.dirSame);
+    setTxt('rMembers', GT.compoundRoles);
+    setHTML('rD1', (2 * N1).toFixed(0) + '<span class="result-unit">mm</span>');
+    setHTML('rD2', (2 * N2).toFixed(0) + '<span class="result-unit">mm</span>');
+    setHTML('rCenter', (N1 + N2).toFixed(0) + '<span class="result-unit">mm</span>');
+  } else {
     const Zs = getV('sZs'), Zp = getV('sZp'), nSun = getV('sPRPM');
-    const Zr = Zs + 2*Zp;
+    const Zr = Zs + 2 * Zp;
     const fixed = document.getElementById('selFixed').value;
-    let nOut, iVal;
-    if (fixed === 'ring') {
+    let nOut, iVal, roles;
+    if (fixed === 'ring'){
       nOut = nSun * Zs / (Zs + Zr);
       iVal = (Zs + Zr) / Zs;
-    }else{
+      roles = GT.planRing;
+    } else {
       nOut = -nSun * Zs / Zr;
       iVal = -Zr / Zs;
+      roles = GT.planCarrier;
     }
-    document.getElementById('rRatio').textContent = fmtGT(Math.abs(iVal), 3);
-    document.getElementById('rOutRPM').innerHTML = fmtGT(nOut, 1) + '<span class="result-unit">RPM</span>';
-    document.getElementById('rTorque').textContent = fmtGT(Math.abs(iVal) * 0.97, 2) + '×';
-    document.getElementById('rEff').innerHTML = '97.0<span class="result-unit">%</span>';
-    document.getElementById('rD1').innerHTML = (2*Zs).toFixed(0) + '<span class="result-unit">mm</span>';
-    document.getElementById('rD2').innerHTML = (2*Zr).toFixed(0) + '<span class="result-unit">mm</span>';
-    document.getElementById('rCenter').innerHTML = (Zs + Zp).toFixed(0) + '<span class="result-unit">mm</span>';
+    setTxt('rRatio', fmtGT(Math.abs(iVal), 3));
+    setHTML('rOutRPM', fmtGT(nOut, 1) + '<span class="result-unit">RPM</span>');
+    setTxt('rTorque', fmtGT(Math.abs(iVal) * 0.97, 2) + '×');
+    setHTML('rEff', '97.0<span class="result-unit">%</span>');
+    setTxt('rMA', fmtGT(Math.abs(iVal), 2) + '×');
+    setTxt('rDir', nOut >= 0 ? GT.dirSame : GT.dirOpp);
+    setTxt('rMembers', roles);
+    setHTML('rD1', (2 * Zs).toFixed(0) + '<span class="result-unit">mm</span>');
+    setHTML('rD2', (2 * Zr).toFixed(0) + '<span class="result-unit">mm</span>');
+    setHTML('rCenter', (Zs + Zp).toFixed(0) + '<span class="result-unit">mm</span>');
   }
-}function drawGear(cx, cy, r, teeth, angle, color, label, labelColor){
-  const toothH = r * 0.18;
+  if (!playing) drawFrame();
+}
+
+function drawGear(cx, cy, r, teeth, angle, color, label, opts){
+  opts = opts || {};
+  const toothH = r * 0.16;
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
-  // Pitch circle
   ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.globalAlpha = 0.4;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  // Gear body
+  ctx.arc(0, 0, r, 0, TWO_PI);
+  ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.35; ctx.stroke(); ctx.globalAlpha = 1;
   ctx.beginPath();
-  for (let i = 0; i < teeth; i++) {
-    const a1 = (i / teeth) * Math.PI * 2;
-    const a2 = ((i + 0.4) / teeth) * Math.PI * 2;
-    const a3 = ((i + 0.6) / teeth) * Math.PI * 2;
-    const a4 = ((i + 1) / teeth) * Math.PI * 2;
+  for (let i = 0; i < teeth; i++){
+    const a1 = (i / teeth) * TWO_PI;
+    const a2 = ((i + 0.4) / teeth) * TWO_PI;
+    const a3 = ((i + 0.6) / teeth) * TWO_PI;
+    const a4 = ((i + 1) / teeth) * TWO_PI;
     ctx.lineTo(Math.cos(a1) * (r - toothH), Math.sin(a1) * (r - toothH));
     ctx.lineTo(Math.cos(a2) * (r + toothH), Math.sin(a2) * (r + toothH));
     ctx.lineTo(Math.cos(a3) * (r + toothH), Math.sin(a3) * (r + toothH));
     ctx.lineTo(Math.cos(a4) * (r - toothH), Math.sin(a4) * (r - toothH));
-  }ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.globalAlpha = 0.18;
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  // Hub
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.18, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  // Spokes
+  }
+  ctx.closePath();
+  ctx.fillStyle = color; ctx.globalAlpha = opts.driver ? 0.30 : 0.16; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.20, 0, TWO_PI); ctx.fillStyle = color; ctx.fill();
   for (let i = 0; i < 4; i++){
     const a = i * Math.PI / 2;
     ctx.beginPath();
-    ctx.moveTo(Math.cos(a) * r * 0.18, Math.sin(a) * r * 0.18);
-    ctx.lineTo(Math.cos(a) * r * 0.65, Math.sin(a) * r * 0.65);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.5;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }ctx.restore();
-  // Label
-  if (label){
-    ctx.fillStyle = labelColor || color;
-    ctx.font = '600 13px Roboto Mono, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, cx, cy + r + 20);
+    ctx.moveTo(Math.cos(a) * r * 0.20, Math.sin(a) * r * 0.20);
+    ctx.lineTo(Math.cos(a) * r * 0.66, Math.sin(a) * r * 0.66);
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1;
   }
-}function drawArrow(cx, cy, dir, label){
-  const len = 36;
-  ctx.save();
-  ctx.translate(cx, cy);
   ctx.beginPath();
-  if (dir > 0) {
-    ctx.arc(0, 0, 22, -Math.PI*0.5, Math.PI*0.5, false);
-  }else{
-    ctx.arc(0, 0, 22, Math.PI*0.5, -Math.PI*0.5, false);
-  }
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.fillStyle = '#fff';
-  ctx.font = '11px Noto Sans JP, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(label, 0, -28);
+  ctx.moveTo(0, 0); ctx.lineTo(r * 0.66, 0);
+  ctx.strokeStyle = '#fff'; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.5; ctx.stroke(); ctx.globalAlpha = 1;
   ctx.restore();
-}function animate(){
-  const __novaDims = __novaHiDpiCanvas(canvas, canvas.clientWidth || parseFloat(canvas.getAttribute('width')) || 760, canvas.clientHeight || parseFloat(canvas.getAttribute('height')) || 480, ctx);
-  const W = __novaDims.w, H = __novaDims.h;
+  if (label){
+    ctx.fillStyle = opts.labelColor || '#fff';
+    ctx.font = '600 12px Roboto Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, cx, cy + r + 18);
+  }
+}
+function drawRing(cx, cy, r, teeth, angle, color, label){
+  const toothH = r * 0.10;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
+  ctx.beginPath();
+  for (let i = 0; i < teeth; i++){
+    const a1 = (i / teeth) * TWO_PI;
+    const a2 = ((i + 0.4) / teeth) * TWO_PI;
+    const a3 = ((i + 0.6) / teeth) * TWO_PI;
+    const a4 = ((i + 1) / teeth) * TWO_PI;
+    ctx.lineTo(Math.cos(a1) * (r + toothH), Math.sin(a1) * (r + toothH));
+    ctx.lineTo(Math.cos(a2) * (r - toothH), Math.sin(a2) * (r - toothH));
+    ctx.lineTo(Math.cos(a3) * (r - toothH), Math.sin(a3) * (r - toothH));
+    ctx.lineTo(Math.cos(a4) * (r + toothH), Math.sin(a4) * (r + toothH));
+  }
+  ctx.closePath();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, r + toothH * 2.2, 0, TWO_PI); ctx.strokeStyle = color; ctx.globalAlpha = 0.35; ctx.lineWidth = 3; ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.restore();
+  if (label){ ctx.fillStyle = color; ctx.font = '600 12px Roboto Mono, monospace'; ctx.textAlign = 'center'; ctx.fillText(label, cx, cy - r - toothH * 2.2 - 6); }
+}
+function meshDot(x, y){
+  ctx.beginPath(); ctx.arc(x, y, 5, 0, TWO_PI);
+  ctx.fillStyle = '#ffd166'; ctx.globalAlpha = 0.9; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#ffd166'; ctx.font = '600 10px Roboto Mono, monospace'; ctx.textAlign = 'center';
+  ctx.fillText(GT.mesh, x, y - 10);
+}
+function dirArrow(cx, cy, r, cw){
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.beginPath();
+  if (cw) ctx.arc(0, 0, r * 0.42, -Math.PI * 0.85, Math.PI * 0.25, false);
+  else    ctx.arc(0, 0, r * 0.42, Math.PI * 1.85, Math.PI * 0.75, true);
+  ctx.strokeStyle = '#fff'; ctx.globalAlpha = 0.55; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.restore();
+}
+function meshOffset(Nn){ return Math.PI / Nn; }
+function rpmLabel(cx, cy, r, rpm, color, above){
+  ctx.fillStyle = color; ctx.font = '600 11px Roboto Mono, monospace'; ctx.textAlign = 'center';
+  ctx.fillText(Math.abs(rpm).toFixed(0) + ' RPM', cx, above ? (cy - r - 8) : (cy + r + 34));
+}
+
+function drawFrame(){
+  const dims = __novaHiDpiCanvas(canvas, canvas.clientWidth || 760, canvas.clientHeight || 480, ctx);
+  const W = dims.w, H = dims.h;
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#020d1a';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#020d1a'; ctx.fillRect(0, 0, W, H);
+  const C = { driver: '#2f93ff', driven: '#00d6c2', third: '#7bd389', fourth: '#e98a5b', idler: '#c792ea' };
 
-  const colors = ['#007BFF','#00B4D8','#00b894','#e17055'];
-
-  if (mode === 0) {
-    const N1 = getV('sN1'), N2 = getV('sN2');
-    const r1 = Math.min(80, N1 * 3.2), r2 = Math.min(80, N2 * 3.2);
-    const cx1 = W/2 - r1 - r2*0.5 - 10, cx2 = W/2 + r2*0.5 + r1*0.5;
-    const cy = H/2;
-    const speedRatio = N1/N2;
-    drawGear(cx1, cy, r1, N1, angle, colors[0], `N₁=${N1}`, '#fff');
-    drawGear(cx2, cy, r2, N2, -angle*speedRatio, colors[1], `N₂=${N2}`, '#fff');
-    // Mesh point indicator
-    const meshX = (cx1+cx2)/2;
-    ctx.beginPath();
-    ctx.arc(meshX, cy, 5, 0, Math.PI*2);
-    ctx.fillStyle = '#fff';
-    ctx.globalAlpha = 0.6;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    // RPM labels
-    const rpm1 = getV('sRPM1'), rpm2 = rpm1 / (N2/N1);
-    ctx.fillStyle = colors[0];
-    ctx.font = '500 12px Roboto Mono';
-    ctx.textAlign = 'center';
-    ctx.fillText(rpm1.toFixed(0)+' RPM', cx1, cy - r1 - 10);
-    ctx.fillStyle = colors[1];
-    ctx.fillText(rpm2.toFixed(0)+' RPM', cx2, cy - r2 - 10);
-  }else if (mode === 1){
-    const N1=getV('sCN1'),N2=getV('sCN2'),N3=getV('sCN3'),N4=getV('sCN4');
-    const scale=2.8;
-    const r1=N1*scale, r2=N2*scale, r3=N3*scale, r4=N4*scale;
-    const gap=10;
-    const cx1=80, cx2=cx1+r1+r2+gap;
-    const cx3=cx2, cx4=cx2+r3+r4+gap;
-    const cy1=H/2, cy2=H/2, cy3=H/2, cy4=H/2;
-    const w1=1, w2=-w1*(N1/N2), w3=w2, w4=-w3*(N3/N4);
-    drawGear(cx1, cy1, r1, N1, angle*w1, colors[0], 'N₁', '#fff');
-    drawGear(cx2, cy2, r2, N2, angle*w2, colors[1], 'N₂', '#fff');
-    drawGear(cx3, cy3, r3, N3, angle*w3, colors[2], 'N₃', '#fff');
-    drawGear(cx4, cy4, r4, N4, angle*w4, colors[3], 'N₄', '#fff');
-  }else{
-    // Planetary
-    const Zs=getV('sZs'), Zp=getV('sZp');
-    const Zr = Zs + 2*Zp;
-    const fixed = document.getElementById('selFixed').value;
-    const cx=W/2, cy=H/2;
-    const scale=3.5;
-    const rs=Zs*scale*0.5, rp=Zp*scale*0.5, rr=Zr*scale*0.5;
-    let wS=1, wC, wR, wP;
-    if(fixed==='ring'){wR=0; wC=wS*Zs/(Zs+Zr); wP=-(wS-wC)*Zs/Zp+wC;}else{wC=0; wR=-wS*Zs/Zr; wP=-wS*(Zs/Zp);}
-    // Ring (dashed)
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, rr, 0, Math.PI*2);
-    ctx.strokeStyle = '#e17055';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([6,4]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-    ctx.fillStyle = '#e17055';
-    ctx.font = '500 12px Roboto Mono';
-    ctx.textAlign = 'center';
-    ctx.fillText('Ring Zr='+Zr, cx, cy - rr - 8);
-    // Carrier arm
-    const nP = 3;
-    const carrierAngle = angle * (wC||0);
-    for(let i=0;i<nP;i++){
-      const a=carrierAngle + i*Math.PI*2/nP;
-      const pcx=cx+Math.cos(a)*(rs+rp), pcy=cy+Math.sin(a)*(rs+rp);
-      ctx.beginPath();
-      ctx.moveTo(cx,cy);
-      ctx.lineTo(pcx,pcy);
-      ctx.strokeStyle='rgba(255,255,255,0.3)';
-      ctx.lineWidth=2;
-      ctx.stroke();
-      drawGear(pcx,pcy,rp,Zp,angle*wP+i*Math.PI*2/nP*0,colors[1],'','');
+  if (mode === 0){
+    const N1 = getV('sN1'), N2 = getV('sN2'), rpm1 = getV('sRPM1');
+    const idler = idlerOn();
+    const Ni = 16;
+    const r1 = Math.max(22, Math.min(74, N1 * 2.6));
+    const r2 = Math.max(22, Math.min(74, N2 * 2.6));
+    const ri = Math.max(20, Math.min(60, Ni * 2.6));
+    const cy = H / 2;
+    let cx1, cxi, cx2;
+    if (idler){
+      const total = r1 + 2 * ri + r2 + 18;
+      cx1 = W / 2 - total / 2 + r1;
+      cxi = cx1 + r1 + ri + 6;
+      cx2 = cxi + ri + r2 + 6;
+      const aIdler = -phase * (N1 / Ni) + meshOffset(Ni);
+      const a2 = -aIdler * (Ni / N2) + meshOffset(N2);
+      drawGear(cx1, cy, r1, N1, phase, C.driver, 'N₁=' + N1, { driver: true });
+      drawGear(cxi, cy, ri, Ni, aIdler, C.idler, GT.idler, {});
+      drawGear(cx2, cy, r2, N2, a2, C.driven, 'N₂=' + N2, {});
+      meshDot((cx1 + cxi) / 2, cy); meshDot((cxi + cx2) / 2, cy);
+      rpmLabel(cx1, cy, r1, rpm1, C.driver, true);
+      rpmLabel(cxi, cy, ri, rpm1 * (N1 / Ni), C.idler, false);
+      rpmLabel(cx2, cy, r2, rpm1 * (N1 / N2), C.driven, true);
+      dirArrow(cx1, cy, r1, true); dirArrow(cxi, cy, ri, false); dirArrow(cx2, cy, r2, true);
+    } else {
+      const total = r1 + r2 + 8;
+      cx1 = W / 2 - total / 2 + r1;
+      cx2 = cx1 + r1 + r2 + 8;
+      const a2 = -phase * (N1 / N2) + meshOffset(N2);
+      drawGear(cx1, cy, r1, N1, phase, C.driver, 'N₁=' + N1, { driver: true });
+      drawGear(cx2, cy, r2, N2, a2, C.driven, 'N₂=' + N2, {});
+      meshDot((cx1 + cx2) / 2, cy);
+      rpmLabel(cx1, cy, r1, rpm1, C.driver, true);
+      rpmLabel(cx2, cy, r2, rpm1 * (N1 / N2), C.driven, false);
+      dirArrow(cx1, cy, r1, true); dirArrow(cx2, cy, r2, false);
     }
-    // Sun
-    drawGear(cx,cy,rs,Zs,angle*wS,colors[0],'Sun Zs='+Zs,'#fff');
+  } else if (mode === 1){
+    const N1 = getV('sCN1'), N2 = getV('sCN2'), N3 = getV('sCN3'), N4 = getV('sCN4'), rpm = getV('sCRPM');
+    const sc = 2.4;
+    const r1 = Math.min(64, N1 * sc), r2 = Math.min(64, N2 * sc), r3 = Math.min(56, N3 * sc), r4 = Math.min(70, N4 * sc);
+    const cy = H / 2;
+    const total = r1 + r2 + r3 + r4 + 36;
+    const cx1 = W / 2 - total / 2 + r1;
+    const cx2 = cx1 + r1 + r2 + 12;
+    const cx4 = cx2 + r3 + r4 + 12;
+    const a1 = phase;
+    const a2 = -phase * (N1 / N2) + meshOffset(N2);
+    const a3 = a2;
+    const a4 = -a3 * (N3 / N4) + meshOffset(N4);
+    drawGear(cx1, cy, r1, N1, a1, C.driver, 'N₁=' + N1, { driver: true });
+    drawGear(cx2, cy, r2, N2, a2, C.driven, 'N₂=' + N2, {});
+    drawGear(cx2, cy, r3, N3, a3, C.third, 'N₃=' + N3, { driver: true });
+    drawGear(cx4, cy, r4, N4, a4, C.fourth, 'N₄=' + N4, {});
+    meshDot((cx1 + cx2) / 2, cy); meshDot((cx2 + cx4) / 2, cy);
+    rpmLabel(cx1, cy, r1, rpm, C.driver, true);
+    rpmLabel(cx4, cy, r4, rpm / ((N2 / N1) * (N4 / N3)), C.fourth, false);
+  } else {
+    const Zs = getV('sZs'), Zp = getV('sZp'), nSun = getV('sPRPM');
+    const Zr = Zs + 2 * Zp;
+    const fixed = document.getElementById('selFixed').value;
+    const cx = W / 2, cy = H / 2;
+    const sc = Math.min(3.4, (Math.min(W, H) * 0.40) / Zr * 2);
+    const rs = Zs * sc * 0.5, rp = Zp * sc * 0.5, rr = Zr * sc * 0.5;
+    let wS = 1, wC, wR, wP;
+    if (fixed === 'ring'){ wR = 0; wC = wS * Zs / (Zs + Zr); wP = (wC - wS) * Zs / Zp + wC; }
+    else { wC = 0; wR = -wS * Zs / Zr; wP = -wS * (Zs / Zp); }
+    const aS = phase * wS, aC = phase * wC, aR = phase * wR;
+    drawRing(cx, cy, rr, Zr, aR, fixed === 'ring' ? '#e98a5b' : '#ffd166', 'Ring Zr=' + Zr + (fixed === 'ring' ? ' ■' : ''));
+    const nP = 3;
+    for (let i = 0; i < nP; i++){
+      const a = aC + i * TWO_PI / nP;
+      const pcx = cx + Math.cos(a) * (rs + rp), pcy = cy + Math.sin(a) * (rs + rp);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pcx, pcy);
+      ctx.strokeStyle = fixed === 'carrier' ? '#ffd166' : 'rgba(255,255,255,0.45)'; ctx.lineWidth = 3; ctx.stroke();
+      drawGear(pcx, pcy, rp, Zp, phase * wP, '#7bd389', '', {});
+      meshDot(cx + Math.cos(a) * rs, cy + Math.sin(a) * rs);
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, rs * 0.30, 0, TWO_PI); ctx.fillStyle = fixed === 'carrier' ? '#ffd166' : 'rgba(255,255,255,0.3)'; ctx.fill();
+    drawGear(cx, cy, rs, Zs, aS, '#2f93ff', 'Sun Zs=' + Zs, { driver: true });
+    ctx.fillStyle = '#cfe8ff'; ctx.font = '600 11px Roboto Mono, monospace'; ctx.textAlign = 'left';
+    ctx.fillText(GT.sunIn + ' ' + nSun.toFixed(0) + ' RPM', 12, 20);
+    ctx.fillText(fixed === 'ring' ? GT.ringFix : GT.carrierFix, 12, 36);
   }
 
-  angle += 0.015;
-  animId = requestAnimationFrame(animate);
-}// Init slider values
-['sN1','sN2','sRPM1','sMod'].forEach(id=>{
-  const s=document.getElementById(id);
-  const v=document.getElementById({'sN1':'vN1','sN2':'vN2','sRPM1':'vRPM1','sMod':'vMod'}[id]);
-  if(v) sliderUpdate(id,v.id,s.value,'');
-});
+  ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.font = '700 13px Roboto Mono, monospace'; ctx.textAlign = 'right';
+  const ratioEl = document.getElementById('rRatio');
+  const dirEl = document.getElementById('rDir');
+  const ratioTxt = ratioEl ? ratioEl.textContent : '';
+  const dirTxt = dirEl ? dirEl.textContent : '';
+  ctx.fillText(GT.ratio + ' ' + ratioTxt + ' : 1', W - 12, 20);
+  ctx.fillText(dirTxt, W - 12, 38);
+  if (reduceMotion){
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(GT.reduced, W / 2, H - 10);
+  }
+}
+
+function loop(ts){
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  let dt = (ts - lastTs) / 1000; lastTs = ts;
+  if (dt > 0.05) dt = 0.05;
+  phase += dt * 1.6 * speedMul;
+  drawFrame();
+  animId = requestAnimationFrame(loop);
+}
+function startPlay(){ if (playing && animId) return; playing = true; lastTs = 0; const b = document.getElementById('btnPlay'); if (b) b.innerHTML = '<i class="fas fa-pause"></i> ' + GT.pause; if (!animId) animId = requestAnimationFrame(loop); }
+function stopPlay(){ playing = false; const b = document.getElementById('btnPlay'); if (b) b.innerHTML = '<i class="fas fa-play"></i> ' + GT.play; }
+function togglePlay(){ if (playing) stopPlay(); else startPlay(); }
+function setSpeed(s){
+  speedMul = s;
+  document.querySelectorAll('.speed-btn').forEach(function(b){ b.classList.remove('active'); b.style.borderColor = ''; b.style.color = ''; });
+  const btn = document.querySelector('.speed-btn[data-speed="' + s + '"]');
+  if (btn){ btn.classList.add('active'); btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)'; }
+}
+function resetSim(){ phase = 0; compute(); drawFrame(); }
+function syncMirror(id){
+  const s = document.getElementById(id); if (!s) return;
+  const m = document.getElementById(id + 'Num'); if (m) m.value = s.value;
+  const vmap = { sN1: 'vN1Num', sN2: 'vN2Num', sRPM1: 'vRPM1Num', sMod: 'vModNum', sCN1: 'vCN1Num', sCN2: 'vCN2Num', sCN3: 'vCN3Num', sCN4: 'vCN4Num', sCRPM: 'vCRPMNum', sZs: 'vZsNum', sZp: 'vZpNum', sPRPM: 'vPRPMNum' };
+  const vid = vmap[id]; if (vid){ const ve = document.getElementById(vid); if (ve) ve.value = s.value; }
+}
+function setPal(id, v){ const e = document.getElementById(id); if (e){ e.value = v; } syncMirror(id); }
+function refreshSliders(ids){ ids.forEach(function(id){ const s = document.getElementById(id); if (s){ const pct = (s.value - s.min) / (s.max - s.min) * 100; s.style.setProperty('--pct', pct + '%'); } syncMirror(id); }); }
+function setPreset(name){
+  const tabs = document.querySelectorAll('.tab-btn');
+  const ic = document.getElementById('chkIdler'); if (ic) ic.checked = false;
+  if (name === 'reduce2'){
+    setMode(0, tabs[0]);
+    setPal('sN1', 20); setPal('sN2', 40); setPal('sRPM1', 1000); setPal('sMod', 2);
+    refreshSliders(['sN1', 'sN2', 'sRPM1', 'sMod']);
+  } else if (name === 'idler'){
+    setMode(0, tabs[0]);
+    setPal('sN1', 20); setPal('sN2', 40); setPal('sRPM1', 1000); setPal('sMod', 2);
+    if (ic) ic.checked = true;
+    refreshSliders(['sN1', 'sN2', 'sRPM1', 'sMod']);
+  } else if (name === 'planetary'){
+    setMode(2, tabs[2]);
+    setPal('sZs', 24); setPal('sZp', 24); setPal('sPRPM', 1000);
+    document.getElementById('selFixed').value = 'ring';
+    refreshSliders(['sZs', 'sZp', 'sPRPM']);
+  } else if (name === 'overdrive'){
+    setMode(0, tabs[0]);
+    setPal('sN1', 40); setPal('sN2', 20); setPal('sRPM1', 1000); setPal('sMod', 2);
+    refreshSliders(['sN1', 'sN2', 'sRPM1', 'sMod']);
+  }
+  phase = 0; compute(); drawFrame();
+}
+
+refreshSliders(['sN1', 'sN2', 'sRPM1', 'sMod', 'sCN1', 'sCN2', 'sCN3', 'sCN4', 'sCRPM', 'sZs', 'sZp', 'sPRPM']);
+const ir0 = document.getElementById('idlerRow'); if (ir0) ir0.style.display = '';
 compute();
-animate();
+drawFrame();
+if (playing && !reduceMotion){ animId = requestAnimationFrame(loop); } else { stopPlay(); }
+window.addEventListener('resize', drawFrame);
 </script>
 
 <section class="explanation">
@@ -546,10 +684,10 @@ animate();
       <div class="bub">良いところに気づいたね。一段で大きな減速比を得ようとすると、歯車の大きさが極端になってしまうんだ。例えば減速比10:1を一段で作るには、小歯車が10歯なら大歯車は100歯必要だ。モジュール（歯の大きさの基準）が同じだと、大歯車が巨大になってしまうよね。実務では、2段や3段に分けてコンパクトに設計することが多いんだ。シミュレーターで各段の歯数をバラバラに変えて、全体の減速比がどう計算されるか確認してみて。</div>
     </div>
     <div class="cmsg st"><span class="ico">🙋</span>
-      <div class="bub">「遊星歯車」って聞くと難しそうですが…。このツールの「サンギア固定」ってどういう状態を選べばいいんですか？</div>
+      <div class="bub">「遊星歯車」って聞くと難しそうですが…。このツールの「固定部材」では何を選べばいいんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">遊星歯車はコンパクトながら大きな減速比を出せるのが魅力なんだ。このシミュレーターでは「リングギア固定」のケースを再現しているよ。サンギア（中心の歯車）を回すと、プラネタリギア（遊星歯車）が自転しながら公転し、その公転運動がキャリア（保持器）の回転として出力される。パラメータで「サンギア歯数 Zs」を小さく、「リングギア歯数」を大きく設定してみて。非常に大きな減速比が得られるのがわかるはずだよ。自動車のATの変速機などで使われている原理さ。</div>
+      <div class="bub">遊星歯車はコンパクトながら大きな減速比を出せるのが魅力なんだ。このシミュレーターでは固定部材を「リングギア固定」と「キャリア固定」から選べるよ。まずは「リングギア固定」を選んでみて。サンギア（中心の歯車）を回すと、プラネタリギア（遊星歯車）が自転しながら公転し、その公転運動がキャリア（保持器）の回転として出力される。パラメータで「サンギア歯数 Zs」を小さく、「プラネタリギア歯数 Zp」を大きく設定してみて（リングギア歯数は Zr = Zs + 2Zp で自動的に決まるんだ）。非常に大きな減速比が得られるのがわかるはずだよ。自動車のATの変速機などで使われている原理さ。</div>
     </div>
   </div>
 
@@ -607,6 +745,9 @@ animate();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="gear-train.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -657,26 +798,42 @@ animate();
 </section>
 <!-- codex-static-related-tools:end -->
 
+<div class="howto-card">
+<h3>準拠規格・前提条件</h3>
+<p><strong>準拠/参考：</strong> 歯車列の運動学。速度比 \(i = N_\text{driven}/N_\text{driver}\)（多段はステージ比の積）、ピッチ円直径 \(d = m\,N\)、中心距離 \(C = m(N_1+N_2)/2\)。遊星機構はWillisの式（リング固定時 \(i = 1 + Z_r/Z_s\)、\(Z_r = Z_s + 2Z_p\)）。モジュール規約はISO 21771。</p>
+<p><strong>モデルの前提：</strong> 標準平歯車・かみ合いを理想化、すべり/バックラッシュ無視。効率は固定値（1段98%、遊星97%）の公称値であり、潤滑・荷重依存のトライボロジー計算ではありません。回転数は剛体・定常を仮定。</p>
+<p><strong>適用範囲・限界：</strong> 速度比・回転数・寸法は厳密（例：\(N_1{=}20, N_2{=}40\) で \(i{=}2.000\)、出力500rpm）。トルク倍率は効率を掛けた近似で、実機の発熱・効率変動・歯面強度（AGMA/ISO 6336）は対象外です。</p>
+</div>
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
 <li>駆動歯車の歯数（N1）と従動歯車の歯数（N2）を入力します。例えば平歯車減速機でN1=20、N2=60の場合、減速比は3.0となります</li>
 <li>駆動側の回転速度をrpm単位で設定します。入力したモジュール値（Mod）と組み合わせて歯車の実寸法が決定されます</li>
-<li>「シミュレーション実行」ボタンをクリックするとアニメーション表示が開始され、出力回転速度・トルク増幅率・ピッチ円直径が自動計算・表示されます</li>
+<li>パラメータを変更すると即座にアニメーション表示が更新され、出力回転速度・トルク増幅率・ピッチ円直径が自動計算・表示されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>工業用減速機でN1=25歯（駆動）、N2=75歯（従動）、入力1800rpm、モジュール2.5mmの場合：減速比=3.0、出力回転速度=600rpm、トルク比=2.85倍となります。駆動歯車のピッチ円直径=62.5mm、従動歯車=187.5mmです。遊星歯車構成（サンギア15歯、プラネタリア30歯、リングギア75歯）では同一モジュール2.0で最大減速比9.0を実現できます</p>
+<p>工業用減速機でN1=25歯（駆動）、N2=75歯（従動）、入力1800rpm、モジュール2.5mmの場合：減速比=3.0、出力回転速度=600rpm、トルク比=約2.94倍となります。駆動歯車のピッチ円直径=62.5mm、従動歯車=187.5mmです。遊星歯車構成（サンギア15歯、プラネタリア30歯、リングギア75歯）では同一モジュール2.0で最大減速比6.0を実現できます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
 <li>平歯車では歯数比が整数比でない場合、バックラッシュ許容値0.05～0.15mm以内に収めるため、実装時に中心距離補正が必須です</li>
 <li>高速域（3000rpm以上）では歯面圧力がHertz応力で150MPaを超えないか確認し、モジュール値を0.5mm単位で増加させる必要があります</li>
-<li>遊星歯車は共線図で各要素の回転関係を検証し、インターネットギア干渉（N_ring &lt; N_sun + 2×N_planet）を避けます</li>
+<li>遊星歯車は共線図で各要素の回転関係を検証し、インターナルギア干渉（N_ring &lt; N_sun + 2×N_planet）を避けます</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

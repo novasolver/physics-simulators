@@ -36,7 +36,7 @@ MathJax={tex:{inlineMath:[["$","$"],["\\(","\\)"]],displayMath:[["$$","$$"],["\\
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
   <script type="application/ld+json">
   {"@context":"https://schema.org","@graph":[
-    {"@type":"SoftwareApplication","name":"月相カレンダーシミュレーター","url":"https://novasolver.jp/tools/moon-phase-calendar.html","applicationCategory":"EducationalApplication","operatingSystem":"Any","inLanguage":"ja","description":"年月を選ぶだけで月齢と月相を朔望月周期から算出し、ひと月分のカレンダーで可視化。新月・満月・大潮の日付を一覧でき、釣り・天体観測・農作業の計画にも役立つ天文ツールです。","offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"}},
+    {"@type":"SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html","name":"月相カレンダーシミュレーター","url":"https://novasolver.jp/tools/moon-phase-calendar.html","applicationCategory":"EducationalApplication","operatingSystem":"Any","inLanguage":"ja","description":"年月を選ぶだけで月齢と月相を朔望月周期から算出し、ひと月分のカレンダーで可視化。新月・満月・大潮の日付を一覧でき、釣り・天体観測・農作業の計画にも役立つ天文ツールです。","offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"}},
     {"@type":"FAQPage","mainEntity":[
       {"@type":"Question","name":"朔望月とは何ですか？","acceptedAnswer":{"@type":"Answer","text":"月が新月から次の新月まで戻る周期で約29.530589日です。太陰暦（旧暦）の1ヶ月の基準で、現在使われているグレゴリオ暦の1ヶ月とは一致しません。このズレにより、毎年新月・満月の日は変化します。"}},
       {"@type":"Question","name":"満月・新月が大潮になるのはなぜですか？","acceptedAnswer":{"@type":"Answer","text":"新月・満月のとき、地球・月・太陽がほぼ一直線に並びます（春分点配置）。このとき月の引力と太陽の引力が重なり合い、潮汐力が最大になって大潮となります。反対に上弦・下弦では三者が直角に並び、引力が打ち消し合って小潮になります。"}},
@@ -246,6 +246,22 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="label">Month input</div>
         <div class="value" id="st_mo_input">4</div>
       </div>
+      <div class="stat-card">
+        <div class="label">月相（アニメ）</div>
+        <div class="value sv" id="sv_phase">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">輝面比（アニメ）</div>
+        <div class="value sv" id="sv_illum">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">月齢（アニメ）</div>
+        <div class="value sv" id="sv_age">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">次の満月まで</div>
+        <div class="value sv" id="sv_next">—</div>
+      </div>
     </div>
 
     <div class="phase-legend">
@@ -254,11 +270,32 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <span>🌕 満月</span><span>🌖 十六夜</span>
       <span>🌗 下弦</span><span>🌘 有明月</span>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right viz panel -->
   <div class="viz-panel">
+    <!-- V2 animated hero: orbital geometry + moon disk sweeping through the synodic month -->
+    <div class="chart-card" style="background:#0a0e17;border-radius:12px;padding:14px;margin-bottom:16px;">
+      <div class="chart-title" style="color:#cfe2ff;"><i class="fas fa-moon"></i> 朔望月アニメーション — 太陽・地球・月の位置と満ち欠け</div>
+      <canvas id="heroCanvas" width="900" height="420" style="width:100%;display:block;border-radius:8px;"></canvas>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button class="tab-btn" id="heroPlay" onclick="heroToggle()">⏸ 一時停止</button>
+        <button class="tab-btn" onclick="heroSyncToday()">📅 今日の月相へ</button>
+        <label style="font-size:.78rem;color:#9fb3d1;display:flex;align-items:center;gap:6px;flex:1;min-width:180px;">月齢
+          <input type="range" id="heroScrub" min="0" max="2952" step="1" value="0" style="flex:1;accent-color:#00B4D8;" oninput="heroScrubInput()">
+        </label>
+      </div>
+    </div>
+
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab(0)">月齢カレンダー</button>
       <button class="tab-btn" onclick="switchTab(1)">詳細月相表示</button>
@@ -340,6 +377,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <p>このページの月齢は簡易計算です。正確な月出・月没、視半径、秤動、食の判定には、観測地点と時刻を含めた天体暦計算が必要です。</p>
   </div>
 </section>
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="moon-phase-calendar.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -393,7 +433,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>slYrNum（年選択）で西暦1900年～2100年の範囲から対象年を指定</li>
+<li>slYrNum（年選択）で西暦2000年～2035年の範囲から対象年を指定</li>
 <li>slMoNum（月選択）で1月～12月を選択し、対象月の朔望月周期データを読み込み</li>
 <li>slDayNum（日選択）で1日～31日を指定すると、その日の月齢・月相（新月・上弦・満月・下弦）と潮汐係数が自動計算される</li>
 <li>シミュレーター画面に月相アイコンと月齢値（0～29.5日）が表示され、大潮・中潮・小潮の判定結果も同時表示</li>
@@ -401,16 +441,26 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>2024年1月15日を入力した場合：朔望月周期29.53日を基準に、該当月の新月（1月11日、ユリウス日JD2460330）からの経過日数を計算すると月齢4.2日となり、月相は上弦前の弧月（月出：14時28分）と判定。同日の潮汐係数は67で中潮。東京湾の高潮位：1.8m、低潮位：0.5mの予測値と連動可能。</p>
+<p>2024年1月15日を入力した場合：朔望月周期29.53日を基準に、該当月の新月（1月11日、ユリウス日JD2460321）からの経過日数を計算すると月齢は約4.3日となり、月相は三日月〜上弦前の弧月と判定されます。月齢が0.1（新月）と0.9以降、および0.4〜0.6（満月前後）にあたる日は大潮、その中間は中潮・小潮としてカレンダーに色分け表示されます（本ツールは月齢に基づく定性的な潮汐区分のみを表示し、具体的な潮位や月出時刻は算出しません）。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
 <li>海洋調査・漁業計画ではユリウス日（JD）換算で月齢を算出し、新月から14～15日目（満月前後）の大潮期（係数70以上）を選定</li>
-<li>天文観測では月の赤緯・時角により南中高度が変動するため、月齢値のみでなく観測地の緯度（例：北緯35.7°）も入力して精密化</li>
+<li>天文観測では月の赤緯・時角により南中高度が変動するため、月齢値だけでなく観測地の緯度（例：北緯35.7°）を別途考慮して南中高度を補正する（本ツールは緯度入力を持たないため月齢・月相の概算用途に限る）</li>
 <li>旧暦カレンダー作成では朔望月の小数点以下を切り上げ/切り下げするルール（平年384日、閏年383日）の設定確認が必須</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -425,6 +475,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </footer>
 
 <script>
+(function(){
 function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
   var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   canvas.setAttribute('data-ux-no-scale', '1');
@@ -846,9 +897,198 @@ const W = __novaDims1.w, H = __novaDims1.h;
     input.addEventListener('change', handler);
   }
 
-  // Initialize with current month
+  // ===== V2 animated hero: orbital geometry + moon disk over the synodic month =====
+  const HERO_LABELS = {
+    title: '太陽 →（光）',
+    earth: '地球', moon: '月', view: '地球から見た月',
+    next_full: '次の満月まで', next_new: '次の新月まで',
+    day: '日'
+  };
+  function heroPhaseName(age){ return phaseName(age); }
+
+  let heroAge = 0;          // moon age in days [0, SYNODIC)
+  let heroPlaying = true;
+  let heroLast = 0;
+  let heroReduced = false;
+
+  function setSv(id, txt){ const el = document.getElementById(id); if (el) el.textContent = txt; }
+
+  function heroUpdateStats(){
+    const illum = illumination(heroAge);
+    setSv('sv_phase', heroPhaseName(heroAge));
+    setSv('sv_illum', (illum*100).toFixed(1) + '%');
+    setSv('sv_age', heroAge.toFixed(2) + '日');
+    // days to next full / next new
+    const full = SYNODIC/2;
+    let toFull = (full - heroAge + SYNODIC) % SYNODIC;
+    let toNew  = (SYNODIC - heroAge) % SYNODIC;
+    if (toFull < toNew) setSv('sv_next', '満月まで ' + toFull.toFixed(1) + '日');
+    else setSv('sv_next', '新月まで ' + toNew.toFixed(1) + '日');
+  }
+
+  function drawHero(){
+    const canvas = document.getElementById('heroCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dims = __novaHiDpiCanvas(canvas, canvas.clientWidth || 900, 420, ctx);
+    const W = dims.w, H = dims.h;
+
+    // background sky
+    const sky = ctx.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0,'#05080f'); sky.addColorStop(1,'#0b1224');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
+
+    // ---- LEFT: orbital geometry ----
+    const gx = W*0.33, gy = H*0.52, orbitR = Math.min(W*0.26, H*0.34);
+    // Sun light direction: Sun far to the LEFT, light travels to the right (+x)
+    ctx.save();
+    // light rays
+    ctx.strokeStyle = 'rgba(255,210,90,0.35)'; ctx.lineWidth = 2;
+    for (let i=-2;i<=2;i++){
+      const yy = gy + i*orbitR*0.55;
+      ctx.beginPath(); ctx.moveTo(8, yy); ctx.lineTo(gx-orbitR-18, yy); ctx.stroke();
+      // arrow head
+      ctx.beginPath(); ctx.moveTo(gx-orbitR-18, yy); ctx.lineTo(gx-orbitR-28, yy-5); ctx.lineTo(gx-orbitR-28, yy+5); ctx.closePath();
+      ctx.fillStyle='rgba(255,210,90,0.45)'; ctx.fill();
+    }
+    ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 13px Noto Sans JP'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('☀ 太陽光 →', 10, gy - orbitR*0.55 - 16);
+    ctx.restore();
+
+    // orbit ring
+    ctx.strokeStyle = 'rgba(160,190,230,0.25)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(gx, gy, orbitR, 0, 2*Math.PI); ctx.stroke();
+
+    // Earth
+    const eg = ctx.createRadialGradient(gx-6, gy-6, 2, gx, gy, 16);
+    eg.addColorStop(0,'#5fa8ff'); eg.addColorStop(1,'#13407a');
+    ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(gx, gy, 16, 0, 2*Math.PI); ctx.fill();
+    // Earth night side (right = away from sun is +x... sun is at left so lit side faces left -x)
+    ctx.save(); ctx.beginPath(); ctx.arc(gx,gy,16,0,2*Math.PI); ctx.clip();
+    ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(gx, gy-16, 16, 32); ctx.restore();
+    ctx.fillStyle='#cfe2ff'; ctx.font='12px Noto Sans JP'; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText(HERO_LABELS.earth, gx, gy+20);
+
+    // Moon orbital position.
+    // phase angle: new moon (age 0) => Moon between Sun and Earth (toward Sun, -x side).
+    // full moon (age SYN/2) => Moon opposite Sun (+x side).
+    // Orbit counterclockwise as seen from north (top view). theta=0 at new moon (toward sun, left).
+    const frac = heroAge / SYNODIC;
+    const theta = 2*Math.PI*frac;           // 0..2pi
+    // place new moon to the LEFT (toward sun): angle measured so that age0 -> left
+    const mx = gx - orbitR*Math.cos(theta);
+    const my = gy - orbitR*Math.sin(theta);
+    // Sun-Earth-Moon angle line
+    ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(gx,gy); ctx.lineTo(mx,my); ctx.stroke();
+
+    // small moon at orbital position with lit side toward the sun (left)
+    const mr = 9;
+    ctx.save(); ctx.beginPath(); ctx.arc(mx,my,mr,0,2*Math.PI); ctx.clip();
+    ctx.fillStyle = DARK_COLOR; ctx.fillRect(mx-mr,my-mr,2*mr,2*mr);
+    ctx.fillStyle = MOON_COLOR; ctx.fillRect(mx-mr, my-mr, mr, 2*mr); // left (sun-facing) half lit
+    ctx.restore();
+    ctx.strokeStyle='rgba(232,228,200,0.5)'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(mx,my,mr,0,2*Math.PI); ctx.stroke();
+    ctx.fillStyle='#e8e4c8'; ctx.font='11px Noto Sans JP'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(HERO_LABELS.moon, mx, my-mr-3);
+
+    // observer view line from Earth to Moon -> shows what we see
+    ctx.fillStyle='rgba(160,190,230,0.55)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='center';
+    ctx.fillText('上から見た軌道（太陽は左方向）', gx, gy - orbitR - 14);
+
+    // ---- RIGHT: the Moon as seen from Earth ----
+    const vx = W*0.74, vy = H*0.5, vr = Math.min(W*0.17, H*0.36);
+    // glow
+    const glow = ctx.createRadialGradient(vx,vy,vr*0.85, vx,vy, vr*1.35);
+    glow.addColorStop(0,'rgba(232,228,200,0.18)'); glow.addColorStop(1,'rgba(232,228,200,0)');
+    ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(vx,vy,vr*1.35,0,2*Math.PI); ctx.fill();
+    drawMoonPhase(ctx, vx, vy, vr, heroAge);
+    ctx.strokeStyle='rgba(232,228,200,0.25)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(vx,vy,vr+1,0,2*Math.PI); ctx.stroke();
+
+    // labels: phase name + illumination on the right
+    const illum = illumination(heroAge)*100;
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillStyle='#e8e4c8'; ctx.font='bold 16px Noto Sans JP';
+    ctx.fillText(heroPhaseName(heroAge), vx, vy+vr+12);
+    ctx.fillStyle='#9fb3d1'; ctx.font='13px Roboto Mono, monospace';
+    ctx.fillText('月齢 ' + heroAge.toFixed(1) + '日 ・ 輝面比 ' + illum.toFixed(0) + '%', vx, vy+vr+34);
+    ctx.fillStyle='rgba(160,190,230,0.6)'; ctx.font='11px Noto Sans JP'; ctx.textBaseline='bottom';
+    ctx.fillText(HERO_LABELS.view, vx, vy-vr-10);
+
+    heroUpdateStats();
+  }
+
+  function heroSetAge(age){
+    heroAge = ((age % SYNODIC) + SYNODIC) % SYNODIC;
+    const scr = document.getElementById('heroScrub');
+    if (scr) scr.value = Math.round(heroAge/SYNODIC*2952);
+    drawHero();
+  }
+
+  function heroLoop(ts){
+    if (!heroPlaying) return;
+    if (!heroLast) heroLast = ts;
+    const dt = (ts - heroLast)/1000; heroLast = ts;
+    // advance ~ one synodic month per 16 seconds
+    heroAge = (heroAge + dt * (SYNODIC/16)) % SYNODIC;
+    const scr = document.getElementById('heroScrub');
+    if (scr) scr.value = Math.round(heroAge/SYNODIC*2952);
+    drawHero();
+    requestAnimationFrame(heroLoop);
+  }
+
+  function heroToggle(){
+    heroPlaying = !heroPlaying;
+    const b = document.getElementById('heroPlay');
+    if (b) b.textContent = heroPlaying ? '⏸ 一時停止' : '▶ 再生';
+    if (heroPlaying){ heroLast = 0; requestAnimationFrame(heroLoop); }
+  }
+  function heroScrubInput(){
+    heroPlaying = false;
+    const b = document.getElementById('heroPlay'); if (b) b.textContent = '▶ 再生';
+    const scr = document.getElementById('heroScrub');
+    heroAge = (parseFloat(scr.value)/2952) * SYNODIC;
+    drawHero();
+  }
+  function heroSyncToday(){
+    const now = new Date();
+    const jd = toJD(now.getFullYear(), now.getMonth()+1, now.getDate());
+    heroPlaying = false;
+    const b = document.getElementById('heroPlay'); if (b) b.textContent = '▶ 再生';
+    heroSetAge(moonAge(jd));
+  }
+
+  // expose handlers used by inline onclick / oninput
+  window.update = update;
+  window.updateDay = updateDay;
+  window.goToday = goToday;
+  window.switchTab = switchTab;
+  window.toggleFaq = toggleFaq;
+  window.heroToggle = heroToggle;
+  window.heroScrubInput = heroScrubInput;
+  window.heroSyncToday = heroSyncToday;
+
+  // Initialize
   bindMonthNumberAuditSync();
   goToday();
+
+  // hero start
+  heroReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  (function initHero(){
+    const now = new Date();
+    const jd = toJD(now.getFullYear(), now.getMonth()+1, now.getDate());
+    heroAge = moonAge(jd);
+    drawHero();
+    if (heroReduced){
+      heroPlaying = false;
+      const b = document.getElementById('heroPlay'); if (b) b.textContent = '▶ 再生';
+    } else {
+      heroPlaying = true; heroLast = 0; requestAnimationFrame(heroLoop);
+    }
+  })();
+  window.addEventListener('resize', function(){ if (typeof drawHero==='function') drawHero(); });
+})();
 </script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>
 <script src="/tools/related-tools.js" defer></script>

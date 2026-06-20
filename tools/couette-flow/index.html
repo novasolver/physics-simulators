@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "クェット流れ シミュレーター",
       "description": "平行平板（上板が動き下板が静止）の間の粘性流について、上板速度・隙間・粘性係数・圧力勾配から壁面せん断応力・単位幅流量・平均流速・レイノルズ数を実時間で計算し、クェット直線＋ポアズイユ放物線の合成速度プロファイルを可視化する教育用シミュレーター。",
       "url": "https://novasolver.jp/tools/couette-flow.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["平行平板間のクェット流れとポアズイユ流れの合成計算","上板速度・隙間・粘性係数・圧力勾配の調整","縦断面のせん断駆動プロファイルの矢印表示","正規化プロファイル u/U vs y/h のチャート可視化"],
       "keywords": "クェット流れ,ポアズイユ流れ,平行平板,粘性流,せん断応力,単位幅流量,圧力勾配,レイノルズ数,ニュートン流体,潤滑解析",
       "datePublished": "2026-05-15",
@@ -166,11 +166,37 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
+    <div class="preset-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+      <button type="button" class="btn secondary" style="flex:1 1 auto;font-size:0.72rem;padding:6px 8px;" onclick="applyPreset('couette')">純粋クェット（直線）</button>
+      <button type="button" class="btn secondary" style="flex:1 1 auto;font-size:0.72rem;padding:6px 8px;" onclick="applyPreset('favorable')">順圧力勾配（膨らみ）</button>
+      <button type="button" class="btn secondary" style="flex:1 1 auto;font-size:0.72rem;padding:6px 8px;" onclick="applyPreset('adverse')">逆圧力勾配（逆流）</button>
+      <button type="button" class="btn secondary" style="flex:1 1 auto;font-size:0.72rem;padding:6px 8px;" onclick="applyPreset('viscous')">高粘性</button>
+    </div>
+
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> dp/dx をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">流体は水（ρ = 1000 kg/m³）を仮定します。dp/dx = 0 で純粋クェット流れ、U = 0 で純粋ポアズイユ流れになります。</p>
+
+    <div class="param-group" style="margin-top:10px;">
+      <div class="param-label">
+        <span class="param-name">アニメ速度 <span id="speedVal">1.0×</span></span>
+      </div>
+      <input type="range" id="speedSlider" min="0.2" max="3.0" step="0.1" value="1.0" aria-label="アニメーション速度" oninput="setSpeed(this.value)">
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:0.74rem;color:var(--muted);margin-top:4px;cursor:pointer;">
+      <input type="checkbox" id="sweepChk" onchange="toggleSweep(this)"> 再生中に dp/dx を自動スイープ（−2000→+2000）
+    </label>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">流体は水（ρ = 1000 kg/m³）を仮定します。dp/dx = 0 で純粋クェット流れ、U = 0 で純粋ポアズイユ流れになります。トレーサー粒子は速度プロファイルに沿って実時間で移動します。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -181,6 +207,8 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <div class="stat-card"><div class="sv" id="statQ">—</div><div class="sl">単位幅流量</div></div>
         <div class="stat-card"><div class="sv" id="statVavg">—</div><div class="sl">平均流速</div></div>
         <div class="stat-card"><div class="sv" id="statRe">—</div><div class="sl">Reynolds 数</div></div>
+        <div class="stat-card"><div class="sv" id="statShear">—</div><div class="sl">せん断速度 U/h</div></div>
+        <div class="stat-card"><div class="sv" id="statUmax">—</div><div class="sl">最大流速</div></div>
       </div>
     </div>
 
@@ -212,413 +240,229 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Couette Flow (Parallel Plate Viscous Flow) Simulator ==========
-var profileCanvas = document.getElementById('profileCanvas');
-var profileCtx = profileCanvas.getContext('2d');
-var chartCanvas = document.getElementById('chartCanvas');
-var chartCtx = chartCanvas.getContext('2d');
-var playing = false;
-var animId = null;
-var RHO = 1000;
+window.__couetteL = {
+  topPlate: '動板', botPlate: '静止板（固定）',
+  shearRate: 'せん断速度', combined: '合成プロファイル', pureCouette: '純粋クェット',
+  play: '再生', pause: '一時停止'
+};
+</script>
+<script>
+// ========== Couette Flow v2 — rAF tracer particles + linear shear profile ==========
+(function(){
+  'use strict';
+  var L = window.__couetteL || {};
+  var profileCanvas = document.getElementById('profileCanvas');
+  var chartCanvas = document.getElementById('chartCanvas');
+  if(!profileCanvas || !chartCanvas) return;
+  var profileCtx = profileCanvas.getContext('2d');
+  var chartCtx = chartCanvas.getContext('2d');
+  var RHO = 1000;
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
 
-function fmtTau(t) {
-  if (!isFinite(t)) return '—';
-  var a = Math.abs(t);
-  if (a >= 1000) return (t / 1000).toFixed(2) + ' kPa';
-  if (a >= 0.01) return t.toFixed(2) + ' Pa';
-  if (a > 0) return t.toExponential(2) + ' Pa';
-  return '0.00 Pa';
-}
+  var anim = { playing:false, id:null, last:0, speed:1, particles:[], sweep:false };
 
-function fmtQ(Qp) {
-  // unit-width flow rate in m^2/s
-  if (!isFinite(Qp)) return '—';
-  var a = Math.abs(Qp);
-  if (a >= 1) return Qp.toFixed(3) + ' m²/s';
-  if (a >= 0.01) return Qp.toFixed(4) + ' m²/s';
-  if (a >= 1e-4) return Qp.toExponential(2) + ' m²/s';
-  if (a > 0) return Qp.toExponential(2) + ' m²/s';
-  return '0.00 m²/s';
-}
+  function $(id){ return document.getElementById(id); }
+  function fmtTau(t){ if(!isFinite(t))return '—'; var a=Math.abs(t); if(a>=1000)return (t/1000).toFixed(2)+' kPa'; if(a>=0.01)return t.toFixed(3)+' Pa'; if(a>0)return t.toExponential(2)+' Pa'; return '0.000 Pa'; }
+  function fmtQ(q){ if(!isFinite(q))return '—'; var a=Math.abs(q); if(a>=1)return q.toFixed(3)+' m²/s'; if(a>=1e-4)return q.toFixed(5)+' m²/s'; if(a>0)return q.toExponential(2)+' m²/s'; return '0.00 m²/s'; }
+  function fmtVel(v){ if(!isFinite(v))return '—'; var a=Math.abs(v); if(a>=100)return v.toFixed(1)+' m/s'; if(a>=10)return v.toFixed(2)+' m/s'; if(a>=0.001)return v.toFixed(3)+' m/s'; if(a>0)return v.toExponential(2)+' m/s'; return '0.000 m/s'; }
+  function fmtRe(Re){ if(!isFinite(Re))return '—'; var a=Math.abs(Re); if(a>=1e5)return Re.toExponential(2); if(a>=1)return Math.round(Re).toString(); return Re.toFixed(3); }
+  function fmtRate(g){ if(!isFinite(g))return '—'; var a=Math.abs(g); if(a>=1000)return (g/1000).toFixed(2)+' k/s'; if(a>=1)return g.toFixed(1)+' /s'; return g.toFixed(3)+' /s'; }
 
-function fmtVel(v) {
-  if (!isFinite(v)) return '—';
-  var a = Math.abs(v);
-  if (a >= 100) return v.toFixed(1) + ' m/s';
-  if (a >= 10) return v.toFixed(2) + ' m/s';
-  if (a >= 0.001) return v.toFixed(3) + ' m/s';
-  if (a > 0) return v.toExponential(2) + ' m/s';
-  return '0.000 m/s';
-}
-
-function fmtRe(Re) {
-  if (!isFinite(Re)) return '—';
-  var a = Math.abs(Re);
-  if (a >= 1e5) return Re.toExponential(2);
-  if (a >= 1) return Math.round(Re).toString();
-  return Re.toFixed(3);
-}
-
-function getParams() {
-  var U = parseFloat(document.getElementById('slU').value);
-  var h_mm = parseFloat(document.getElementById('slH').value);
-  var mu = parseFloat(document.getElementById('slMu').value);
-  var dpdx = parseFloat(document.getElementById('slDpDx').value);
-  var h = h_mm / 1000; // m
-  return { U: U, h: h, h_mm: h_mm, mu: mu, dpdx: dpdx };
-}
-
-function computePhysics(p) {
-  // u(y) = U*y/h - (1/(2mu))*dpdx*y*(h-y)
-  // tau_top = mu*U/h - (h/2)*dpdx
-  // tau_bot = mu*U/h + (h/2)*dpdx
-  var tauTop = p.mu * p.U / p.h - (p.h / 2) * p.dpdx;
-  var tauBot = p.mu * p.U / p.h + (p.h / 2) * p.dpdx;
-  var tauMean = (Math.abs(tauTop) + Math.abs(tauBot)) / 2;
-  // Q' = U*h/2 - (h^3/(12 mu))*dpdx
-  var Qp = p.U * p.h / 2 - (p.h * p.h * p.h / (12 * p.mu)) * p.dpdx;
-  var Vavg = Qp / p.h;
-  var Re = RHO * p.U * p.h / p.mu;
-  return { tauTop: tauTop, tauBot: tauBot, tauMean: tauMean, Qp: Qp, Vavg: Vavg, Re: Re };
-}
-
-function profileU(y, p) {
-  // y in [0, h]
-  return p.U * (y / p.h) - (1 / (2 * p.mu)) * p.dpdx * y * (p.h - y);
-}
-
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-
-function resizeCanvases() {
-  [profileCanvas, chartCanvas].forEach(function (cv) {
-    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.5);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  });
-}
-
-function drawProfile(p, r) {
-  var ctx = profileCtx, W = __novaCanvasCssW(profileCanvas), H = __novaCanvasCssH(profileCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  // Layout: top plate at top of band, bottom plate at bottom of band.
-  var marginX = 70, marginY = 30;
-  var x0 = marginX, x1 = W - marginX;
-  var yTop = marginY, yBot = H - marginY;
-  var bandH = yBot - yTop;
-
-  // Find umax and umin across profile for arrow scale
-  var Npr = 60;
-  var umax = 0, umin = 0;
-  for (var k = 0; k <= Npr; k++) {
-    var yy = p.h * k / Npr;
-    var uu = profileU(yy, p);
-    if (uu > umax) umax = uu;
-    if (uu < umin) umin = uu;
+  function getParams(){
+    var U=parseFloat($('slU').value);
+    var h_mm=parseFloat($('slH').value);
+    var mu=parseFloat($('slMu').value);
+    var dpdx=parseFloat($('slDpDx').value);
+    return { U:U, h:h_mm/1000, h_mm:h_mm, mu:mu, dpdx:dpdx };
   }
-  var uAbsMax = Math.max(Math.abs(umax), Math.abs(umin));
-  if (!isFinite(uAbsMax) || uAbsMax <= 0) uAbsMax = 1e-9;
-  var maxArrowLen = (x1 - x0) * 0.42;
+  function profileU(y,p){ return p.U*(y/p.h) - (1/(2*p.mu))*p.dpdx*y*(p.h-y); }
+  function computePhysics(p){
+    var tauTop=p.mu*p.U/p.h - (p.h/2)*p.dpdx;
+    var tauBot=p.mu*p.U/p.h + (p.h/2)*p.dpdx;
+    var tauMean=(Math.abs(tauTop)+Math.abs(tauBot))/2;
+    var Qp=p.U*p.h/2 - (p.h*p.h*p.h/(12*p.mu))*p.dpdx;
+    var Vavg=Qp/p.h;
+    var Re=RHO*p.U*p.h/p.mu;
+    var shearRate=p.U/p.h;
+    var umax=0,umin=0;
+    for(var k=0;k<=80;k++){ var u=profileU(p.h*k/80,p); if(u>umax)umax=u; if(u<umin)umin=u; }
+    return { tauTop:tauTop, tauBot:tauBot, tauMean:tauMean, Qp:Qp, Vavg:Vavg, Re:Re, shearRate:shearRate, umax:umax, umin:umin };
+  }
 
-  // Top plate (moving)
-  ctx.strokeStyle = '#FFD166';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(x0, yTop); ctx.lineTo(x1, yTop);
-  ctx.stroke();
-  // Bottom plate (static)
-  ctx.strokeStyle = '#9bd5ff';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(x0, yBot); ctx.lineTo(x1, yBot);
-  ctx.stroke();
+  function cssW(c){ return parseFloat(c.dataset.cssW)||c.width/Math.min(window.devicePixelRatio||1,2.5); }
+  function cssH(c){ return parseFloat(c.dataset.cssH)||c.height/Math.min(window.devicePixelRatio||1,2.5); }
+  function resizeCanvases(){
+    [profileCanvas,chartCanvas].forEach(function(cv){
+      var w=Math.max(280,Math.min(cv.parentElement.clientWidth-40,900));
+      var W=w, Hh=Math.round(w*0.5), dpr=Math.min(window.devicePixelRatio||1,2.5);
+      cv.style.width=W+'px'; cv.style.height=Hh+'px';
+      cv.width=Math.round(W*dpr); cv.height=Math.round(Hh*dpr);
+      cv.dataset.cssW=String(W); cv.dataset.cssH=String(Hh);
+      var c=cv.getContext&&cv.getContext('2d'); if(c)c.setTransform(dpr,0,0,dpr,0,0);
+    });
+  }
 
-  // Plate labels
-  ctx.fillStyle = '#FFD166';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('上板 U = ' + p.U.toFixed(2) + ' m/s →', x0, yTop - 10);
-  ctx.fillStyle = '#9bd5ff';
-  ctx.textAlign = 'left';
-  ctx.fillText('下板（静止）', x0, yBot + 18);
-
-  // Gap label on right
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('h = ' + p.h_mm.toFixed(1) + ' mm', x1 + 6, (yTop + yBot) / 2);
-
-  // dp/dx indicator
-  ctx.fillStyle = (p.dpdx === 0) ? '#cfe3f7' : (p.dpdx > 0 ? '#ff6b6b' : '#7bed9f');
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText('dp/dx = ' + p.dpdx.toFixed(0) + ' Pa/m', x1, yTop - 10);
-
-  // Velocity vectors at multiple y levels
-  var rows = 11;
-  for (var i = 0; i <= rows; i++) {
-    var yRel = i / rows; // 0..1, 0=bottom, 1=top
-    var yPhys = p.h * yRel;
-    var u = profileU(yPhys, p);
-    var arrowLen = (u / uAbsMax) * maxArrowLen;
-    var yPix = yBot - yRel * bandH;
-    var xCenter = (x0 + x1) / 2;
-    var xStart = xCenter - arrowLen / 2;
-    var xEnd = xCenter + arrowLen / 2;
-    // For visualization, anchor arrows from x0 + 20 going right (if positive) or left (if negative).
-    // Use centered start for clarity.
-    var color = (u >= 0) ? '#00B4D8' : '#ff6b6b';
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(xStart, yPix); ctx.lineTo(xEnd, yPix);
-    ctx.stroke();
-    if (Math.abs(arrowLen) > 6) {
-      ctx.beginPath();
-      if (arrowLen >= 0) {
-        ctx.moveTo(xEnd, yPix);
-        ctx.lineTo(xEnd - 5, yPix - 3);
-        ctx.lineTo(xEnd - 5, yPix + 3);
-      } else {
-        ctx.moveTo(xStart, yPix);
-        ctx.lineTo(xStart + 5, yPix - 3);
-        ctx.lineTo(xStart + 5, yPix + 3);
+  function seedParticles(){
+    anim.particles=[];
+    var rows=9, cols=7;
+    for(var i=0;i<rows;i++){
+      for(var j=0;j<cols;j++){
+        anim.particles.push({ yRel:(i+0.5)/rows, xRel:(j+0.5)/cols });
       }
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
     }
   }
+  seedParticles();
 
-  // Vertical reference axis (y)
-  ctx.strokeStyle = 'rgba(143,184,224,0.45)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  ctx.moveTo((x0 + x1) / 2, yTop); ctx.lineTo((x0 + x1) / 2, yBot);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  function drawProfile(p,r){
+    var ctx=profileCtx, W=cssW(profileCanvas), H=cssH(profileCanvas);
+    ctx.fillStyle='#0a1929'; ctx.fillRect(0,0,W,H);
+    var marginX=72, marginY=34;
+    var x0=marginX, x1=W-marginX, yTop=marginY, yBot=H-marginY, bandH=yBot-yTop;
+    var uAbsMax=Math.max(Math.abs(r.umax),Math.abs(r.umin)); if(!isFinite(uAbsMax)||uAbsMax<=0)uAbsMax=1e-9;
+    var maxArrow=(x1-x0)*0.42;
+    var xCenter=(x0+x1)/2;
 
-  // Profile curve overlay (connect arrow tips)
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  for (var j = 0; j <= 80; j++) {
-    var yRelJ = j / 80;
-    var yPhysJ = p.h * yRelJ;
-    var uJ = profileU(yPhysJ, p);
-    var arrowLenJ = (uJ / uAbsMax) * maxArrowLen;
-    var xTip = (x0 + x1) / 2 + arrowLenJ / 2;
-    var yPixJ = yBot - yRelJ * bandH;
-    if (j === 0) ctx.moveTo(xTip, yPixJ); else ctx.lineTo(xTip, yPixJ);
-  }
-  ctx.stroke();
+    ctx.fillStyle='rgba(0,180,216,0.05)'; ctx.fillRect(x0,yTop,x1-x0,bandH);
 
-  // Title hint
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('u(y) = U·y/h − (1/2μ)(dp/dx)·y(h−y)', (x0 + x1) / 2, H - 8);
-}
-
-function drawChart(p, r) {
-  var ctx = chartCtx, W = __novaCanvasCssW(chartCanvas), H = __novaCanvasCssH(chartCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 60, my = 32;
-  var x0 = mx, x1 = W - 14, y0 = H - my, y1 = my + 6;
-  var gw = x1 - x0, gh = y0 - y1;
-
-  // X = y/h in [0,1], Y = u/U.
-  // Find ymin, ymax of u/U across profile (and clamp range).
-  var Npts = 100;
-  var ptsCombined = [];
-  var ptsCouette = [];
-  var Uref = p.U;
-  var safeU = (Math.abs(Uref) > 1e-9) ? Uref : 1; // avoid divide by zero
-  var ymin = 0, ymax = 1;
-  for (var i = 0; i <= Npts; i++) {
-    var yRel = i / Npts;
-    var yPhys = p.h * yRel;
-    var u = profileU(yPhys, p);
-    var uN = u / safeU;
-    var uC = yRel; // pure Couette
-    ptsCombined.push({ x: yRel, y: uN });
-    ptsCouette.push({ x: yRel, y: uC });
-    if (uN < ymin) ymin = uN;
-    if (uN > ymax) ymax = uN;
-  }
-  // Ensure axis includes [0,1]
-  if (ymin > 0) ymin = 0;
-  if (ymax < 1) ymax = 1;
-  // Pad
-  var span = ymax - ymin;
-  ymin -= span * 0.08;
-  ymax += span * 0.08;
-  if (ymax - ymin < 0.2) { ymax = ymin + 0.2; }
-
-  function px(xN) { return x0 + xN * gw; }
-  function py(yN) { return y0 - (yN - ymin) / (ymax - ymin) * gh; }
-
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.stroke();
-
-  // x ticks
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  for (var v = 0; v <= 10; v += 2) {
-    var xv = v / 10;
-    var xx = px(xv);
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-    ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText(xv.toFixed(1), xx, y0 + 14);
-  }
-  // y ticks
-  ctx.textAlign = 'right';
-  var nyT = 5;
-  for (var k = 0; k <= nyT; k++) {
-    var yv = ymin + (ymax - ymin) * k / nyT;
-    var yy = py(yv);
-    ctx.beginPath();
-    ctx.strokeStyle = (Math.abs(yv) < 1e-6) ? 'rgba(143,184,224,0.45)' : 'rgba(143,184,224,0.18)';
-    ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke();
-    ctx.fillStyle = '#8fb8e0';
-    ctx.fillText(yv.toFixed(2), x0 - 4, yy + 3);
-  }
-
-  // Pure Couette reference (dashed gray)
-  ctx.strokeStyle = 'rgba(200,200,200,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([5, 4]);
-  ctx.beginPath();
-  for (var j2 = 0; j2 < ptsCouette.length; j2++) {
-    var x2 = px(ptsCouette[j2].x), y2 = py(ptsCouette[j2].y);
-    if (j2 === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
-  }
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Combined profile (blue solid, red if reverse flow)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  for (var j = 0; j < ptsCombined.length; j++) {
-    var xV = px(ptsCombined[j].x), yV = py(ptsCombined[j].y);
-    if (j === 0) ctx.moveTo(xV, yV); else ctx.lineTo(xV, yV);
-  }
-  ctx.stroke();
-
-  // Highlight reverse-flow region if any
-  var hasReverse = ptsCombined.some(function (q) { return q.y < 0; });
-  if (hasReverse) {
-    ctx.fillStyle = 'rgba(255,107,107,0.18)';
-    ctx.beginPath();
-    var yZero = py(0);
-    ctx.moveTo(x0, yZero);
-    for (var jj = 0; jj < ptsCombined.length; jj++) {
-      var xR = px(ptsCombined[jj].x);
-      var yR = py(Math.min(0, ptsCombined[jj].y));
-      ctx.lineTo(xR, yR);
+    for(var pi=0;pi<anim.particles.length;pi++){
+      var pt=anim.particles[pi];
+      var yPhys=p.h*pt.yRel;
+      var u=profileU(yPhys,p);
+      var yPix=yBot-pt.yRel*bandH;
+      var xPix=x0+pt.xRel*(x1-x0);
+      var c=(u>=0)?'rgba(110,220,255,0.85)':'rgba(255,120,120,0.9)';
+      ctx.fillStyle=c;
+      ctx.beginPath(); ctx.arc(xPix,yPix,2.4,0,Math.PI*2); ctx.fill();
+      var streak=(u/uAbsMax)*22;
+      ctx.strokeStyle=(u>=0)?'rgba(110,220,255,0.35)':'rgba(255,120,120,0.4)';
+      ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(xPix,yPix); ctx.lineTo(xPix-streak,yPix); ctx.stroke();
     }
-    ctx.lineTo(x1, yZero);
-    ctx.closePath();
-    ctx.fill();
+
+    ctx.strokeStyle='#FFD166'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(x0,yTop); ctx.lineTo(x1,yTop); ctx.stroke();
+    ctx.strokeStyle='#9bd5ff'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(x0,yBot); ctx.lineTo(x1,yBot); ctx.stroke();
+    ctx.fillStyle='#FFD166'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText((L.topPlate||'top plate')+' U = '+p.U.toFixed(2)+' m/s →',x0,yTop-12);
+    ctx.fillStyle='#9bd5ff'; ctx.fillText(L.botPlate||'bottom plate (static)',x0,yBot+20);
+    ctx.fillStyle='#cfe3f7'; ctx.textAlign='left'; ctx.fillText('h = '+p.h_mm.toFixed(1)+' mm',x1+6,(yTop+yBot)/2);
+    ctx.fillStyle=(p.dpdx===0)?'#cfe3f7':(p.dpdx>0?'#ff6b6b':'#7bed9f'); ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='right';
+    ctx.fillText('dp/dx = '+p.dpdx.toFixed(0)+' Pa/m',x1,yTop-12);
+
+    var rows=11;
+    for(var i=0;i<=rows;i++){
+      var yRel=i/rows, yPhys2=p.h*yRel, u2=profileU(yPhys2,p);
+      var arrowLen=(u2/uAbsMax)*maxArrow;
+      var yPix2=yBot-yRel*bandH;
+      var xs=xCenter, xe=xCenter+arrowLen;
+      var col=(u2>=0)?'#00B4D8':'#ff6b6b';
+      ctx.strokeStyle=col; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(xs,yPix2); ctx.lineTo(xe,yPix2); ctx.stroke();
+      if(Math.abs(arrowLen)>6){ ctx.beginPath(); if(arrowLen>=0){ctx.moveTo(xe,yPix2);ctx.lineTo(xe-5,yPix2-3);ctx.lineTo(xe-5,yPix2+3);}else{ctx.moveTo(xe,yPix2);ctx.lineTo(xe+5,yPix2-3);ctx.lineTo(xe+5,yPix2+3);} ctx.closePath(); ctx.fillStyle=col; ctx.fill(); }
+    }
+    ctx.strokeStyle='rgba(143,184,224,0.4)'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(xCenter,yTop); ctx.lineTo(xCenter,yBot); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1.4; ctx.beginPath();
+    for(var j=0;j<=80;j++){ var yr=j/80, uj=profileU(p.h*yr,p), xt=xCenter+(uj/uAbsMax)*maxArrow, yp=yBot-yr*bandH; if(j===0)ctx.moveTo(xt,yp); else ctx.lineTo(xt,yp); }
+    ctx.stroke();
+    ctx.fillStyle='rgba(10,25,41,0.78)'; ctx.fillRect(x0,yTop+6,176,52);
+    ctx.fillStyle='#9bd5ff'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='left';
+    ctx.fillText('τ = '+fmtTau(r.tauMean),x0+8,yTop+22);
+    ctx.fillText((L.shearRate||'shear rate')+' = '+fmtRate(r.shearRate),x0+8,yTop+36);
+    ctx.fillText('Re = '+fmtRe(r.Re),x0+8,yTop+50);
+    ctx.fillStyle='#cfe3f7'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('u(y) = U·y/h − (1/2μ)(dp/dx)·y(h−y)',xCenter,H-8);
   }
 
-  // axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '12px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('y / h', (x0 + x1) / 2, H - 6);
-  ctx.save();
-  ctx.translate(12, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('u / U', 0, 0);
-  ctx.restore();
-
-  // Legend
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#00B4D8';
-  ctx.fillText('— 合成プロファイル', x0 + 8, y1 + 12);
-  ctx.fillStyle = 'rgba(200,200,200,0.85)';
-  ctx.fillText('-- 純粋クェット', x0 + 8, y1 + 26);
-}
-
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.U) || !isFinite(p.h) || !isFinite(p.mu) || !isFinite(p.dpdx) || p.mu <= 0 || p.h <= 0) return;
-  var r = computePhysics(p);
-  document.getElementById('statTau').textContent = fmtTau(r.tauMean);
-  document.getElementById('statQ').textContent = fmtQ(r.Qp);
-  document.getElementById('statVavg').textContent = fmtVel(r.Vavg);
-  document.getElementById('statRe').textContent = fmtRe(r.Re);
-  drawProfile(p, r);
-  drawChart(p, r);
-}
-
-function animationStep() {
-  if (!playing) return;
-  var sl = document.getElementById('slDpDx');
-  var v = parseFloat(sl.value) + 20;
-  if (v > 2000) v = -2000;
-  sl.value = v;
-  updateSlider(sl, 'slDpDxVal', 0, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
-}
-
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> dp/dx をスイープ';
-    if (animId) cancelAnimationFrame(animId);
+  function drawChart(p,r){
+    var ctx=chartCtx, W=cssW(chartCanvas), H=cssH(chartCanvas);
+    ctx.fillStyle='#0a1929'; ctx.fillRect(0,0,W,H);
+    var mx=60,my=32, x0=mx, x1=W-14, y0=H-my, y1=my+6, gw=x1-x0, gh=y0-y1;
+    var N=100, comb=[], cou=[], safeU=(Math.abs(p.U)>1e-9)?p.U:1, ymin=0, ymax=1;
+    for(var i=0;i<=N;i++){ var yr=i/N, u=profileU(p.h*yr,p), uN=u/safeU; comb.push({x:yr,y:uN}); cou.push({x:yr,y:yr}); if(uN<ymin)ymin=uN; if(uN>ymax)ymax=uN; }
+    if(ymin>0)ymin=0; if(ymax<1)ymax=1; var span=ymax-ymin; ymin-=span*0.08; ymax+=span*0.08; if(ymax-ymin<0.2)ymax=ymin+0.2;
+    function px(x){return x0+x*gw;} function py(y){return y0-(y-ymin)/(ymax-ymin)*gh;}
+    ctx.strokeStyle='rgba(143,184,224,0.5)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0,y1); ctx.stroke();
+    ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    for(var v=0;v<=10;v+=2){ var xv=v/10, xx=px(xv); ctx.strokeStyle='rgba(143,184,224,0.18)'; ctx.beginPath(); ctx.moveTo(xx,y0); ctx.lineTo(xx,y1); ctx.stroke(); ctx.fillStyle='#8fb8e0'; ctx.fillText(xv.toFixed(1),xx,y0+14); }
+    ctx.textAlign='right';
+    for(var k=0;k<=5;k++){ var yv=ymin+(ymax-ymin)*k/5, yy=py(yv); ctx.strokeStyle=(Math.abs(yv)<1e-6)?'rgba(143,184,224,0.45)':'rgba(143,184,224,0.18)'; ctx.beginPath(); ctx.moveTo(x0,yy); ctx.lineTo(x1,yy); ctx.stroke(); ctx.fillStyle='#8fb8e0'; ctx.fillText(yv.toFixed(2),x0-4,yy+3); }
+    ctx.strokeStyle='rgba(200,200,200,0.6)'; ctx.lineWidth=1.5; ctx.setLineDash([5,4]); ctx.beginPath();
+    for(var j2=0;j2<cou.length;j2++){ var a=px(cou[j2].x),b=py(cou[j2].y); if(j2===0)ctx.moveTo(a,b); else ctx.lineTo(a,b); } ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2.5; ctx.beginPath();
+    for(var j=0;j<comb.length;j++){ var a2=px(comb[j].x),b2=py(comb[j].y); if(j===0)ctx.moveTo(a2,b2); else ctx.lineTo(a2,b2); } ctx.stroke();
+    if(comb.some(function(q){return q.y<0;})){ ctx.fillStyle='rgba(255,107,107,0.18)'; ctx.beginPath(); var yz=py(0); ctx.moveTo(x0,yz); for(var jj=0;jj<comb.length;jj++){ ctx.lineTo(px(comb[jj].x),py(Math.min(0,comb[jj].y))); } ctx.lineTo(x1,yz); ctx.closePath(); ctx.fill(); }
+    var midN=profileU(p.h*0.5,p)/safeU; ctx.fillStyle='#FFD166'; ctx.beginPath(); ctx.arc(px(0.5),py(midN),4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#cfe3f7'; ctx.font='12px "Roboto Mono",monospace'; ctx.textAlign='center'; ctx.fillText('y / h',(x0+x1)/2,H-6);
+    ctx.save(); ctx.translate(12,(y0+y1)/2); ctx.rotate(-Math.PI/2); ctx.fillText('u / U',0,0); ctx.restore();
+    ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='left'; ctx.fillStyle='#00B4D8'; ctx.fillText('— '+(L.combined||'combined'),x0+8,y1+12); ctx.fillStyle='rgba(200,200,200,0.85)'; ctx.fillText('-- '+(L.pureCouette||'pure Couette'),x0+8,y1+26);
   }
-}
 
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> dp/dx をスイープ';
-  var defs = { slU: 1.00, slH: 2.0, slMu: 0.0010, slDpDx: 0 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slU'), 'slUVal', 2, '');
-  updateSlider(document.getElementById('slH'), 'slHVal', 1, '');
-  updateSlider(document.getElementById('slMu'), 'slMuVal', 4, '');
-  updateSlider(document.getElementById('slDpDx'), 'slDpDxVal', 0, '');
+  function compute(){
+    var p=getParams();
+    if(!isFinite(p.U)||!isFinite(p.h)||!isFinite(p.mu)||!isFinite(p.dpdx)||p.mu<=0||p.h<=0) return;
+    var r=computePhysics(p);
+    $('statTau').textContent=fmtTau(r.tauMean);
+    $('statQ').textContent=fmtQ(r.Qp);
+    $('statVavg').textContent=fmtVel(r.Vavg);
+    $('statRe').textContent=fmtRe(r.Re);
+    var sr=$('statShear'); if(sr)sr.textContent=fmtRate(r.shearRate);
+    var um=$('statUmax'); if(um)um.textContent=fmtVel(Math.max(r.umax,Math.abs(r.umin)));
+    drawProfile(p,r); drawChart(p,r);
+  }
+  window.compute=compute;
+
+  function step(ts){
+    if(!anim.playing){ return; }
+    if(!anim.last)anim.last=ts;
+    var dt=Math.min((ts-anim.last)/1000,0.05); anim.last=ts;
+    var p=getParams();
+    if(p.mu>0&&p.h>0){
+      var uAbsMax=Math.max(Math.abs(p.U),1e-6);
+      for(var i=0;i<anim.particles.length;i++){
+        var pt=anim.particles[i];
+        var u=profileU(p.h*pt.yRel,p);
+        pt.xRel += (u/uAbsMax)*dt*anim.speed*0.6;
+        if(pt.xRel>1)pt.xRel-=1; if(pt.xRel<0)pt.xRel+=1;
+      }
+      if(anim.sweep){
+        var sl=$('slDpDx'); var nv=parseFloat(sl.value)+anim.speed*8;
+        if(nv>2000)nv=-2000; sl.value=nv; updateSlider(sl,'slDpDxVal',0,'');
+      }
+    }
+    compute();
+    anim.id=requestAnimationFrame(step);
+  }
+
+  function setPlay(on){
+    anim.playing=on; var btn=$('playBtn');
+    if(on){ if(btn)btn.innerHTML='<i class="fas fa-pause"></i> '+(L.pause||'Pause'); anim.last=0; anim.id=requestAnimationFrame(step); }
+    else { if(btn)btn.innerHTML='<i class="fas fa-play"></i> '+(L.play||'Play'); if(anim.id)cancelAnimationFrame(anim.id); }
+  }
+  window.togglePlay=function(){ setPlay(!anim.playing); };
+  window.setSpeed=function(val){ anim.speed=parseFloat(val); var lbl=$('speedVal'); if(lbl)lbl.textContent=anim.speed.toFixed(1)+'×'; };
+  window.toggleSweep=function(cb){ anim.sweep=cb.checked; };
+
+  var PRESETS={
+    couette:{ slU:1.00, slH:2.0, slMu:0.0010, slDpDx:0 },
+    favorable:{ slU:1.00, slH:2.0, slMu:0.0010, slDpDx:-1200 },
+    adverse:{ slU:1.00, slH:2.0, slMu:0.0010, slDpDx:1600 },
+    viscous:{ slU:1.50, slH:0.5, slMu:0.1000, slDpDx:0 }
+  };
+  function applyDefs(d){
+    $('slU').value=d.slU; $('slH').value=d.slH; $('slMu').value=d.slMu; $('slDpDx').value=d.slDpDx;
+    updateSlider($('slU'),'slUVal',2,''); updateSlider($('slH'),'slHVal',1,'');
+    updateSlider($('slMu'),'slMuVal',4,''); updateSlider($('slDpDx'),'slDpDxVal',0,'');
+  }
+  window.applyPreset=function(name){ var d=PRESETS[name]; if(!d)return; applyDefs(d); compute(); };
+  window.resetParams=function(){
+    setPlay(false); applyDefs(PRESETS.couette);
+    var sw=$('sweepChk'); if(sw){sw.checked=false; anim.sweep=false;}
+    compute();
+  };
+
+  window.addEventListener('resize',function(){ resizeCanvases(); compute(); });
+  resizeCanvases();
   compute();
-}
-
-window.addEventListener('resize', function () { resizeCanvases(); compute(); });
-
-resizeCanvases();
-compute();
+  if(!reduceMotion){ setPlay(true); }
+})();
 </script>
 
 <section class="explanation">
@@ -692,6 +536,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="couette-flow.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -747,7 +594,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>SAE 10W-30エンジンオイル(μ=100 mPa·s)を平板間隔H=0.5 mmのジャーナルベアリング内に充填し、上板速度U=1.5 m/sで駆動する場合を想定します。圧力勾配dp/dx=0 Pa/mの純粋なクェット流れでは、壁面せん断応力τ_w=μ(U/H)=100×(1.5/0.0005)=300,000 Pa=300 kPaとなります。単位幅流量は q=U×H/2=1.5×0.0005/2=0.000375 m³/(m·s)、Reynolds数Re=ρUD/μ=(860×1.5×0.001)/0.1≒12.9で層流域です。</p>
+<p>SAE 10W-30エンジンオイル(μ=100 mPa·s)を平板間隔H=0.5 mmのジャーナルベアリング内に充填し、上板速度U=1.5 m/sで駆動する場合を想定します。圧力勾配dp/dx=0 Pa/mの純粋なクェット流れでは、壁面せん断応力τ_w=μ(U/H)=0.1×(1.5/0.0005)=300 Pa=0.3 kPaとなります（μ=100 mPa·s=0.1 Pa·s）。単位幅流量は q=U×H/2=1.5×0.0005/2=0.000375 m³/(m·s)、Reynolds数Re=ρUD/μ=(860×1.5×0.001)/0.1≒12.9で層流域です。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -758,6 +605,16 @@ compute();
 <li>マイクロスケール(<100 μm)では滑り境界条件の補正が必要となり、Knudsen数をチェックしてください</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

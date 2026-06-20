@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "音のうなり シミュレーター",
       "description": "2 つの正弦波 f₁・f₂ と振幅 A₁・A₂ を操作し、合成波形・スペクトル・うなり周波数 |f₁−f₂|・平均周波数・うなり周期・最大合成振幅をリアルタイムに可視化する音響干渉シミュレーター。",
       "url": "https://novasolver.jp/tools/acoustic-beats.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["合成波形 y(t)=A₁cos(2πf₁t)+A₂cos(2πf₂t) のリアルタイム描画","うなり周波数 |f₁−f₂|・平均周波数 (f₁+f₂)/2 の即時計算","うなり周期 T_b=1/|f₁−f₂| とうなりエンベロープの可視化","スペクトル（f₁・f₂ の 2 本のスパイク）の同時表示"],
       "keywords": "音のうなり,ビート周波数,2音の干渉,音響,うなり,beat frequency,acoustic beats,正弦波合成,平均周波数,周波数差",
       "datePublished": "2026-05-15",
@@ -101,7 +101,22 @@
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 #waveCanvas,#freqCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#waveCanvas:focus-visible,#freqCanvas:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.preset-row{ display:flex; flex-wrap:wrap; gap:6px; }
+.preset-btn{ flex:1 1 auto; min-width:88px; font-size:0.74rem; padding:7px 8px; border:1px solid var(--border); border-radius:7px; background:#fff; color:var(--text); cursor:pointer; transition:border-color .15s,color .15s; }
+.preset-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.preset-btn:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+.toggle-btn{ font-size:0.78rem; padding:6px 12px; border:1px solid var(--border); border-radius:7px; background:#fff; color:var(--muted); cursor:pointer; }
+.toggle-btn.active{ border-color:var(--accent); color:var(--accent); font-weight:700; }
+.toggle-btn:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+.live-readout{ display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+.live-readout .lr{ flex:1 1 110px; background:#0a1929; border-radius:7px; padding:8px 10px; }
+.live-readout .lr .lrv{ font-family:'Roboto Mono',monospace; font-size:1.0rem; color:#7fd3ff; font-weight:700; }
+.live-readout .lr .lrl{ font-size:0.66rem; color:#9fb6d0; margin-top:2px; }
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{ transition:none; }
+}
 </style>
 </head>
 <body>
@@ -131,12 +146,24 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
   <div class="panel">
     <div class="panel-title"><i class="fas fa-sliders-h"></i> パラメータ設定</div>
 
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row">
+        <button type="button" class="preset-btn" onclick="setPreset('close')">近接 → 遅いうなり</button>
+        <button type="button" class="preset-btn" onclick="setPreset('far')">離調 → 速いうなり</button>
+        <button type="button" class="preset-btn" onclick="setPreset('unison')">同度 → うなり無し</button>
+        <button type="button" class="preset-btn" onclick="setPreset('octave')">オクターブ</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="param-group">
       <div class="param-label">
         <span class="param-name">周波数 1 f₁</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slF1Val" value="440" min="100" max="2000" step="1" oninput="syncFromNum('slF1','slF1Val')"><span class="num-unit">Hz</span></div>
       </div>
-      <input type="range" id="slF1" min="100" max="2000" step="1" value="440" oninput="syncToNum('slF1','slF1Val');updateSlider(this,'slF1Val',0,'');compute()">
+      <input type="range" id="slF1" min="100" max="2000" step="1" value="440" aria-label="周波数 1 f1 ヘルツ" oninput="syncToNum('slF1','slF1Val');updateSlider(this,'slF1Val',0,'');compute()">
     </div>
 
     <div class="param-group">
@@ -144,7 +171,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">周波数 2 f₂</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slF2Val" value="444" min="100" max="2000" step="1" oninput="syncFromNum('slF2','slF2Val')"><span class="num-unit">Hz</span></div>
       </div>
-      <input type="range" id="slF2" min="100" max="2000" step="1" value="444" oninput="syncToNum('slF2','slF2Val');updateSlider(this,'slF2Val',0,'');compute()">
+      <input type="range" id="slF2" min="100" max="2000" step="1" value="444" aria-label="周波数 2 f2 ヘルツ" oninput="syncToNum('slF2','slF2Val');updateSlider(this,'slF2Val',0,'');compute()">
     </div>
 
     <div class="param-group">
@@ -152,7 +179,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">振幅 1 A₁</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slA1Val" value="0.50" min="0.00" max="1.00" step="0.05" oninput="syncFromNum('slA1','slA1Val')"><span class="num-unit">—</span></div>
       </div>
-      <input type="range" id="slA1" min="0.00" max="1.00" step="0.05" value="0.50" oninput="syncToNum('slA1','slA1Val');updateSlider(this,'slA1Val',2,'');compute()">
+      <input type="range" id="slA1" min="0.00" max="1.00" step="0.05" value="0.50" aria-label="振幅 1 A1" oninput="syncToNum('slA1','slA1Val');updateSlider(this,'slA1Val',2,'');compute()">
     </div>
 
     <div class="param-group">
@@ -160,16 +187,43 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <span class="param-name">振幅 2 A₂</span>
         <div class="num-wrap"><input type="number" class="num-input" id="slA2Val" value="0.50" min="0.00" max="1.00" step="0.05" oninput="syncFromNum('slA2','slA2Val')"><span class="num-unit">—</span></div>
       </div>
-      <input type="range" id="slA2" min="0.00" max="1.00" step="0.05" value="0.50" oninput="syncToNum('slA2','slA2Val');updateSlider(this,'slA2Val',2,'');compute()">
+      <input type="range" id="slA2" min="0.00" max="1.00" step="0.05" value="0.50" aria-label="振幅 2 A2" oninput="syncToNum('slA2','slA2Val');updateSlider(this,'slA2Val',2,'');compute()">
+    </div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name">時間ズーム（表示窓）</span>
+        <div class="num-wrap"><input type="number" class="num-input" id="slZoomVal" value="1000" min="100" max="2000" step="50" oninput="syncFromNum('slZoom','slZoomVal')"><span class="num-unit">ms</span></div>
+      </div>
+      <input type="range" id="slZoom" min="100" max="2000" step="50" value="1000" aria-label="時間ズーム 表示窓 ミリ秒" oninput="syncToNum('slZoom','slZoomVal');updateSlider(this,'slZoomVal',0,'');compute()">
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="param-group">
+      <div class="param-label">
+        <span class="param-name"><i class="fas fa-volume-up"></i> 音を鳴らす（Web Audio）</span>
+        <button type="button" class="toggle-btn" id="audioToggle" onclick="toggleAudio()" aria-pressed="false"><i class="fas fa-volume-mute"></i> ミュート</button>
+      </div>
+      <p style="font-size:0.7rem;color:var(--muted);margin-top:4px;">既定はミュート。クリックで 2 つの実オシレーターを鳴らし、可視エンベロープと同じうなりを耳で確認できます（自動再生はしません）。</p>
     </div>
 
     <div class="divider"></div>
 
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> f₂ をスイープ</button>
+      <button type="button" class="btn" id="playBtn" data-play="<i class=&quot;fas fa-play&quot;></i> 再生（波形をスクロール）" data-pause="<i class=&quot;fas fa-pause&quot;></i> 一時停止" onclick="togglePlay()"><i class="fas fa-play"></i> 再生（波形をスクロール）</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は f₁=440 Hz（A4 ピッチ）、f₂=444 Hz（4 Hz ずれ）、A₁=A₂=0.5。スイープは f₂ を 440→2000 Hz まで往復し、うなりが消える瞬間（f₁=f₂）と差が広がるほどうなりが速くなる様子を観察できます。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は f₁=440 Hz（A4 ピッチ）、f₂=444 Hz（4 Hz ずれ）、A₁=A₂=0.5。再生すると合成波が実時間で左へスクロールし、うなりエンベロープが膨らんでは収縮する様子が見えます。f₁=f₂ でうなりが消え、差が広がるほどうなりが速くなります。</p>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -181,12 +235,17 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <div class="stat-card"><div class="sv" id="statTbeat">—</div><div class="sl">うなり周期</div></div>
         <div class="stat-card"><div class="sv" id="statAmax">—</div><div class="sl">最大合成振幅</div></div>
       </div>
+      <div class="live-readout" aria-live="polite">
+        <div class="lr"><div class="lrv" id="roTime">0 ms</div><div class="lrl">再生時刻 t</div></div>
+        <div class="lr"><div class="lrv" id="roEnv">—</div><div class="lrl">現在のエンベロープ振幅</div></div>
+        <div class="lr"><div class="lrv" id="roBeats">0</div><div class="lrl">経過うなり回数</div></div>
+      </div>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-wave-square"></i> 合成波形 y(t)（0〜1000 ms）</div>
-      <canvas id="waveCanvas"></canvas>
-      <p class="canvas-hint">青＝合成波 y(t)=A₁cos(2πf₁t)+A₂cos(2πf₂t)／橙破線＝振幅エンベロープ ±|A₁cos(2π·f_b·t)+…|／黄点＝最大点（A_max）／赤点＝最小点（A_min）。エンベロープの 1 周期が「うなり 1 回」に対応。</p>
+      <div class="chart-title"><i class="fas fa-wave-square"></i> 合成波形 y(t)（スクロール表示）</div>
+      <canvas id="waveCanvas" tabindex="0" role="img" aria-label="2 音の合成波形とうなりエンベロープのリアルタイムアニメーション"></canvas>
+      <p class="canvas-hint">青＝合成波 y(t)=A₁cos(2πf₁t)+A₂cos(2πf₂t)／橙破線＝振幅エンベロープ ±√(A₁²+A₂²+2A₁A₂cos(2πΔf·t))／黄点＝最大点（A_max）／赤点＝最小点（A_min）／橙の括弧＝うなり 1 周期 T_b。再生中は波形が左へスクロールし、エンベロープの膨張・収縮が見えます。スペースキーで再生／停止。</p>
     </div>
 
     <div class="chart-card">
@@ -210,39 +269,56 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Acoustic Beats (Two-Tone Interference) Simulator ==========
+// ========== Acoustic Beats (Two-Tone Interference) Simulator — v2 ==========
+var I18N = {
+  inf: "∞",
+  roTimeFmt: function(ms){ return ms.toFixed(0) + " ms"; },
+  beatsLabel: function(n){ return n.toFixed(2); },
+  audioMute: '<i class="fas fa-volume-mute"></i> ミュート',
+  audioOn: '<i class="fas fa-volume-up"></i> 鳴らしています',
+  tbBracket: "T_b"
+};
+
 var waveCanvas = document.getElementById('waveCanvas');
 var waveCtx = waveCanvas.getContext('2d');
 var freqCanvas = document.getElementById('freqCanvas');
 var freqCtx = freqCanvas.getContext('2d');
+
 var playing = false;
 var animId = null;
-var sweepDir = 1;
+var simT = 0;        // elapsed playback time (seconds)
+var lastTs = 0;
+
+var prefersReduced = false;
+try { prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { prefersReduced = false; }
+
+// ---- Web Audio ----
+var audioCtx = null;
+var osc1 = null, osc2 = null, gain1 = null, gain2 = null, masterGain = null;
+var audioOn = false;
 
 function getParams() {
   var f1 = parseFloat(document.getElementById('slF1').value);
   var f2 = parseFloat(document.getElementById('slF2').value);
   var A1 = parseFloat(document.getElementById('slA1').value);
   var A2 = parseFloat(document.getElementById('slA2').value);
-  return { f1: f1, f2: f2, A1: A1, A2: A2 };
+  var winMs = parseFloat(document.getElementById('slZoom').value);
+  if (!isFinite(winMs) || winMs <= 0) winMs = 1000;
+  return { f1: f1, f2: f2, A1: A1, A2: A2, winMs: winMs };
 }
 
-function beatFrequency(f1, f2) {
-  return Math.abs(f1 - f2);
-}
-function avgFrequency(f1, f2) {
-  return 0.5 * (f1 + f2);
-}
+function beatFrequency(f1, f2) { return Math.abs(f1 - f2); }
+function avgFrequency(f1, f2) { return 0.5 * (f1 + f2); }
 function beatPeriodMs(f1, f2) {
   var fb = beatFrequency(f1, f2);
   if (fb <= 0) return Infinity;
   return 1000.0 / fb;
 }
-function maxAmplitude(A1, A2) {
-  return A1 + A2;
-}
-function minAmplitude(A1, A2) {
-  return Math.abs(A1 - A2);
+function maxAmplitude(A1, A2) { return A1 + A2; }
+function minAmplitude(A1, A2) { return Math.abs(A1 - A2); }
+function envelopeAt(p, t) {
+  var s = p.A1 * p.A1 + p.A2 * p.A2 + 2 * p.A1 * p.A2 * Math.cos(2 * Math.PI * (p.f1 - p.f2) * t);
+  return s > 0 ? Math.sqrt(s) : 0;
 }
 
 function __novaCanvasCssW(canvas){
@@ -269,7 +345,8 @@ function resizeCanvases() {
   });
 }
 
-function drawWave(p) {
+// Draw the scrolling waveform. tOffset (seconds) is the left edge of the window.
+function drawWave(p, tOffset) {
   var ctx = waveCtx, W = __novaCanvasCssW(waveCanvas), H = __novaCanvasCssH(waveCanvas);
   ctx.fillStyle = '#0a1929';
   ctx.fillRect(0, 0, W, H);
@@ -282,28 +359,28 @@ function drawWave(p) {
   var gw = x1 - x0, gh = y0 - y1;
   var cy = (y0 + y1) / 2;
 
-  // Time window: 0 - 1000 ms (1 second)
-  var Tend = 1.0; // seconds
+  var Twin = p.winMs / 1000.0;          // window length (seconds)
+  var tStart = tOffset;
+  var tEnd = tOffset + Twin;
   var Amax = p.A1 + p.A2;
   if (Amax <= 0) Amax = 1.0;
   var yScale = (gh / 2) * 0.92 / Amax;
 
-  function px(t) { return x0 + (t / Tend) * gw; }
+  function px(t) { return x0 + ((t - tStart) / Twin) * gw; }
   function py(y) { return cy - y * yScale; }
 
-  // Gridlines (time axis)
+  // time gridlines (10 divisions, labelled relative to window start)
   ctx.strokeStyle = 'rgba(143,184,224,0.18)';
   ctx.fillStyle = '#8fb8e0';
   ctx.font = '10px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
   for (var k = 0; k <= 10; k++) {
-    var tt = k * 100; // ms
-    var xx = x0 + (tt / 1000) * gw;
+    var tt = tStart + (Twin * k / 10);
+    var xx = px(tt);
     ctx.beginPath();
     ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
-    ctx.fillText(tt.toString(), xx, y0 + 14);
+    ctx.fillText((tt * 1000).toFixed(0), xx, y0 + 14);
   }
-  // Y gridlines
   ctx.textAlign = 'right';
   var yticks = [-Amax, -Amax/2, 0, Amax/2, Amax];
   for (var i = 0; i < yticks.length; i++) {
@@ -314,100 +391,108 @@ function drawWave(p) {
     ctx.fillText(yv.toFixed(2), x0 - 4, yy + 3);
   }
 
-  // Axes
+  // axes
   ctx.strokeStyle = 'rgba(143,184,224,0.55)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.stroke();
-  // Center axis y = 0
   ctx.strokeStyle = 'rgba(143,184,224,0.45)';
   ctx.beginPath(); ctx.moveTo(x0, cy); ctx.lineTo(x1, cy); ctx.stroke();
 
-  // Envelope: |A1*cos(2*pi*fb*t) + A2*cos(...)| -- for unequal amplitudes
-  // For visualization, use slow envelope from beat frequency
-  var fb_half = (p.f1 - p.f2) / 2; // half difference (signed)
-  var fa = (p.f1 + p.f2) / 2;
   var twoPi = 2 * Math.PI;
 
-  // Draw envelope (orange dashed): |A1+A2| upper, with cos(2*pi*fb_half*t) modulation
+  // envelope (orange dashed), upper + lower
   ctx.save();
   ctx.setLineDash([5, 4]);
   ctx.strokeStyle = 'rgba(255,170,80,0.85)';
   ctx.lineWidth = 1.6;
-  // Upper envelope
+  var envSamples = 900;
+  var sIdx, tEnv, env, Xe, Ye, firstE;
+  firstE = true;
   ctx.beginPath();
-  var envSamples = 800;
-  var firstE = true;
-  for (var s = 0; s <= envSamples; s++) {
-    var t = (s / envSamples) * Tend;
-    // For unequal amplitudes: envelope is sqrt(A1^2 + A2^2 + 2*A1*A2*cos(2*pi*(f1-f2)*t))
-    var dphi = twoPi * (p.f1 - p.f2) * t;
-    var envSq = p.A1 * p.A1 + p.A2 * p.A2 + 2 * p.A1 * p.A2 * Math.cos(dphi);
-    var env = envSq > 0 ? Math.sqrt(envSq) : 0;
-    var X = px(t), Y = py(env);
-    if (firstE) { ctx.moveTo(X, Y); firstE = false; } else ctx.lineTo(X, Y);
+  for (sIdx = 0; sIdx <= envSamples; sIdx++) {
+    tEnv = tStart + (sIdx / envSamples) * Twin;
+    env = envelopeAt(p, tEnv);
+    Xe = px(tEnv); Ye = py(env);
+    if (firstE) { ctx.moveTo(Xe, Ye); firstE = false; } else ctx.lineTo(Xe, Ye);
   }
   ctx.stroke();
-  // Lower envelope
-  ctx.beginPath();
   firstE = true;
-  for (var s2 = 0; s2 <= envSamples; s2++) {
-    var t2 = (s2 / envSamples) * Tend;
-    var dphi2 = twoPi * (p.f1 - p.f2) * t2;
-    var envSq2 = p.A1 * p.A1 + p.A2 * p.A2 + 2 * p.A1 * p.A2 * Math.cos(dphi2);
-    var env2 = envSq2 > 0 ? Math.sqrt(envSq2) : 0;
-    var X2 = px(t2), Y2 = py(-env2);
-    if (firstE) { ctx.moveTo(X2, Y2); firstE = false; } else ctx.lineTo(X2, Y2);
+  ctx.beginPath();
+  for (sIdx = 0; sIdx <= envSamples; sIdx++) {
+    tEnv = tStart + (sIdx / envSamples) * Twin;
+    env = envelopeAt(p, tEnv);
+    Xe = px(tEnv); Ye = py(-env);
+    if (firstE) { ctx.moveTo(Xe, Ye); firstE = false; } else ctx.lineTo(Xe, Ye);
   }
   ctx.stroke();
   ctx.restore();
 
-  // Composite waveform (blue)
+  // composite waveform (blue)
   ctx.strokeStyle = 'rgba(74,198,255,0.95)';
   ctx.lineWidth = 1.6;
   ctx.beginPath();
-  // Adaptive sampling: enough to show high-frequency oscillation
   var maxF = Math.max(p.f1, p.f2);
-  var samples = Math.max(2000, Math.min(8000, Math.round(maxF * Tend * 6)));
+  var samples = Math.max(2000, Math.min(9000, Math.round(maxF * Twin * 8)));
   var firstW = true;
   for (var ss = 0; ss <= samples; ss++) {
-    var tw = (ss / samples) * Tend;
+    var tw = tStart + (ss / samples) * Twin;
     var y = p.A1 * Math.cos(twoPi * p.f1 * tw) + p.A2 * Math.cos(twoPi * p.f2 * tw);
-    var X3 = px(tw), Y3 = py(y);
-    if (firstW) { ctx.moveTo(X3, Y3); firstW = false; } else ctx.lineTo(X3, Y3);
+    var Xw = px(tw), Yw = py(y);
+    if (firstW) { ctx.moveTo(Xw, Yw); firstW = false; } else ctx.lineTo(Xw, Yw);
   }
   ctx.stroke();
 
-  // Marker: maximum point (constructive, near t=0 or first envelope peak)
-  // For equal-frequency offsets, A_max occurs at t=0 (both phases aligned)
-  // But mark first envelope peak more generically.
-  var Tb_s = 1.0 / Math.max(beatFrequency(p.f1, p.f2), 1e-6);
-  var tMaxMark = 0; // first constructive peak at t=0
-  // First minimum (destructive) at t = Tb/2 if equal amps
-  var tMinMark = Tb_s / 2.0;
-  if (tMaxMark <= Tend) {
-    var xm = px(tMaxMark), ym = py(p.A1 + p.A2);
-    ctx.fillStyle = '#FFD166';
-    ctx.beginPath(); ctx.arc(xm, ym, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.font = '10px "Roboto Mono",monospace';
-    ctx.fillStyle = '#FFD166';
-    ctx.textAlign = 'left';
-    ctx.fillText('A_max=' + (p.A1 + p.A2).toFixed(2), xm + 6, ym - 6);
-  }
-  if (tMinMark <= Tend) {
-    var xn = px(tMinMark);
-    var yn = py(0); // for equal amp case, min envelope = 0; but draw at A_min for general
-    var Amin = Math.abs(p.A1 - p.A2);
-    yn = py(Amin > 0 ? Amin : 0);
-    ctx.fillStyle = '#FF6B6B';
-    ctx.beginPath(); ctx.arc(xn, yn, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.font = '10px "Roboto Mono",monospace';
-    ctx.fillStyle = '#FF6B6B';
-    ctx.textAlign = 'left';
-    ctx.fillText('A_min=' + Amin.toFixed(2), xn + 6, yn + 12);
+  // annotate one full beat-envelope cycle inside the window (orange bracket)
+  var fb = beatFrequency(p.f1, p.f2);
+  if (fb > 0) {
+    var Tb = 1.0 / fb;
+    // first envelope maximum at or after tStart: maxima when (f1-f2)t = integer
+    var df = Math.abs(p.f1 - p.f2);
+    var firstMaxT = Math.ceil(tStart * df) / df;
+    var bx0 = firstMaxT, bx1 = firstMaxT + Tb;
+    if (bx0 >= tStart && bx1 <= tEnd) {
+      var bxA = px(bx0), bxB = px(bx1);
+      var by = y1 + 14;
+      ctx.strokeStyle = 'rgba(255,170,80,0.95)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(bxA, by + 6); ctx.lineTo(bxA, by); ctx.lineTo(bxB, by); ctx.lineTo(bxB, by + 6);
+      ctx.stroke();
+      ctx.fillStyle = '#FFAA50';
+      ctx.font = '11px "Roboto Mono",monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(I18N.tbBracket + ' = ' + (Tb * 1000).toFixed(1) + ' ms', (bxA + bxB) / 2, by - 4);
+    }
   }
 
-  // Axis labels
+  // markers: A_max and A_min within window (first occurrences)
+  var dfAbs = Math.abs(p.f1 - p.f2);
+  if (dfAbs > 0) {
+    var tMax = Math.ceil(tStart * dfAbs) / dfAbs;             // envelope maximum
+    var tMin = (Math.floor(tStart * dfAbs - 0.5) + 0.5 < tStart * dfAbs)
+      ? (Math.floor(tStart * dfAbs + 0.5) + 0.5) / dfAbs
+      : (Math.ceil(tStart * dfAbs - 0.5) + 0.5) / dfAbs;
+    if (tMax >= tStart && tMax <= tEnd) {
+      var xm = px(tMax), ym = py(p.A1 + p.A2);
+      ctx.fillStyle = '#FFD166';
+      ctx.beginPath(); ctx.arc(xm, ym, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.font = '10px "Roboto Mono",monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('A_max=' + (p.A1 + p.A2).toFixed(2), xm + 6, ym - 6);
+    }
+    if (tMin >= tStart && tMin <= tEnd) {
+      var Amin = Math.abs(p.A1 - p.A2);
+      var xn = px(tMin), yn = py(Amin);
+      ctx.fillStyle = '#FF6B6B';
+      ctx.beginPath(); ctx.arc(xn, yn, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.font = '10px "Roboto Mono",monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('A_min=' + Amin.toFixed(2), xn + 6, yn + 12);
+    }
+  }
+
+  // axis labels
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '12px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
@@ -418,13 +503,13 @@ function drawWave(p) {
   ctx.fillText('y(t)', 0, 0);
   ctx.restore();
 
-  // Top-right info readout
+  // top-right readout
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '11px "Roboto Mono",monospace';
   ctx.textAlign = 'right';
   ctx.fillText('f1 = ' + p.f1.toFixed(0) + ' Hz', W - 14, 22);
   ctx.fillText('f2 = ' + p.f2.toFixed(0) + ' Hz', W - 14, 38);
-  ctx.fillText('|f1-f2| = ' + beatFrequency(p.f1, p.f2).toFixed(1) + ' Hz', W - 14, 54);
+  ctx.fillText('|f1-f2| = ' + fb.toFixed(1) + ' Hz', W - 14, 54);
 }
 
 function drawSpectrum(p) {
@@ -439,7 +524,6 @@ function drawSpectrum(p) {
   var x0 = mx, x1 = W - 14, y0 = H - my, y1 = my;
   var gw = x1 - x0, gh = y0 - y1;
 
-  // X axis: frequency, dynamic range around f1, f2
   var fmin = Math.min(p.f1, p.f2);
   var fmax = Math.max(p.f1, p.f2);
   var span = Math.max(fmax - fmin, 20);
@@ -447,19 +531,16 @@ function drawSpectrum(p) {
   var xHigh = fmax + Math.max(span * 1.5, 50);
   if (xHigh - xLow < 100) { xLow = Math.max(0, fmin - 50); xHigh = fmax + 50; }
 
-  // Y axis: amplitude 0..1.05*max(A1,A2)
   var Amax = Math.max(p.A1, p.A2, 0.1);
   var yMax = Amax * 1.15;
 
   function px(f) { return x0 + (f - xLow) / (xHigh - xLow) * gw; }
   function py(a) { return y0 - (a / yMax) * gh; }
 
-  // Gridlines
   ctx.strokeStyle = 'rgba(143,184,224,0.18)';
   ctx.fillStyle = '#8fb8e0';
   ctx.font = '10px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
-  // X ticks (5)
   for (var k = 0; k <= 5; k++) {
     var fv = xLow + (xHigh - xLow) * k / 5;
     var xx = px(fv);
@@ -467,7 +548,6 @@ function drawSpectrum(p) {
     ctx.moveTo(xx, y0); ctx.lineTo(xx, y1); ctx.stroke();
     ctx.fillText(fv.toFixed(0), xx, y0 + 14);
   }
-  // Y ticks (5)
   ctx.textAlign = 'right';
   for (var i = 0; i <= 4; i++) {
     var av = (yMax * i) / 4;
@@ -477,13 +557,11 @@ function drawSpectrum(p) {
     ctx.fillText(av.toFixed(2), x0 - 4, yy + 3);
   }
 
-  // Axes
   ctx.strokeStyle = 'rgba(143,184,224,0.55)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.stroke();
 
-  // Average frequency line (yellow dashed)
   var fa = avgFrequency(p.f1, p.f2);
   var faX = px(fa);
   if (faX >= x0 && faX <= x1) {
@@ -499,7 +577,6 @@ function drawSpectrum(p) {
     ctx.fillText('f_avg = ' + fa.toFixed(1) + ' Hz', faX, y1 - 6);
   }
 
-  // Spectrum spikes for f1 and f2
   function drawSpike(f, A, color, label) {
     var xs = px(f);
     if (xs < x0 || xs > x1) return;
@@ -507,7 +584,6 @@ function drawSpectrum(p) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 3.0;
     ctx.beginPath(); ctx.moveTo(xs, y0); ctx.lineTo(xs, ys); ctx.stroke();
-    // Triangle marker on top
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(xs, ys - 6);
@@ -522,15 +598,13 @@ function drawSpectrum(p) {
   drawSpike(p.f1, p.A1, 'rgba(74,198,255,0.95)', 'f1=' + p.f1.toFixed(0));
   drawSpike(p.f2, p.A2, 'rgba(255,140,200,0.95)', 'f2=' + p.f2.toFixed(0));
 
-  // Frequency-difference arrow at the bottom
   var x1p = px(p.f1), x2p = px(p.f2);
-  if (x1p >= x0 && x1p <= x1 && x2p >= x0 && x2p <= x1) {
+  if (x1p >= x0 && x1p <= x1 && x2p >= x0 && x2p <= x1 && Math.abs(p.f1 - p.f2) > 0) {
     var arrowY = y0 - 18;
     ctx.strokeStyle = 'rgba(255,170,80,0.9)';
     ctx.fillStyle = 'rgba(255,170,80,0.9)';
     ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.moveTo(x1p, arrowY); ctx.lineTo(x2p, arrowY); ctx.stroke();
-    // arrowheads
     var dir1 = x2p > x1p ? 1 : -1;
     ctx.beginPath();
     ctx.moveTo(x1p, arrowY); ctx.lineTo(x1p + dir1 * 5, arrowY - 4); ctx.lineTo(x1p + dir1 * 5, arrowY + 4); ctx.closePath(); ctx.fill();
@@ -542,7 +616,6 @@ function drawSpectrum(p) {
     ctx.fillText('|f1-f2| = ' + beatFrequency(p.f1, p.f2).toFixed(1) + ' Hz', (x1p + x2p) / 2, arrowY - 6);
   }
 
-  // Axis labels
   ctx.fillStyle = '#cfe3f7';
   ctx.font = '12px "Roboto Mono",monospace';
   ctx.textAlign = 'center';
@@ -554,67 +627,166 @@ function drawSpectrum(p) {
   ctx.restore();
 }
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.f1) || !isFinite(p.f2) || !isFinite(p.A1) || !isFinite(p.A2)) return;
+function updateStats(p) {
   var fb = beatFrequency(p.f1, p.f2);
   var fa = avgFrequency(p.f1, p.f2);
   var Tb = beatPeriodMs(p.f1, p.f2);
   var Amax = maxAmplitude(p.A1, p.A2);
   document.getElementById('statFbeat').textContent = fb.toFixed(1) + ' Hz';
   document.getElementById('statFavg').textContent  = fa.toFixed(0) + ' Hz';
-  document.getElementById('statTbeat').textContent = (Tb === Infinity ? '∞' : Tb.toFixed(0)) + ' ms';
+  document.getElementById('statTbeat').textContent = (Tb === Infinity ? I18N.inf : Tb.toFixed(0)) + ' ms';
   document.getElementById('statAmax').textContent  = Amax.toFixed(2);
-  drawWave(p);
+}
+
+function updateLive(p, tOffset) {
+  var env = envelopeAt(p, tOffset);
+  document.getElementById('roTime').textContent = I18N.roTimeFmt(tOffset * 1000);
+  document.getElementById('roEnv').textContent = env.toFixed(2);
+  var fb = beatFrequency(p.f1, p.f2);
+  document.getElementById('roBeats').textContent = I18N.beatsLabel(fb * tOffset);
+}
+
+function render(tOffset) {
+  var p = getParams();
+  if (!isFinite(p.f1) || !isFinite(p.f2) || !isFinite(p.A1) || !isFinite(p.A2)) return;
+  updateStats(p);
+  drawWave(p, tOffset);
   drawSpectrum(p);
+  updateLive(p, tOffset);
+  if (audioOn) applyAudioParams(p);
 }
 
-function animationStep() {
-  if (!playing) return;
-  var sl = document.getElementById('slF2');
-  var cur = parseFloat(sl.value);
-  if (!isFinite(cur)) cur = 444;
-  var step = 4;
-  cur = cur + sweepDir * step;
-  if (cur > 2000) { cur = 2000; sweepDir = -1; }
-  if (cur < 440)  { cur = 440;  sweepDir = 1;  }
-  sl.value = cur.toFixed(0);
-  updateSlider(sl, 'slF2Val', 0, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
+// compute() keeps the legacy entry point used by slider oninput handlers.
+function compute() {
+  render(playing ? simT : 0);
 }
 
-function togglePlay() {
-  playing = !playing;
+/* ===== Animation loop ===== */
+function loop(ts) {
+  if (!playing) { animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dtReal = Math.min(0.05, (ts - lastTs) / 1000);
+  lastTs = ts;
+  simT += dtReal;       // 1:1 real-time so audio and visual envelope match
+  render(simT);
+  animId = requestAnimationFrame(loop);
+}
+
+function setPlayBtn(isPlaying) {
   var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> f₂ をスイープ';
-    if (animId) cancelAnimationFrame(animId);
-  }
+  btn.innerHTML = isPlaying ? btn.getAttribute('data-pause') : btn.getAttribute('data-play');
 }
+
+function startPlay() {
+  if (prefersReduced) { simT = 0; render(0); return; }
+  playing = true; lastTs = 0;
+  setPlayBtn(true);
+  if (!animId) animId = requestAnimationFrame(loop);
+}
+function stopPlay() {
+  playing = false;
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  setPlayBtn(false);
+}
+function togglePlay() { playing ? stopPlay() : startPlay(); }
 
 function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> f₂ をスイープ';
-  var defs = { slF1: 440, slF2: 444, slA1: 0.50, slA2: 0.50 };
-  Object.keys(defs).forEach(function(id){
-    document.getElementById(id).value = defs[id];
-  });
+  stopPlay();
+  simT = 0;
+  var defs = { slF1: 440, slF2: 444, slA1: 0.50, slA2: 0.50, slZoom: 1000 };
+  Object.keys(defs).forEach(function(id){ document.getElementById(id).value = defs[id]; });
   updateSlider(document.getElementById('slF1'), 'slF1Val', 0, '');
   updateSlider(document.getElementById('slF2'), 'slF2Val', 0, '');
   updateSlider(document.getElementById('slA1'), 'slA1Val', 2, '');
   updateSlider(document.getElementById('slA2'), 'slA2Val', 2, '');
-  compute();
+  updateSlider(document.getElementById('slZoom'), 'slZoomVal', 0, '');
+  render(0);
 }
 
-window.addEventListener('resize', function(){ resizeCanvases(); compute(); });
+function setPreset(name) {
+  var P = {
+    close:  { f1: 440, f2: 443,  A1: 0.50, A2: 0.50, win: 1000 },
+    far:    { f1: 440, f2: 470,  A1: 0.50, A2: 0.50, win: 300  },
+    unison: { f1: 440, f2: 440,  A1: 0.50, A2: 0.50, win: 1000 },
+    octave: { f1: 440, f2: 880,  A1: 0.50, A2: 0.50, win: 200  }
+  }[name];
+  if (!P) return;
+  document.getElementById('slF1').value = P.f1;
+  document.getElementById('slF2').value = P.f2;
+  document.getElementById('slA1').value = P.A1;
+  document.getElementById('slA2').value = P.A2;
+  document.getElementById('slZoom').value = P.win;
+  updateSlider(document.getElementById('slF1'), 'slF1Val', 0, '');
+  updateSlider(document.getElementById('slF2'), 'slF2Val', 0, '');
+  updateSlider(document.getElementById('slA1'), 'slA1Val', 2, '');
+  updateSlider(document.getElementById('slA2'), 'slA2Val', 2, '');
+  updateSlider(document.getElementById('slZoom'), 'slZoomVal', 0, '');
+  render(playing ? simT : 0);
+}
+
+/* ===== Web Audio (two real oscillators) ===== */
+function ensureAudio() {
+  if (audioCtx) return;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  audioCtx = new AC();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.0;
+  masterGain.connect(audioCtx.destination);
+  gain1 = audioCtx.createGain();
+  gain2 = audioCtx.createGain();
+  osc1 = audioCtx.createOscillator();
+  osc2 = audioCtx.createOscillator();
+  osc1.type = 'sine'; osc2.type = 'sine';
+  osc1.connect(gain1); gain1.connect(masterGain);
+  osc2.connect(gain2); gain2.connect(masterGain);
+  osc1.start(); osc2.start();
+}
+
+function applyAudioParams(p) {
+  if (!audioCtx) return;
+  var now = audioCtx.currentTime;
+  try {
+    osc1.frequency.setTargetAtTime(p.f1, now, 0.01);
+    osc2.frequency.setTargetAtTime(p.f2, now, 0.01);
+    // normalize so A1+A2 maps to a safe level
+    var norm = (p.A1 + p.A2) > 0 ? 0.18 / (p.A1 + p.A2) : 0;
+    gain1.gain.setTargetAtTime(p.A1 * norm, now, 0.01);
+    gain2.gain.setTargetAtTime(p.A2 * norm, now, 0.01);
+  } catch (e) {}
+}
+
+function toggleAudio() {
+  var btn = document.getElementById('audioToggle');
+  if (!audioOn) {
+    ensureAudio();
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+    audioOn = true;
+    masterGain.gain.setTargetAtTime(1.0, audioCtx.currentTime, 0.02);
+    applyAudioParams(getParams());
+    btn.classList.add('active');
+    btn.setAttribute('aria-pressed', 'true');
+    btn.innerHTML = I18N.audioOn;
+    if (!playing && !prefersReduced) startPlay();
+  } else {
+    audioOn = false;
+    if (masterGain && audioCtx) masterGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.02);
+    btn.classList.remove('active');
+    btn.setAttribute('aria-pressed', 'false');
+    btn.innerHTML = I18N.audioMute;
+  }
+}
+
+// keyboard: space / enter toggles play on the wave canvas
+waveCanvas.addEventListener('keydown', function(e){
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePlay(); }
+});
+
+window.addEventListener('resize', function(){ resizeCanvases(); render(playing ? simT : 0); });
 
 resizeCanvases();
-compute();
+render(0);
 </script>
 
 <section class="explanation">
@@ -691,6 +863,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="acoustic-beats.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -743,7 +918,7 @@ compute();
 
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
-<ol><li>周波数1(F1)と周波数2(F2)を設定します。例えばピアノ調律の場合、基準のA4=440Hzに対して、調律対象弦を435Hz～445Hzの範囲で調整してうなりの変化を観測します。</li><li>各周波数の振幅(A1、A2)をスライダーで調整し、0.5～2.0Vの範囲で入力します。異なる音量の音源を模擬できます。</li><li>リアルタイムでビート周波数(|F1-F2|)、合成波形、周波数スペクトルが更新されます。うなり周期はビート周波数の逆数で自動計算されます。</li></ol>
+<ol><li>周波数1(F1)と周波数2(F2)を設定します。例えばピアノ調律の場合、基準のA4=440Hzに対して、調律対象弦を435Hz～445Hzの範囲で調整してうなりの変化を観測します。</li><li>各周波数の振幅(A1、A2)をスライダーで調整します（無次元、0.00～1.00の範囲）。異なる音量の音源を模擬できます。</li><li>リアルタイムでビート周波数(|F1-F2|)、合成波形、周波数スペクトルが更新されます。うなり周期はビート周波数の逆数で自動計算されます。</li></ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
@@ -751,8 +926,18 @@ compute();
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
-<ul><li>ピアノ調律では良いうなり周波数は0.3～1.0Hz程度が目安です。2Hz以上では調律が粗すぎます。</li><li>振幅が大きく異なる場合(A1=1.5V、A2=0.2V)、合成波形は周波数の高い成分に支配されやすくなるため、可聴性が低下します。</li><li>ビート周波数が可聴域下限(約20Hz)より小さい場合、人間の耳では個別のうなりを認識できず、振幅変調として感知されます。</li><li>スペクトル表示で|F1-F2|と(F1+F2)/2の両成分が明確に分離していることを確認し、測定系のノイズレベルが-60dBm以下であることを推奨します。</li></ul>
+<ul><li>ピアノ調律では良いうなり周波数は0.3～1.0Hz程度が目安です。2Hz以上では調律が粗すぎます。</li><li>振幅が大きく異なる場合(例 A1=0.9、A2=0.2)、うなりの谷でも|A1−A2|=0.7が残り変調が浅くなる一方、合成波形は振幅の大きい成分に支配されます。</li><li>ビート周波数が可聴域下限(約20Hz)より小さい場合、人間の耳では個別のうなりを認識できず、振幅変調として感知されます。</li><li>スペクトル表示で|F1-F2|と(F1+F2)/2の両成分が明確に分離していることを確認し、測定系のノイズレベルが-60dBm以下であることを推奨します。</li></ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/476490330X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/476490330X.09._SCMZZZZZZ_.jpg" alt="音響工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">音響工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

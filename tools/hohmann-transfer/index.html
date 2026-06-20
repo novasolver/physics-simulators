@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ホーマン遷移軌道 シミュレーター",
       "description": "二つの円軌道間の最小エネルギー遷移（ホーマン遷移）に必要な二回の Δv 噴射量・合計 Δv・遷移時間を実時間で計算し、遷移楕円軌道とホーマン効率曲線を可視化する軌道力学シミュレーター。",
       "url": "https://novasolver.jp/tools/hohmann-transfer.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["第一噴射 Δv1 と第二噴射 Δv2 の解析計算","合計 Δv とホーマン半周期遷移時間の表示","出発・目的高度と中心天体パラメータの調整","遷移楕円軌道とホーマン効率曲線の可視化"],
       "keywords": "ホーマン遷移,Hohmann transfer,デルタv,軌道力学,円軌道,遷移軌道,LEO,GEO,最小エネルギー,宇宙工学",
       "datePublished": "2026-05-16",
@@ -103,6 +103,27 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 #orbitCanvas,#dvCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
 .aux-readout{ font-size:0.7rem; color:var(--muted); margin-top:2px; font-family:'Roboto Mono',monospace; }
+/* ===== v2 additions ===== */
+.preset-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+.preset-btn{ padding:4px 10px; font-size:0.76rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); cursor:pointer; font-family:inherit; transition:all .2s; }
+.preset-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.preset-btn.active{ background:rgba(0,123,255,.1); border-color:var(--accent); color:var(--accent); font-weight:600; }
+.live-readouts{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+.live-ro{ background:linear-gradient(135deg,#0a1628,#102a4c); border:1px solid rgba(0,180,216,.25); border-radius:10px; padding:10px 8px; text-align:center; }
+.live-ro .rv{ font-family:'Roboto Mono',monospace; font-size:1.05rem; font-weight:700; color:#fff; line-height:1.1; }
+.live-ro .rl{ font-size:0.62rem; color:rgba(255,255,255,.6); margin-top:4px; letter-spacing:.02em; }
+.live-ro.accent .rv{ color:#ffd54a; }
+@media(max-width:600px){ .live-readouts{ grid-template-columns:repeat(2,1fr); } }
+.play-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+.toggle-btn{ display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:0.82rem; font-family:inherit; cursor:pointer; transition:all .2s; }
+.toggle-btn.active{ background:rgba(0,123,255,.1); border-color:var(--accent); color:var(--accent); font-weight:600; }
+.scrub-row{ display:flex; align-items:center; gap:10px; margin-top:10px; }
+.scrub-row input[type=range]{ flex:1; }
+.scrub-time{ font-family:'Roboto Mono',monospace; font-size:0.78rem; color:var(--accent); min-width:84px; text-align:right; }
+canvas:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce){
+  input[type=range]::-webkit-slider-thumb{ transition:none; }
+}
 </style>
 </head>
 <body>
@@ -166,14 +187,59 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">中心天体プリセット</div>
+    <div class="preset-row">
+      <button type="button" class="preset-btn active" data-preset="leogeo" onclick="setPreset('leogeo')">地球 LEO→GEO</button>
+      <button type="button" class="preset-btn" data-preset="moon" onclick="setPreset('moon')">地球→月距離</button>
+      <button type="button" class="preset-btn" data-preset="mars" onclick="setPreset('mars')">太陽 地球→火星</button>
+    </div>
+
+    <div class="divider"></div>
+
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> h2 をスイープ</button>
+      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
-    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は地球（GM=398600 km³/s²、R=6378 km）。h1=400 km は LEO、h2=35800 km は GEO 近辺で、合計 Δv ≈ 3.85 km/s が標準的な打ち上げシナリオに相当します。</p>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">既定値は地球（GM=398600 km³/s²、R=6378 km）。h1=400 km は LEO、h2=35800 km は GEO 近辺で、合計 Δv ≈ 3.85 km/s が標準的な打ち上げシナリオに相当します。再生で宇宙機が r1 を周回 → Δv1 噴射 → 遷移楕円（近点で速く・遠点で遅く）→ Δv2 噴射 → r2 を周回します。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> 飛行中ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roPhase">—</div><div class="rl">フェーズ</div></div>
+        <div class="live-ro"><div class="rv" id="roR">—</div><div class="rl">半径 r [km]</div></div>
+        <div class="live-ro"><div class="rv" id="roSpd">—</div><div class="rl">速さ |v| [km/s]</div></div>
+        <div class="live-ro"><div class="rv" id="roElapsed">—</div><div class="rl">遷移経過 t</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-satellite"></i> リアルタイム軌道アニメーション</div>
+      <canvas id="orbitCanvas" tabindex="0" role="img" aria-label="ホーマン遷移のリアルタイム軌道アニメーション。宇宙機が r1 を周回し、Δv1 を噴射して遷移楕円を飛行し、Δv2 を噴射して r2 に乗ります。"></canvas>
+      <div class="play-row">
+        <button type="button" class="btn" id="playBtn2" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+        <button type="button" class="btn secondary" onclick="replay()"><i class="fas fa-rotate-left"></i> 最初から</button>
+        <button type="button" class="toggle-btn" id="phaseToggle" onclick="togglePhase()"><i class="fas fa-clock-rotate-left"></i> ランデブー位相角</button>
+        <div style="display:flex;gap:4px;margin-left:auto">
+          <button type="button" class="preset-btn speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+          <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="setSpeed(1)">1×</button>
+          <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+          <button type="button" class="preset-btn speed-btn" data-speed="4" onclick="setSpeed(4)">4×</button>
+        </div>
+      </div>
+      <p class="canvas-hint">中央＝中心天体／青円＝出発軌道 r1／緑円＝目的軌道 r2／黄破線＝半楕円遷移軌道／白＝宇宙機と軌跡。ケプラー運動で近点では速く・遠点では遅く動きます（等面積）。</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -182,12 +248,13 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
         <div class="stat-card"><div class="sv" id="statDvTotal">—</div><div class="sl">合計 Δv</div></div>
         <div class="stat-card"><div class="sv" id="statT">—</div><div class="sl">遷移時間 t_tx</div></div>
       </div>
+      <p class="aux-readout" id="auxSpeeds">—</p>
     </div>
 
     <div class="chart-card">
-      <div class="chart-title"><i class="fas fa-circle-notch"></i> 遷移軌道の幾何</div>
-      <canvas id="orbitCanvas"></canvas>
-      <p class="canvas-hint">中央＝中心天体／青円＝出発軌道 r1／緑円＝目的軌道 r2／黄破線＝半楕円遷移軌道／黄丸＝Δv1 噴射点／緑丸＝Δv2 噴射点</p>
+      <div class="chart-title"><i class="fas fa-chart-column"></i> Δv 比較</div>
+      <canvas id="dvBarCanvas"></canvas>
+      <p class="canvas-hint">第1噴射 Δv1・第2噴射 Δv2・合計 Δv の棒グラフ比較。</p>
     </div>
 
     <div class="chart-card">
@@ -211,13 +278,25 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Hohmann Transfer Simulator ==========
+// ========== Hohmann Transfer Simulator (v2) ==========
+var L = {
+  play: '再生', pause: '一時停止',
+  phCoast1: 'r1 周回', phBurn1: 'Δv1 噴射', phTransfer: '遷移楕円', phBurn2: 'Δv2 噴射', phCoast2: 'r2 周回',
+  rendez: 'ランデブー位相角 φ = ',
+  vcirc1: 'v1=√(μ/r1)=', vcirc2: 'v2=√(μ/r2)=', vperi: '遷移近点 vp=', vapo: '遷移遠点 va='
+};
 var orbitCanvas = document.getElementById('orbitCanvas');
 var orbitCtx = orbitCanvas.getContext('2d');
 var dvCanvas = document.getElementById('dvCanvas');
 var dvCtx = dvCanvas.getContext('2d');
+var dvBarCanvas = document.getElementById('dvBarCanvas');
+var dvBarCtx = dvBarCanvas.getContext('2d');
 var playing = false;
 var animId = null;
+var speedMult = 1;
+var showPhase = false;
+var anim = { phase: 0, tau: 0, lastTs: 0, theta: 0, trail: [], burn1: 0, burn2: 0 };
+var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function fmtKms(v) {
   if (!isFinite(v)) return '—';
@@ -251,12 +330,20 @@ function computeHohmann(r1, r2, mu) {
   var rl = Math.max(r1, r2);
   var v1c = Math.sqrt(mu / rs);
   var v2c = Math.sqrt(mu / rl);
-  var dv1 = v1c * (Math.sqrt(2 * rl / (rs + rl)) - 1);
-  var dv2 = v2c * (1 - Math.sqrt(2 * rs / (rs + rl)));
-  var dv_total = dv1 + dv2;
   var a_tx = (rs + rl) / 2;
+  // Vis-viva on the transfer ellipse at periapsis (rs) and apoapsis (rl)
+  var vp = Math.sqrt(mu * (2 / rs - 1 / a_tx));
+  var va = Math.sqrt(mu * (2 / rl - 1 / a_tx));
+  var dv1 = vp - v1c;
+  var dv2 = v2c - va;
+  var dv_total = dv1 + dv2;
   var t_tx = Math.PI * Math.sqrt((a_tx * a_tx * a_tx) / mu);
-  return { dv1: dv1, dv2: dv2, dv_total: dv_total, t_tx: t_tx, a_tx: a_tx, v1c: v1c, v2c: v2c, rs: rs, rl: rl };
+  var ecc = (rl - rs) / (rl + rs);
+  // rendezvous phase angle: target must lead by pi - (transfer-time sweep of target)
+  var n2 = Math.sqrt(mu / (rl * rl * rl));   // target mean motion
+  var phaseAngle = Math.PI - n2 * t_tx;       // radians (lead angle of target at departure)
+  return { dv1: dv1, dv2: dv2, dv_total: dv_total, t_tx: t_tx, a_tx: a_tx,
+           v1c: v1c, v2c: v2c, vp: vp, va: va, ecc: ecc, phaseAngle: phaseAngle, rs: rs, rl: rl };
 }
 
 function __novaCanvasCssW(canvas){
@@ -267,10 +354,10 @@ function __novaCanvasCssH(canvas){
 }
 
 function resizeCanvases() {
-  [orbitCanvas, dvCanvas].forEach(function (cv) {
+  [orbitCanvas, dvCanvas, dvBarCanvas].forEach(function (cv) {
     var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
     var __novaW = w;
-    var __novaH = Math.round(w * 0.55);
+    var __novaH = (cv === orbitCanvas) ? Math.round(w * 0.72) : (cv === dvBarCanvas ? Math.round(w * 0.42) : Math.round(w * 0.55));
     var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
     cv.style.width = __novaW + 'px';
     cv.style.height = __novaH + 'px';
@@ -283,6 +370,50 @@ function resizeCanvases() {
   });
 }
 
+// Kepler: eccentric anomaly from mean anomaly (Newton)
+function keplerE(M, e) {
+  M = ((M % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  var E = M;
+  for (var i = 0; i < 8; i++) {
+    E = E - (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+  }
+  return E;
+}
+
+// Spacecraft physical state at the current animation progress.
+// Returns {r (km), v (km/s), x, y in orbit-plane units of km, ang}
+// Periapsis of the transfer ellipse is on -x (departure side), apoapsis on +x.
+function spacecraftState(p, r) {
+  var rs = r.rs, rl = r.rl, mu = p.mu;
+  var st = { r: rs, v: r.v1c, x: 0, y: 0, ang: 0 };
+  if (anim.phase === 0 || anim.phase === 1) {
+    // coasting on r1 (departure circle). Park at periapsis side (-x) ready for burn.
+    var ang = Math.PI; // periapsis direction
+    st.r = rs; st.v = r.v1c; st.ang = ang;
+    st.x = rs * Math.cos(ang); st.y = rs * Math.sin(ang);
+  } else if (anim.phase === 2) {
+    // transfer ellipse, tau in [0,1] from periapsis (M=0) to apoapsis (M=pi)
+    var M = Math.PI * anim.tau;
+    var e = r.ecc;
+    var a = r.a_tx;
+    var E = keplerE(M, e);
+    var rr = a * (1 - e * Math.cos(E));
+    var nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+    // periapsis points to -x: orbit angle = PI - nu (sweep toward +x apoapsis going counter-clockwise via top)
+    var ang2 = Math.PI - nu;
+    st.r = rr;
+    st.v = Math.sqrt(mu * (2 / rr - 1 / a));
+    st.ang = ang2;
+    st.x = rr * Math.cos(ang2); st.y = rr * Math.sin(ang2);
+  } else {
+    // coasting on r2 (target circle), starting at apoapsis (+x), sweeping further.
+    var ang3 = 0 + (anim.tau || 0) * Math.PI; // continue around
+    st.r = rl; st.v = r.v2c; st.ang = ang3;
+    st.x = rl * Math.cos(ang3); st.y = rl * Math.sin(ang3);
+  }
+  return st;
+}
+
 function drawOrbit(p, r) {
   var ctx = orbitCtx, W = __novaCanvasCssW(orbitCanvas), H = __novaCanvasCssH(orbitCanvas);
   ctx.fillStyle = '#0a1929';
@@ -291,15 +422,18 @@ function drawOrbit(p, r) {
   var cx = W / 2;
   var cy = H / 2;
 
-  // Scale: largest radius (r2 if outer, or rl from result) fills available space
   var rs = r.rs, rl = r.rl;
-  var margin = 36;
+  var margin = 40;
   var maxR = Math.min(W, H) / 2 - margin;
   var scale = maxR / rl;
 
   var rs_px = rs * scale;
   var rl_px = rl * scale;
   var Rp_px = Math.max(8, Math.min(p.Rp * scale, rs_px * 0.85));
+
+  // map orbit-plane km coords -> canvas px (y inverted so +y is up)
+  function mx(x) { return cx + x * scale; }
+  function my(y) { return cy - y * scale; }
 
   // Central body
   var grad = ctx.createRadialGradient(cx, cy, Rp_px * 0.2, cx, cy, Rp_px);
@@ -327,76 +461,88 @@ function drawOrbit(p, r) {
   ctx.arc(cx, cy, rl_px, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Transfer ellipse: semi-major a = (rs+rl)/2, periapsis = rs on -x side, apoapsis = rl on +x side
-  // Ellipse center is offset by c = (rl - rs)/2 along +x relative to focus (which is at origin = central body)
+  // Transfer ellipse (focus at central body). periapsis -x, apoapsis +x.
   var a_tx_px = (rs_px + rl_px) / 2;
   var c_px = (rl_px - rs_px) / 2;
   var b_tx_px = Math.sqrt(a_tx_px * a_tx_px - c_px * c_px);
-  var ex_cx = cx + c_px;
-  var ex_cy = cy;
-  ctx.strokeStyle = '#FFD166';
+  var ex_cx = cx - c_px; // ellipse geometric center shifted toward periapsis side (-x), focus at origin
+  ctx.strokeStyle = 'rgba(255,209,102,0.85)';
   ctx.lineWidth = 2;
   ctx.setLineDash([6, 4]);
-  // draw full ellipse (the relevant half is the transfer path)
   ctx.beginPath();
-  ctx.ellipse(ex_cx, ex_cy, a_tx_px, b_tx_px, 0, 0, Math.PI * 2);
+  ctx.ellipse(ex_cx, cy, a_tx_px, b_tx_px, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Periapsis (Δv1 burn): at angle 180° from ellipse center -> on -x side, r = rs
-  var p1x = cx - rs_px;
-  var p1y = cy;
-  // Apoapsis (Δv2 burn): on +x side, r = rl
-  var p2x = cx + rl_px;
-  var p2y = cy;
-
-  // Δv1 burn marker (yellow)
+  // Burn markers
+  var p1x = cx - rs_px, p1y = cy;     // periapsis Δv1 (-x)
+  var p2x = cx + rl_px, p2y = cy;     // apoapsis Δv2 (+x)
   ctx.fillStyle = '#FFD166';
-  ctx.shadowColor = '#FFD166';
-  ctx.shadowBlur = 10;
-  ctx.beginPath();
-  ctx.arc(p1x, p1y, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-
-  // Δv2 burn marker (green)
+  ctx.beginPath(); ctx.arc(p1x, p1y, 5, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#7CFFB2';
-  ctx.shadowColor = '#7CFFB2';
-  ctx.shadowBlur = 10;
-  ctx.beginPath();
-  ctx.arc(p2x, p2y, 7, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(p2x, p2y, 5, 0, Math.PI * 2); ctx.fill();
+
+  // Rendezvous phase angle overlay (target lead angle)
+  if (showPhase) {
+    var phi = r.phaseAngle;
+    ctx.strokeStyle = 'rgba(124,255,178,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    // departure direction = -x (periapsis). target marker at angle (PI - phi) measured from periapsis going CCW.
+    var tAng = Math.PI - phi;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + rl_px * Math.cos(tAng), cy - rl_px * Math.sin(tAng)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p2x, p2y); ctx.stroke();
+    ctx.setLineDash([]);
+    // target spacecraft (where the body must be at departure to rendezvous)
+    ctx.fillStyle = '#7CFFB2';
+    ctx.beginPath(); ctx.arc(cx + rl_px * Math.cos(tAng), cy - rl_px * Math.sin(tAng), 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#cfe3f7';
+    ctx.font = '11px "Roboto Mono",monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('φ = ' + (phi * 180 / Math.PI).toFixed(1) + '°', cx, cy - rl_px - 18);
+  }
+
+  // Spacecraft state + trail
+  var s = spacecraftState(p, r);
+  // append to trail
+  anim.trail.push({ x: mx(s.x), y: my(s.y) });
+  if (anim.trail.length > 220) anim.trail.shift();
+  // draw fading trail
+  ctx.lineWidth = 2;
+  for (var i = 1; i < anim.trail.length; i++) {
+    var al = i / anim.trail.length;
+    ctx.strokeStyle = 'rgba(255,255,255,' + (0.08 + 0.55 * al).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.moveTo(anim.trail[i - 1].x, anim.trail[i - 1].y);
+    ctx.lineTo(anim.trail[i].x, anim.trail[i].y);
+    ctx.stroke();
+  }
+
+  // burn flash + Δv vector at burn moments
+  function burnFlash(bx, by, mag, col) {
+    if (mag <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = mag;
+    ctx.fillStyle = col;
+    ctx.shadowColor = col; ctx.shadowBlur = 18;
+    ctx.beginPath(); ctx.arc(bx, by, 9 + 8 * mag, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // prograde Δv arrow (tangent +y at periapsis -x side; tangent -y at apoapsis +x side handled by sign)
+  }
+  if (anim.phase >= 1 && anim.phase <= 2) burnFlash(p1x, p1y, anim.burn1, '#FFD166');
+  if (anim.phase >= 3) burnFlash(p2x, p2y, anim.burn2, '#7CFFB2');
+
+  // spacecraft marker
+  var spx = mx(s.x), spy = my(s.y);
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.arc(spx, spy, 5, 0, Math.PI * 2); ctx.fill();
   ctx.shadowBlur = 0;
-
-  // Δv arrow indicators (tangent direction = ±y at these points)
-  ctx.strokeStyle = '#FFD166';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(p1x, p1y);
-  ctx.lineTo(p1x, p1y - 22);
-  ctx.stroke();
-  // arrowhead
-  ctx.beginPath();
-  ctx.moveTo(p1x, p1y - 22);
-  ctx.lineTo(p1x - 4, p1y - 16);
-  ctx.lineTo(p1x + 4, p1y - 16);
-  ctx.closePath();
-  ctx.fillStyle = '#FFD166';
-  ctx.fill();
-
-  ctx.strokeStyle = '#7CFFB2';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(p2x, p2y);
-  ctx.lineTo(p2x, p2y - 22);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(p2x, p2y - 22);
-  ctx.lineTo(p2x - 4, p2y - 16);
-  ctx.lineTo(p2x + 4, p2y - 16);
-  ctx.closePath();
-  ctx.fillStyle = '#7CFFB2';
-  ctx.fill();
+  // velocity direction tick (prograde, perpendicular to radius)
+  var vdir = s.ang + Math.PI / 2; // CCW prograde
+  ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(spx, spy);
+  ctx.lineTo(spx + 16 * Math.cos(vdir), spy - 16 * Math.sin(vdir)); ctx.stroke();
 
   // Labels
   ctx.fillStyle = '#cfe3f7';
@@ -412,14 +558,9 @@ function drawOrbit(p, r) {
   ctx.fillStyle = '#7CFFB2';
   ctx.fillText('Δv2 = ' + r.dv2.toFixed(3) + ' km/s', W - 8, 32);
   ctx.fillStyle = '#cfe3f7';
-  ctx.fillText('ratio r2/r1 = ' + (p.r2 / p.r1).toFixed(2), W - 8, 48);
+  ctx.fillText('r2/r1 = ' + (r.rl / r.rs).toFixed(2), W - 8, 48);
 
-  ctx.fillStyle = '#00B4D8';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('出発 r1', cx, cy + rs_px + 14);
-  ctx.fillStyle = '#7CFFB2';
-  ctx.fillText('目的 r2', cx, cy - rl_px - 6);
+  return s;
 }
 
 function drawDvCurve(p, r) {
@@ -546,61 +687,193 @@ function drawDvCurve(p, r) {
   ctx.fillText('現在 R = ' + curR.toFixed(2) + ', η = ' + dTc.toFixed(3), W - 12, 18);
 }
 
+function drawDvBar(r) {
+  var ctx = dvBarCtx, W = __novaCanvasCssW(dvBarCanvas), H = __novaCanvasCssH(dvBarCanvas);
+  ctx.fillStyle = '#0a1929';
+  ctx.fillRect(0, 0, W, H);
+  var vals = [r.dv1, r.dv2, r.dv_total];
+  var cols = ['#FFD166', '#7CFFB2', '#00B4D8'];
+  var labels = ['Δv1', 'Δv2', '合計 Δv'];
+  var maxV = Math.max(r.dv_total, 1e-6) * 1.15;
+  var padL = 40, padR = 16, padT = 18, padB = 30;
+  var gw = W - padL - padR, gh = H - padT - padB;
+  var n = vals.length;
+  var bw = gw / n * 0.55;
+  // y axis ticks
+  ctx.font = '10px "Roboto Mono",monospace';
+  ctx.fillStyle = '#8fb8e0';
+  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
+  for (var k = 0; k <= 4; k++) {
+    var yv = maxV * k / 4;
+    var yy = padT + gh - (yv / maxV) * gh;
+    ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(W - padR, yy); ctx.stroke();
+    ctx.textAlign = 'right';
+    ctx.fillText(yv.toFixed(1), padL - 4, yy + 3);
+  }
+  for (var i = 0; i < n; i++) {
+    var cxb = padL + gw * (i + 0.5) / n;
+    var bh = (vals[i] / maxV) * gh;
+    var bx = cxb - bw / 2, by = padT + gh - bh;
+    ctx.fillStyle = cols[i];
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = '#cfe3f7';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 11px "Roboto Mono",monospace';
+    ctx.fillText(vals[i].toFixed(2), cxb, by - 5);
+    ctx.font = '10px "Roboto Mono",monospace';
+    ctx.fillStyle = '#8fb8e0';
+    ctx.fillText(labels[i], cxb, H - 10);
+  }
+  ctx.save();
+  ctx.translate(12, padT + gh / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#cfe3f7'; ctx.textAlign = 'center'; ctx.font = '10px "Roboto Mono",monospace';
+  ctx.fillText('km/s', 0, 0);
+  ctx.restore();
+}
+
+var __lastR = null, __lastP = null;
 function compute() {
   var p = getParams();
   if (!isFinite(p.r1) || !isFinite(p.r2) || !isFinite(p.mu)
       || p.r1 <= 0 || p.r2 <= 0 || p.mu <= 0) return;
   var r = computeHohmann(p.r1, p.r2, p.mu);
+  __lastR = r; __lastP = p;
   document.getElementById('statDv1').textContent = fmtKms(r.dv1);
   document.getElementById('statDv2').textContent = fmtKms(r.dv2);
   document.getElementById('statDvTotal').textContent = fmtKms(r.dv_total);
   document.getElementById('statT').textContent = fmtTime(r.t_tx);
-  drawOrbit(p, r);
+  document.getElementById('auxSpeeds').textContent =
+    L.vcirc1 + r.v1c.toFixed(3) + '  ' + L.vcirc2 + r.v2c.toFixed(3) +
+    '  ' + L.vperi + r.vp.toFixed(3) + '  ' + L.vapo + r.va.toFixed(3) + ' km/s  ·  ' +
+    L.rendez + (r.phaseAngle * 180 / Math.PI).toFixed(1) + '°';
+  var s = drawOrbit(p, r);
+  updateLiveReadouts(s, r);
+  drawDvBar(r);
   drawDvCurve(p, r);
 }
 
-function animationStep() {
+function phaseLabel() {
+  switch (anim.phase) {
+    case 0: return L.phCoast1;
+    case 1: return L.phBurn1;
+    case 2: return L.phTransfer;
+    case 3: return L.phBurn2;
+    default: return L.phCoast2;
+  }
+}
+
+function updateLiveReadouts(s, r) {
+  if (!s) return;
+  document.getElementById('roPhase').textContent = phaseLabel();
+  document.getElementById('roR').textContent = s.r.toFixed(0);
+  document.getElementById('roSpd').textContent = s.v.toFixed(3);
+  var elapsed = (anim.phase < 2) ? 0 : (anim.phase === 2 ? anim.tau * r.t_tx : r.t_tx);
+  document.getElementById('roElapsed').textContent = fmtTime(elapsed);
+}
+
+// ===== Real-time animation state machine =====
+// phases: 0 coast r1 -> 1 burn1 -> 2 transfer ellipse -> 3 burn2 -> 4 coast r2 -> loop
+function stepAnim(ts) {
   if (!playing) return;
-  var sl = document.getElementById('slH2');
-  var v = parseFloat(sl.value) + 500;
-  if (v > 100000) v = 200;
-  sl.value = v;
-  updateSlider(sl, 'slH2Val', 0, '');
-  compute();
-  animId = requestAnimationFrame(animationStep);
+  if (!anim.lastTs) anim.lastTs = ts;
+  var dt = Math.min(0.05, (ts - anim.lastTs) / 1000);
+  anim.lastTs = ts;
+  var sp = speedMult;
+  if (anim.phase === 0) {
+    anim.tau += dt * 0.55 * sp;
+    if (anim.tau >= 1) { anim.phase = 1; anim.tau = 0; anim.burn1 = 1; }
+  } else if (anim.phase === 1) {
+    anim.burn1 -= dt * 1.6 * sp;
+    if (anim.burn1 <= 0) { anim.burn1 = 0; anim.phase = 2; anim.tau = 0; anim.trail = []; }
+  } else if (anim.phase === 2) {
+    anim.tau += dt * 0.32 * sp;   // traverse half ellipse
+    if (anim.tau >= 1) { anim.tau = 1; anim.phase = 3; anim.burn2 = 1; }
+  } else if (anim.phase === 3) {
+    anim.burn2 -= dt * 1.6 * sp;
+    if (anim.burn2 <= 0) { anim.burn2 = 0; anim.phase = 4; anim.tau = 0; anim.trail = []; }
+  } else {
+    anim.tau += dt * 0.55 * sp;
+    if (anim.tau >= 1) { anim.phase = 0; anim.tau = 0; anim.trail = []; } // loop
+  }
+  if (__lastP && __lastR) { var s = drawOrbit(__lastP, __lastR); updateLiveReadouts(s, __lastR); }
+  animId = requestAnimationFrame(stepAnim);
 }
 
 function togglePlay() {
   playing = !playing;
-  var btn = document.getElementById('playBtn');
+  var b1 = document.getElementById('playBtn'), b2 = document.getElementById('playBtn2');
   if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
+    var ic = '<i class="fas fa-pause"></i> ' + L.pause;
+    if (b1) b1.innerHTML = ic; if (b2) b2.innerHTML = ic;
+    anim.lastTs = 0;
+    animId = requestAnimationFrame(stepAnim);
   } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> h2 をスイープ';
+    var ip = '<i class="fas fa-play"></i> ' + L.play;
+    if (b1) b1.innerHTML = ip; if (b2) b2.innerHTML = ip;
     if (animId) cancelAnimationFrame(animId);
   }
+}
+
+function replay() {
+  anim.phase = 0; anim.tau = 0; anim.burn1 = 0; anim.burn2 = 0; anim.trail = [];
+  if (!playing) togglePlay();
+  else { if (__lastP && __lastR) { var s = drawOrbit(__lastP, __lastR); updateLiveReadouts(s, __lastR); } }
+}
+
+function setSpeed(m) {
+  speedMult = m;
+  var btns = document.querySelectorAll('.speed-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', parseFloat(btns[i].getAttribute('data-speed')) === m);
+  }
+}
+
+function togglePhase() {
+  showPhase = !showPhase;
+  document.getElementById('phaseToggle').classList.toggle('active', showPhase);
+  if (__lastP && __lastR) drawOrbit(__lastP, __lastR);
+}
+
+function setPreset(name) {
+  var P = {
+    leogeo: { h1: 400, h2: 35800, mu: 398600, Rp: 6378 },
+    moon:   { h1: 400, h2: 378022, mu: 398600, Rp: 6378 },
+    mars:   { h1: 149200000, h2: 227700000, mu: 132712440018, Rp: 700000 }
+  };
+  var d = P[name]; if (!d) return;
+  // expand slider ranges if needed for large heliocentric presets
+  setSliderVal('slH1', d.h1); setSliderVal('slH2', d.h2);
+  setSliderVal('slMu', d.mu); setSliderVal('slRp', d.Rp);
+  var pbtns = document.querySelectorAll('.preset-btn[data-preset]');
+  for (var i = 0; i < pbtns.length; i++) pbtns[i].classList.toggle('active', pbtns[i].getAttribute('data-preset') === name);
+  anim.phase = 0; anim.tau = 0; anim.trail = [];
+  compute();
+}
+
+function setSliderVal(id, val) {
+  var sl = document.getElementById(id), num = document.getElementById(id + 'Val');
+  if (val > parseFloat(sl.max)) { sl.max = String(val); if (num) num.max = String(val); }
+  if (val < parseFloat(sl.min)) { sl.min = String(val); if (num) num.min = String(val); }
+  sl.value = val; if (num) num.value = val;
+  updateSlider(sl, id + 'Val', 0, '');
 }
 
 function resetParams() {
   playing = false;
   if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> h2 をスイープ';
-  var defs = { slH1: 400, slH2: 35800, slMu: 398600, slRp: 6378 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slH1'), 'slH1Val', 0, '');
-  updateSlider(document.getElementById('slH2'), 'slH2Val', 0, '');
-  updateSlider(document.getElementById('slMu'), 'slMuVal', 0, '');
-  updateSlider(document.getElementById('slRp'), 'slRpVal', 0, '');
-  compute();
+  var ip = '<i class="fas fa-play"></i> ' + L.play;
+  var b1 = document.getElementById('playBtn'), b2 = document.getElementById('playBtn2');
+  if (b1) b1.innerHTML = ip; if (b2) b2.innerHTML = ip;
+  anim.phase = 0; anim.tau = 0; anim.burn1 = 0; anim.burn2 = 0; anim.trail = [];
+  setPreset('leogeo');
 }
 
 window.addEventListener('resize', function () { resizeCanvases(); compute(); });
 
 resizeCanvases();
 compute();
+if (!prefersReduced) { togglePlay(); }
 </script>
 
 <section class="explanation">
@@ -674,6 +947,9 @@ compute();
   </div>
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="hohmann-transfer.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -735,7 +1011,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>LEO 高度400km → GEO 高度35786km への地球上昇遷移：μ=398600 km³/s²、初期軌道半径 rp=6778km、最終軌道半径 ra=42164km。第1噴射 Δv1≈2.43 km/s (近地点での加速)、第2噴射 Δv2≈1.50 km/s (遠地点での加速)、合計 Δv≈3.93 km/s。遷移軌道の半周期 t_tx≈10.9時間。このΔv予算は衛星バスの推進性能評価に直結し、ケロシン/液酸エンジン (Isp=350s) では合計5100kgf推力で約60秒の燃焼時間に相当します</p>
+<p>LEO 高度400km → GEO 高度35786km への地球上昇遷移：μ=398600 km³/s²、初期軌道半径 rp=6778km、最終軌道半径 ra=42164km。第1噴射 Δv1≈2.40 km/s (近地点での加速)、第2噴射 Δv2≈1.46 km/s (遠地点での加速)、合計 Δv≈3.85 km/s。遷移軌道の半周期 t_tx=π√(a³/μ)≈5.29時間。このΔv予算は衛星バスの推進性能評価に直結し、ケロシン/液酸エンジン (Isp=350s) では合計5100kgf推力で約60秒の燃焼時間に相当します</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -746,6 +1022,16 @@ compute();
 <li>電気推進(イオンエンジン Isp=3000s)による低推力螺旋遷移の場合、このツール結果は理想Δvであり、実遷移時間は数か月～1年に延伸します</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4130610430?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4130610430.09._SCMZZZZZZ_.jpg" alt="航空力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">航空力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

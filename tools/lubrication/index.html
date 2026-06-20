@@ -125,14 +125,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "流体潤滑・ストライベック曲線シミュレーター",
       "description": "ジャーナル軸受のSommerfeld数・最小油膜厚さhmin・油膜厚さ比Λをリアルタイム計算。ストライベック曲線で境界潤滑・混合潤滑・流体潤滑の各領域を可視化。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/lubrication.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -278,7 +278,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -306,6 +314,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="sl">摩擦係数 μ</div>
       </div>
     </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 潤滑体制のライブ可視化 — ストライベック曲線 ＆ 接触ズーム</div>
+      <canvas id="heroCanvas" height="300" role="img" aria-label="ストライベック曲線上を動作点が掃引し、境界・混合・流体潤滑の3領域で2面間の油膜と凹凸接触がどう変化するかを可視化するアニメーション。"></canvas>
+      <div class="play-row" style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+        <button class="btn" type="button" id="btnSweep"><i class="fas fa-play"></i> 掃引</button>
+        <button class="btn secondary" type="button" id="btnHere"><i class="fas fa-crosshairs"></i> 現在条件へ</button>
+        <span style="font-size:.72rem;color:var(--muted)">速度・粘度・荷重を変えると曲線上の点と油膜が即座に動きます</span>
+      </div>
     </div>
 
       <div class="charts">
@@ -338,6 +355,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 
 <script>
+(function(){
+"use strict";
+const LANG = {
+  boundary:'境界潤滑', mixed:'混合潤滑', hydro:'流体潤滑',
+  sweepPlay:'<i class="fas fa-play"></i> 掃引', sweepStop:'<i class="fas fa-pause"></i> 停止',
+  stribeck:'ストライベック曲線  μ vs ηN/P', zoom:'接触ズーム（軸 ／ 油膜 ／ 軸受）',
+  asperity:'凹凸が接触', partial:'部分油膜', fullfilm:'完全油膜で分離',
+  hersey:'ηN/P', mu:'μ'
+};
 let chartStribeck = null, chartLambda = null;
 
 function getParams(){
@@ -408,7 +434,17 @@ function getParams(){
 
   drawStribeckChart(eta, N, P, etaNoverP, mu);
   drawLambdaChart(D, L, c, N, eta, sigma, W);
-}function stribeckMu(x){
+
+  // feed hero animation with current operating point
+  OP.x = Math.max(1e-9, etaNoverP);
+  OP.lambda = lambda;
+  OP.S = S;
+  OP.hmin = hmin;
+  if (!sweeping) heroPos = xToProgress(OP.x);
+  if (reduceMotion) drawHero();
+}
+window.compute = compute;
+function stribeckMu(x){
   if (x < 1e-9) return 0.15;
   const muBoundary = 0.15;
   const muMin = 0.002;
@@ -566,7 +602,246 @@ function getParams(){
       }
     }
   });
-}// Init sliders
+}
+
+/* ============================================================
+   V2 HERO — Stribeck curve sweep + contact-zoom of the film
+   ============================================================ */
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OP = { x: 1e-4, lambda: 2, S: 0.1, hmin: 1 };  // live operating point
+// Hersey range mapped to the curve (log space)
+const X_LO = 1e-8, X_HI = 1e-1;
+function progressToX(p){ return Math.pow(10, Math.log10(X_LO) + p*(Math.log10(X_HI)-Math.log10(X_LO))); }
+function xToProgress(x){
+  const v = (Math.log10(Math.max(X_LO, Math.min(X_HI, x))) - Math.log10(X_LO)) / (Math.log10(X_HI)-Math.log10(X_LO));
+  return Math.max(0, Math.min(1, v));
+}
+// regime thresholds in Hersey-number space (match Stribeck band plugin)
+function regimeOfX(x){ return x < 1e-6 ? 0 : (x < 1e-4 ? 1 : 2); }
+// film thickness fraction (0..1): how separated the surfaces are at Hersey x
+function filmFracOfX(x){
+  // grows monotonically with ηN/P, saturates in hydrodynamic regime
+  const p = xToProgress(x);
+  return Math.max(0, Math.min(1, Math.pow(p, 1.35)));
+}
+
+const hero = document.getElementById('heroCanvas');
+const hctx = hero ? hero.getContext('2d') : null;
+let heroPos = 0.5;       // sweep progress 0..1
+let sweeping = false;
+let sweepDir = 1;
+let heroAnim = null, lastTs = 0;
+let hcssW = 0, hcssH = 300;
+
+function resizeHero(){
+  if (!hero) return;
+  const rect = hero.parentElement.getBoundingClientRect();
+  hcssW = Math.max(280, Math.floor(rect.width - 24));
+  hcssH = hcssW < 520 ? 340 : 300;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  hero.style.width = hcssW + 'px';
+  hero.style.height = hcssH + 'px';
+  hero.width = Math.round(hcssW * dpr);
+  hero.height = Math.round(hcssH * dpr);
+  hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+const REG_COL = ['#e74c3c', '#e67e22', '#00b894'];
+function regimeColor(i){ return REG_COL[i]; }
+
+function drawHero(){
+  if (!hctx) return;
+  resizeHero();
+  const W = hcssW, H = hcssH;
+  hctx.clearRect(0,0,W,H);
+  hctx.fillStyle = '#0a1628'; hctx.fillRect(0,0,W,H);
+
+  const stacked = W < 520;
+  const gap = 14;
+  let curveBox, zoomBox;
+  if (stacked){
+    const h2 = (H - gap) / 2;
+    curveBox = { x: 8, y: 6, w: W-16, h: h2-12 };
+    zoomBox  = { x: 8, y: h2+gap, w: W-16, h: h2-12 };
+  } else {
+    const cw = Math.round((W-gap) * 0.56);
+    curveBox = { x: 8, y: 6, w: cw-12, h: H-14 };
+    zoomBox  = { x: cw+gap, y: 6, w: W-(cw+gap)-8, h: H-14 };
+  }
+
+  const xNow = progressToX(heroPos);
+  drawCurve(curveBox, xNow);
+  drawZoom(zoomBox, xNow);
+}
+
+function drawCurve(b, xNow){
+  const c = hctx;
+  // axes frame
+  const padL = 40, padB = 26, padT = 26, padR = 10;
+  const x0 = b.x + padL, y0 = b.y + b.h - padB;
+  const pw = b.w - padL - padR, ph = b.h - padT - padB;
+
+  // regime bands (boundary/mixed/hydro) along log Hersey
+  const bands = [
+    { a: X_LO, c2: 1e-6, col: 'rgba(231,76,60,0.13)' },
+    { a: 1e-6, c2: 1e-4, col: 'rgba(230,126,34,0.11)' },
+    { a: 1e-4, c2: X_HI, col: 'rgba(0,184,148,0.10)' }
+  ];
+  bands.forEach(bn=>{
+    const xa = x0 + xToProgress(bn.a)*pw, xb = x0 + xToProgress(bn.c2)*pw;
+    c.fillStyle = bn.col; c.fillRect(xa, b.y+padT, xb-xa, ph);
+  });
+
+  // grid
+  c.strokeStyle='rgba(255,255,255,0.08)'; c.lineWidth=1;
+  for (let i=0;i<=4;i++){ const yy=b.y+padT+ph*i/4; c.beginPath(); c.moveTo(x0,yy); c.lineTo(x0+pw,yy); c.stroke(); }
+
+  // mu(x): boundary high -> dip -> rises in hydro. Plot on fixed mu scale [0,0.16]
+  const muMax = 0.16;
+  const muY = mu => b.y+padT + ph*(1 - Math.min(1, mu/muMax));
+  c.strokeStyle = '#00B4D8'; c.lineWidth = 2.4; c.beginPath();
+  for (let i=0;i<=120;i++){
+    const p=i/120, xx=progressToX(p), m=stribeckMu(xx);
+    const px = x0 + p*pw, py = muY(m);
+    i?c.lineTo(px,py):c.moveTo(px,py);
+  }
+  c.stroke();
+
+  // regime labels
+  c.font='bold 10px Noto Sans JP'; c.textAlign='center';
+  const lblX = [ (xToProgress(X_LO)+xToProgress(1e-6))/2, (xToProgress(1e-6)+xToProgress(1e-4))/2, (xToProgress(1e-4)+xToProgress(X_HI))/2 ];
+  [LANG.boundary,LANG.mixed,LANG.hydro].forEach((t,i)=>{ c.fillStyle=regimeColor(i); c.fillText(t, x0+lblX[i]*pw, b.y+padT+12); });
+
+  // axis labels
+  c.fillStyle='rgba(255,255,255,0.6)'; c.font='10px Noto Sans JP';
+  c.textAlign='center'; c.fillText(LANG.hersey, x0+pw/2, b.y+b.h-6);
+  c.save(); c.translate(b.x+12, b.y+padT+ph/2); c.rotate(-Math.PI/2); c.fillText(LANG.mu,0,0); c.restore();
+
+  // moving operating marker
+  const m = stribeckMu(xNow);
+  const px = x0 + heroPos*pw, py = muY(m);
+  const reg = regimeOfX(xNow);
+  // vertical guide
+  c.strokeStyle='rgba(243,156,18,0.5)'; c.setLineDash([4,4]); c.lineWidth=1;
+  c.beginPath(); c.moveTo(px,b.y+padT); c.lineTo(px,y0); c.stroke(); c.setLineDash([]);
+  // marker
+  c.beginPath(); c.arc(px,py,6,0,7); c.fillStyle=regimeColor(reg); c.fill();
+  c.strokeStyle='#fff'; c.lineWidth=1.5; c.stroke();
+  // readout chip
+  c.font='bold 10px Roboto Mono'; c.textAlign='left';
+  c.fillStyle='rgba(255,255,255,0.85)';
+  c.fillText('μ='+m.toFixed(3), x0+4, b.y+padT+12);
+}
+
+function drawZoom(b, xNow){
+  const c = hctx;
+  c.save();
+  c.beginPath(); c.rect(b.x,b.y,b.w,b.h); c.clip();
+  c.fillStyle='#071120'; c.fillRect(b.x,b.y,b.w,b.h);
+
+  const reg = regimeOfX(xNow);
+  const frac = filmFracOfX(xNow);
+  const cx = b.x + b.w/2;
+  const midY = b.y + b.h*0.52;
+  const amp = 7;                          // asperity height
+  const baseGap = 4;
+  const gap = baseGap + frac * 26;        // film thickness in px grows with ηN/P
+
+  const topSurfaceY = midY - gap/2;
+  const botSurfaceY = midY + gap/2;
+  const wob = sweeping ? Math.sin(Date.now()/250) : 0;
+
+  // lubricant film (blue band between surfaces)
+  const filmGrad = c.createLinearGradient(0, topSurfaceY, 0, botSurfaceY);
+  filmGrad.addColorStop(0,'rgba(0,180,216,0.15)');
+  filmGrad.addColorStop(0.5,'rgba(0,180,216,0.5)');
+  filmGrad.addColorStop(1,'rgba(0,123,255,0.2)');
+  c.fillStyle = filmGrad;
+  c.fillRect(b.x+10, topSurfaceY, b.w-20, gap);
+
+  function surface(yMid, flip){
+    c.beginPath();
+    const x1=b.x+10, x2=b.x+b.w-10;
+    c.moveTo(x1, flip? b.y+b.h : b.y);
+    c.lineTo(x1, yMid);
+    const teeth = Math.max(7, Math.floor(b.w/22));
+    for (let i=0;i<=teeth;i++){
+      const xx = x1 + (x2-x1)*i/teeth;
+      const ph = Math.sin(i*1.7 + (flip?1.3:0) + wob);
+      const yy = yMid + (flip?-1:1)*Math.abs(ph)*amp - (flip?-1:1)*amp*0.5;
+      c.lineTo(xx, yy);
+    }
+    c.lineTo(x2, yMid);
+    c.lineTo(x2, flip? b.y+b.h : b.y);
+    c.closePath();
+  }
+  // top surface (shaft) metal grey gradient
+  const mg1=c.createLinearGradient(0,b.y,0,topSurfaceY);
+  mg1.addColorStop(0,'#5a6b7d'); mg1.addColorStop(1,'#8b9aa8');
+  c.fillStyle=mg1; surface(topSurfaceY,false); c.fill();
+  const mg2=c.createLinearGradient(0,botSurfaceY,0,b.y+b.h);
+  mg2.addColorStop(0,'#8b9aa8'); mg2.addColorStop(1,'#5a6b7d');
+  c.fillStyle=mg2; surface(botSurfaceY,true); c.fill();
+
+  // asperity contact sparks in boundary regime (surfaces touch)
+  if (reg===0 || (reg===1 && frac<0.25)){
+    const teeth = Math.max(7, Math.floor(b.w/22));
+    c.fillStyle='#ff5252';
+    for (let i=0;i<=teeth;i++){
+      if (Math.sin(i*1.7)>0.55){
+        const xx=b.x+10+(b.w-20)*i/teeth;
+        c.beginPath(); c.arc(xx, midY, 2.6, 0, 7); c.fill();
+      }
+    }
+  }
+
+  // labels
+  c.fillStyle='rgba(255,255,255,0.5)'; c.font='9px Noto Sans JP'; c.textAlign='left';
+  c.fillText('軸', b.x+12, b.y+14);
+  c.fillText('軸受', b.x+12, b.y+b.h-8);
+  // film thickness arrow + state text
+  c.strokeStyle='#00B4D8'; c.lineWidth=1; c.beginPath();
+  c.moveTo(b.x+b.w-22, topSurfaceY); c.lineTo(b.x+b.w-22, botSurfaceY); c.stroke();
+  c.fillStyle=regimeColor(reg); c.font='bold 11px Noto Sans JP'; c.textAlign='center';
+  const stTxt = reg===0?LANG.asperity:(reg===1?LANG.partial:LANG.fullfilm);
+  c.fillText(stTxt, cx, b.y+b.h-22);
+  c.fillStyle='rgba(255,255,255,0.7)'; c.font='10px Roboto Mono';
+  c.fillText('h≈'+OP.hmin.toFixed(2)+'μm · Λ='+OP.lambda.toFixed(2), cx, b.y+b.h-8);
+  c.restore();
+}
+
+function heroLoop(ts){
+  if (!sweeping){ heroAnim=null; return; }
+  if (!lastTs) lastTs=ts;
+  const dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+  heroPos += sweepDir * dt * 0.12;
+  if (heroPos>=1){ heroPos=1; sweepDir=-1; }
+  else if (heroPos<=0){ heroPos=0; sweepDir=1; }
+  drawHero();
+  heroAnim=requestAnimationFrame(heroLoop);
+}
+function startSweep(){
+  if (reduceMotion) return;
+  sweeping=true; lastTs=0;
+  const btn=document.getElementById('btnSweep');
+  if (btn) btn.innerHTML=LANG.sweepStop;
+  if (!heroAnim) heroAnim=requestAnimationFrame(heroLoop);
+}
+function stopSweep(){
+  sweeping=false;
+  if (heroAnim){ cancelAnimationFrame(heroAnim); heroAnim=null; }
+  const btn=document.getElementById('btnSweep');
+  if (btn) btn.innerHTML=LANG.sweepPlay;
+}
+
+// wire buttons
+const bSweep=document.getElementById('btnSweep');
+if (bSweep) bSweep.addEventListener('click', ()=>{ sweeping?stopSweep():startSweep(); });
+const bHere=document.getElementById('btnHere');
+if (bHere) bHere.addEventListener('click', ()=>{ stopSweep(); heroPos=xToProgress(OP.x); drawHero(); });
+window.addEventListener('resize', ()=>{ if(!sweeping) drawHero(); });
+
+// Init sliders
 [
   ['diam','dVal',1,'mm'],
   ['lBear','lVal',1,'mm'],
@@ -580,6 +855,10 @@ function getParams(){
   if (el) updateSlider(el, valId, dec, unit);
 });
 compute();
+heroPos = xToProgress(OP.x);
+drawHero();
+if (!reduceMotion) startSweep();
+})();
 </script>
 
 <section class="explanation">
@@ -642,6 +921,9 @@ compute();
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="lubrication.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -696,13 +978,13 @@ compute();
 <h3>使い方ガイド</h3>
 <ol>
 <li>軸受径（mm）・軸受幅（mm）・隙間（μm）をスライダーで入力します。SKF 6204軸受の場合、典型値は径20mm・幅7mm・隙間15μmです</li>
-<li>荷重（kN）と潤滑油の動粘度（cSt、常温40℃）を設定してください。機械油ISO VG32で粘度32cStが標準、重荷重時はVG46（46cSt）を選択します</li>
+<li>荷重（N）と潤滑油の動粘度（Pa·s）を設定してください。機械油ISO VG32は約0.03 Pa·s、重荷重時のVG68は約0.06 Pa·sを目安に選択します</li>
 <li>シミュレータが自動計算するSommerfeld数（S）と最小油膜厚さ（h_min）からストライベック曲線上の潤滑体制を特定し、摩擦係数と摩耗リスクを即座に判定します</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>ジャーナル軸受：径φ30mm、幅25mm、隙間20μm、荷重8kN、粘度32cStの条件でシミュレート実行。Sommerfeld数S≒2.8、最小油膜厚さh_min≒1.2μmと算出され、Λ=h_min/σ（表面粗さRa＝0.4μm）＝3.0となり流体潤滑域に到達します。この場合、摩擦係数μ≒0.004～0.008で安定潤滑が確保され、軸受寿命L₁₀は計算寿命の95%以上を見込めます</p>
+<p>ジャーナル軸受：径φ30mm、幅25mm、半径すきま20μm、荷重8kN、回転速度1500rpm、粘度0.03 Pa·s（≈VG32）の条件でシミュレート実行。Sommerfeld数S≒0.04、最小油膜厚さh_min≒0.5μmと算出され、Λ=h_min/σ（合成粗さσ＝0.4μm）≒1.3となり混合潤滑域に入ります。流体潤滑（Λ≧3）に持ち込むには、回転速度を上げる・粘度を高める・荷重を下げる・すきまを詰めるなどが有効で、各スライダーでΛの回復を確認できます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -712,6 +994,16 @@ compute();
 <li>起動時は低速で粘性抵抗が大きく、定常回転速度に達して初めて流体潤滑が成立します。頻繁な発停は軸受劣化を加速させるため、連続運転設計が望ましいです</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

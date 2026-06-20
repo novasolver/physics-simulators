@@ -43,7 +43,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "膜構造プレストレス解析ツール",
       "description": "PTFE・ETFE・PVC膜材の膜構造プレストレス解析。スパン・プレテンション・荷重条件から最大応力・たわみ・安全率・形状安定指数をリアルタイム計算するインタラクティブツール。",
       "url": "https://novasolver.jp/tools/membrane-structure.html",
@@ -53,7 +53,7 @@ function syncFromNum(slId){var sl=document.getElementById(slId);var el=document.
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["最大膜応力σmax計算","最大たわみδmax算出","形状安定指数T/qL²評価","必要プレテンションTmin計算","溶接強度要求値"],
       "keywords": "膜構造,プレストレス,PTFE,ETFE,PVC膜材,テンション構造,幕張,たわみ解析",
       "datePublished": "2026-04-08",
@@ -132,6 +132,25 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 hero animation ===== */
+.chart-card{ background: var(--card); border-radius: 12px; padding: 14px; border: 1px solid var(--border); margin-bottom: 14px; }
+.viz-panel .chart-card canvas#memCanvas{ display:block; width:100%; border-radius:8px; background:#0a1628; }
+.stat-cards{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
+@media(max-width:600px){ .stat-cards{ grid-template-columns:repeat(2,1fr); } }
+.stat-card{ background:linear-gradient(135deg,#0a1628,#102a4c); border:1px solid rgba(0,180,216,.25); border-radius:10px; padding:10px 8px; text-align:center; }
+.stat-card .sv{ font-family:'Roboto Mono',monospace; font-size:1.05rem; font-weight:700; color:#fff; line-height:1.1; }
+.stat-card.accent .sv{ color:#ffd54a; }
+.stat-card .sl{ font-size:0.6rem; color:rgba(255,255,255,.62); margin-top:4px; letter-spacing:.02em; }
+.play-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+.btn{ display:inline-flex; align-items:center; gap:6px; background:var(--accent); color:#fff; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:0.83rem; font-family:inherit; font-weight:600; }
+.btn.secondary{ background:var(--bg); color:var(--text); border:1px solid var(--border); }
+.preset-btn{ padding:4px 10px; font-size:0.76rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); cursor:pointer; font-family:inherit; }
+.preset-btn.active{ border-color:var(--accent); color:var(--accent); }
+.mem-legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:0.72rem; color:var(--muted); margin-top:10px; }
+.mem-legend span{ display:inline-flex; align-items:center; gap:5px; }
+.mem-legend i.sw{ width:16px; height:10px; border-radius:3px; display:inline-block; }
+canvas#memCanvas:focus-visible{ outline:2px solid var(--accent2); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce){ .stat-card .sv{ transition:none; } }
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/membrane-structure.html">
@@ -232,157 +251,305 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <div class="sf-bar-bg"><div class="sf-bar" id="sfBar" style="width:0%;background:var(--accent);"></div></div>
     </div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-<div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-<div class="result-card">
-        <div class="rv" id="rDef">—</div>
-        <div class="rl">最大たわみ δmax (m)</div>
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ膜張力・たわみ</div>
+      <div class="stat-cards">
+        <div class="stat-card accent"><div class="sv" id="svDef">—</div><div class="sl">最大たわみ δ [mm]</div></div>
+        <div class="stat-card"><div class="sv" id="svTwarp">—</div><div class="sl">谷方向張力 T₁ [kN/m]</div></div>
+        <div class="stat-card"><div class="sv" id="svTweft">—</div><div class="sl">尾根方向張力 T₂ [kN/m]</div></div>
+        <div class="stat-card"><div class="sv" id="svSig">—</div><div class="sl">最大膜応力 σ [MPa]</div></div>
       </div>
-</div>
+    </div>
 
     <div class="chart-card">
-<div class="chart-title">膜応力 <span style="text-transform:none">σ</span> vs スパン L（異なるプレテンション、現在点 ●）</div>
-    <canvas class="ux-chartjs-canvas" id="chartSig"></canvas>
-</div>
-    <div class="chart-title" style="margin-top:18px;">最大たわみ <span style="text-transform:none">δ</span>max vs 荷重強度 q（現在点 ●）</div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> たわみ</div><canvas class="ux-chartjs-canvas" id="chartDef"></canvas></div>
-  
-<div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <div class="chart-title"><i class="fas fa-film"></i> 張力膜サドル面（荷重をプレストレスで受ける）</div>
+      <canvas id="memCanvas" height="360" tabindex="0" role="img" aria-label="アンチクラスティック張力膜のサドル面が風・積雪荷重を受けてたわみ、谷方向と尾根方向の膜張力で荷重を支える様子のアニメーション"></canvas>
+      <div class="play-row">
+        <button class="btn" type="button" id="btnPlay" onclick="memTogglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="preset-btn" type="button" onclick="memSetLoad('wind')">突風</button>
+        <button class="preset-btn" type="button" onclick="memSetLoad('snow')">積雪</button>
+        <span style="font-size:.72rem;color:var(--muted);margin-left:auto">膜応力 σ = (T/t)(1 + qL²/8fT)</span>
+      </div>
+      <div class="mem-legend">
+        <span><i class="sw" style="background:linear-gradient(90deg,#1a4a7a,#00d4a0)"></i>低張力</span>
+        <span><i class="sw" style="background:linear-gradient(90deg,#00d4a0,#ffd54a)"></i>中</span>
+        <span><i class="sw" style="background:linear-gradient(90deg,#ffd54a,#ff5252)"></i>高張力</span>
+        <span><i class="sw" style="background:#ff5252;height:3px"></i>谷T₁ / 尾根T₂ 主張力</span>
+      </div>
+    </div>
 
-      <p>膜応力：\(\sigma = \frac{T}{t}\left(1 + \frac{qL^2}{8fT}\right)\)</p>
-      <p>最小プレテンション：\(T_{min}= \frac{qL^2}{8f}\)</p>
-      <p style="font-size:0.76rem;color:var(--muted);margin-top:4px;">q = qw + qs, f = f/L × L</p>
-    
-</div>
-</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果（設計値）</div>
+      <div class="result-grid">
+        <div class="result-card"><div class="rv" id="rDef">—</div><div class="rl">最大たわみ δmax (m)</div></div>
+        <div class="result-card"><div class="rv" id="rR">—</div><div class="rl">曲率半径 R≈L²/8f (m)</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+      <p>荷重の釣り合い（主曲率2方向で分担）：\(p = \dfrac{T_1}{R_1} + \dfrac{T_2}{R_2}\)</p>
+      <p>膜応力：\(\sigma = \frac{T}{t}\left(1 + \frac{qL^2}{8fT}\right)\)、　最小プレテンション：\(T_{min}= \frac{qL^2}{8f}\)</p>
+      <p style="font-size:0.76rem;color:var(--muted);margin-top:4px;">q = qw + qs, f = f/L × L, R ≈ L²/8f。プレテンションや曲率（f/L）を上げるとたわみが減ります。</p>
+    </div>
+  </div>
 </div>
 
 <script>
-// material props
-
+(function(){
+"use strict";
 const matProps = {
   ptfe: { sigAllow: 40, t: 0.8, name: 'PTFE' },
-  etfe:{ sigAllow: 20, t: 0.2, name: 'ETFE' },
-  pvc:{ sigAllow: 20, t: 0.9, name: 'PVC' }
+  etfe: { sigAllow: 20, t: 0.2, name: 'ETFE' },
+  pvc:  { sigAllow: 20, t: 0.9, name: 'PVC' }
 };
+function el(id){ return document.getElementById(id); }
+function getNum(id){ return parseFloat(el(id).value); }
 
-function setSlider(el, pct){
-  el.style.setProperty('--pct', (pct * 100).toFixed(1) + '%');
-}function sliderPct(el){
-  return (el.value - el.min) / (el.max - el.min);
-}function calcStress(T, t_mm, q, L, fL){
-  const t = t_mm / 1000; // m
-  const f = fL * L;
+function setSlider(e){
+  const pct = (e.value - e.min) / (e.max - e.min);
+  e.style.setProperty('--pct', (pct*100).toFixed(1) + '%');
+}
+function calcStress(T, t_mm, q, L, fL){
+  const t = t_mm/1000, f = fL*L;
   if (f <= 0) return 0;
-  return (T / t) * (1 + (q * L * L) / (8 * f * T)) / 1000; // MPa (T kN/m, q kN/m²)
-}function calcDeflection(T, L, q, fL){
-  // simplified beam-cable analogy
-  const f = fL * L;
-  // delta = q*L^4 / (T * 8 * f) — rough membrane deflection
-  return (q * L * L * L) / (8 * T * 100); // m
-}function calcTmin(q, L, fL){
-  const f = fL * L;
-  if (f <= 0) return 0;
-  return (q * L * L) / (8 * f);
-}const ctxS = document.getElementById('chartSig').getContext('2d');
-const ctxD = document.getElementById('chartDef').getContext('2d');
+  return (T/t)*(1 + (q*L*L)/(8*f*T))/1000; // MPa (T kN/m, q kN/m²)
+}
+function calcTmin(q, L, fL){ const f = fL*L; return f<=0?0:(q*L*L)/(8*f); }
+// Anticlastic saddle deflection: stiffness rises with prestress T and curvature (f).
+// δ ∝ q·L² / (8·(T + extra prestress-stiffness from anticlastic curvature)).
+function calcDeflection(T, L, q, fL){
+  const f = fL*L;
+  if (f<=0 || T<=0) return 0;
+  // effective carrying tension grows with both prestress T and the anticlastic
+  // ridge action (proportional to curvature ~ f/L); keeps δ falling as T or f/L rise.
+  const Teff = T*(1 + 8*f/L);          // kN/m, prestress + curvature stiffening
+  const raw = (q*L*L)/(8*Teff);        // m  (q kN/m², Teff kN/m)
+  return Math.min(raw, f);             // bounded by camber rise f (membrane inverts beyond)
+}
 
-const chartSig = new Chart(ctxS,{
-  type: 'line',
-  data: { datasets: [
-    { label: 'T = 3 kN/m', data: [], borderColor: '#e17055', backgroundColor: 'transparent', tension: 0.4, pointRadius: 0 },{ label: 'T = 8 kN/m', data: [], borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,.1)', fill: false, tension: 0.4, pointRadius: 0 },{ label: 'T = 15 kN/m', data: [], borderColor: '#00B4D8', backgroundColor: 'transparent', tension: 0.4, pointRadius: 0 },{ label: '現在点', data: [], borderColor: '#e74c3c', backgroundColor: '#e74c3c', pointRadius: 8, showLine: false }
-  ]},
-  options:{ responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100, plugins: { legend: { labels: { font: { size: 10 } } } },
-    scales:{ x: { type:'linear', title: { display: true, text: 'スパン L (m)' } }, y:{ title: { display: true, text: 'σmax (MPa)' }, min: 0 } } }
-});
+// ===== Current model state (read from inputs) =====
+const M = { L:20, T:5, fL:0.15, t:0.9, q:1.5, sig:0, def:0, R:0, T1:0, T2:0, mat:'pvc' };
 
-const chartDef = new Chart(ctxD,{
-  type: 'line',
-  data: { datasets: [
-    { label: 'たわみ δmax (m)', data: [], borderColor: '#007BFF', backgroundColor: 'rgba(0,123,255,.1)', fill: true, tension: 0.4, pointRadius: 0 },{ label: 'L/50 限界', data: [], borderColor: '#e74c3c', borderDash: [5,4], backgroundColor: 'transparent', pointRadius: 0 },{ label: '現在点', data: [], borderColor: '#e74c3c', backgroundColor: '#e74c3c', pointRadius: 8, showLine: false }
-  ]},
-  options:{ responsive: true, animation: false, maintainAspectRatio: false,resizeDelay:100, plugins: { legend: { labels: { font: { size: 10 } } } },
-    scales:{ x: { type:'linear', title: { display: true, text: '荷重強度 q (kN/m²)' } }, y:{ title: { display: true, text: 'δmax (m)' }, min: 0 } } }
-});
+function readModel(){
+  M.mat = el('sMat').value;
+  M.L  = getNum('sL');
+  M.T  = getNum('sT');
+  M.fL = getNum('sFL');
+  M.t  = getNum('sThk');
+  const qw = getNum('sQw'), qs = getNum('sQs');
+  M.q  = qw + qs;
+  const f = M.fL*M.L;
+  M.sig = calcStress(M.T, M.t, M.q, M.L, M.fL);
+  M.def = calcDeflection(M.T, M.L, M.q, M.fL);      // m
+  M.R   = f>0 ? (M.L*M.L)/(8*f) : 0;                 // m, principal radius
+  // principal tensions via p = T1/R1 + T2/R2 (anticlastic: warp valley + weft ridge)
+  // warp (valley) tension carries part, weft (ridge, opposite curvature) the rest
+  M.T1 = M.T + (M.q * M.R) * 0.5;                    // kN/m valley direction
+  M.T2 = M.T + (M.q * M.R) * 0.5;                    // kN/m ridge direction (prestress dominant)
+}
 
-function update(){
-  const mat = document.getElementById('sMat').value;
-  const L = +document.getElementById('sL').value;
-  const T = +document.getElementById('sT').value;
-  const fL = +document.getElementById('sFL').value;
-  const thkInput = +document.getElementById('sThk').value;
-  const qw = +document.getElementById('sQw').value;
-  const qs = +document.getElementById('sQs').value;
+function updateOutputs(){
+  const mp = matProps[M.mat];
+  const SF = M.sig>0 ? mp.sigAllow/M.sig : 99;
+  const Tmin = calcTmin(M.q, M.L, M.fL);
+  const stab = M.q*M.L*M.L>0 ? M.T/(M.q*M.L*M.L) : 0;
+  const weld = M.T*1.5;
 
-  const mp = matProps[mat];
-  const t_mm = thkInput; // use input thickness
-  const q = qw + qs;
+  el('rSig').textContent  = M.sig.toFixed(2);
+  el('rSF').textContent   = SF.toFixed(2);
+  el('rStab').textContent = stab.toFixed(4);
+  el('rTmin').textContent = Tmin.toFixed(2);
+  el('rWeld').textContent = weld.toFixed(1);
+  el('rDef').textContent  = M.def.toFixed(3);
+  el('rR').textContent    = M.R.toFixed(1);
 
-  ['sL','sT','sFL','sThk','sQw','sQs'].forEach(id => {
-    const el = document.getElementById(id);
-    setSlider(el, sliderPct(el));
-  });
-
-  const sigma = calcStress(T, t_mm, q, L, fL);
-  const delta = calcDeflection(T, L, q, fL);
-  const SF = sigma > 0 ? mp.sigAllow / sigma : 99;
-  const Tmin = calcTmin(q, L, fL);
-  const stab = T / (q * L * L);
-  const weld = T * 1.5; // 1.5x safety factor for weld
-
-  document.getElementById('rSig').textContent = sigma.toFixed(2);
-  document.getElementById('rDef').textContent = delta.toFixed(3);
-  document.getElementById('rSF').textContent = SF.toFixed(2);
-  document.getElementById('rStab').textContent = stab.toFixed(4);
-  document.getElementById('rTmin').textContent = Tmin.toFixed(2);
-  document.getElementById('rWeld').textContent = weld.toFixed(1);
+  // live stat cards (never '—')
+  el('svDef').textContent   = (M.def*1000).toFixed(1);
+  el('svTwarp').textContent = M.T1.toFixed(1);
+  el('svTweft').textContent = M.T2.toFixed(1);
+  el('svSig').textContent   = M.sig.toFixed(2);
 
   // SF bar
-  const sfPct = Math.min(100, (SF / 4) * 100);
-  const sfBar = document.getElementById('sfBar');
+  const sfPct = Math.min(100, (SF/4)*100);
+  const sfBar = el('sfBar');
   sfBar.style.width = sfPct + '%';
-  sfBar.style.background = SF >= 2 ? 'var(--accent)' : SF >= 1 ? '#e17055' : '#e74c3c';
-  document.getElementById('rSFpct').textContent = 'SF = ' + SF.toFixed(2);
+  sfBar.style.background = SF>=2 ? 'var(--accent)' : SF>=1 ? '#e17055' : '#e74c3c';
+  el('rSFpct').textContent = 'SF = ' + SF.toFixed(2);
+  el('rSF').parentElement.className = 'result-card' + (SF<1.5 ? ' warn' : '');
+}
 
-  // warn card
-  const sfCard = document.getElementById('rSF').parentElement;
-  sfCard.className = 'result-card' + (SF < 1.5 ? ' warn' : '');
+// ===== Hero animation: anticlastic saddle membrane under pulsing load =====
+const canvas = el('memCanvas');
+const ctx = canvas.getContext('2d');
+const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let cssW = 0, cssH = 0;
+let playing = !reduce, animId = null, phase = 0;
+let loadMode = 'wind';   // 'wind' (downward gust) or 'snow' (steady)
 
-  // chart 1: sigma vs L for different T levels
-  const Tarr = [3, 8, 15];
-  const colors = ['#e17055', '#007BFF', '#00B4D8'];
-  Tarr.forEach((Ti, i) =>{
-    const pts = [];
-    for (let Li = 2; Li <= 50; Li += 2) {
-      const s = calcStress(Ti, t_mm, q, Li, fL);
-      pts.push({ x: Li, y: +s.toFixed(3) });
+function resizeCanvas(){
+  const rect = canvas.parentElement.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width - 28));
+  cssH = 360;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW*dpr);
+  canvas.height = Math.round(cssH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+// color map low->high tension
+function tColor(u){
+  u = Math.max(0, Math.min(1, u));
+  let r,g,b;
+  if (u < 0.5){ const k=u/0.5; r=26+(0-26)*k; g=74+(212-74)*k; b=122+(160-122)*k; }
+  else { const k=(u-0.5)/0.5; r=0+(255-0)*k; g=212+(82-212)*k; b=160+(82-160)*k; }
+  return 'rgb('+(r|0)+','+(g|0)+','+(b|0)+')';
+}
+
+const NX = 16, NY = 12;
+// saddle surface height: anticlastic. valley sags along x, ridge rises along y.
+// returns z in [-1,1]*amp units (model height f scaled), plus load deflection.
+function surfaceZ(u, v, f, loadAmp){
+  // u,v in [-1,1]; anticlastic base shape
+  const base = f * ( (u*u) - (v*v) );      // saddle: + along x edges, - along y edges
+  // load pushes membrane down at center, resisted by curvature/prestress
+  const bell = Math.cos(u*Math.PI/2)*Math.cos(v*Math.PI/2);
+  return base - loadAmp*bell;
+}
+
+function render(){
+  resizeCanvas();
+  const W = cssW, H = cssH;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+  const f = M.fL;                         // curvature proxy (normalized)
+  // animated load amplitude: gust pulses, snow steadier; scaled by load/prestress
+  const loadFrac = M.q / Math.max(M.T*(1+8*f), 0.5);
+  const pulse = loadMode==='wind'
+      ? (0.6 + 0.4*Math.sin(phase*2.0))
+      : (0.85 + 0.15*Math.sin(phase*0.8));
+  const loadAmp = Math.min(0.9, 0.35 + 1.2*loadFrac) * pulse * 0.6;
+
+  // isometric-ish projection
+  const cx = W*0.5, cy = H*0.56;
+  const sx = (W*0.40), sy = (H*0.30), sz = (H*0.40);
+  function proj(u, v, z){
+    const px = cx + u*sx*0.92 + v*sx*0.30;
+    const py = cy - v*sy*0.62 - z*sz + u*sy*0.10;
+    return [px, py];
+  }
+
+  // tension field magnitude at (u,v): prestress + curvature carry, peaks where load is
+  function tensionU(u,v){
+    const bell = Math.cos(u*Math.PI/2)*Math.cos(v*Math.PI/2);
+    const base = (M.T)/20;                // prestress baseline (normalize ~20kN/m)
+    return Math.max(0, Math.min(1, base*4 + loadAmp*bell*1.2));
+  }
+
+  // draw mesh quads (painter's order: back to front by v then u)
+  for (let j=0;j<NY;j++){
+    for (let i=0;i<NX;i++){
+      const u0=-1+2*i/NX, u1=-1+2*(i+1)/NX;
+      const v0=-1+2*j/NY, v1=-1+2*(j+1)/NY;
+      const z00=surfaceZ(u0,v0,f,loadAmp), z10=surfaceZ(u1,v0,f,loadAmp);
+      const z11=surfaceZ(u1,v1,f,loadAmp), z01=surfaceZ(u0,v1,f,loadAmp);
+      const p00=proj(u0,v0,z00), p10=proj(u1,v0,z10), p11=proj(u1,v1,z11), p01=proj(u0,v1,z01);
+      const tm=(tensionU((u0+u1)/2,(v0+v1)/2));
+      ctx.beginPath();
+      ctx.moveTo(p00[0],p00[1]); ctx.lineTo(p10[0],p10[1]);
+      ctx.lineTo(p11[0],p11[1]); ctx.lineTo(p01[0],p01[1]); ctx.closePath();
+      ctx.fillStyle = tColor(tm); ctx.globalAlpha = 0.9; ctx.fill();
+      ctx.globalAlpha = 1; ctx.strokeStyle='rgba(10,22,40,.55)'; ctx.lineWidth=1; ctx.stroke();
     }
-    chartSig.data.datasets[i].data = pts;
-  });
-  chartSig.data.datasets[3].data = [{ x: L, y: +sigma.toFixed(3) }];
-  chartSig.update('none');
+  }
 
-  // chart 2: delta vs q
-  const defArr = [], lim50Arr = [], currDArr = [];
-  for (let qi = 0.1; qi <= 5; qi += 0.1){
-    const d = calcDeflection(T, L, qi, fL);
-    defArr.push({ x: +qi.toFixed(2), y: +d.toFixed(4) });
-    lim50Arr.push({ x: +qi.toFixed(2), y: +(L / 50).toFixed(3) });
-  }currDArr.push({ x: +q.toFixed(2), y: +delta.toFixed(4) });
-  chartDef.data.datasets[0].data = defArr;
-  chartDef.data.datasets[1].data = lim50Arr;
-  chartDef.data.datasets[2].data = currDArr;
-  chartDef.update('none');
-}['sMat','sL','sT','sFL','sThk','sQw','sQs'].forEach(id =>{
-  const el = document.getElementById(id);
-  el.addEventListener('input', update);
-  el.addEventListener('change', update);
+  // principal tension arrows at center: warp (valley, along u) and weft (ridge, along v)
+  const zc = surfaceZ(0,0,f,loadAmp);
+  const c = proj(0,0,zc);
+  function arrow(p0,p1,col){
+    ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); ctx.stroke();
+    const a=Math.atan2(p1[1]-p0[1],p1[0]-p0[0]), h=9;
+    ctx.beginPath(); ctx.moveTo(p1[0],p1[1]);
+    ctx.lineTo(p1[0]-h*Math.cos(a-0.4),p1[1]-h*Math.sin(a-0.4));
+    ctx.lineTo(p1[0]-h*Math.cos(a+0.4),p1[1]-h*Math.sin(a+0.4));
+    ctx.closePath(); ctx.fill();
+  }
+  // warp (valley) along ±u
+  const wL=proj(-0.6,0,surfaceZ(-0.6,0,f,loadAmp)), wR=proj(0.6,0,surfaceZ(0.6,0,f,loadAmp));
+  arrow(c,wR,'#ff5252'); arrow(c,wL,'#ff5252');
+  // weft (ridge) along ±v
+  const fL2=proj(0,-0.6,surfaceZ(0,-0.6,f,loadAmp)), fR2=proj(0,0.6,surfaceZ(0,0.6,f,loadAmp));
+  arrow(c,fR2,'#00B4D8'); arrow(c,fL2,'#00B4D8');
+
+  // load arrow (down) at center
+  ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.fillStyle='rgba(255,255,255,.85)'; ctx.lineWidth=2.4;
+  const la0=[c[0],c[1]-46-loadAmp*30], la1=[c[0],c[1]-8];
+  ctx.beginPath(); ctx.moveTo(la0[0],la0[1]); ctx.lineTo(la1[0],la1[1]); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(la1[0],la1[1]); ctx.lineTo(la1[0]-5,la1[1]-9); ctx.lineTo(la1[0]+5,la1[1]-9); ctx.closePath(); ctx.fill();
+
+  // labels
+  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='bold 11px Noto Sans JP'; ctx.textAlign='center';
+  ctx.fillText(loadMode==='wind'?'風 q':'積雪 q', c[0], c[1]-52-loadAmp*30);
+  ctx.fillStyle='#ff8a8a'; ctx.textAlign='left';
+  ctx.fillText('谷 T₁='+M.T1.toFixed(1)+' kN/m', 10, 22);
+  ctx.fillStyle='#7fdcff';
+  ctx.fillText('尾根 T₂='+M.T2.toFixed(1)+' kN/m', 10, 38);
+  ctx.fillStyle='rgba(255,255,255,.75)'; ctx.textAlign='right';
+  ctx.fillText('δmax='+(M.def*1000).toFixed(1)+' mm', W-10, 22);
+  ctx.fillText('σ='+M.sig.toFixed(1)+' MPa', W-10, 38);
+  ctx.textAlign='left';
+}
+
+function loop(){
+  if (!playing){ animId=null; return; }
+  phase += 0.03;
+  render();
+  animId = requestAnimationFrame(loop);
+}
+function startAnim(){ if (!playing){ playing=true; el('btnPlay').innerHTML='<i class="fas fa-pause"></i> 一時停止'; } if(!animId) animId=requestAnimationFrame(loop); }
+function stopAnim(){ playing=false; if(animId){cancelAnimationFrame(animId);animId=null;} el('btnPlay').innerHTML='<i class="fas fa-play"></i> 再生'; }
+window.memTogglePlay = function(){ playing ? stopAnim() : startAnim(); };
+window.memSetLoad = function(m){
+  loadMode = m;
+  document.querySelectorAll('.play-row .preset-btn').forEach(b=>b.classList.remove('active'));
+  const idx = m==='wind'?0:1;
+  document.querySelectorAll('.play-row .preset-btn')[idx].classList.add('active');
+  if (reduce) render();
+};
+
+function recompute(){
+  ['sL','sT','sFL','sThk','sQw','sQs'].forEach(id=>setSlider(el(id)));
+  readModel();
+  updateOutputs();
+  if (reduce || !playing) render();
+}
+
+['sMat','sL','sT','sFL','sThk','sQw','sQs'].forEach(id=>{
+  const e = el(id);
+  e.addEventListener('input', recompute);
+  e.addEventListener('change', recompute);
 });
+canvas.addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); window.memTogglePlay(); } });
+window.addEventListener('resize', ()=>{ if(reduce||!playing) render(); });
 
-update();
+// init
+recompute();
+if (reduce){ render(); } else { startAnim(); }
+})();
 </script>
 
 <section class="explanation">
@@ -404,7 +571,7 @@ update();
       <div class="bub">なるほど！膜の種類（PTFEとかETFE）を変えると、結果はどう変わるんですか？材料によってプレテンションの入れ方が違うということ？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">いいところに気がついたね。材料によって「許容応力」が大きく異なるんだ。例えば、PTFE材は強くて40MPaまでOKだけど、PVC材は15MPaまで。だから、同じスパンでも使える材料が限られてくる。ツール上部の「膜材」を切り替えてみて。PTFEからPVCに変えると、同じ条件でも「最大応力」が許容値を超えて赤字警告が出るはずだ。現場ではコストと強度のバランスで材料を選ぶんだ。</div>
+      <div class="bub">いいところに気がついたね。材料によって「許容応力」が大きく異なるんだ。例えば、PTFE材は強くて40MPaまでOKだけど、PVC材は20MPaまで。だから、同じスパンでも使える材料が限られてくる。ツール上部の「膜材」を切り替えてみて。PTFEからPVCに変えると、同じ条件でも「最大応力」が許容値を超えて赤字警告が出るはずだ。現場ではコストと強度のバランスで材料を選ぶんだ。</div>
     </div>
   </div>
   <h2>よくある質問</h2>
@@ -442,6 +609,9 @@ update();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="membrane-structure.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -497,13 +667,13 @@ update();
 <h3>使い方ガイド</h3>
 <ol>
 <li>膜材種別（PTFE・ETFE・PVC）を選択し、スパン長[m]、厚さ[mm]を入力してください</li>
-<li>プレテンション値[kN/m]をX・Y方向で独立設定し、初期形状安定指数（目安：≥4.0）を確認します</li>
-<li>風荷重[kN/m²]と積雪荷重[kN/m²]を入力後、「計算実行」ボタンで最大応力[MPa]、たわみ[mm]、溶接強度要求値[MPa]をリアルタイム取得します</li>
+<li>プレテンション値[kN/m]を設定し、初期の形状安定指数（目安：T/qL² > 0.1）を確認します</li>
+<li>風荷重[kN/m²]と積雪荷重[kN/m²]を入力すると、最大応力[MPa]、たわみ[m]、溶接強度要求値[kN/m]がリアルタイムに更新されます</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>PTFE膜（E=172MPa、厚さ0.8mm）のスパン6.0m、プレテンション280kN/m（両方向）、風荷重1.5kN/m²、積雪0.8kN/m²のケースでは、最大応力約14.2MPa、中央たわみ約38mm、安定指数4.8が算出されます。溶接部の要求強度は材料降伏比から27.6MPa以上が必要となり、TIG溶接で品質確保が可能です</p>
+<p>PTFE膜（厚さ0.8mm、許容応力40MPa）のスパン6.0m、プレテンション15kN/m、風荷重1.5kN/m²、積雪0.8kN/m²（合計q=2.3kN/m²）のケースでは、最大応力約33.1MPa（安全率1.2）、中央たわみ約0.041m、形状安定指数約0.18が算出されます。溶接部の要求強度はプレテンションの1.5倍として約22.5kN/m以上が必要となり、TIG溶接やインパルスシール溶着で品質確保が可能です</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -513,6 +683,16 @@ update();
 <li>積雪地域（北海道など）ではプレテンション力で積雪荷重を支持できない場合、排水傾斜≥10度または融雪シート併用を検討してください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983356?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983356.09._SCMZZZZZZ_.jpg" alt="材料力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">材料力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

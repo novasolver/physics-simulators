@@ -119,20 +119,20 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "管理図 SPCシミュレーター",
-      "description": "X-bar・R図、I-MR図、p図、c図など主要な管理図をブラウザ上で作成。UCL/LCL自動計算、Western Electric判定ルール8則、工程能力指数Cp/Cpkを算出する統計的工程管理（SPC）ツール。",
+      "description": "X-bar・R図、I-MR図、p図、c図など主要な管理図をブラウザ上で作成。UCL/LCL自動計算、Western Electric判定ルール（主要5則）、工程能力指数Cp/Cpkを算出する統計的工程管理（SPC）ツール。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/control-chart.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
         "X-bar・R図 / X-bar・s図 / I-MR図 / p図 / c図 / np図",
         "UCL・LCL・中心線の自動計算（A2・D3・D4係数使用）",
-        "Western Electric判定ルール8則による異常検出",
+        "Western Electric判定ルール（主要5則）による異常検出",
         "異常点の赤色ハイライトと違反ルール表示",
         "工程能力指数 Cp・Cpk・Pp・Ppk 算出",
         "正常工程・シフト・異常スパイクのサンプルデータ生成"
@@ -204,7 +204,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   <div class="hero-inner">
     <div class="hero-badge"><i class="fas fa-chart-line"></i> 制御工学</div>
     <h1>管理図（X-bar・R図・p図・c図）SPCシミュレーター</h1>
-    <p class="hero-sub">データを貼り付けるだけでUCL/LCLを自動算出。Western Electric 8則判定・Cp/Cpk算出まで対応した工程管理ツール。</p>
+    <p class="hero-sub">データを貼り付けるだけでUCL/LCLを自動算出。Western Electric判定（主要ルール）・Cp/Cpk算出まで対応した工程管理ツール。</p>
   </div>
 </div>
 
@@ -228,9 +228,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     <div class="param-group" id="sizeGroup">
       <div class="param-label">
         <span class="param-name">サンプルサイズ n</span>
-        <div class="num-wrap"><input type="number" class="num-input" id="nVal" value="5" min="2" max="10" step="1" oninput="syncFromNum('nSize','nVal');updateSliderPct(document.getElementById('nSize'));compute()"></div>
+        <div class="num-wrap"><input type="number" class="num-input" id="nVal" value="5" min="2" max="500" step="1" oninput="syncFromNum('nSize','nVal');updateSliderPct(document.getElementById('nSize'));compute()"></div>
       </div>
-      <input type="range" id="nSize" min="2" max="10" step="1" value="5" oninput="syncToNum('nSize','nVal');(function(){var _e=document.getElementById('nVal');if(_e){if(_e.tagName==='INPUT')_e.value=this.value;else _e.textContent=this.value;}}).call(this);updateSliderPct(this);compute()">
+      <input type="range" id="nSize" min="2" max="500" step="1" value="5" oninput="syncToNum('nSize','nVal');(function(){var _e=document.getElementById('nVal');if(_e){if(_e.tagName==='INPUT')_e.value=this.value;else _e.textContent=this.value;}}).call(this);updateSliderPct(this);compute()">
     </div>
 
     <div class="divider"></div>
@@ -269,7 +269,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="divider"></div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <!-- Right Viz -->
@@ -369,22 +377,25 @@ function updateSliderPct(el){
   document.getElementById('dataInput').value = rows.join('\n');
   compute();
 }function westernElectric(vals, cl, ucl, lcl){
-  const sigma = (ucl - cl) / 3;
+  const getU = i => Array.isArray(ucl) ? ucl[i] : ucl;
+  const getL = i => Array.isArray(lcl) ? lcl[i] : lcl;
+  const sigmaAt = i => (getU(i) - cl) / 3;
   const violations = new Array(vals.length).fill(null);
   for (let i=0;i<vals.length;i++) {
     const v = vals[i];
+    const sigma = sigmaAt(i);
     // Rule 1: beyond 3σ
-    if (v > ucl || v < lcl) { violations[i] = 'R1'; continue; }// Rule 2: 2 of 3 consecutive > 2σ same side
+    if (v > getU(i) || v < getL(i)) { violations[i] = 'R1'; continue; }// Rule 2: 2 of 3 consecutive > 2σ same side
     if (i>=2){
       const w = [vals[i-2],vals[i-1],vals[i]];
-      const above2 = w.filter(x=>x>cl+2*sigma).length;
-      const below2 = w.filter(x=>x<cl-2*sigma).length;
+      const above2 = w.filter((x,j)=>x>cl+2*sigmaAt(i-2+j)).length;
+      const below2 = w.filter((x,j)=>x<cl-2*sigmaAt(i-2+j)).length;
       if (above2>=2||below2>=2) { violations[i] = 'R2'; continue; }
     }// Rule 3: 4 of 5 > 1σ same side
     if (i>=4){
       const w = [vals[i-4],vals[i-3],vals[i-2],vals[i-1],vals[i]];
-      const above1 = w.filter(x=>x>cl+sigma).length;
-      const below1 = w.filter(x=>x<cl-sigma).length;
+      const above1 = w.filter((x,j)=>x>cl+sigmaAt(i-4+j)).length;
+      const below1 = w.filter((x,j)=>x<cl-sigmaAt(i-4+j)).length;
       if (above1>=4||below1>=4) { violations[i] = 'R3'; continue; }
     }// Rule 4: 8 in a row same side
     if (i>=7){
@@ -434,8 +445,9 @@ function updateSliderPct(el){
         dispVals = data.map(r=>{const m=r.reduce((a,b)=>a+b,0)/r.length;return Math.sqrt(r.reduce((a,v)=>a+(v-m)**2,0)/(r.length-1));});
         const xdbar = xbarVals.reduce((a,b)=>a+b,0)/xbarVals.length;
         const sbar = dispVals.reduce((a,b)=>a+b,0)/dispVals.length;
-        const c4 = Math.sqrt(2/(nn-1))*Math.exp(lgamma(nn/2)-lgamma((nn-1)/2));
-        const A3 = 3/(c4*Math.sqrt(nn));
+        const ns = Math.max(2, data[0].length);
+        const c4 = Math.sqrt(2/(ns-1))*Math.exp(lgamma(ns/2)-lgamma((ns-1)/2));
+        const A3 = 3/(c4*Math.sqrt(ns));
         const B3 = Math.max(0, 1-3*Math.sqrt(1-c4*c4)/c4);
         const B4 = 1+3*Math.sqrt(1-c4*c4)/c4;
         cl_x=xdbar; ucl_x=xdbar+A3*sbar; lcl_x=xdbar-A3*sbar;
@@ -444,8 +456,7 @@ function updateSliderPct(el){
       }
     }
   }else if (type==='p'){
-    const pVals = data.map(r=>{const tot=r.reduce((a,b)=>a+b,0);return r[1]/(r[1]+r[0])||r[0];});
-    // For p-chart: each row is [defectives, sample_size] or just defective fraction
+    // Each row is [defectives, sample_size] or a precomputed fraction; limits use the first row's n.
     const flatP = data.map(r=> r.length>=2 ? r[0]/r[1] : r[0]);
     const pbar = flatP.reduce((a,b)=>a+b,0)/flatP.length;
     const ni = data[0].length>=2 ? data[0][1] : n;
@@ -454,7 +465,16 @@ function updateSliderPct(el){
     cl_x=pbar; ucl_x=pbar+3*Math.sqrt(pbar*(1-pbar)/ni); lcl_x=Math.max(0,pbar-3*Math.sqrt(pbar*(1-pbar)/ni));
     cl_d=0; ucl_d=0; lcl_d=0;
     sigmaEst = Math.sqrt(pbar*(1-pbar)/ni);
-  }else if (type==='c'||type==='np'){
+  }else if (type==='np'){
+    const vals = data.map(r=>r[0]);
+    const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
+    const pbar = mean/n;
+    xbarVals = vals;
+    dispVals = [];
+    cl_x=mean; ucl_x=mean+3*Math.sqrt(n*pbar*(1-pbar)); lcl_x=Math.max(0,mean-3*Math.sqrt(n*pbar*(1-pbar)));
+    cl_d=0; ucl_d=0; lcl_d=0;
+    sigmaEst = Math.sqrt(n*pbar*(1-pbar));
+  }else if (type==='c'){
     const cVals = data.map(r=>r[0]);
     const cbar = cVals.reduce((a,b)=>a+b,0)/cVals.length;
     xbarVals = cVals;
@@ -462,6 +482,17 @@ function updateSliderPct(el){
     cl_x=cbar; ucl_x=cbar+3*Math.sqrt(cbar); lcl_x=Math.max(0,cbar-3*Math.sqrt(cbar));
     cl_d=0; ucl_d=0; lcl_d=0;
     sigmaEst = Math.sqrt(cbar);
+  }else if (type==='u'){
+    const vals = data.map(r=>r[0]);
+    const ns = data.map(r=> r.length>=2 ? Math.max(1,r[1]) : n);
+    const defects = vals.reduce((a,b)=>a+b,0);
+    const units = ns.reduce((a,b)=>a+b,0);
+    const ubar = units>0 ? defects/units : 0;
+    xbarVals = vals.map((v,i)=>v/ns[i]);
+    dispVals = [];
+    cl_x=ubar; ucl_x=xbarVals.map((_,i)=>ubar+3*Math.sqrt(ubar/ns[i])); lcl_x=xbarVals.map((_,i)=>Math.max(0,ubar-3*Math.sqrt(ubar/ns[i])));
+    cl_d=0; ucl_d=0; lcl_d=0;
+    sigmaEst = Math.sqrt(ubar/(units/ns.length));
   }const xbar_val = cl_x;
   const Rbar_val = cl_d;
   const violations = westernElectric(xbarVals, cl_x, ucl_x, lcl_x);
@@ -481,8 +512,10 @@ function updateSliderPct(el){
   document.getElementById('scRbar').textContent = Rbar_val>0?Rbar_val.toFixed(4):'—';
   document.getElementById('scCpk').textContent = Cpk?Cpk.toFixed(3):'—';
   document.getElementById('scViol').textContent = violCount;
-  _setVal('scUCLx', ucl_x.toFixed(4));
-  _setVal('scLCLx', lcl_x.toFixed(4));
+  const uclStat = Array.isArray(ucl_x) ? Math.max(...ucl_x) : ucl_x;
+  const lclStat = Array.isArray(lcl_x) ? Math.min(...lcl_x) : lcl_x;
+  _setVal('scUCLx', uclStat.toFixed(4));
+  _setVal('scLCLx', lclStat.toFixed(4));
   _setVal('scCp', Cp?Cp.toFixed(3):'—');
   const statusEl = document.getElementById('scStatus');
   if (statusEl) {
@@ -506,6 +539,8 @@ function updateSliderPct(el){
   const existing = window.Chart && Chart.getChart ? Chart.getChart(canvas) : null;
   if (existing) existing.destroy();
   const ctx = canvas.getContext('2d');
+  const uclDraw = Array.isArray(ucl) ? Math.max(...ucl) : ucl;
+  const lclDraw = Array.isArray(lcl) ? Math.min(...lcl) : lcl;
   chartXbarInst = new Chart(ctx, {
     type: 'line',
     data: {
@@ -531,8 +566,8 @@ function updateSliderPct(el){
         annotation:{
           annotations: {
             cl:  { type:'line', yMin:cl,  yMax:cl,  borderColor:'#00b894', borderWidth:2, borderDash:[] },
-            ucl:{ type:'line', yMin:ucl, yMax:ucl, borderColor:'#e74c3c', borderWidth:1.5, borderDash:[5,3] },
-            lcl:{ type:'line', yMin:lcl, yMax:lcl, borderColor:'#e74c3c', borderWidth:1.5, borderDash:[5,3] }
+            ucl:{ type:'line', yMin:uclDraw, yMax:uclDraw, borderColor:'#e74c3c', borderWidth:1.5, borderDash:[5,3] },
+            lcl:{ type:'line', yMin:lclDraw, yMax:lclDraw, borderColor:'#e74c3c', borderWidth:1.5, borderDash:[5,3] }
           }
         }
       },
@@ -541,7 +576,7 @@ function updateSliderPct(el){
         y:{ grid:{ color:'rgba(0,0,0,0.05)' } }
       }
     },
-    plugins: [annotationPlugin(cl, ucl, lcl)]
+    plugins: [annotationPlugin(cl, uclDraw, lclDraw)]
   });
 }function drawR(labels, vals, cl, ucl, lcl){
   const canvas = document.getElementById('chartR');
@@ -631,7 +666,7 @@ genSample('normal');
       <div class="bub">Western Electricルールって、管理限界線を超えなくても異常ってわかるんですか？</div>
     </div>
     <div class="cmsg pr"><span class="ico">🎓</span>
-      <div class="bub">その通り！管理限界線の内側でも、データに不自然な「パターン」があれば、それは異常の前兆かもしれない。例えば「連続8点が中心線より上」というのは、工程平均が上にシフトしている可能性が高い。このシミュレーターは、データを生成したり入力したら、自動でWestern Electricルール8則をチェックして、どのルールに引っかかったか教えてくれるんだ。現場で多いのは、限界線ギリギリをうろうろする「2σ外の点」が続くパターンだね。</div>
+      <div class="bub">Xbar-R管理図なら、各サブグループの平均と範囲からCL/UCL/LCLを計算して、Western Electricルールの主要5則もチェックする。Cp/Cpkも出るから、工程能力の判断まで一気にできるよ。</div>
     </div>
 
   </div>
@@ -642,8 +677,8 @@ genSample('normal');
     <div class="faq-a">貼り付けるデータは、1行に1サンプル、列ごとに測定値を入力してください。数値以外の文字や空行が含まれていると正しく認識されません。また、サンプルサイズ（n）が一定でない場合は、X-bar-R図ではなく個別値管理図をご検討ください。</div>
   </div>
   <div class="faq-item">
-    <button class="faq-q" onclick="toggleFaq(this)">Western Electric 8則判定とは何ですか？どのように役立ちますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">工程異常を検出するための8つのルールです。例えば「1点が管理限界外」「連続7点が中心線の片側」など、偶然では起こりにくいパターンを自動判定します。本ツールでは該当する点を色分け表示するため、異常の早期発見と原因特定に役立ちます。</div>
+    <button class="faq-q" onclick="toggleFaq(this)">Western Electric判定とは何ですか？どのように役立ちますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
+        <div class="faq-a">工程異常を検出するための判定ルール群（古典は8ルール）です。本ツールはこのうち「1点が管理限界外」「連続点が中心線の片側」など主要ルールを自動判定します。該当点を色分け表示するため、異常の早期発見と原因特定に役立ちます。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">Cp/Cpkの値が低い場合、どのように改善すればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -671,6 +706,9 @@ genSample('normal');
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="control-chart.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -725,7 +763,7 @@ genSample('normal');
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>サンプルサイズ（nSize）を設定：通常n=5または10を入力し、採取回数（nVal）を20～30回指定</li>
+<li>サブグループサイズnを設定します。Xbar-R/Xbar-S図では2〜10程度、p/np/u図では2〜500の範囲で扱えます。データ入力は1行1サブグループで、20〜30行程度を目安にします。</li>
 <li>規格上限（USL）と規格下限（LSL）を入力：例えば自動車部品の軸径φ25.00mm±0.05mm場合、USL=25.05、LSL=24.95</li>
 <li>各サンプルの個別値を入力するか、シミュレーションデータを生成してX-bar図・R図を自動描画し、UCL/LCL、Western Electric判定ルールで異常点を検出</li>
 <li>Cp/Cpk値を確認：Cpk≧1.33は工程能力良好、Cpk＜1.0は工程改善が必要</li>
@@ -733,17 +771,27 @@ genSample('normal');
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>樹脂成形品の厚さ管理（n=5、25回採取）でUSL=2.10mm、LSL=1.90mmの場合：X̄=2.00mm、R̄=0.18mm、s=0.078mmを得たとします。Cp=(2.10-1.90)/(6×0.078)=1.28、プロセス中心が規格中心からズレている場合Cpk=0.95となり、型温度調整による改善が必要です。一方、フランジ厚さ規格が2.00±0.10mmで同条件なら、Cp=2.56、Cpk=2.00と十分な余裕が確認でき、サンプリング頻度削減の検討が可能</p>
+<p>樹脂成形品の厚さ管理（n=5、25回採取）でUSL=2.10mm、LSL=1.90mmの場合、X̄=2.02mm、R̄=0.06mmを得たとすると、σ̂=R̄/d₂=0.06/2.326=0.0258mm、Cp=(2.10-1.90)/(6×0.0258)=1.29となります。工程中心が規格中心からずれているため Cpk=min((2.10-2.02), (2.02-1.90))/(3×0.0258)=1.03 にとどまり、中心調整が有効です。中心を2.00mmに合わせられれば Cpk=Cp=1.29 となり、Cpk≥1.33までもう一歩と評価できます。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ul>
-<li>p図（不良率管理）は検査数量が一定でない場合に活用：食品パック検査で日産500～1500個時、従来のn=100固定ではなく変動サイズ対応でUCL/LCL自動調整</li>
+<li>p管理図は不良率、np管理図は不良個数、c管理図は単位あたり欠点数（一定検査単位）、u管理図は単位あたり欠点数（検査単位が変動）に適用します。p/np管理図ではサンプルサイズnを固定値として扱うため、行ごとにnが大きく変わる場合は専用SPCソフトで確認してください。</li>
 <li>c図（欠陥数管理）は一定面積・体積単位での瑕疵計数に使用：プリント基板100cm²当たり外観不良3個がc̄の場合、UCL=3+3√3≒8個で異常閾値を設定</li>
-<li>Western Electric判定で連続9点同側、連続3点2σ超過検出時は、即座に工程停止し原因特定（金型摩耗、治具ズレ、材料ロット変更など）を実施</li>
+<li>Western Electric判定で連続点同側、3点中2点の2σ超えを検出した時は、即座に工程停止し原因特定（金型摩耗、治具ズレ、材料ロット変更など）を実施</li>
 <li>Cpk値が月ごとに低下傾向を示す場合、機械精度劣化を先制的に検査し、定期保全計画へ反映</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4065137470?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4065137470.09._SCMZZZZZZ_.jpg" alt="制御工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">制御工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

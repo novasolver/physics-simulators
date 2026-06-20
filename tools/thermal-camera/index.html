@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "赤外線サーモグラフィーシミュレーター — 2D熱分布可視化",
       "description": "熱源・冷却板・断熱材を自由に描いて2D定常熱伝導をシミュレート。ヤコビ反復法でラプラス方程式を解き、サーモグラフィー風の温度分布マップを生成。PCB基板や壁断熱、ヒートシンク検討の初期評価に使える熱解析ツールです。",
       "url": "https://novasolver.jp/tools/thermal-camera.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ヤコビ反復法による2D定常熱伝導数値解析","熱源・冷却板・断熱材の自由配置","レインボー/クールウォーム/ホットの3カラーマップ","PCB基板・壁断熱・ヒートシンクのプリセット"],
       "keywords": "サーモグラフィー,赤外線カメラ,熱分布,熱伝導,熱解析,温度分布,CAE",
       "datePublished": "2026-04-08",
@@ -222,9 +222,15 @@ header { background: var(--navy); color: #fff; padding: 0 24px; }
       <button class="preset-btn" onclick="applyPreset('wall')">壁断熱不良</button>
       <button class="preset-btn" onclick="applyPreset('heatsink')">ヒートシンク</button>
     </div>
-
-    
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 熱</div><canvas id="thermalCanvas"></canvas></div>
@@ -351,14 +357,16 @@ function solve(){
   const hotT=parseInt(document.getElementById('hotTempSlider').value);
   const coldT=parseInt(document.getElementById('coldTempSlider').value);
   const Tnew=new Float32Array(T);
+  function neighborT(nx,ny,selfI){
+    const ni=idx(nx,ny);
+    return fixed[ni]===3 ? T[selfI] : T[ni]; // zero normal gradient at insulator
+  }
   for(let it=0;it<iters;it++){
     for(let y=1;y<GH-1;y++){
       for(let x=1;x<GW-1;x++){
         const i=idx(x,y);
-        if(fixed[i]===1||fixed[i]===2) continue;
-        if(fixed[i]===3) continue; // insulator: no update
-        Tnew[i]=(T[idx(x+1,y)]+T[idx(x-1,y)]+T[idx(x,y+1)]+T[idx(x,y-1)])*0.25;
-        // re-apply fixed neighbors from insulator boundary
+        if(fixed[i]!==0) continue;
+        Tnew[i]=(neighborT(x+1,y,i)+neighborT(x-1,y,i)+neighborT(x,y+1,i)+neighborT(x,y-1,i))*0.25;
       }
     }// enforce BCs
     for(let i=0;i<GW*GH;i++){
@@ -537,6 +545,9 @@ applyPreset('pcb');
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="thermal-camera.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -590,9 +601,9 @@ applyPreset('pcb');
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>ブラシ値（brushVal）を1～10の範囲で設定し、熱源・冷却源の空間分布を描画します。PCB基板上の発熱部品配置を模擬してください</li>
-<li>ホット温度（hotTempVal）を50～150℃、コールド温度（coldTempVal）を10～40℃の範囲で入力し、境界条件を定義します</li>
-<li>反復回数（iterVal）を100～5000に設定してラプラス方程式をヤコビ反復法で求解し、定常2D温度分布を計算実行します</li>
+<li>ブラシ値（brushVal）を1～12の範囲で設定し、熱源・冷却源・断熱領域の空間分布を描画します。PCB基板上の発熱部品配置を模擬してください。</li>
+<li>ホット温度（hotTempVal）を50～150℃、コールド温度（coldTempVal）を-20～20℃の範囲で入力し、境界条件を定義します。</li>
+<li>反復回数（iterVal）を50～2000に設定してラプラス方程式をヤコビ反復法で求解し、定常2D温度分布を計算実行します。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
@@ -607,6 +618,16 @@ applyPreset('pcb');
 <li>実装設計時には銅ベタ層熱伝導率Cu（k=398 W/m·K）とFR-4基材（k=0.3 W/m·K）の異方性を考慮し、本シミュレーション結果を参考値として扱ってください</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

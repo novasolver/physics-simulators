@@ -40,7 +40,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "オットーサイクル シミュレーター",
       "description": "オットーサイクルシミュレーターで圧縮比・比熱比・吸入温度・加熱量から熱効率 η=1-1/r^(γ-1)・温度変化・ネット仕事をリアルタイム計算。P-V 線図を可視化する熱力学解析ツール。",
       "url": "https://novasolver.jp/tools/otto-cycle.html",
@@ -50,7 +50,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher": {"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["圧縮比と比熱比から熱効率を計算","4状態（吸入・圧縮終了・燃焼後・膨張後）の温度表示","P-V線図による4過程の可視化","圧縮比に対する熱効率曲線"],
       "keywords": "オットーサイクル,空気標準サイクル,熱効率,圧縮比,比熱比,火花点火機関,内燃機関,熱機関",
       "datePublished": "2026-05-15",
@@ -100,8 +100,19 @@
   --muted:#6c757d; --border:#dee2e6;
 }
 body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-#pvCanvas,#effCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
+#pvCanvas,#pvDiagCanvas,#effCanvas{ background:#0a1929; border-radius:8px; display:block; width:100%; }
 .canvas-hint{ font-size:0.75rem; color:var(--muted); margin-top:6px; text-align:center; }
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:10px 8px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.62rem;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.preset-btn{padding:4px 10px;font-size:0.76rem;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+#pvCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.preset-btn{transition:none}}
 </style>
 </head>
 <body>
@@ -165,14 +176,60 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="divider"></div>
 
+    <div style="margin-bottom:8px;">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">プリセット</div>
+      <div class="preset-row" style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button type="button" class="preset-btn" onclick="setPreset('gasoline')">標準ガソリン r=10</button>
+        <button type="button" class="preset-btn" onclick="setPreset('perf')">高性能 r=12</button>
+        <button type="button" class="preset-btn" onclick="setPreset('low')">低圧縮 r=8</button>
+        <button type="button" class="preset-btn" onclick="setPreset('diesel')">ディーゼル風 高r</button>
+      </div>
+    </div>
+
     <div class="btn-group">
-      <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 圧縮比をスイープ</button>
       <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
     </div>
     <p style="font-size:0.72rem;color:var(--muted);margin-top:6px;">空気を作動流体とし、気体定数 R = 0.287 kJ/(kg·K) を仮定。c_v は γ から自動計算（c_v = R/(γ−1)）。</p>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> 動作中ライブ数値</div>
+      <div class="live-readouts">
+        <div class="live-ro accent"><div class="rv" id="roStroke">—</div><div class="rl">現在のストローク</div></div>
+        <div class="live-ro"><div class="rv" id="roP">0.00</div><div class="rl">圧力 P / P₁</div></div>
+        <div class="live-ro"><div class="rv" id="roV">0.000</div><div class="rl">比体積 v / v₁</div></div>
+        <div class="live-ro accent"><div class="rv" id="roEta">—</div><div class="rl">熱効率 η [%]</div></div>
+        <div class="live-ro"><div class="rv" id="roQin">—</div><div class="rl">加熱 Q_in [kJ/kg]</div></div>
+        <div class="live-ro"><div class="rv" id="roQout">—</div><div class="rl">放熱 Q_out [kJ/kg]</div></div>
+        <div class="live-ro"><div class="rv" id="roMep">—</div><div class="rl">平均有効圧 MEP [kPa]</div></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gas-pump"></i> 4ストローク・エンジン × P-V 同期アニメーション</div>
+      <canvas id="pvCanvas" tabindex="0" role="img" aria-label="4ストロークエンジンのピストン動作と、それに同期したP-V線図上のマーカー。"></canvas>
+      <div class="play-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+        <button type="button" class="btn" id="playBtn" onclick="togglePlay()"><i class="fas fa-play"></i> 再生</button>
+        <button type="button" class="btn secondary" onclick="resetParams()"><i class="fas fa-redo"></i> リセット</button>
+        <div style="display:flex;gap:4px;margin-left:auto;">
+          <button type="button" class="preset-btn speed-btn" data-speed="0.5" onclick="setSpeed(0.5)">0.5×</button>
+          <button type="button" class="preset-btn speed-btn active" data-speed="1" onclick="setSpeed(1)" style="border-color:var(--accent);color:var(--accent)">1×</button>
+          <button type="button" class="preset-btn speed-btn" data-speed="2" onclick="setSpeed(2)">2×</button>
+        </div>
+      </div>
+      <p class="canvas-hint">左＝シリンダー内ピストン（バルブ／点火プラグ）／右＝同期するP-Vループ上の黄色マーカー。吸気→圧縮→点火→膨張→排気が実時間で進みます。</p>
+    </div>
+
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
       <div class="stat-cards">
@@ -185,7 +242,7 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 
     <div class="chart-card">
       <div class="chart-title"><i class="fas fa-chart-area"></i> P-V 線図（4過程）</div>
-      <canvas id="pvCanvas"></canvas>
+      <canvas id="pvDiagCanvas"></canvas>
       <p class="canvas-hint">横軸＝比体積 v（v₁=1 を基準）／縦軸＝圧力 P（P₁=1 を基準）／黄色のシェードがネット仕事</p>
     </div>
 
@@ -212,311 +269,354 @@ body{ font-family:'Noto Sans JP',sans-serif; background:var(--bg); color:var(--t
 </div>
 
 <script>
-// ========== Otto Cycle Simulator ==========
-var pvCanvas = document.getElementById('pvCanvas');
-var pvCtx = pvCanvas.getContext('2d');
-var effCanvas = document.getElementById('effCanvas');
-var effCtx = effCanvas.getContext('2d');
-var playing = false;
-var animId = null;
-var sweepDir = 1;
+window.__OTTO_L__ = {"compression":"圧縮（1→2）","ignition":"点火・燃焼（2→3）","power":"膨張・出力（3→4）","exhaust":"排気・吸気（4→1）","play":"再生","pause":"一時停止","current":"現在"};
+"use strict";
+(function(){
+  var L = window.__OTTO_L__ || {};
+  var R_AIR = 0.287;
+  var pv = document.getElementById('pvCanvas');
+  var pvCtx = pv.getContext('2d');
+  var diag = document.getElementById('pvDiagCanvas');
+  var diagCtx = diag.getContext('2d');
+  var eff = document.getElementById('effCanvas');
+  var effCtx = eff.getContext('2d');
 
-var R_AIR = 0.287; // kJ/(kg*K)
+  var playing = false, animId = null, lastTs = 0;
+  var phase = 0;            // 0..4 cycle position (0=1, 1=2, 2=3, 3=4, 4=back to 1)
+  var speedMult = 1;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function getParams() {
-  var r = parseFloat(document.getElementById('slR').value);
-  var gamma = parseFloat(document.getElementById('slGamma').value);
-  var T1 = parseFloat(document.getElementById('slT1').value);
-  var Qin = parseFloat(document.getElementById('slQ').value);
-  return { r: r, gamma: gamma, T1: T1, Qin: Qin };
-}
+  function el(id){ return document.getElementById(id); }
+  function gv(id){ return parseFloat(el(id).value); }
 
-// truncate to 2 decimals to match hand-calc reference
-function truncPct(eta) {
-  return (Math.floor(eta * 10000) / 100).toFixed(2);
-}
-
-function __novaCanvasCssW(canvas){
-  return parseFloat(canvas.dataset.cssW) || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-function __novaCanvasCssH(canvas){
-  return parseFloat(canvas.dataset.cssH) || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5);
-}
-
-function resizeCanvases() {
-  [pvCanvas, effCanvas].forEach(function (cv) {
-    var w = Math.max(280, Math.min(cv.parentElement.clientWidth - 40, 900));
-    var __novaW = w;
-    var __novaH = Math.round(w * 0.55);
-    var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-    cv.style.width = __novaW + 'px';
-    cv.style.height = __novaH + 'px';
-    cv.width = Math.round(__novaW * __novaDpr);
-    cv.height = Math.round(__novaH * __novaDpr);
-    cv.dataset.cssW = String(__novaW);
-    cv.dataset.cssH = String(__novaH);
-    var __novaCtx = cv.getContext && cv.getContext('2d');
-    if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  });
-}
-
-function drawPV(p) {
-  var ctx = pvCtx, W = __novaCanvasCssW(pvCanvas), H = __novaCanvasCssH(pvCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 56, my = 26;
-  var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
-  var gw = x1 - x0, gh = y0 - y1;
-
-  // states (relative): v1=1, v2=1/r ; P1=1, P2=r^gamma
-  var v1 = 1, v2 = 1 / p.r;
-  var P1 = 1, P2 = Math.pow(p.r, p.gamma);
-  // Q_in = cv * (T3 - T2). At constant volume: P/T = const, so P3/P2 = T3/T2.
-  var cv_kj = R_AIR / (p.gamma - 1);
-  var T2 = p.T1 * Math.pow(p.r, p.gamma - 1);
-  var T3 = T2 + p.Qin / cv_kj;
-  var P3 = P2 * (T3 / T2);
-  var P4 = P3 * Math.pow(v2 / v1, p.gamma); // isentropic 3->4
-
-  // axes ranges
-  var vmin = v2 * 0.85, vmax = v1 * 1.10;
-  var pmin = 0, pmax = Math.max(P3, P2, P4, 1) * 1.10;
-  function xv(v) { return x0 + (v - vmin) / (vmax - vmin) * gw; }
-  function yp(P) { return y0 - (P - pmin) / (pmax - pmin) * gh; }
-
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.stroke();
-
-  // build the closed cycle path for shading
-  var N = 80;
-  var pathPts = [];
-  // 1 -> 2 (isentropic compression): PV^gamma = P1*v1^gamma
-  for (var i = 0; i <= N; i++) {
-    var v = v1 + (v2 - v1) * (i / N);
-    var P = P1 * Math.pow(v1 / v, p.gamma);
-    pathPts.push([v, P]);
+  function getParams(){
+    return {
+      r: gv('slR'),
+      gamma: gv('slGamma'),
+      T1: gv('slT1'),
+      Qin: gv('slQ')
+    };
   }
-  // 2 -> 3 (constant volume)
-  for (var i = 1; i <= N; i++) {
-    var P = P2 + (P3 - P2) * (i / N);
-    pathPts.push([v2, P]);
-  }
-  // 3 -> 4 (isentropic expansion): PV^gamma = P3*v2^gamma
-  for (var i = 1; i <= N; i++) {
-    var v = v2 + (v1 - v2) * (i / N);
-    var P = P3 * Math.pow(v2 / v, p.gamma);
-    pathPts.push([v, P]);
-  }
-  // 4 -> 1 (constant volume)
-  for (var i = 1; i <= N; i++) {
-    var P = P4 + (P1 - P4) * (i / N);
-    pathPts.push([v1, P]);
+  function truncPct(eta){ return (Math.floor(eta*10000)/100).toFixed(2); }
+
+  // ---- thermodynamic state of the cycle ----
+  function cycleState(p){
+    var v1=1, v2=1/p.r;
+    var P1=1, P2=Math.pow(p.r,p.gamma);
+    var cv=R_AIR/(p.gamma-1);
+    var T2=p.T1*Math.pow(p.r,p.gamma-1);
+    var T3=T2+p.Qin/cv;
+    var T4=T3/Math.pow(p.r,p.gamma-1);
+    var P3=P2*(T3/T2);
+    var P4=P3*Math.pow(v2/v1,p.gamma);
+    var eta=1-1/Math.pow(p.r,p.gamma-1);
+    var wnet=eta*p.Qin;
+    var Qout=p.Qin-wnet;
+    // MEP = wnet / (v1 - v2), specific volumes at 1 atm intake -> realistic kPa
+    var P_ATM=101.325; // kPa
+    var v1_real=R_AIR*p.T1/P_ATM; // m3/kg
+    var v2_real=v1_real/p.r;
+    var mep=wnet/(v1_real-v2_real); // (kJ/kg)/(m3/kg) = kPa
+    return {v1:v1,v2:v2,P1:P1,P2:P2,P3:P3,P4:P4,T1:p.T1,T2:T2,T3:T3,T4:T4,
+            eta:eta,wnet:wnet,Qin:p.Qin,Qout:Qout,mep:mep,cv:cv};
   }
 
-  // shade work area (yellow translucent)
-  ctx.fillStyle = 'rgba(255,209,102,0.18)';
-  ctx.beginPath();
-  ctx.moveTo(xv(pathPts[0][0]), yp(pathPts[0][1]));
-  for (var k = 1; k < pathPts.length; k++) {
-    ctx.lineTo(xv(pathPts[k][0]), yp(pathPts[k][1]));
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // helper: draw a curve between two points along an isentrope
-  function drawIsentrope(va, Pa, vb) {
-    ctx.beginPath();
-    var Nseg = 60;
-    for (var i = 0; i <= Nseg; i++) {
-      var v = va + (vb - va) * (i / Nseg);
-      var P = Pa * Math.pow(va / v, p.gamma);
-      if (i === 0) ctx.moveTo(xv(v), yp(P)); else ctx.lineTo(xv(v), yp(P));
+  // Map continuous phase [0,4) to (v,P,strokeKey)
+  // Stroke mapping for 4-stroke engine display:
+  //   seg0: 1->2 compression (volume v1->v2, isentrope)   "compression"
+  //   seg1: 2->3 heat add at v2 (spark)                    "ignition"
+  //   seg2: 3->4 expansion (v2->v1, isentrope)             "power"
+  //   seg3: 4->1 heat reject at v1 (exhaust/intake)        "exhaust"
+  function stateAtPhase(s, ph){
+    var seg=Math.floor(ph)%4;
+    var f=ph-Math.floor(ph);
+    var v,P,key,T;
+    if(seg===0){ // compression 1->2
+      v=s.v1+(s.v2-s.v1)*f;
+      P=s.P1*Math.pow(s.v1/v,s.gamma!==undefined?s.gamma:1.4);
+      key='compression';
+    } else if(seg===1){ // ignition 2->3
+      v=s.v2;
+      P=s.P2+(s.P3-s.P2)*f;
+      key='ignition';
+    } else if(seg===2){ // power 3->4
+      v=s.v2+(s.v1-s.v2)*f;
+      P=s.P3*Math.pow(s.v2/v,s.gamma!==undefined?s.gamma:1.4);
+      key='power';
+    } else { // exhaust 4->1
+      v=s.v1;
+      P=s.P4+(s.P1-s.P4)*f;
+      key='exhaust';
     }
+    return {v:v,P:P,key:key};
+  }
+
+  function compute(){
+    var p=getParams();
+    if(!isFinite(p.r)||!isFinite(p.gamma)||p.r<=1||p.gamma<=1) return;
+    var s=cycleState(p); s.gamma=p.gamma;
+    window.__OTTO_S__=s;
+    el('statEff').textContent=truncPct(s.eta)+' %';
+    el('statT2').textContent=s.T2.toFixed(1)+' K';
+    el('statT3').textContent=s.T3.toFixed(1)+' K';
+    el('statW').textContent=s.wnet.toFixed(1)+' kJ/kg';
+    if(el('roQin')) el('roQin').textContent=s.Qin.toFixed(0);
+    if(el('roQout')) el('roQout').textContent=s.Qout.toFixed(0);
+    if(el('roMep')) el('roMep').textContent=s.mep.toFixed(0);
+    if(el('roEta')) el('roEta').textContent=truncPct(s.eta);
+    drawEngine(s);
+    drawDiag(s);
+    drawEff(p);
+    updateLive(s);
+  }
+
+  function dpr(){ return Math.min(window.devicePixelRatio||1,2.5); }
+  function sizeCanvas(cv,h){
+    var w=Math.max(280,Math.min(cv.parentElement.clientWidth-40,900));
+    var d=dpr();
+    cv.style.width=w+'px'; cv.style.height=h+'px';
+    cv.width=Math.round(w*d); cv.height=Math.round(h*d);
+    cv.dataset.cssW=String(w); cv.dataset.cssH=String(h);
+    cv.getContext('2d').setTransform(d,0,0,d,0,0);
+    return {w:w,h:h};
+  }
+  function csz(cv){ return {w:parseFloat(cv.dataset.cssW)||cv.width/dpr(), h:parseFloat(cv.dataset.cssH)||cv.height/dpr()}; }
+
+  function resizeAll(){
+    sizeCanvas(pv,360);
+    sizeCanvas(diag,Math.round(Math.min(diag.parentElement.clientWidth-40,900)*0.55));
+    sizeCanvas(eff,Math.round(Math.min(eff.parentElement.clientWidth-40,900)*0.55));
+  }
+
+  // ===== Engine showcase (piston + valves + spark + synced P-V loop) =====
+  function drawEngine(s){
+    var ctx=pvCtx, sz=csz(pv), W=sz.w, H=sz.h;
+    ctx.fillStyle='#0a1929'; ctx.fillRect(0,0,W,H);
+    var st=stateAtPhase(s,phase);
+
+    // left: piston/cylinder ; right: synced P-V loop
+    var splitX=Math.min(W*0.46,260);
+
+    // --- cylinder geometry ---
+    var cx=splitX*0.5, cylW=Math.min(splitX*0.5,86), cylTop=44, cylBot=H-40;
+    var bx0=cx-cylW/2, bx1=cx+cylW/2;
+    var travel=cylBot-cylTop-30; // piston travel range
+    // piston position from volume: v in [v2, v1]; topY when v=v2 (TDC), botY when v=v1 (BDC)
+    var frac=(st.v-s.v2)/(s.v1-s.v2); // 0 at TDC .. 1 at BDC
+    var pistonY=cylTop+24+frac*travel;
+
+    // gas color by temperature (compression heats; combustion hot)
+    var Trange=(st.key==='compression')? (s.T1+(s.T2-s.T1)*((st.v? (s.v1-st.v)/(s.v1-s.v2):0))) : st.P;
+    var hot=Math.min(1,Math.max(0,(st.P-1)/(s.P3-1+1e-9)));
+    var gtop=ctx.createLinearGradient(0,cylTop,0,pistonY);
+    gtop.addColorStop(0,'rgba('+Math.round(40+hot*215)+','+Math.round(80+hot*60)+','+Math.round(160-hot*120)+',0.55)');
+    gtop.addColorStop(1,'rgba('+Math.round(20+hot*180)+','+Math.round(40+hot*30)+','+Math.round(110-hot*80)+',0.85)');
+
+    // cylinder walls
+    ctx.fillStyle='#13283f'; ctx.fillRect(bx0-8,cylTop-18,cylW+16,cylBot-cylTop+20);
+    // gas chamber
+    ctx.fillStyle=gtop; ctx.fillRect(bx0,cylTop,cylW,pistonY-cylTop);
+    // combustion flash on ignition
+    if(st.key==='ignition'){
+      var fl=ctx.createRadialGradient(cx,cylTop+18,2,cx,cylTop+18,cylW*0.7);
+      fl.addColorStop(0,'rgba(255,230,120,0.9)'); fl.addColorStop(1,'rgba(255,90,30,0)');
+      ctx.fillStyle=fl; ctx.fillRect(bx0,cylTop,cylW,pistonY-cylTop);
+    }
+    // piston
+    ctx.fillStyle='#9fb4c9'; ctx.fillRect(bx0,pistonY,cylW,16);
+    ctx.fillStyle='#6b7f96'; ctx.fillRect(cx-4,pistonY+16,8,cylBot-(pistonY+16));
+    // cylinder outline
+    ctx.strokeStyle='rgba(160,190,220,0.6)'; ctx.lineWidth=2;
+    ctx.strokeRect(bx0,cylTop,cylW,cylBot-cylTop);
+
+    // valves (intake left, exhaust right). open during exhaust(4->1) for gas exchange
+    var valOpen=(st.key==='exhaust');
+    function valve(vx,open,color){
+      ctx.fillStyle=open?color:'#4a5b6e';
+      ctx.fillRect(vx-5,cylTop-18+(open?6:0),10,12);
+      ctx.strokeStyle='rgba(200,220,240,0.5)'; ctx.lineWidth=1; ctx.strokeRect(vx-5,cylTop-18+(open?6:0),10,12);
+    }
+    valve(bx0+cylW*0.3,valOpen,'#2ecc71');
+    valve(bx0+cylW*0.7,valOpen,'#e67e22');
+
+    // spark plug at top center
+    var sparkFire=(st.key==='ignition');
+    ctx.fillStyle=sparkFire?'#ffe066':'#7a8aa0';
+    ctx.beginPath(); ctx.arc(cx,cylTop-22,4,0,6.2832); ctx.fill();
+    if(sparkFire){
+      ctx.strokeStyle='#fff7c2'; ctx.lineWidth=2;
+      for(var a=0;a<5;a++){
+        var ang=Math.random()*6.28;
+        ctx.beginPath(); ctx.moveTo(cx,cylTop-20);
+        ctx.lineTo(cx+Math.cos(ang)*10,cylTop-20+Math.abs(Math.sin(ang))*16); ctx.stroke();
+      }
+    }
+
+    // stroke label
+    var label=L[st.key]||st.key;
+    ctx.fillStyle='#ffd54a'; ctx.font='bold 13px "Noto Sans JP",sans-serif'; ctx.textAlign='center';
+    ctx.fillText(label, cx, H-14);
+
+    // --- right: P-V loop synced ---
+    var gx0=splitX+44, gx1=W-16, gy0=H-30, gy1=24;
+    var gw=gx1-gx0, gh=gy0-gy1;
+    var vmin=s.v2*0.85, vmax=s.v1*1.10, pmax=Math.max(s.P3,s.P2,s.P4,1)*1.10;
+    function XV(v){ return gx0+(v-vmin)/(vmax-vmin)*gw; }
+    function YP(P){ return gy0-(P-0)/(pmax-0)*gh; }
+    ctx.strokeStyle='rgba(143,184,224,0.4)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(gx0,gy0); ctx.lineTo(gx1,gy0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gx0,gy1); ctx.lineTo(gx0,gy0); ctx.stroke();
+    drawLoop(ctx,s,XV,YP);
+    // moving marker
+    var mx=XV(st.v), my=YP(st.P);
+    ctx.beginPath(); ctx.arc(mx,my,5,0,6.2832); ctx.fillStyle='#ffd54a'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#cfe3f7'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('P-V', (gx0+gx1)/2, gy1-8<12?12:gy1-8);
+  }
+
+  function drawLoop(ctx,s,XV,YP){
+    var N=60,i,v,P;
+    ctx.lineWidth=2;
+    // shade
+    ctx.fillStyle='rgba(255,209,102,0.16)';
+    ctx.beginPath(); ctx.moveTo(XV(s.v1),YP(s.P1));
+    for(i=0;i<=N;i++){ v=s.v1+(s.v2-s.v1)*(i/N); P=s.P1*Math.pow(s.v1/v,s.gamma); ctx.lineTo(XV(v),YP(P)); }
+    ctx.lineTo(XV(s.v2),YP(s.P3));
+    for(i=0;i<=N;i++){ v=s.v2+(s.v1-s.v2)*(i/N); P=s.P3*Math.pow(s.v2/v,s.gamma); ctx.lineTo(XV(v),YP(P)); }
+    ctx.closePath(); ctx.fill();
+    // 1->2
+    ctx.strokeStyle='#00B4D8'; ctx.beginPath();
+    for(i=0;i<=N;i++){ v=s.v1+(s.v2-s.v1)*(i/N); P=s.P1*Math.pow(s.v1/v,s.gamma); i===0?ctx.moveTo(XV(v),YP(P)):ctx.lineTo(XV(v),YP(P)); }
     ctx.stroke();
+    // 2->3
+    ctx.strokeStyle='#e74c3c'; ctx.beginPath(); ctx.moveTo(XV(s.v2),YP(s.P2)); ctx.lineTo(XV(s.v2),YP(s.P3)); ctx.stroke();
+    // 3->4
+    ctx.strokeStyle='#2ecc71'; ctx.beginPath();
+    for(i=0;i<=N;i++){ v=s.v2+(s.v1-s.v2)*(i/N); P=s.P3*Math.pow(s.v2/v,s.gamma); i===0?ctx.moveTo(XV(v),YP(P)):ctx.lineTo(XV(v),YP(P)); }
+    ctx.stroke();
+    // 4->1
+    ctx.strokeStyle='#9b59b6'; ctx.beginPath(); ctx.moveTo(XV(s.v1),YP(s.P4)); ctx.lineTo(XV(s.v1),YP(s.P1)); ctx.stroke();
+    // state dots
+    var pts=[[s.v1,s.P1,'1'],[s.v2,s.P2,'2'],[s.v2,s.P3,'3'],[s.v1,s.P4,'4']];
+    ctx.fillStyle='#FFD166'; ctx.font='bold 11px "Roboto Mono",monospace'; ctx.textAlign='left';
+    for(i=0;i<4;i++){ ctx.beginPath(); ctx.arc(XV(pts[i][0]),YP(pts[i][1]),3,0,6.2832); ctx.fill(); ctx.fillText(pts[i][2],XV(pts[i][0])+5,YP(pts[i][1])-5); }
   }
 
-  // 1->2 (compression)
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  drawIsentrope(v1, P1, v2);
-  // 2->3 (constant volume) - vertical
-  ctx.strokeStyle = '#e74c3c';
-  ctx.beginPath();
-  ctx.moveTo(xv(v2), yp(P2));
-  ctx.lineTo(xv(v2), yp(P3));
-  ctx.stroke();
-  // 3->4 (expansion)
-  ctx.strokeStyle = '#2ecc71';
-  drawIsentrope(v2, P3, v1);
-  // 4->1 (constant volume)
-  ctx.strokeStyle = '#9b59b6';
-  ctx.beginPath();
-  ctx.moveTo(xv(v1), yp(P4));
-  ctx.lineTo(xv(v1), yp(P1));
-  ctx.stroke();
-
-  // state markers and labels
-  var states = [
-    { v: v1, P: P1, name: '1' },
-    { v: v2, P: P2, name: '2' },
-    { v: v2, P: P3, name: '3' },
-    { v: v1, P: P4, name: '4' },
-  ];
-  ctx.fillStyle = '#FFD166';
-  ctx.font = 'bold 12px "Roboto Mono",monospace';
-  for (var s = 0; s < states.length; s++) {
-    var sx = xv(states[s].v), sy = yp(states[s].P);
-    ctx.beginPath();
-    ctx.arc(sx, sy, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillText(states[s].name, sx + 6, sy - 6);
+  // ===== static P-V diagram (large) =====
+  function drawDiag(s){
+    var ctx=diagCtx, sz=csz(diag), W=sz.w, H=sz.h;
+    ctx.fillStyle='#0a1929'; ctx.fillRect(0,0,W,H);
+    var x0=56,x1=W-16,y0=H-26,y1=26;
+    var vmin=s.v2*0.85,vmax=s.v1*1.10,pmax=Math.max(s.P3,s.P2,s.P4,1)*1.10;
+    var gw=x1-x0,gh=y0-y1;
+    function XV(v){ return x0+(v-vmin)/(vmax-vmin)*gw; }
+    function YP(P){ return y0-(P)/(pmax)*gh; }
+    ctx.strokeStyle='rgba(143,184,224,0.5)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0,y1); ctx.lineTo(x0,y0); ctx.stroke();
+    drawLoop(ctx,s,XV,YP);
+    ctx.fillStyle='#cfe3f7'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText('v / v₁',(x0+x1)/2,H-6);
+    ctx.save(); ctx.translate(12,(y0+y1)/2); ctx.rotate(-Math.PI/2); ctx.fillText('P / P₁',0,0); ctx.restore();
   }
 
-  // axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('v / v₁', (x0 + x1) / 2, H - 6);
-  ctx.save();
-  ctx.translate(12, (y0 + y1) / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('P / P₁', 0, 0);
-  ctx.restore();
-  ctx.textAlign = 'left';
-  ctx.fillText('v₂ = 1/r', xv(v2) + 4, y0 - 4);
-  ctx.fillText('v₁', xv(v1) - 22, y0 - 4);
-}
-
-function drawEff(p) {
-  var ctx = effCtx, W = __novaCanvasCssW(effCanvas), H = __novaCanvasCssH(effCanvas);
-  ctx.fillStyle = '#0a1929';
-  ctx.fillRect(0, 0, W, H);
-  var mx = 50, my = 28;
-  var x0 = mx, x1 = W - 16, y0 = H - my, y1 = my;
-  var gw = x1 - x0, gh = y0 - y1;
-
-  var rmin = 2, rmax = 25;
-  function xr(r) { return x0 + (r - rmin) / (rmax - rmin) * gw; }
-  function ye(e) { return y0 - e * gh; }
-
-  // axes
-  ctx.strokeStyle = 'rgba(143,184,224,0.5)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x0, y1); ctx.lineTo(x0, y0); ctx.stroke();
-  // gridlines (eta = 0.2, 0.4, 0.6, 0.8)
-  ctx.strokeStyle = 'rgba(143,184,224,0.18)';
-  ctx.fillStyle = '#8fb8e0';
-  ctx.font = '10px "Roboto Mono",monospace';
-  ctx.textAlign = 'right';
-  for (var e = 0.2; e <= 0.8 + 1e-9; e += 0.2) {
-    ctx.beginPath(); ctx.moveTo(x0, ye(e)); ctx.lineTo(x1, ye(e)); ctx.stroke();
-    ctx.fillText((e * 100).toFixed(0) + '%', x0 - 4, ye(e) + 3);
+  // ===== efficiency vs r =====
+  function drawEff(p){
+    var ctx=effCtx, sz=csz(eff), W=sz.w, H=sz.h;
+    ctx.fillStyle='#0a1929'; ctx.fillRect(0,0,W,H);
+    var x0=50,x1=W-16,y0=H-28,y1=28, gw=x1-x0, gh=y0-y1;
+    var rmin=2,rmax=25;
+    function xr(r){ return x0+(r-rmin)/(rmax-rmin)*gw; }
+    function ye(e){ return y0-e*gh; }
+    ctx.strokeStyle='rgba(143,184,224,0.5)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0,y1); ctx.lineTo(x0,y0); ctx.stroke();
+    ctx.strokeStyle='rgba(143,184,224,0.18)'; ctx.fillStyle='#8fb8e0'; ctx.font='10px "Roboto Mono",monospace'; ctx.textAlign='right';
+    for(var e=0.2;e<=0.8+1e-9;e+=0.2){ ctx.beginPath(); ctx.moveTo(x0,ye(e)); ctx.lineTo(x1,ye(e)); ctx.stroke(); ctx.fillText((e*100).toFixed(0)+'%',x0-4,ye(e)+3); }
+    ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2.5; ctx.beginPath();
+    for(var i=0;i<=200;i++){ var rr=rmin+(rmax-rmin)*(i/200); var ee=1-1/Math.pow(rr,p.gamma-1); i===0?ctx.moveTo(xr(rr),ye(ee)):ctx.lineTo(xr(rr),ye(ee)); }
+    ctx.stroke();
+    var ec=1-1/Math.pow(p.r,p.gamma-1), cpx=xr(p.r), cpy=ye(ec);
+    ctx.strokeStyle='rgba(255,209,102,0.55)'; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(x0,cpy); ctx.lineTo(cpx,cpy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cpx,y0); ctx.lineTo(cpx,cpy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(cpx,cpy,5,0,6.2832); ctx.fillStyle='#FFD166'; ctx.fill();
+    ctx.fillStyle='#cfe3f7'; ctx.font='11px "Roboto Mono",monospace'; ctx.textAlign='center';
+    ctx.fillText((L.current||'current')+' r = '+p.r.toFixed(1)+' / η = '+truncPct(ec)+' %',(x0+x1)/2,y1-8<12?12:y1-8);
   }
 
-  // efficiency curve at current gamma
-  ctx.strokeStyle = '#00B4D8';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  var Nc = 200;
-  for (var i = 0; i <= Nc; i++) {
-    var rr = rmin + (rmax - rmin) * (i / Nc);
-    var ee = 1 - 1 / Math.pow(rr, p.gamma - 1);
-    if (i === 0) ctx.moveTo(xr(rr), ye(ee)); else ctx.lineTo(xr(rr), ye(ee));
+  function updateLive(s){
+    var st=stateAtPhase(s,phase);
+    if(el('roStroke')) el('roStroke').textContent=L[st.key]||st.key;
+    if(el('roP')) el('roP').textContent=st.P.toFixed(2);
+    if(el('roV')) el('roV').textContent=st.v.toFixed(3);
   }
-  ctx.stroke();
 
-  // current point
-  var ec = 1 - 1 / Math.pow(p.r, p.gamma - 1);
-  var cpx = xr(p.r), cpy = ye(ec);
-  ctx.strokeStyle = 'rgba(255,209,102,0.55)';
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath(); ctx.moveTo(x0, cpy); ctx.lineTo(cpx, cpy); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cpx, y0); ctx.lineTo(cpx, cpy); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.beginPath(); ctx.arc(cpx, cpy, 5, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFD166';
-  ctx.fill();
+  // ===== animation =====
+  function loop(ts){
+    if(!playing){ animId=null; return; }
+    if(!lastTs) lastTs=ts;
+    var dt=Math.min(0.05,(ts-lastTs)/1000); lastTs=ts;
+    phase=(phase+dt*0.7*speedMult)%4;
+    var s=window.__OTTO_S__;
+    if(s){ drawEngine(s); updateLive(s); }
+    animId=requestAnimationFrame(loop);
+  }
+  function startPlay(){
+    if(reduceMotion) return;
+    playing=true; lastTs=0;
+    el('playBtn').innerHTML='<i class="fas fa-pause"></i> '+(L.pause||'Pause');
+    if(!animId) animId=requestAnimationFrame(loop);
+  }
+  function stopPlay(){
+    playing=false; if(animId){ cancelAnimationFrame(animId); animId=null; }
+    el('playBtn').innerHTML='<i class="fas fa-play"></i> '+(L.play||'Play');
+  }
+  function togglePlay(){ playing?stopPlay():startPlay(); }
 
-  // x-axis labels
-  ctx.fillStyle = '#cfe3f7';
-  ctx.font = '11px "Roboto Mono",monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('r = ' + rmin, x0, y0 + 14);
-  ctx.textAlign = 'right';
-  ctx.fillText('r = ' + rmax, x1, y0 + 14);
-  ctx.textAlign = 'center';
-  ctx.fillText('現在 r = ' + p.r.toFixed(1) + ' / η = ' + truncPct(ec) + ' %', (x0 + x1) / 2, y1 - 8 < 12 ? 12 : y1 - 8);
-}
+  function resetParams(){
+    stopPlay(); phase=0;
+    var defs={slR:9.0,slGamma:1.40,slT1:300,slQ:1500};
+    Object.keys(defs).forEach(function(id){ el(id).value=defs[id]; if(el(id+'Val')) el(id+'Val').value=defs[id]; });
+    if(window.updateSlider){ updateSlider(el('slR'),'slRVal',1,''); updateSlider(el('slGamma'),'slGammaVal',2,''); updateSlider(el('slT1'),'slT1Val',0,''); updateSlider(el('slQ'),'slQVal',0,''); }
+    compute();
+  }
+  function setSpeed(x){
+    speedMult=x;
+    var btns=document.querySelectorAll('.speed-btn');
+    for(var i=0;i<btns.length;i++){ var a=parseFloat(btns[i].dataset.speed)===x; btns[i].classList.toggle('active',a); btns[i].style.borderColor=a?'var(--accent)':''; btns[i].style.color=a?'var(--accent)':''; }
+  }
+  function setPreset(name){
+    var P={
+      gasoline:{slR:10,slGamma:1.40,slT1:300,slQ:1800},
+      perf:{slR:12,slGamma:1.40,slT1:300,slQ:2000},
+      low:{slR:8,slGamma:1.40,slT1:300,slQ:1500},
+      diesel:{slR:18,slGamma:1.35,slT1:310,slQ:1600}
+    }[name];
+    if(!P) return;
+    Object.keys(P).forEach(function(id){ el(id).value=P[id]; if(el(id+'Val')) el(id+'Val').value=P[id]; });
+    if(window.updateSlider){ updateSlider(el('slR'),'slRVal',1,''); updateSlider(el('slGamma'),'slGammaVal',2,''); updateSlider(el('slT1'),'slT1Val',0,''); updateSlider(el('slQ'),'slQVal',0,''); }
+    compute();
+  }
 
-function compute() {
-  var p = getParams();
-  if (!isFinite(p.r) || !isFinite(p.gamma) || p.r <= 1 || p.gamma <= 1) return;
-  var cv_kj = R_AIR / (p.gamma - 1);
-  var rgm1 = Math.pow(p.r, p.gamma - 1);
-  var T2 = p.T1 * rgm1;
-  var T3 = T2 + p.Qin / cv_kj;
-  var T4 = T3 / rgm1;
-  var eta = 1 - 1 / rgm1;
-  var wnet = eta * p.Qin;
-  document.getElementById('statEff').textContent = truncPct(eta) + ' %';
-  document.getElementById('statT2').textContent = T2.toFixed(1) + ' K';
-  document.getElementById('statT3').textContent = T3.toFixed(1) + ' K';
-  document.getElementById('statW').textContent = wnet.toFixed(1) + ' kJ/kg';
-  // T4 is computed but not displayed in stats; available for future use
-  void T4;
-  drawPV(p);
-  drawEff(p);
-}
+  // expose for inline handlers
+  window.compute=compute;
+  window.togglePlay=togglePlay;
+  window.resetParams=resetParams;
+  window.setSpeed=setSpeed;
+  window.setPreset=setPreset;
 
-function animationStep() {
-  if (!playing) return;
-  var slR = document.getElementById('slR');
-  var v = parseFloat(slR.value) + sweepDir * 0.5;
-  if (v >= 20) { v = 20; sweepDir = -1; }
-  if (v <= 4) { v = 4; sweepDir = 1; }
-  slR.value = v;
-  updateSlider(slR, 'slRVal', 1, '');
+  window.addEventListener('resize', function(){ resizeAll(); var s=window.__OTTO_S__; if(s){ drawDiag(s); drawEff(getParams()); drawEngine(s); } });
+
+  // keyboard on hero canvas
+  pv.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); togglePlay(); } });
+
+  resizeAll();
   compute();
-  setTimeout(function () {
-    if (playing) animId = requestAnimationFrame(animationStep);
-  }, 220);
-}
-
-function togglePlay() {
-  playing = !playing;
-  var btn = document.getElementById('playBtn');
-  if (playing) {
-    btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止';
-    animId = requestAnimationFrame(animationStep);
-  } else {
-    btn.innerHTML = '<i class="fas fa-play"></i> 圧縮比をスイープ';
-    if (animId) cancelAnimationFrame(animId);
-  }
-}
-
-function resetParams() {
-  playing = false;
-  if (animId) cancelAnimationFrame(animId);
-  document.getElementById('playBtn').innerHTML = '<i class="fas fa-play"></i> 圧縮比をスイープ';
-  var defs = { slR: 9.0, slGamma: 1.40, slT1: 300, slQ: 1500 };
-  Object.keys(defs).forEach(function (id) {
-    document.getElementById(id).value = defs[id];
-  });
-  updateSlider(document.getElementById('slR'), 'slRVal', 1, '');
-  updateSlider(document.getElementById('slGamma'), 'slGammaVal', 2, '');
-  updateSlider(document.getElementById('slT1'), 'slT1Val', 0, '');
-  updateSlider(document.getElementById('slQ'), 'slQVal', 0, '');
-  compute();
-}
-
-window.addEventListener('resize', function () { resizeCanvases(); compute(); });
-
-resizeCanvases();
-compute();
+  if(!reduceMotion){ startPlay(); }
+})();
 </script>
 
 <section class="explanation">
@@ -548,7 +648,36 @@ compute();
     </div>
   </div>
 
-  <h2>よくある質問</h2>
+  <h2>オットーサイクルの4過程と熱効率</h2>
+<div class="fblock">
+<p>オットーサイクルは<strong>火花点火（ガソリン）機関</strong>の理想サイクルで、4つの過程からなります。</p>
+<ol>
+<li><strong>断熱圧縮：</strong>ピストンが混合気を圧縮（圧縮比 $r=V_1/V_2$）。</li>
+<li><strong>等容加熱：</strong>点火・燃焼で瞬間的に加熱（一定体積で圧力上昇）。</li>
+<li><strong>断熱膨張：</strong>高温高圧ガスが膨張して仕事を取り出す（出力行程）。</li>
+<li><strong>等容放熱：</strong>排気で熱を放出（一定体積）。</li>
+</ol>
+<p style="text-align:center">熱効率 $\eta = 1 - \dfrac{1}{r^{\,\gamma-1}}$</p>
+<p>$r$ は圧縮比、$\gamma$ は比熱比（空気で約1.4）です。<strong>圧縮比が高いほど効率が上がる</strong>のがポイントで、効率は圧縮比のみで決まります（理想空気標準サイクル）。ただし実機では圧縮比を上げすぎると<strong>ノッキング（異常燃焼）</strong>が起こるため、燃料のオクタン価で上限が制限されます。</p>
+</div>
+
+<h2>主要熱サイクルの効率比較</h2>
+<div class="fblock">
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">サイクル</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">機関</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">熱効率</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">カルノー</td><td style="border:1px solid #d0d7de;padding:6px 8px">理想（上限）</td><td style="border:1px solid #d0d7de;padding:6px 8px">$1-T_c/T_h$</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">オットー</td><td style="border:1px solid #d0d7de;padding:6px 8px">ガソリン機関</td><td style="border:1px solid #d0d7de;padding:6px 8px">$1-1/r^{\gamma-1}$（$r$=圧縮比）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">ディーゼル</td><td style="border:1px solid #d0d7de;padding:6px 8px">ディーゼル機関</td><td style="border:1px solid #d0d7de;padding:6px 8px">圧縮比に加え締切比に依存</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">ブレイトン</td><td style="border:1px solid #d0d7de;padding:6px 8px">ガスタービン</td><td style="border:1px solid #d0d7de;padding:6px 8px">$1-1/r_p^{(\gamma-1)/\gamma}$（$r_p$=圧力比）</td></tr>
+</tbody>
+</table>
+</div>
+<p>同じ圧縮比ならオットーがディーゼルより効率は高いものの、ディーゼルは高圧縮比が可能なため実機では高効率になります。いずれもカルノー効率を超えることはできません。</p>
+</div>
+
+<h2>よくある質問</h2>
   <div class="faq-section">
     <div class="faq-item">
       <button type="button" class="faq-q" onclick="toggleFaq(this)">オットーサイクルとディーゼルサイクルはどう違いますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -583,6 +712,9 @@ compute();
     <p>最後に、<strong>このシミュレーターが示すのは理想サイクルの上限値</strong>であり、実機の効率はこれより大きく下がる点に注意してください。空気を理想気体とし γ を一定とする近似、瞬時の等容加熱、可逆な等エントロピー過程——これらの仮定はすべて実機では成り立ちません。実際の指示熱効率は理想値の70〜85%程度、機械摩擦・補機損失を引いた制動熱効率はさらに下がり、市販車の実効率は30〜40%が一般的です。理想サイクルは「これ以上は出ない」という上限を与えるものとして使うのが正しい付き合い方です。</p>
   </div>
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="otto-cycle.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -637,7 +769,7 @@ compute();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>圧縮比(R)を1.5～12の範囲で設定します。ガソリンエンジンは通常8～10、ディーゼルエンジンは16～20です</li>
+<li>圧縮比(R)を4～20の範囲で設定します。ガソリンエンジンは通常8～10、ディーゼルエンジンは16～20です</li>
 <li>比熱比(γ)を空気の1.4またはガス混合物の1.35に調整し、燃焼ガスの物理特性を反映させます</li>
 <li>初期温度T₁(293K～350K)と単位質量当たりの熱入力Q(1000～3000 kJ/kg)を入力してシミュレーションを実行します</li>
 <li>圧縮終了温度T₂、燃焼後温度T₃、熱効率ηの計算結果から、エンジン性能への影響を分析します</li>
@@ -645,7 +777,7 @@ compute();
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>初期条件T₁=300K、圧縮比R=8、比熱比γ=1.4、熱入力Q=2000 kJ/kgのガソリンエンジンを解析すると、圧縮終了温度T₂はT₁×R^(γ-1)=300×8^0.4≒700Kになります。燃焼後温度T₃=T₂+Q/(Cv)≒2200Kで、理論熱効率η=1-1/R^(γ-1)≒56.5%となります。実機では機械損失と熱損失により実効熱効率は30～35%に低下します</p>
+<p>初期条件T₁=300K、圧縮比R=8、比熱比γ=1.4、熱入力Q=2000 kJ/kgのガソリンエンジンを解析すると、圧縮終了温度T₂はT₁×R^(γ-1)=300×8^0.4≒700Kになります。燃焼後温度T₃=T₂+Q/(Cv)≒3477K（cv=R/(γ-1)≒0.718 kJ/kg·K）で、理論熱効率η=1-1/R^(γ-1)≒56.5%となります。実機では機械損失と熱損失により実効熱効率は30～35%に低下します</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -655,6 +787,16 @@ compute();
 <li>比熱比γは燃焼進行とともに変化します。精密CAE解析ではポリトロープ指数を1.25～1.30に設定し、実測値との比較検証を行います</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

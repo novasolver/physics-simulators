@@ -36,7 +36,7 @@ MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']] }, svg: { fontCache: 'g
 <script type="application/ld+json">
 {
   "@context":"https://schema.org","@graph":[
-    {"@type":"SoftwareApplication","name":"アルキメデスの原理・浮力計算ツール","applicationCategory":"EducationalApplication","operatingSystem":"Web Browser","url":"https://novasolver.jp/tools/archimedes-buoyancy.html","description":"浮力・沈降条件をリアルタイム計算する流体静力学ツール","inLanguage":"ja"},
+    {"@type":"SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html","name":"アルキメデスの原理・浮力計算ツール","applicationCategory":"EducationalApplication","operatingSystem":"Web Browser","url":"https://novasolver.jp/tools/archimedes-buoyancy.html","description":"浮力・沈降条件をリアルタイム計算する流体静力学ツール","inLanguage":"ja"},
     {"@type":"FAQPage","mainEntity":[
       {"@type":"Question","name":"アルキメデスの原理とは？","acceptedAnswer":{"@type":"Answer","text":"「流体中の物体には、物体が排除した流体の重さに等しい浮力が上向きに働く」という原理です。F_b = ρ_fluid × g × V_submerged で計算します。"}},
       {"@type":"Question","name":"物体が浮くか沈むかはどう決まる？","acceptedAnswer":{"@type":"Answer","text":"物体の密度ρ_objと流体密度ρ_fluidの比較で決まります。ρ_obj < ρ_fluid なら浮く、ρ_obj > ρ_fluid なら沈む、等しければ浮遊（中性浮力）します。"}},
@@ -97,6 +97,11 @@ header{background:var(--navy);color:#fff;padding:0 24px;}
 .tab-btn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s;}
 .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 canvas{display:block;width:100%;}
+.sim-controls{display:flex;gap:8px;margin:14px 0 4px;}
+.sim-btn{flex:1;padding:9px 10px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:.82rem;font-weight:700;cursor:pointer;transition:opacity .2s;display:flex;align-items:center;justify-content:center;gap:6px;}
+.sim-btn:hover{opacity:.85;}
+.sim-btn[data-paused="1"]{background:var(--bg);color:var(--accent);}
+@media(prefers-reduced-motion:reduce){.sim-btn{transition:none;}}
 .explanation{max-width:1200px;margin:0 auto;padding:0 24px 40px;}
 .section-title{font-size:1.25rem;font-weight:800;color:var(--navy);margin:32px 0 16px;padding-left:12px;border-left:4px solid var(--accent);}
 .chat{background:var(--card);border-radius:14px;padding:24px;border:1px solid var(--border);}
@@ -157,14 +162,12 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <div class="main">
   <div class="panel">
     <h2><i class="fas fa-sliders-h"></i> パラメータ</h2>
-    <div style="font-size:.8rem;color:var(--muted);margin-bottom:6px;">物体のプリセット</div>
+    <div style="font-size:.8rem;color:var(--muted);margin-bottom:6px;">シナリオ プリセット</div>
     <div class="presets">
-      <button class="preset-btn" onclick="applyPreset('wood')">🌲 木材</button>
-      <button class="preset-btn" onclick="applyPreset('ice')">🧊 氷</button>
-      <button class="preset-btn active" onclick="applyPreset('steel')">⚓ 鋼鉄球</button>
-      <button class="preset-btn" onclick="applyPreset('cork')">🍾 コルク</button>
-      <button class="preset-btn" onclick="applyPreset('concrete')">🏗 コンクリ</button>
-      <button class="preset-btn" onclick="applyPreset('balloon')">🎈 気球（空気）</button>
+      <button class="preset-btn" onclick="applyPreset('wood')">🌲 木材（浮く）</button>
+      <button class="preset-btn" onclick="applyPreset('ice')">🧊 氷（92%水没）</button>
+      <button class="preset-btn active" onclick="applyPreset('steel')">⚓ 鋼鉄（沈む）</button>
+      <button class="preset-btn" onclick="applyPreset('neutral')">⚖ 中性浮力</button>
     </div>
     <div class="ctrl">
       <div class="field-header"><label>物体密度 ρ_obj <span id="lbl-robj" style="font-size:0.72rem;color:var(--muted)">7800 kg/m³</span></label><div class="num-wrap"><input type="number" class="num-input" id="num-robj" value="7800" min="1" max="20000" step="10" oninput="syncFromNum('sl-robj','num-robj',1,20000)"><span class="num-unit">kg/m³</span></div></div>
@@ -178,16 +181,26 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       <div class="field-header"><label>流体密度 ρ_fluid <span id="lbl-rfluid" style="font-size:0.72rem;color:var(--muted)">1025 kg/m³（海水）</span></label><div class="num-wrap"><input type="number" class="num-input" id="num-rfluid" value="1025" min="1.2" max="14000" step="5" oninput="syncFromNum('sl-rfluid','num-rfluid',1.2,14000)"><span class="num-unit">kg/m³</span></div></div>
       <input type="range" id="sl-rfluid" min="1.2" max="14000" value="1025" step="5" oninput="syncToNum('sl-rfluid','num-rfluid');update()">
     </div>
-    <div class="ctrl">
-      <div class="field-header"><label>水没率（浸漬割合） <span id="lbl-sub" style="font-size:0.72rem;color:var(--muted)">100 %</span></label><div class="num-wrap"><input type="number" class="num-input" id="num-sub" value="100" min="1" max="100" step="1" oninput="syncFromNum('sl-sub','num-sub',1,100)"><span class="num-unit">%</span></div></div>
-      <input type="range" id="sl-sub" min="1" max="100" value="100" step="1" oninput="syncToNum('sl-sub','num-sub');update()">
+
+    <div class="sim-controls">
+      <button class="sim-btn" id="btn-play" onclick="togglePlay()" aria-label="再生／一時停止"><i class="fas fa-pause"></i> 一時停止</button>
+      <button class="sim-btn" onclick="resetSim()" aria-label="最初から"><i class="fas fa-rotate-left"></i> リセット</button>
     </div>
 
     <div class="buoyancy-status" id="buoyancy-status">—</div>
-</div>
+
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> ライブ数値</div>
     <div class="stats-grid">
       <div class="stat-card">
         <div class="val" id="sc-fb">—</div>
@@ -198,6 +211,14 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="lbl">重力 W (N)</div>
       </div>
       <div class="stat-card">
+        <div class="val" id="sc-sub">—</div>
+        <div class="lbl">水没率 (%)</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" id="sc-app">—</div>
+        <div class="lbl">見かけの重さ (N)</div>
+      </div>
+      <div class="stat-card">
         <div class="val" id="sc-fnet">—</div>
         <div class="lbl">合力 (N) ↑正=浮</div>
       </div>
@@ -205,17 +226,11 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="val" id="sc-ratio">—</div>
         <div class="lbl">浮力/重力 比</div>
       </div>
-
   </div>
     </div>
 
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('visual')">浮力の可視化</button>
-      <button class="tab-btn" onclick="switchTab('density')">密度比較チャート</button>
-      <button class="tab-btn" onclick="switchTab('submersion')">水没率と浮力</button>
-    </div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 可視化</div><canvas id="canvas" height="340"></canvas></div>
-  
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-water"></i> 浮力の可視化（実時間アニメーション）</div><canvas id="canvas" height="360" aria-label="流体中の物体が密度に応じて浮上・沈降し平衡水位に落ち着く様子を、浮力ベクトル・重力ベクトル・排除体積とともに描画"></canvas></div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 <div class="formula-block">
       浮力: $F_b = \rho_{fluid} \cdot g \cdot V_{submerged}$<br>
@@ -230,7 +245,7 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       水没割合: $\dfrac{V_{sub}}{V_{total}} = \dfrac{\rho_{obj}}{\rho_{fluid}}$<br>
       氷: ρ_ice/ρ_water ≈ 0.917 → 海面下に91.7% が沈む（氷山の9/10が水中）
     </div>
-  
+
 </div>
 </div>
 </div>
@@ -278,6 +293,29 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <div class="fblock">
 <p>本ツールは、流体中に置かれた物体に働く浮力を、アルキメデスの原理に基づき計算する物理モデルを実装しています。物体の密度 \(\rho_{\text{obj}}\) と体積 \(V\)、流体の密度 \(\rho_{\text{fluid}}\) をスライダーで操作すると、物体に働く重力 \(F_g = \rho_{\text{obj}} V g\) と、物体が押しのけた流体の重さに等しい浮力 \(F_b = \rho_{\text{fluid}} V g\) がリアルタイムで算出されます。ここで \(g\) は重力加速度です。これらの力の合力 \(F_{\text{net}} = F_b - F_g\) の符号と大きさにより、物体の浮遊状態が動的に判定されます。具体的には、\(F_{\text{net}} > 0\) なら浮上、\(F_{\text{net}} < 0\) なら沈降、\(F_{\text{net}} = 0\) なら水中で静止する浮遊状態となります。このモデルは船舶の浮力設計や気球の揚力計算、潜水艦の浮力制御の基本原理を直感的に理解するために活用できます。</p>
 </div>
+<h2>アルキメデスの原理と浮力</h2>
+<div class="fblock">
+<p>流体中の物体は、<strong>排除した流体の重さに等しい上向きの力</strong>（浮力）を受けます。これがアルキメデスの原理です。</p>
+<p style="text-align:center">$F_{浮力} = \rho_{流体}\, V_{排除}\, g$</p>
+<p>$\rho_{流体}$ は流体密度、$V_{排除}$ は物体が押しのけた流体の体積、$g$ は重力加速度です。浮力は物体の材質ではなく<strong>排除した流体の体積と密度</strong>で決まります。水中での<strong>見かけの重さ</strong>は、実際の重さから浮力を引いた値になります。</p>
+</div>
+
+<h2>浮く・沈むの条件と比重</h2>
+<div class="fblock">
+<p>物体が浮くか沈むかは、物体の平均密度 $\rho_{物体}$ と流体密度 $\rho_{流体}$ の比（<strong>比重</strong>）で決まります。</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">条件</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">挙動</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">$\rho_{物体} < \rho_{流体}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">浮く（一部を水面上に出して浮遊）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">$\rho_{物体} = \rho_{流体}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">中立（任意の深さで静止）</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">$\rho_{物体} > \rho_{流体}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">沈む</td></tr>
+</tbody>
+</table>
+</div>
+<p>鋼の船が浮くのは、船体形状で大量の水を排除し、平均密度を水より小さくしているからです。浮遊する物体は、$\rho_{物体}/\rho_{流体}$ の割合だけ水面下に沈みます（氷山が約9割沈むのはこのため）。本シミュレーターで密度・体積を変え、浮力と浮沈を確認できます。</p>
+</div>
+
 <h2>実世界での応用</h2>
 <div class="fblock">
 <p><strong>産業での実際の使用例：</strong>造船業界では、三菱重工や今治造船が本ツールの原理を応用し、タンカーやコンテナ船の船体設計時に浮力と重心位置を最適化。また、潜水艦メーカー川崎重工は、潜航・浮上のためのバラストタンク容量計算に活用。航空宇宙分野では、気球型成層圏プラットフォーム「HAPS」の浮揚力設計にも応用され、ヘリウムガス量とペイロードの関係を精密に調整している。</p><p><strong>研究・教育での活用：</strong>東京海洋大学の船舶工学実習では、学生が本ツールで船体模型の浮遊条件をシミュレーションし、実海域試験と比較。また、中学校理科の「浮力と密度」単元で、塩水と真水での浮き沈みの違いを視覚的に理解させる教材として採用。さらに、流体力学研究では、非ニュートン流体（泥水・血液）中の浮力特性を解析する基礎ツールとして利用されている。</p><p><strong>CAE解析との連携や実務での位置付け：</strong>本ツールは、本格的なCAE（ANSYS Fluent、STAR-CCM+）の前段階として位置づけられる。設計初期段階で浮力・重力バランスを簡易計算し、その結果を基に詳細な流体構造連成解析へ移行。特に、海洋構造物（浮体式洋上風車）の設計では、本ツールで浮力条件をスクリーニングした後、波浪応答解析を実施するワークフローが標準化されている。</p>
@@ -291,6 +329,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 </section>
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="archimedes-buoyancy.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -347,13 +388,13 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <li>物体密度（num-robj）をスライダー（sl-robj）で設定します。例えば鋼材は7850 kg/m³、アルミニウムは2700 kg/m³です。</li>
 <li>物体体積（num-vol）をスライダー（sl-vol）で入力します。単位はm³で、0.5～5.0m³の範囲を推奨します。</li>
 <li>流体密度（num-rfluid）をスライダー（sl-rfluid）で設定します。淡水は1000 kg/m³、海水は1025 kg/m³です。</li>
-<li>没水深度（num-sub）をスライダー（sl-sub）で調整し、浮力F=ρ流体×g×V没水を自動計算します。</li>
+<li>流体密度（num-rfluid）をスライダー（sl-rfluid）で設定します。淡水は1000 kg/m³、海水は1025 kg/m³です。物体はアニメーションで平衡水位まで沈み、水没率は自動計算されます（浮力F=ρ流体×g×V没水）。</li>
 <li>計算結果から物体の浮沈判定（浮力＞重量で浮上）を即座に確認できます。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>鋼製タンク：体積V=2.0m³、密度ρ物体=7850 kg/m³、全没水時の浮力F=1025 kg/m³×9.8 m/s²×2.0 m³=20090 N。物体重量W=7850×2.0×9.8=153,880 Nのため、単独では沈降します。浮力を上回らせるには、内部に空気室を設けて平均密度を600 kg/m³以下に低減する必要があります。</p>
+<p>鋼製タンク：体積V=2.0m³、密度ρ物体=7850 kg/m³、全没水時の浮力F=1025 kg/m³×9.8 m/s²×2.0 m³=20090 N。物体重量W=7850×2.0×9.8=153,860 Nのため、単独では沈降します。浮力を上回らせるには、内部に空気室を設けて平均密度を600 kg/m³以下に低減する必要があります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -364,6 +405,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 <li>温度変化による流体密度変動（4℃基準）は河川・内湾では最大2％の誤差要因になります。</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/488898333X?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/488898333X.09._SCMZZZZZZ_.jpg" alt="流体力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">流体力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -378,219 +429,158 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </footer>
 
 <script>
+/* ===== Archimedes Buoyancy v2 — real-time animation ===== */
 const slRobj = document.getElementById('sl-robj');
 const slVol = document.getElementById('sl-vol');
 const slRfluid = document.getElementById('sl-rfluid');
-const slSub = document.getElementById('sl-sub');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-let currentTab = 'visual';
 const G = 9.81;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const PRESETS = {
-  wood: { robj: 600, vol: 0.1 },
-  ice: { robj: 917, vol: 0.5 },
-  steel: { robj: 7800, vol: 0.001 },
-  cork: { robj: 200, vol: 0.01 },
-  concrete: { robj: 2300, vol: 0.05 },
-  balloon: { robj: 1.1, vol: 100 }
+  wood:    { robj: 600,  vol: 0.1   },
+  ice:     { robj: 917,  vol: 0.5   },
+  steel:   { robj: 7800, vol: 0.001 },
+  neutral: { robj: 1025, vol: 0.05  }
 };
 
-function applyPreset(p) {
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  const pr = PRESETS[p];
-  slRobj.value = pr.robj;
-  slVol.value = pr.vol;
-  compute();
-}
+// Animation state: y = vertical center of object in physics units (0 = waterline, + = below)
+const sim = {
+  y: 0, vy: 0, playing: !reduceMotion, t: 0
+};
 
-function switchTab(tab) {
-  currentTab = tab;
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    b.classList.toggle('active', ['visual','density','submersion'][i] === tab);
-  });
-  compute();
-}
-
-function compute() {
+function getParams() {
   const robj = +slRobj.value;
   const V = +slVol.value;
   const rfluid = +slRfluid.value;
-  const subPct = +slSub.value / 100;
-  const Vsub = V * subPct;
+  return { robj, V, rfluid };
+}
 
-  document.getElementById('lbl-robj').textContent = robj + ' kg/m³';(function(){var e=document.getElementById('num-robj');if(e)e.value=robj;})()
+// Equilibrium: floating -> submerged fraction = robj/rfluid; sinking -> rests at bottom (fully submerged)
+function equilibrium(robj, rfluid) {
+  if (robj < rfluid) return { floating: true, frac: robj / rfluid };
+  return { floating: false, frac: 1 };
+}
+
+function applyPreset(p) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (typeof event !== 'undefined' && event && event.target) event.target.classList.add('active');
+  const pr = PRESETS[p];
+  slRobj.value = pr.robj;
+  slVol.value = pr.vol;
+  syncLabelsFromSliders();
+  resetSim();
+}
+
+function syncLabelsFromSliders() {
+  const { robj, V, rfluid } = getParams();
+  document.getElementById('lbl-robj').textContent = robj + ' kg/m³';
+  (function(){var e=document.getElementById('num-robj');if(e)e.value=robj;})();
   document.getElementById('lbl-vol').textContent = V >= 1 ? V.toFixed(1) + ' m³' : V >= 0.01 ? V.toFixed(3) + ' m³' : (V * 1000).toFixed(2) + ' L';
-  document.getElementById('lbl-rfluid').textContent = rfluid + ' kg/m³' + (rfluid === 1025 ? '（海水）' : rfluid === 1000 ? '（淡水）' : '');(function(){var e=document.getElementById('num-rfluid');if(e)e.value=rfluid;})()
-  document.getElementById('lbl-sub').textContent = (subPct * 100).toFixed(0) + ' %';(function(){var e=document.getElementById('num-sub');if(e)e.value=(subPct*100).toFixed(0);})()
+  (function(){var e=document.getElementById('num-vol');if(e)e.value=V;})();
+  document.getElementById('lbl-rfluid').textContent = rfluid + ' kg/m³' + (rfluid === 1025 ? '（海水）' : rfluid === 1000 ? '（淡水）' : '');
+  (function(){var e=document.getElementById('num-rfluid');if(e)e.value=rfluid;})();
+}
 
+// Called on every slider input
+function update() {
+  syncLabelsFromSliders();
+  // keep animating toward new equilibrium without hard reset
+  if (!sim.playing) { sim.playing = true; setPlayUI(); loop(); }
+}
+
+function resetSim() {
+  // start object dropped from above the surface so it visibly settles
+  sim.y = -1.4; sim.vy = 0; sim.t = 0;
+  syncLabelsFromSliders();
+  if (!sim.playing) { sim.playing = true; setPlayUI(); }
+  if (!rafId) loop();
+}
+
+function togglePlay() {
+  sim.playing = !sim.playing;
+  setPlayUI();
+  if (sim.playing && !rafId) loop();
+}
+
+function setPlayUI() {
+  const btn = document.getElementById('btn-play');
+  if (!btn) return;
+  if (sim.playing) { btn.innerHTML = '<i class="fas fa-pause"></i> 一時停止'; btn.dataset.paused = '0'; }
+  else { btn.innerHTML = '<i class="fas fa-play"></i> 再生'; btn.dataset.paused = '1'; }
+}
+
+// physics: object normalized half-height = 1 unit. yEq is center offset (below waterline +).
+function stepPhysics(dt) {
+  const { robj, V, rfluid } = getParams();
+  const eq = equilibrium(robj, rfluid);
+  // center-of-object equilibrium offset in "half-height" units:
+  // floating: bottom fraction = frac submerged. center sits at (frac-0.5) below surface.
+  // sinking: object fully under, rest near bottom (offset ~ 2.4)
+  const yEq = eq.floating ? (eq.frac - 0.5) * 2 : 2.4;
+  // spring-damper toward equilibrium (mass-normalized) gives bobbing then settle
+  const k = eq.floating ? 9.0 : 4.0;
+  const c = eq.floating ? 2.2 : 5.5; // floating bobs; sinking is overdamped-ish
+  const a = -k * (sim.y - yEq) - c * sim.vy;
+  sim.vy += a * dt;
+  sim.y += sim.vy * dt;
+  sim.t += dt;
+}
+
+function computeNumbers() {
+  const { robj, V, rfluid } = getParams();
+  const eq = equilibrium(robj, rfluid);
+  // current submerged fraction derived from animated position (clamped 0..1)
+  // map object center offset (sim.y, half-height units) to submerged fraction.
+  // fraction submerged = clamp((sim.y + 1)/2 , 0, 1) where y=-1 -> top just touches, y=+1 -> fully under
+  let fracNow = Math.max(0, Math.min(1, (sim.y + 1) / 2));
+  const Vsub = V * fracNow;
   const Fb = rfluid * G * Vsub;
   const W = robj * G * V;
   const Fnet = Fb - W;
-  const ratio = Fb / W;
+  const ratio = W > 0 ? Fb / W : 0;
+  const apparent = Math.max(0, W - Fb);
+  return { robj, V, rfluid, eq, fracNow, Vsub, Fb, W, Fnet, ratio, apparent };
+}
 
-  document.getElementById('sc-fb').textContent = Fb.toFixed(2);
-  document.getElementById('sc-fg').textContent = W.toFixed(2);
-  document.getElementById('sc-fnet').textContent = (Fnet >= 0 ? '+' : '') + Fnet.toFixed(2);
-  document.getElementById('sc-ratio').textContent = ratio.toFixed(3);
+function updateReadouts(n) {
+  document.getElementById('sc-fb').textContent = n.Fb.toFixed(2);
+  document.getElementById('sc-fg').textContent = n.W.toFixed(2);
+  document.getElementById('sc-sub').textContent = (n.fracNow * 100).toFixed(1);
+  document.getElementById('sc-app').textContent = n.apparent.toFixed(2);
+  document.getElementById('sc-fnet').textContent = (n.Fnet >= 0 ? '+' : '') + n.Fnet.toFixed(2);
+  document.getElementById('sc-ratio').textContent = n.ratio.toFixed(3);
 
   const statusEl = document.getElementById('buoyancy-status');
-  if (Math.abs(ratio - 1) < 0.01) {
-    statusEl.textContent = '⚖ 中性浮力（浮遊）';
+  const robj = n.robj, rfluid = n.rfluid;
+  if (Math.abs(robj - rfluid) / rfluid < 0.01) {
+    statusEl.textContent = '⚖ 中性浮力（任意の深さで浮遊） — 水没率 ' + (n.eq.frac * 100).toFixed(0) + '%';
     statusEl.className = 'buoyancy-status neutral';
-  } else if (Fnet > 0) {
-    statusEl.textContent = '↑ 浮上（浮力 > 重力）';
+  } else if (robj < rfluid) {
+    statusEl.textContent = '↑ 浮く — 平衡水没率 ' + (n.eq.frac * 100).toFixed(1) + '% (ρ_obj/ρ_fluid)';
     statusEl.className = 'buoyancy-status floating';
   } else {
-    statusEl.textContent = '↓ 沈降（重力 > 浮力）';
+    statusEl.textContent = '↓ 沈む（重力 > 最大浮力）';
     statusEl.className = 'buoyancy-status sinking';
   }
-
-  drawCanvas(robj, V, rfluid, subPct, Fb, W, Fnet);
 }
 
-function update(){ compute(); }
-
-function drawCanvas(robj, V, rfluid, subPct, Fb, W, Fnet) {
+function setupHiDPI() {
   const CW = canvas.offsetWidth || 680;
-  const CH = 340;
-  var __novaW = CW;
-  var __novaH = CH;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, CW, CH);
-
-  if (currentTab === 'visual') {
-    const waterLevel = CH * 0.55;
-    // Water
-    const wGrad = ctx.createLinearGradient(0, waterLevel, 0, CH);
-    wGrad.addColorStop(0, 'rgba(0,100,220,0.4)');
-    wGrad.addColorStop(1, 'rgba(0,50,150,0.7)');
-    ctx.fillStyle = wGrad;
-    ctx.fillRect(0, waterLevel, CW, CH - waterLevel);
-
-    // Water surface line
-    ctx.strokeStyle = 'rgba(100,200,255,0.6)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, waterLevel); ctx.lineTo(CW, waterLevel); ctx.stroke();
-
-    // Object position based on net force
-    const normRatio = Math.min(2, Math.max(0, robj / rfluid));
-    // If robj < rfluid, float (above water), if > sink (below)
-    const objRadius = Math.min(50, Math.max(12, Math.sqrt(V) * 30));
-    let objY;
-    if (Fnet > 0) {
-      // Floating: partially submerged
-      objY = waterLevel - objRadius * (1 - subPct) + objRadius * 0.1;
-    } else {
-      // Sinking: fully submerged
-      objY = waterLevel + CH * 0.25;
-    }
-
-    // Draw object
-    ctx.beginPath();
-    ctx.arc(CW / 2, objY, objRadius, 0, Math.PI * 2);
-    const objColor = robj < rfluid ? '#28a745' : robj === rfluid ? '#ffc107' : '#dc3545';
-    ctx.fillStyle = objColor + 'cc';
-    ctx.fill();
-    ctx.strokeStyle = objColor; ctx.lineWidth = 2; ctx.stroke();
-
-    // Force arrows
-    const scale = 0.002;
-    const arrowLen_Fb = Math.min(80, Fb * scale + 20);
-    const arrowLen_W = Math.min(80, W * scale + 20);
-
-    // Buoyancy arrow (up, blue)
-    drawArrow2(ctx, CW/2 - 25, objY, CW/2 - 25, objY - arrowLen_Fb, '#007BFF', 'Fb=' + Fb.toFixed(1) + 'N');
-    // Weight arrow (down, red)
-    drawArrow2(ctx, CW/2 + 25, objY, CW/2 + 25, objY + arrowLen_W, '#dc3545', 'W=' + W.toFixed(1) + 'N');
-
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '12px Roboto Mono'; ctx.textAlign = 'center';
-    ctx.fillText('ρ_obj=' + robj + ' / ρ_fluid=' + rfluid + ' kg/m³', CW/2, 24);
-    ctx.fillText('Fnet=' + (Fnet >= 0 ? '+' : '') + Fnet.toFixed(2) + ' N', CW/2, 44);
-
-  } else if (currentTab === 'density') {
-    const materials = [
-      { name: '空気', rho: 1.2 }, { name: 'コルク', rho: 200 }, { name: '木材', rho: 600 }, { name: '氷', rho: 917 },
-      { name: '淡水', rho: 1000 }, { name: '海水', rho: 1025 }, { name: '砂岩', rho: 2200 },
-      { name: 'コンクリ', rho: 2300 }, { name: 'アルミ', rho: 2700 }, { name: '鉄/鋼', rho: 7800 },
-      { name: '鉛', rho: 11340 }, { name: '水銀', rho: 13600 }
-    ];
-    const pad = { l: 70, r: 20, t: 30, b: 60 };
-    const gW = CW - pad.l - pad.r, gH = CH - pad.t - pad.b;
-    const maxRho = 14000;
-    const barW = gW / materials.length - 4;
-
-    materials.forEach((m, i) => {
-      const x = pad.l + i * (gW / materials.length) + 2;
-      const barH = m.rho / maxRho * gH;
-      const y = pad.t + gH - barH;
-      const isFluid = m.rho === rfluid || (m.name === '淡水' && rfluid === 1000) || (m.name === '海水' && rfluid === 1025);
-      const isObj = Math.abs(m.rho - robj) < m.rho * 0.05;
-      ctx.fillStyle = isFluid ? 'rgba(0,123,255,0.85)' : isObj ? 'rgba(220,53,69,0.85)' : 'rgba(100,180,200,0.5)';
-      ctx.fillRect(x, y, barW, barH);
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '9px Roboto Mono'; ctx.textAlign = 'center';
-      ctx.fillText(m.rho >= 1000 ? (m.rho/1000).toFixed(1) + 'k' : m.rho, x + barW/2, y - 4);
-      ctx.save(); ctx.translate(x + barW/2, pad.t + gH + 12);
-      ctx.rotate(-Math.PI/4); ctx.fillText(m.name, 0, 0); ctx.restore();
-    });
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '12px Roboto Mono'; ctx.textAlign = 'center';
-    ctx.fillText('各材料・流体の密度比較 (kg/m³)　青=流体, 赤=物体', CW/2, pad.t - 10);
-
-  } else {
-    // Submersion vs buoyancy
-    const pad = { l: 70, r: 20, t: 30, b: 50 };
-    const gW = CW - pad.l - pad.r, gH = CH - pad.t - pad.b;
-    const maxFb = rfluid * G * V;
-    const maxW = W;
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1;
-    for (let i = 0; i <= 5; i++) {
-      const yy = pad.t + i / 5 * gH;
-      ctx.beginPath(); ctx.moveTo(pad.l, yy); ctx.lineTo(CW - pad.r, yy); ctx.stroke();
-    }
-
-    // Buoyancy vs submersion
-    ctx.strokeStyle = '#007BFF'; ctx.lineWidth = 3;
-    ctx.beginPath();
-    for (let s = 0; s <= 1; s += 0.01) {
-      const fb = rfluid * G * V * s;
-      const x = pad.l + s * gW;
-      const y = pad.t + (1 - fb / (maxFb || 1)) * gH;
-      s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // Weight line (constant)
-    ctx.strokeStyle = '#dc3545'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
-    const wY = pad.t + (1 - W / (maxFb || 1)) * gH;
-    ctx.beginPath(); ctx.moveTo(pad.l, wY); ctx.lineTo(CW - pad.r, wY); ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Current point
-    const currX = pad.l + subPct * gW;
-    const currY = pad.t + (1 - Fb / (maxFb || 1)) * gH;
-    ctx.beginPath(); ctx.arc(currX, currY, 7, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffd700'; ctx.fill();
-
-    ctx.fillStyle = 'rgba(0,123,255,0.9)'; ctx.font = '11px Roboto Mono'; ctx.textAlign = 'left';
-    ctx.fillText('─ 浮力 Fb（水没率で変化）', pad.l + 5, pad.t + 16);
-    ctx.fillStyle = 'rgba(220,53,69,0.9)';
-    ctx.fillText('- 重力 W（一定）', pad.l + 5, pad.t + 32);
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.textAlign = 'center';
-    ctx.fillText('水没率 (%)', CW/2, CH - 10);
-    ctx.fillText('水没率と力の関係', CW/2, pad.t - 10);
-  }
+  const CH = 360;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = CW + 'px';
+  canvas.style.height = CH + 'px';
+  canvas.width = Math.round(CW * dpr);
+  canvas.height = Math.round(CH * dpr);
+  canvas.dataset.cssW = String(CW);
+  canvas.dataset.cssH = String(CH);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { CW, CH };
 }
 
-function drawArrow2(ctx, x1, y1, x2, y2, color, label) {
+function drawArrow(x1, y1, x2, y2, color, label) {
   const headLen = 12;
   const angle = Math.atan2(y2 - y1, x2 - x1);
   ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3;
@@ -600,12 +590,111 @@ function drawArrow2(ctx, x1, y1, x2, y2, color, label) {
   ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/7), y2 - headLen * Math.sin(angle - Math.PI/7));
   ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/7), y2 - headLen * Math.sin(angle + Math.PI/7));
   ctx.closePath(); ctx.fill();
-  ctx.font = '10px Roboto Mono'; ctx.textAlign = 'center'; ctx.fillStyle = color;
-  ctx.fillText(label, (x1 + x2) / 2 + (angle > 0 ? -35 : 35), (y1 + y2) / 2);
+  ctx.font = '11px Roboto Mono'; ctx.textAlign = 'center'; ctx.fillStyle = color;
+  ctx.fillText(label, (x1 + x2) / 2 + (angle > 0 ? -38 : 38), (y1 + y2) / 2);
 }
 
-[slRobj, slVol, slRfluid, slSub].forEach(el => el.addEventListener('input', compute));
-compute();
+function render(n) {
+  const { CW, CH } = setupHiDPI();
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0, 0, CW, CH);
+
+  const waterLevel = CH * 0.42;
+  // water body
+  const wGrad = ctx.createLinearGradient(0, waterLevel, 0, CH);
+  wGrad.addColorStop(0, 'rgba(0,100,220,0.40)');
+  wGrad.addColorStop(1, 'rgba(0,50,150,0.72)');
+  ctx.fillStyle = wGrad;
+  ctx.fillRect(0, waterLevel, CW, CH - waterLevel);
+  // waterline
+  ctx.strokeStyle = 'rgba(120,210,255,0.75)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, waterLevel); ctx.lineTo(CW, waterLevel); ctx.stroke();
+  ctx.fillStyle = 'rgba(150,220,255,0.85)'; ctx.font = '11px Roboto Mono'; ctx.textAlign = 'left';
+  ctx.fillText('水面 / waterline', 8, waterLevel - 6);
+
+  // object geometry: square block centered at CW/2
+  const half = Math.min(58, Math.max(26, Math.sqrt(n.V) * 70)); // px half-height
+  const cx = CW / 2;
+  const pxPerUnit = half; // 1 half-height unit = half px
+  const cy = waterLevel + sim.y * pxPerUnit;
+  const top = cy - half, bot = cy + half;
+
+  // displaced fluid highlight = submerged portion of block
+  const subTop = Math.max(top, waterLevel);
+  if (bot > waterLevel) {
+    ctx.fillStyle = 'rgba(0,180,255,0.30)';
+    ctx.fillRect(cx - half - 8, subTop, half * 2 + 16, bot - subTop);
+    ctx.strokeStyle = 'rgba(0,200,255,0.6)'; ctx.lineWidth = 1; ctx.setLineDash([4,3]);
+    ctx.strokeRect(cx - half - 8, subTop, half * 2 + 16, bot - subTop);
+    ctx.setLineDash([]);
+  }
+
+  // object block
+  const robj = n.robj, rfluid = n.rfluid;
+  const objColor = (Math.abs(robj - rfluid)/rfluid < 0.01) ? '#ffc107' : robj < rfluid ? '#28a745' : '#dc3545';
+  ctx.fillStyle = objColor + 'dd';
+  ctx.fillRect(cx - half, top, half * 2, half * 2);
+  ctx.strokeStyle = objColor; ctx.lineWidth = 2;
+  ctx.strokeRect(cx - half, top, half * 2, half * 2);
+
+  // force vectors from object center
+  const fScale = 70 / Math.max(n.W, n.Fb, 1);
+  const lenW = Math.min(95, n.W * fScale + 12);
+  const lenFb = Math.min(95, n.Fb * fScale + 12);
+  drawArrow(cx - 18, cy, cx - 18, cy - lenFb, '#00B4D8', 'Fb=' + n.Fb.toFixed(0) + 'N');
+  drawArrow(cx + 18, cy, cx + 18, cy + lenW, '#ff6b6b', 'W=' + n.W.toFixed(0) + 'N');
+
+  // top overlay info
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = '12px Roboto Mono'; ctx.textAlign = 'center';
+  ctx.fillText('ρ_obj=' + robj + '  /  ρ_fluid=' + rfluid + ' kg/m³', cx, 22);
+  ctx.fillStyle = n.Fnet >= 0 ? 'rgba(120,255,170,0.95)' : 'rgba(255,150,150,0.95)';
+  ctx.fillText('水没率 ' + (n.fracNow * 100).toFixed(1) + '%   Fnet=' + (n.Fnet >= 0 ? '+' : '') + n.Fnet.toFixed(1) + ' N', cx, 40);
+
+  if (n.eq.floating) {
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '10px Roboto Mono'; ctx.textAlign = 'right';
+    ctx.fillText('平衡水没率 = ρ_obj/ρ_fluid = ' + (n.eq.frac*100).toFixed(1) + '%', CW - 8, CH - 10);
+  }
+}
+
+let rafId = null;
+let lastTs = 0;
+function loop(ts) {
+  if (!ts) ts = performance.now();
+  let dt = (ts - lastTs) / 1000;
+  lastTs = ts;
+  if (!isFinite(dt) || dt <= 0) dt = 1/60;
+  dt = Math.min(dt, 1/30);
+
+  if (sim.playing) {
+    // sub-step for stability
+    const steps = 3;
+    for (let i = 0; i < steps; i++) stepPhysics(dt / steps);
+  }
+  const n = computeNumbers();
+  updateReadouts(n);
+  render(n);
+
+  if (sim.playing) {
+    rafId = requestAnimationFrame(loop);
+  } else {
+    rafId = null;
+  }
+}
+
+[slRobj, slVol, slRfluid].forEach(el => el.addEventListener('input', update));
+window.update = update;
+
+// init
+syncLabelsFromSliders();
+if (reduceMotion) {
+  // settle instantly to equilibrium, no animation
+  const { robj, rfluid } = getParams();
+  const eq = equilibrium(robj, rfluid);
+  sim.y = eq.floating ? (eq.frac - 0.5) * 2 : 2.4;
+  sim.vy = 0; sim.playing = false; setPlayUI();
+  const n = computeNumbers(); updateReadouts(n); render(n);
+} else {
+  resetSim();
+}
 </script>
 <script src="/tools/related-tools.js" defer></script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>

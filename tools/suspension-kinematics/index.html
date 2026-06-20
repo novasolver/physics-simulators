@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "サスペンション運動学シミュレーター",
       "description": "ダブルウィッシュボーンとマクファーソンストラットの運動学をリアルタイム可視化。キャンバー・トレッド変化・ロールセンター高さを計算。",
       "url": "https://novasolver.jp/tools/suspension-kinematics.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ダブルウィッシュボーン/マクファーソン切替","キャンバー角 vs ホイールトラベル","トレッド変化 vs ホイールトラベル","ロールセンター高さ計算"],
       "keywords": "サスペンション,運動学,ダブルウィッシュボーン,マクファーソン,キャンバー,ロールセンター,自動車設計,CAE",
       "datePublished": "2026-04-08",
@@ -181,7 +181,16 @@ canvas#suspCanvas { width: 100%; border-radius: 8px; background: #0a0f1a; }.char
       <div class="ctrl-label"><span>スタティックキャンバー (°)</span><div class="num-wrap"><input type="number" class="num-input" id="v-scamber" value="-1.5" min="-5" max="2" step="0.5" oninput="syncFromNum('s-scamber','v-scamber')"><span class="num-unit">°</span></div></div>
       <input type="range" id="s-scamber" min="-5" max="2" step="0.5" value="-1.5" oninput="syncToNum('s-scamber','v-scamber');update()">
     </div>
-</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4274223213?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274223213.09._SCMZZZZZZ_.jpg" alt="自動車工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">自動車工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 
   <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
@@ -255,12 +264,17 @@ function setType(t) {
   let trackChange = 0;
 
   if (suspType === 'dw') {
-    const clampedUpper = Math.max(-1, Math.min(1, (p.umount + travel * 0.85) / p.upper));
-    const uAngleRad = Math.asin(clampedUpper);
-    const upperX = p.upper * Math.cos(uAngleRad);
-    const dx = upperX - hubX;
-    const dy = (p.umount + travel * 0.85) - hubY;
-    camber = p.scamber + Math.atan2(dx, dy) * 180 / Math.PI * 0.6;
+    function uprightAngle(t) {
+      const lowerClamp = Math.max(-1, Math.min(1, (p.lmount + t * 0.7) / p.lower));
+      const hubXAt = p.lower * Math.cos(Math.asin(lowerClamp));
+      const hubYAt = p.lmount + t * 0.7;
+      const upperClamp = Math.max(-1, Math.min(1, (p.umount + t * 0.85) / p.upper));
+      const upperXAt = p.upper * Math.cos(Math.asin(upperClamp));
+      const upperYAt = p.umount + t * 0.85;
+      return Math.atan2(upperXAt - hubXAt, upperYAt - hubYAt);
+    }
+    const camberGain = (uprightAngle(travel) - uprightAngle(0)) * 180 / Math.PI * 0.6;
+    camber = p.scamber + camberGain;
     trackChange = hubX - p.lower * Math.cos(Math.asin(Math.max(-1,Math.min(1,p.lmount/p.lower))));
   }else{
     // MacPherson: strut angle changes
@@ -554,6 +568,9 @@ window.addEventListener('resize', () =>{ if (activeTab === 'geom') { const p = g
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="suspension-kinematics.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -607,14 +624,14 @@ window.addEventListener('resize', () =>{ if (activeTab === 'geom') { const p = g
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>ダブルウィッシュボーン型の場合、上側ウィッシュボーンの長さ(v-upper)と取付幅(s-upper)を入力します。スポーツカーではv-upper=350mm、s-upper=1200mmが標準値です</li>
-<li>下側ウィッシュボーン(v-lower=380mm、s-lower=1400mm)と上下マウント位置の高さ差(v-umount、v-lmount)を設定するとキャンバー角が自動計算されます</li>
-<li>ホイール変位量を0～80mmの範囲で変更するとロールセンター軌跡とトレッド変化がリアルタイムで更新され、アンチスクワット率(%)とジオメトリ係数が表示されます</li>
+<li>ダブルウィッシュボーン型では、アッパーアーム長、ロアアーム長、上下マウント高さ、ホイールトラベル、スタティックキャンバーを入力します。</li>
+<li>マクファーソン型では、アッパーアーム項目が非表示になり、ストラット角変化の簡易モデルでキャンバー変化を計算します。</li>
+<li>ホイールトラベルは-80～80mmの範囲で変更でき、現在キャンバー、トレッド変化、ロールセンター高、スクラブ半径が更新されます。</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>日本の軽自動車でマクファーソンストラット採用時、ストラット軸長v-umount=800mm、タイヤ外径=560mm、ホイール沈み込み50mm時のシミュレーション結果：キャンバー角が-0.8°から-2.1°へ変化、ロールセンター高さが地面から85mmから120mmへ上昇、トレッド変化は1412mmから1408mmへ4mm減少します</p>
+<p>初期値のダブルウィッシュボーン設定では、トラベル0mmで現在キャンバーはスタティックキャンバーと同じ-1.50°、トレッド変化0.0mm、ロールセンター高140mm、スクラブ半径18.0mmです。トラベル50mmでは、この簡易モデルでキャンバー約-0.44°、トレッド変化-11.2mm、ロールセンター高142.5mm、スクラブ半径19.0mmになります。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -624,6 +641,16 @@ window.addEventListener('resize', () =>{ if (activeTab === 'geom') { const p = g
 <li>マウント位置(s-umount、s-lmount)の左右非対称が5mm以上あると、コーナリング中に予期しないトーイン変化が生じるため製造精度±2mm以内を厳守</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4274223213?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4274223213.09._SCMZZZZZZ_.jpg" alt="自動車工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">自動車工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

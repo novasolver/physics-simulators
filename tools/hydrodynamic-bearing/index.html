@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "流体潤滑ジャーナル軸受設計",
       "description": "ゾンマーフェルト数S、最小油膜厚さh_min、摩擦係数f、摩擦損失をリアルタイム計算。Raimondi-Boyd近似による軸受設計の可否判定ツール。",
       "url": "https://novasolver.jp/tools/hydrodynamic-bearing.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["ゾンマーフェルト数のリアルタイム計算","h_min/C vs S のRaimondi-Boyd特性図","回転数vs摩擦損失曲線","OK/WARNING軸受状態判定"],
       "keywords": "流体潤滑,ジャーナル軸受,ゾンマーフェルト数,油膜厚さ,Raimondi-Boyd,トライボロジー,CAE",
       "datePublished": "2026-04-09",
@@ -220,10 +220,22 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <div class="panel-title">統計サマリー</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4873117984?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4873117984.09._SCMZZZZZZ_.jpg" alt="機械学習の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">機械学習 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-film"></i> 油膜が見える — 偏心ジャーナルと油膜圧力（ライブ）</div>
+    <div class="canvas-wrap" style="height:380px"><canvas id="bearingCanvas" aria-label="偏心して回転するジャーナルがくさび状の収束すきまに油を引き込み、収束域で油膜圧力が立ち上がって荷重を支える様子のアニメーション"></canvas></div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -235,8 +247,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="sl">h_min (μm)</div>
       </div>
       <div class="stat-card">
+        <div class="sv" id="statPpeak">—</div>
+        <div class="sl">油膜ピーク圧 p_max (MPa)</div>
+      </div>
+      <div class="stat-card">
         <div class="sv" id="statF">—</div>
         <div class="sl">摩擦係数 f</div>
+      </div>
+      <div class="stat-card">
+        <div class="sv" id="statEps">—</div>
+        <div class="sl">偏心率 ε</div>
       </div>
       <div class="stat-card">
         <div class="sv" id="statPloss">—</div>
@@ -267,40 +287,47 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
-
-function setPct(el){el.style.setProperty('--pct',(el.value-el.min)/(el.max-el.min)*100+'%');}function wire(id,did,dec){
+(function(){
+'use strict';
+function setPct(el){el.style.setProperty('--pct',(el.value-el.min)/(el.max-el.min)*100+'%');}
+function wire(id,did,dec){
   const sl=document.getElementById(id),dv=document.getElementById(did);
-  function u(){const sv=parseFloat(sl.value).toFixed(dec);if(dv){if(dv.tagName==='INPUT')dv.value=sv;else dv.textContent=sv;}setPct(sl);}sl.addEventListener('input',()=>{u();compute();});u();
-}wire('diameter','dValNum',0);wire('length','lValNum',0);wire('clearance','cValNum',0);
+  function u(){const sv=parseFloat(sl.value).toFixed(dec);if(dv){if(dv.tagName==='INPUT')dv.value=sv;else dv.textContent=sv;}setPct(sl);}
+  sl.addEventListener('input',()=>{u();compute();});u();
+}
+wire('diameter','dValNum',0);wire('length','lValNum',0);wire('clearance','cValNum',0);
 wire('rotSpeed','nValNum',0);wire('load','wValNum',1);wire('viscosity','etaValNum',0);
 
 // Raimondi-Boyd polynomial approximations (L/D=1)
-
 function rbFromS(S){
-  // eccentricity ratio epsilon from S (Raimondi-Boyd L/D=1)
-  // Approximate: epsilon = 1 - exp(-0.9 / (S^0.55 + 0.001))
   const eps = 1 - Math.exp(-0.9 / (Math.pow(S, 0.55) + 0.001));
   const eps_clamp = Math.min(0.97, Math.max(0.01, eps));
   const h_ratio = 1 - eps_clamp;
-  // Friction variable f*(R/C) from Raimondi-Boyd (approximate)
   const fRC = 3.22 / (Math.sqrt(S) + 0.3);
   return { eps: eps_clamp, h_ratio, fRC };
-}function computeBearing(D_mm, L_mm, C_um, N_rpm, W_kN, eta_mPas){
-  const R = D_mm / 2 / 1000; // m
-  const L = L_mm / 1000; // m
-  const C = C_um / 1e6; // m
-  const W = W_kN * 1000; // N
-  const mu = eta_mPas / 1000; // Pa·s
-  const N_rps = N_rpm / 60; // rev/s
-  const P_bearing = W / (L * D_mm / 1000); // N/m^2
+}
+function computeBearing(D_mm, L_mm, C_um, N_rpm, W_kN, eta_mPas){
+  const R = D_mm / 2 / 1000;
+  const L = L_mm / 1000;
+  const C = C_um / 1e6;
+  const W = W_kN * 1000;
+  const mu = eta_mPas / 1000;
+  const N_rps = N_rpm / 60;
+  const P_bearing = W / (L * D_mm / 1000);
   const S = mu * N_rps / P_bearing * Math.pow(R / C, 2);
   const rb = rbFromS(S);
-  const h_min = C * rb.h_ratio * 1e6; // μm
+  const h_min = C * rb.h_ratio * 1e6;
   const f = rb.fRC * C / R;
-  const v_surface = 2 * Math.PI * R * N_rps; // m/s
-  const P_loss = f * W * v_surface; // W
-  return { S, h_min, f, P_loss, eps: rb.eps };
-}const N_PTS = 60;
+  const v_surface = 2 * Math.PI * R * N_rps;
+  const P_loss = f * W * v_surface;
+  // Attitude angle phi (Ocvirk/short-bearing): tan(phi)=pi*sqrt(1-eps^2)/(4*eps)
+  const e = rb.eps;
+  const phi = Math.atan2(Math.PI * Math.sqrt(Math.max(1e-6, 1 - e*e)), 4 * e);
+  // Peak film pressure: p_peak = K * P_bearing, K rises strongly with eccentricity
+  const p_peak = P_bearing * (1 + 2.2 * e / Math.max(0.05, 1 - e*e));
+  return { S, h_min, f, P_loss, eps: rb.eps, P_bearing, phi, p_peak };
+}
+const N_PTS = 60;
 
 const rbChart = new Chart(document.getElementById('rbChart').getContext('2d'),{
   type: 'line',
@@ -330,6 +357,7 @@ const powerChart = new Chart(document.getElementById('powerChart').getContext('2
   }
 });
 
+let LAST = null;
 function compute(){
   const D = parseFloat(document.getElementById('diameter').value);
   const L = parseFloat(document.getElementById('length').value);
@@ -339,55 +367,206 @@ function compute(){
   const eta = parseFloat(document.getElementById('viscosity').value);
 
   const result = computeBearing(D, L, C, N, W, eta);
+  LAST = { D, L, C, N, W, eta, r: result };
 
-  // 図1： h_min/C vs S curve
   const sLabels = [], hRatioData = [];
   for (let i = 0; i <= N_PTS; i++) {
     const S_val = Math.exp(Math.log(0.001) + i * (Math.log(100) - Math.log(0.001)) / N_PTS);
     sLabels.push(parseFloat(S_val.toFixed(4)));
     hRatioData.push(parseFloat(rbFromS(S_val).h_ratio.toFixed(4)));
-  }// Operating point
+  }
   const opHratio = rbFromS(result.S).h_ratio;
-
   rbChart.data.labels = sLabels;
   rbChart.data.datasets[0].data = hRatioData;
-  rbChart.data.datasets[1].data = sLabels.map((s, i) =>{
+  rbChart.data.datasets[1].data = sLabels.map((s) =>{
     const diff = Math.abs(Math.log(s) - Math.log(result.S));
     return diff < (Math.log(100) - Math.log(0.001)) / N_PTS * 0.6 ? opHratio : null;
   });
   rbChart.update('none');
 
-  // 図2： Power loss vs rpm
   const nLabels = [], plossData = [];
-  const currentNLabel = N.toFixed(0);
   for (let i = 0; i <= N_PTS; i++){
     const N_val = 500 + i * (5000 - 500) / N_PTS;
     const res = computeBearing(D, L, C, N_val, W, eta);
     nLabels.push(N_val.toFixed(0));
     plossData.push(parseFloat(res.P_loss.toFixed(2)));
-  }powerChart.data.labels = nLabels;
+  }
+  powerChart.data.labels = nLabels;
   powerChart.data.datasets[0].data = plossData;
-  powerChart.data.datasets[1].data = nLabels.map((n, i) =>{
+  powerChart.data.datasets[1].data = nLabels.map((n) =>{
     const diff = Math.abs(parseFloat(n) - N);
     return diff < (5000-500)/N_PTS * 0.7 ? result.P_loss : null;
   });
   powerChart.update('none');
 
-  // Stat cards
   document.getElementById('statS').textContent = result.S.toFixed(4);
   document.getElementById('statHmin').textContent = result.h_min.toFixed(2);
+  document.getElementById('statPpeak').textContent = (result.p_peak/1e6).toFixed(2);
   document.getElementById('statF').textContent = result.f.toExponential(3);
+  document.getElementById('statEps').textContent = result.eps.toFixed(3);
   document.getElementById('statPloss').textContent = result.P_loss.toFixed(1);
 
-  // Status: assume Ra_sum = 1μm, h_min > 3μm is OK
-  const Ra_sum = 1.0; // μm typical
+  const Ra_sum = 1.0;
   const ok = result.h_min >= 3 * Ra_sum;
   const badge = document.getElementById('statusBadge');
   const txt = document.getElementById('statusText');
   badge.className = 'status-badge ' + (ok ? 'ok' : 'warn');
   badge.querySelector('i').className = ok ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle';
   txt.textContent = ok ? `OK — 流体潤滑 (h_min=${result.h_min.toFixed(1)}μm)` : `WARNING — 混合潤滑の恐れ (h_min=${result.h_min.toFixed(1)}μm)`;
-}compute();
+}
+
+/* ===== V2 hero: eccentric journal + hydrodynamic pressure lobe ===== */
+const cv = document.getElementById('bearingCanvas');
+const cx = cv.getContext('2d');
+const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let cw=0, ch=0;
+function resizeHero(){
+  const rect = cv.parentElement.getBoundingClientRect();
+  cw = Math.max(280, Math.floor(rect.width));
+  ch = 380;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+  cv.width = Math.round(cw*dpr); cv.height = Math.round(ch*dpr);
+  cx.setTransform(dpr,0,0,dpr,0,0);
+}
+let spin = 0;
+function drawHero(){
+  if (!LAST){ return; }
+  resizeHero();
+  const W = cw, H = ch;
+  cx.clearRect(0,0,W,H);
+  cx.fillStyle = '#0a1628'; cx.fillRect(0,0,W,H);
+
+  const eps = LAST.r.eps;
+  const phi = LAST.r.phi;           // attitude angle (from load line to line of centres)
+  const Cval = LAST.C;              // clearance in um
+  const cxC = W*0.50, cyC = H*0.52; // bore centre
+  const Rb = Math.min(W,H)*0.34;    // bore radius on screen (px)
+  // Exaggerate clearance visually so the wedge is visible
+  const clrPx = Rb * 0.20;          // on-screen clearance ring
+  const Rj = Rb - clrPx;            // journal radius (px)
+  // Load acts downward (+y screen). Line of centres is offset by attitude angle from load.
+  // Journal centre displaced opposite to where film is thinnest. Thin film at bottom-ish, shifted by phi.
+  const lineAng = Math.PI/2 - phi;  // direction of journal-centre displacement (screen angle, 0=right, +down)
+  const ecc = clrPx * eps;
+  const jx = cxC + ecc*Math.cos(lineAng);
+  const jy = cyC + ecc*Math.sin(lineAng);
+
+  // Bore (bearing shell)
+  cx.lineWidth = 10; cx.strokeStyle = '#27496d';
+  cx.beginPath(); cx.arc(cxC, cyC, Rb, 0, Math.PI*2); cx.stroke();
+
+  // Oil film gap (filled ring between bore and journal) — colour by local thickness
+  const NSEG = 120;
+  // h(theta) = C (1 + eps*cos(theta - thetaH0)); h_min at theta = lineAng (line of centres, toward thin side)
+  // pressure lobe rises in the converging wedge (just upstream of h_min, in rotation direction)
+  // rotation: journal surface moves; drag pulls oil from wide gap into the converging wedge.
+  for (let i=0;i<NSEG;i++){
+    const a0 = i/NSEG*Math.PI*2, a1=(i+1)/NSEG*Math.PI*2;
+    const am = (a0+a1)/2;
+    // local film thickness fraction (1=widest, near 1-eps... =thinnest at lineAng)
+    const hf = 1 + eps*Math.cos(am - lineAng - Math.PI); // thinnest toward lineAng
+    const t = (hf)/(2); // 0..1
+    const col = `hsl(${200 - 120*(1-t)}, 80%, ${30+25*t}%)`;
+    cx.beginPath();
+    cx.arc(cxC,cyC,Rb-5,a0,a1);
+    cx.arc(jx,jy,Rj,a1,a0,true);
+    cx.closePath();
+    cx.fillStyle = col; cx.fill();
+  }
+
+  // Journal (rotating shaft)
+  const grd = cx.createRadialGradient(jx-Rj*0.3, jy-Rj*0.3, Rj*0.2, jx, jy, Rj);
+  grd.addColorStop(0,'#cfe8ff'); grd.addColorStop(1,'#5b7fa6');
+  cx.beginPath(); cx.arc(jx,jy,Rj,0,Math.PI*2); cx.fillStyle=grd; cx.fill();
+  cx.lineWidth=2; cx.strokeStyle='#13294b'; cx.stroke();
+  // rotation marks on journal
+  cx.save(); cx.translate(jx,jy); cx.rotate(spin);
+  for (let k=0;k<8;k++){
+    cx.rotate(Math.PI/4);
+    cx.beginPath(); cx.moveTo(0,Rj*0.55); cx.lineTo(0,Rj*0.92);
+    cx.strokeStyle='rgba(19,41,75,0.6)'; cx.lineWidth=2; cx.stroke();
+  }
+  cx.restore();
+  // hub
+  cx.beginPath(); cx.arc(jx,jy,Rj*0.13,0,Math.PI*2); cx.fillStyle='#13294b'; cx.fill();
+
+  // Rotation direction arrow
+  cx.strokeStyle='rgba(255,255,255,0.8)'; cx.lineWidth=2.2;
+  cx.beginPath(); cx.arc(jx,jy,Rj*1.18,-0.5,0.9); cx.stroke();
+  const ea=0.9, ax=jx+Rj*1.18*Math.cos(ea), ay=jy+Rj*1.18*Math.sin(ea);
+  cx.beginPath(); cx.moveTo(ax,ay);
+  cx.lineTo(ax-8*Math.cos(ea-0.5), ay-8*Math.sin(ea-0.5));
+  cx.lineTo(ax-8*Math.cos(ea+0.9), ay-8*Math.sin(ea+0.9));
+  cx.closePath(); cx.fillStyle='rgba(255,255,255,0.8)'; cx.fill();
+
+  // Pressure lobe: vectors pointing inward toward journal, peaking in converging wedge.
+  // Converging wedge is upstream of h_min in rotation direction (rotation CCW on screen here => upstream = lineAng + small)
+  const thMin = lineAng;          // screen angle of minimum film (line of centres)
+  const lobeCenter = thMin - 0.5; // peak just before the minimum (converging side)
+  cx.strokeStyle='#ff6b6b';
+  for (let i=0;i<26;i++){
+    const a = thMin - 1.7 + i*(3.0/26);
+    // pressure profile: positive lobe peaking at lobeCenter, ~zero elsewhere
+    let p = Math.cos((a-lobeCenter)*1.05);
+    p = Math.max(0,p); p = Math.pow(p, 1.6) * (0.4 + 1.6*eps);
+    if (p<0.02) continue;
+    const rOut = Rb-6;
+    const ox = cxC + rOut*Math.cos(a), oy = cyC + rOut*Math.sin(a);
+    const len = p*clrPx*4.0;
+    const ix = ox - len*Math.cos(a), iy = oy - len*Math.sin(a);
+    cx.lineWidth = 2.4; cx.beginPath(); cx.moveTo(ox,oy); cx.lineTo(ix,iy); cx.stroke();
+    // arrowhead pointing inward
+    cx.beginPath(); cx.moveTo(ix,iy);
+    cx.lineTo(ix+6*Math.cos(a-0.4), iy+6*Math.sin(a-0.4));
+    cx.lineTo(ix+6*Math.cos(a+0.4), iy+6*Math.sin(a+0.4));
+    cx.closePath(); cx.fillStyle='#ff6b6b'; cx.fill();
+  }
+
+  // Load arrow (downward, supported by film)
+  drawArrowHero(cxC, cyC-Rb-34, cxC, cyC-Rb-6, '#ffd166', 3.2);
+  cx.fillStyle='#ffd166'; cx.font='bold 12px Noto Sans JP'; cx.textAlign='center';
+  cx.fillText('荷重 W = '+LAST.W.toFixed(1)+' kN', cxC, cyC-Rb-40);
+
+  // h_min marker at the minimum film point
+  const hmx = cxC + (Rb-clrPx*0.5)*Math.cos(thMin), hmy = cyC + (Rb-clrPx*0.5)*Math.sin(thMin);
+  cx.fillStyle='#00e0a0'; cx.beginPath(); cx.arc(hmx,hmy,4,0,Math.PI*2); cx.fill();
+  annotHero('h_min = '+LAST.r.h_min.toFixed(1)+' μm', hmx, hmy+22, '#00e0a0');
+
+  // labels
+  cx.fillStyle='rgba(255,255,255,0.85)'; cx.font='bold 12px Noto Sans JP'; cx.textAlign='left';
+  cx.fillText('くさび域で油膜圧力 → 荷重を支持', 12, 22);
+  cx.fillStyle='rgba(255,107,107,0.95)'; cx.font='11px Noto Sans JP';
+  cx.fillText('● 油膜圧力 p_max = '+(LAST.r.p_peak/1e6).toFixed(2)+' MPa', 12, 40);
+  cx.fillStyle='rgba(255,255,255,0.6)'; cx.fillText('偏心率 ε = '+eps.toFixed(3)+' / S = '+LAST.r.S.toFixed(3), 12, H-12);
+}
+function drawArrowHero(x0,y0,x1,y1,color,w){
+  cx.strokeStyle=color; cx.lineWidth=w; cx.fillStyle=color;
+  cx.beginPath(); cx.moveTo(x0,y0); cx.lineTo(x1,y1); cx.stroke();
+  const ang=Math.atan2(y1-y0,x1-x0), h=7+w;
+  cx.beginPath(); cx.moveTo(x1,y1);
+  cx.lineTo(x1-h*Math.cos(ang-0.4), y1-h*Math.sin(ang-0.4));
+  cx.lineTo(x1-h*Math.cos(ang+0.4), y1-h*Math.sin(ang+0.4));
+  cx.closePath(); cx.fill();
+}
+function annotHero(text,x,y,color){
+  cx.font='bold 11px Noto Sans JP';
+  const w=cx.measureText(text).width, pad=5;
+  cx.fillStyle='rgba(10,22,40,0.85)';
+  cx.beginPath();
+  (cx.roundRect?cx.roundRect(x-w/2-pad,y-13,w+pad*2,16,4):cx.rect(x-w/2-pad,y-13,w+pad*2,16));
+  cx.fill(); cx.strokeStyle=color; cx.lineWidth=1; cx.stroke();
+  cx.fillStyle=color; cx.textAlign='center'; cx.fillText(text,x,y-1); cx.textAlign='left';
+}
+function loop(){
+  if (LAST){ const rpm=LAST.N; spin += (rpm/60)*0.10; drawHero(); }
+  requestAnimationFrame(loop);
+}
+
+compute();
+if (reduced){ drawHero(); } else { requestAnimationFrame(loop); }
+window.addEventListener('resize', ()=>{ if(reduced) drawHero(); });
+})();
 </script>
 
 <section class="explanation">
@@ -420,11 +599,11 @@ function compute(){
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">入力する動粘度μの単位は何ですか？また、温度による粘度変化は考慮されますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">動粘度μの単位はPa·s（ポアズイユ）です。本ツールはリアルタイム計算を行いますが、温度による粘度変化は自動補正しません。運転温度に応じた粘度値を手動で入力してください。高温時は粘度低下に注意が必要です。</div>
+    <div class="faq-a">入力する粘度ηは動粘度ではなく「粘度（dynamic viscosity）」で、単位はmPa·s（=cP、計算内部でPa·sに換算）です。本ツールはリアルタイム計算を行いますが、温度による粘度変化は自動補正しません。運転温度に応じた粘度値を手動で入力してください。高温時は粘度低下に注意が必要です。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">最小油膜厚さh_minの許容値はどのように決めればよいですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">一般的な目安として、h_minは軸表面粗さの合計（Ra+Ra）の3倍以上、または軸径の0.001〜0.005倍を推奨します。例えば軸径50mmなら50〜250μmが目安です。金属接触を避けるため、必ず表面粗さと加工公差を考慮してください。</div>
+    <div class="faq-a">一般的な目安として、h_minは軸表面粗さの合計（Ra+Ra）の3倍以上を確保します。h_minはクリアランスCを超えられない（h_min = C·(1−ε)）ため、まずクリアランスを適切に選び、その上でε（離心率）が大きくなりすぎない設計点を狙います。金属接触を避けるため、必ず表面粗さと加工公差を考慮してください。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">摩擦損失の計算結果が大きすぎる場合、どのパラメータを変更すべきですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -448,6 +627,9 @@ function compute(){
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="hydrodynamic-bearing.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -496,24 +678,34 @@ function compute(){
 <h3>使い方ガイド</h3>
 <ol>
 <li>軸径(mm)、軸受長(mm)、すきま(μm)、回転速度(rpm)を入力欄に設定する</li>
-<li>「計算実行」ボタンをクリックすると、ゾンマーフェルト数S、最小油膜厚さh_min、摩擦係数f、摩擦損失P_lossが即座に算出される</li>
+<li>値を入力・変更すると、ゾンマーフェルト数S、最小油膜厚さh_min、摩擦係数f、摩擦損失P_lossが即座に算出される</li>
 <li>出力値がRaimondi-Boyd近似による安定領域(通常S>0.4)に収まっているか確認し、軸受設計の可否を判定する</li>
 <li>必要に応じて回転速度やすきまを調整し、最小油膜厚さが加工粗さの3倍以上になるまで反復最適化する</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>軸径30mm、軸受長40mm、すきま20μm、回転速度3000rpmの油圧モータ軸受を設計する場合：ISO VG32鉱油(μ=32cSt@40°C≈0.032Pa·s)を使用すると、ゾンマーフェルト数S≈0.62、最小油膜厚さh_min≈3.8μm、摩擦係数f≈0.008、摩擦損失P_loss≈85Wと計算される。軸受長を50mmに増加させるとh_minは4.2μmに改善され、軸受寿命が延長される。</p>
+<p>軸径80mm、軸受長80mm、すきま50μm、回転速度1500rpm、荷重5kNの軸受に ISO VG32 鉱油(μ≈32mPa·s)を用いる場合（本ツールの既定値）：ゾンマーフェルト数S≈0.655、最小油膜厚さh_min≈16.1μm、摩擦係数f≈0.0036、摩擦損失P_loss≈114Wと計算される。荷重を大きくするとh_minは薄くなり、表面粗さの3倍を下回ると混合潤滑域に入る。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
 <ol>
-<li>起動時の低速回転(n<500rpm)ではすきまが相対的に大きくなり、H_minが負値になる混合潤滑領域に入るため、事前潤滑と徐々の加速が必須である</li>
+<li>起動時の低速回転(n<500rpm)ではゾンマーフェルト数Sが下がり、h_minが表面粗さに近づく混合潤滑領域に入るため、事前潤滑と徐々の加速が必須である</li>
 <li>鉱油の粘度指数が低い場合、温度上昇時(50℃→80℃)に粘度が40%低下するため、季節変動や連続運転環境では高粘度グレード(ISO VG46)への変更を検討する</li>
 <li>超高速運転(n>5000rpm)では遠心力による油膜厚さ低下が顕著になり、合成油PAO系への切り替えで粘度温度特性を改善することが有効である</li>
 <li>すきま公差が±5μm以上の粗い加工では、数値ばらつきにより一部で混合潤滑が発生する可能性があるため、軸受座の幾何学的精度管理(IT7以上)が重要である</li>
 </ol>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4873117984?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4873117984.09._SCMZZZZZZ_.jpg" alt="機械学習の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">機械学習 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

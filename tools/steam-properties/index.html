@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "蒸気特性計算機",
       "description": "水蒸気の熱力学特性をリアルタイム計算。モリエ線図（h-s図）上で飽和・過熱・湿り蒸気の状態点を可視化。蒸気タービン・ボイラー設計に活用。",
       "url": "https://novasolver.jp/tools/steam-properties.html",
@@ -49,7 +49,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["モリエ線図（h-s図）可視化","飽和・過熱・湿り蒸気の自動判定","Antoine式・Clausius-Clapeyron式による飽和特性","P-v線図・T-s線図の切り替え表示"],
       "keywords": "水蒸気特性,モリエ線図,水蒸気表,飽和蒸気,過熱蒸気,エンタルピー,エントロピー,蒸気タービン",
       "datePublished": "2026-04-08",
@@ -172,7 +172,15 @@ header{background:var(--navy);color:#fff;padding:0 24px;}
 
     <div class="section-title">熱力学特性</div>
 <div class="section-title" style="margin-top:16px;">飽和曲線（Antoine式）</div>
-    
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -187,7 +195,7 @@ header{background:var(--navy);color:#fff;padding:0 24px;}
       <div class="stat-card"><div class="stat-val" id="stat-sf">2.447</div><div class="stat-label">sf (kJ/kg·K)</div></div>
       <div class="stat-card"><div class="stat-val" id="stat-sfg">3.888</div><div class="stat-label">sfg (kJ/kg·K)</div></div>
       <div class="stat-card"><div class="stat-val" id="stat-Psat">—</div><div class="stat-label">Psat (MPa)</div></div>
-      <div class="stat-card"><div class="stat-val" id="stat-dPdT">—</div><div class="stat-label">dP/dT (MPa/K)</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-dPdT">—</div><div class="stat-label">dP/dT (kPa/K)</div></div>
     </div>
     </div>
 
@@ -202,6 +210,14 @@ header{background:var(--navy);color:#fff;padding:0 24px;}
 
 <div class="chart-card">
       <div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
+  <div class="fblock">
+    <p>飽和蒸気圧（Wagner型相関式）：</p>
+    $$ \ln\frac{P_{sat}}{P_c} = \frac{a_1\tau + a_2\tau^{1.5} + a_3\tau^{3} + a_4\tau^{3.5} + a_5\tau^{4} + a_6\tau^{7.5}}{1-\tau},\quad \tau = 1-\frac{T}{T_c} $$
+    <p>湿り蒸気の比エンタルピー・比エントロピー：</p>
+    $$ h = h_f + x\,h_{fg},\qquad s = s_f + x\,\frac{h_{fg}}{T_{sat}} $$
+    <p>過熱蒸気（簡易近似）：</p>
+    $$ h \approx h_g(T_{sat}) + c_p\,(T - T_{sat}) $$
+  </div>
 </div>
 
 <script>
@@ -246,11 +262,10 @@ function satProps(T_C){
   const hfg_base = 2501 - 2.369 * T - 0.00267 * T * T;
   const hfg = Math.max(0, hfg_base);
   const hg = hf + hfg;
-  // sf (kJ/kg·K)
-  const sf = -0.00015 + 0.01518 * T - 4.5e-5 * T * T + 8e-8 * T * T * T;
-  // sg (kJ/kg·K)
-  const sfg_base = 9.1562 - 0.02956 * T + 5.4e-5 * T * T - 6.5e-8 * T * T * T;
-  const sfg = Math.max(0, sfg_base);
+  // sf (kJ/kg·K): sf = cp_w * ln(T/T0)
+  const sf = 4.187 * Math.log((T + 273.15) / 273.15);
+  // sfg (kJ/kg·K): sfg = hfg / Tsat
+  const sfg = hfg / (T + 273.15);
   const sg = sf + sfg;
   // vf (m³/kg)
   const vf = 0.001 + 1.1e-7 * T + 2.5e-9 * T * T + 1.1e-11 * T * T * T;
@@ -280,20 +295,20 @@ function superheatProps(T_C, P_bar){
 
   let h, s, v, x, phase;
 
-  if (P_bar < Psat && T_C <= 373) {
-    // Superheated
+  if (T_C < Tsat - 0.5) {
+    // Compressed (subcooled) liquid: T below saturation temperature at P
+    h = sp_T.hf + (P_bar - Psat) * sp_T.vf * 100; // pressure correction
+    s = sp_T.sf;
+    v = sp_T.vf;
+    x = null; phase = 'subcooled';
+  }else if (T_C > Tsat + 0.5){
+    // Superheated vapor: T above saturation temperature at P
     const sup = superheatProps(T_C, P_bar);
     if (sup) {
       h = sup.h; s = sup.s; v = sup.v; x = null; phase = 'superheated';
     }else{
       h = sp_T.hg; s = sp_T.sg; v = sp_T.vg; x = 1; phase = 'saturated-vapor';
     }
-  }else if (P_bar > Psat && T_C < 100){
-    // Subcooled liquid
-    h = sp_T.hf + (P_bar - Psat) * sp_T.vf * 100; // pressure correction
-    s = sp_T.sf;
-    v = sp_T.vf;
-    x = null; phase = 'subcooled';
   }else{
     // Two-phase (wet steam) or saturation
     x = Math.max(0, Math.min(1, x_input));
@@ -307,8 +322,8 @@ function superheatProps(T_C, P_bar){
   const P = +document.getElementById('sl-P').value;
   const x_in = +document.getElementById('sl-x').value;
 
-  document.getElementById('lbl-T').value = T + ' °C';
-  document.getElementById('lbl-P').value = P.toFixed(2) + ' bar';
+  document.getElementById('lbl-T').value = T;
+  document.getElementById('lbl-P').value = P.toFixed(2);
 
   const props = getProperties(T, P, x_in);
   const Psat = Psat_bar(T);
@@ -316,7 +331,7 @@ function superheatProps(T_C, P_bar){
 
   // dP/dT via Clausius-Clapeyron: dP/dT = hfg / (T * (vg - vf))
   const Tk = T + 273.15;
-  const dPdT = (sp.hfg * 1000) / (Tk * (sp.vg - sp.vf) * 1e5) * 1e5 / 1000; // bar/K
+  const dPdT = (sp.hfg * 1000) / (Tk * (sp.vg - sp.vf) * 1e5) * 1e5 / 1000; // kPa/K
 
   document.getElementById('lbl-x').textContent = props.x !== null ? props.x.toFixed(2) : '—';
   document.getElementById('stat-h').textContent = props.h.toFixed(1);
@@ -497,7 +512,7 @@ function superheatProps(T_C, P_bar){
           backgroundColor: 'rgba(0,123,255,0.1)',
           fill: true, tension: 0.4, pointRadius: 0,showLine:true, yAxisID: 'y1'
         },{
-          label: 'dP/dT (bar/K)',
+          label: 'dP/dT (kPa/K)',
           data: dPdTvals,
           borderColor: '#e05',
           tension: 0.4, pointRadius: 0,showLine:true, yAxisID: 'y2'
@@ -512,7 +527,7 @@ function superheatProps(T_C, P_bar){
         scales: {
           x: { title: { display: true, text: '温度 T (°C)' } },
           y1:{ title: { display: true, text: 'Psat (bar)' }, min: 0, position: 'left' },
-          y2:{ title: { display: true, text: 'dP/dT (bar/K)' }, min: 0, position: 'right', grid:{ drawOnChartArea: false } }
+          y2:{ title: { display: true, text: 'dP/dT (kPa/K)' }, min: 0, position: 'right', grid:{ drawOnChartArea: false } }
         },
         plugins:{ legend: { position: 'top' } }
       }
@@ -574,7 +589,7 @@ update();
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">計算結果の精度はどの程度ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">本ツールはIAPWS-IF97（国際蒸気特性標準）に準拠した簡易計算エンジンを使用しており、一般的な熱力学計算（0～350℃、0.01～100 bar）で誤差0.5%以内の精度を提供します。ただし、臨界点近傍や極低温域では誤差が大きくなる場合があるため、高精度な設計用途には専用ソフトウェアをご利用ください。</div>
+    <div class="faq-a">本ツールは蒸気表にフィッティングした教育用の簡易相関式を使用しており、計算結果の誤差は概ね数%以内です（条件によりさらに大きくなる場合があります）。ただし、臨界点近傍や極低温域では誤差が大きくなる場合があるため、高精度な設計用途には専用ソフトウェアをご利用ください。</div>
   </div>
 </div>
 <h2>実世界での応用</h2>
@@ -594,6 +609,9 @@ update();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="steam-properties.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -648,16 +666,22 @@ update();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>圧力スライダー（sl-P）を0.1～10MPaの範囲で調整し、蒸気の作動圧力を設定する</li>
+<li>圧力スライダー（sl-P）を0.001～22MPa（0.01～220 bar）の範囲で調整し、蒸気の作動圧力を設定する</li>
 <li>温度スライダー（sl-T）を飽和温度以上に設定して過熱度を入力、または飽和状態で固定する</li>
 <li>湿り蒸気の場合は乾き度スライダー（sl-x）を0～1.0の範囲で調整し、液相混在率を指定する</li>
-<li>リアルタイム計算により比エンタルピーh、比エントロピーs、比容積vがJIS Z 8806に準拠した水蒸気表から自動算出される</li>
+<li>リアルタイム計算により比エンタルピーh、比エントロピーs、比容積vが蒸気表にフィッティングした教育用の簡易相関式から自動算出される</li>
 <li>モリエ線図上に現在の状態点がプロット表示され、熱力学サイクルの可視化が可能</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>火力発電所タービン入口：圧力P=8.5MPa、温度T=500℃の過熱蒸気ではh≈3398kJ/kg、s≈6.724kJ/(kg·K)、v≈0.0409m³/kgとなります。一方、圧力P=0.5MPa、乾き度x=0.85の湿り蒸気（凝縮水混在）ではh≈2307kJ/kg、s≈6.584kJ/(kg·K)、v≈0.358m³/kgと算出され、蒸気タービンの効率低下が可視化されます。</p>
+<p>火力発電所タービン入口：圧力P=8.5MPa、温度T=400℃の過熱蒸気ではh≈3164kJ/kg、s≈6.22kJ/(kg·K)、v≈0.0365m³/kgとなります（本ツールの簡易相関式による値）。一方、圧力P=0.5MPa、乾き度x=0.85の湿り蒸気（凝縮水混在）ではh≈2427kJ/kg、s≈6.01kJ/(kg·K)、v≈0.334m³/kgと算出され、蒸気タービンの効率低下が可視化されます。</p>
+</div>
+<div class="howto-card">
+<h3>準拠規格・前提条件</h3>
+<p><strong>準拠/参考：</strong> 飽和蒸気圧は IAPWS（IAPWS-95／IF97）の Wagner型飽和圧力相関（\(T_c=647.096\,\mathrm{K},\,P_c=22.064\,\mathrm{MPa}\)、規定の6係数）。湿り蒸気 \(h = h_f + x\,h_{fg},\; s = s_f + x\,s_{fg}\)。Clausius–Clapeyron \(dP/dT = h_{fg}/(T(v_g-v_f))\)。</p>
+<p><strong>モデルの前提：</strong> 飽和圧力曲線は IAPWS 準拠で高精度（100°C→1.014 bar、200°C→15.55 bar 等、誤差&lt;0.1%）。一方 \(h_f,h_{fg},s_f,v_f,v_g\) は蒸気表への低次多項式フィット（数%級の誤差、例：\(h_f\)(200°C)=883 vs 表852 kJ/kg）。過熱蒸気は理想気体＋簡易補正。</p>
+<p><strong>適用範囲・限界：</strong> 教育用の概略計算。臨界点近傍・極低温では誤差増大。表示の状態は外挿でも点が出るため、まずその圧力の飽和温度を確認すること。高精度設計には IAPWS-IF97 準拠ソフトを使用のこと。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -668,6 +692,16 @@ update();
 <li>冷凍サイクルやヒートポンプ設計ではR410A等の代替冷媒物性も同様計算可能、臨界点付近では精度確認が必須</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

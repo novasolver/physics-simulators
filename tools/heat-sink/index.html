@@ -40,14 +40,14 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "ヒートシンク熱抵抗シミュレーター",
       "description": "フィン効率・フィンアレイ・強制/自然対流の熱抵抗ネットワークをリアルタイム計算。ジャンクション温度・熱抵抗合計を即時算出。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/heat-sink.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": [
@@ -168,6 +168,25 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== Heat-sink hero animation ===== */
+#hsHero{width:100%;display:block;border-radius:8px;background:#0a1628}
+#hsHero:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.hs-readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+.hs-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.hs-ro .rv{font-family:'Roboto Mono',monospace;font-size:1.05rem;font-weight:700;color:#fff;line-height:1.1}
+.hs-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.62);margin-top:4px;letter-spacing:.02em}
+.hs-ro.hot .rv{color:#ff6b6b}
+.hs-ro.cool .rv{color:#74e0ff}
+.hs-ctrls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.hs-btn{padding:8px 14px;font-size:0.82rem}
+.hs-presets{display:flex;gap:6px;flex-wrap:wrap}
+.hs-speed{display:flex;gap:4px;margin-left:auto}
+.preset-btn.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+.hs-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);margin-top:10px}
+.hs-legend span{display:inline-flex;align-items:center;gap:5px}
+.hs-legend .hs-sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+@media(max-width:600px){.hs-readouts{grid-template-columns:repeat(3,1fr)}.hs-speed{margin-left:0}}
+@media(prefers-reduced-motion:reduce){.preset-btn,.hs-btn{transition:none}}
 </style>
 </head>
 <body>
@@ -290,8 +309,42 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="rcsSlider" min="0.0" max="2.0" step="0.05" value="0.2" oninput="syncToNum('rcsSlider','rcsValNum');updateSlider(this);compute()">
     </div>
-</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-fan"></i> ヒートシンク冷却ライブ・アニメーション</div>
+      <div class="hs-readouts" id="hsReadouts"></div>
+      <canvas id="hsHero" height="360" tabindex="0" role="img" aria-label="フィン付きヒートシンクの温度分布と空気対流のアニメーション。ベースが赤く高温、フィン先端が青く低温。フィン間を空気が流れて熱を運び去る様子を表示します。"></canvas>
+      <div class="hs-ctrls">
+        <button class="btn hs-btn" type="button" id="hsPlay"><i class="fas fa-pause"></i> 一時停止</button>
+        <button class="btn secondary hs-btn" type="button" id="hsReset"><i class="fas fa-redo"></i> リセット</button>
+        <div class="hs-presets">
+          <button class="preset-btn" type="button" data-hp="passive">CPU受動</button>
+          <button class="preset-btn" type="button" data-hp="fan">CPU＋ファン</button>
+          <button class="preset-btn" type="button" data-hp="high">高発熱</button>
+          <button class="preset-btn" type="button" data-hp="natural">自然対流</button>
+        </div>
+        <div class="hs-speed">
+          <button class="preset-btn hs-spd" type="button" data-spd="0.5">0.5×</button>
+          <button class="preset-btn hs-spd active" type="button" data-spd="1">1×</button>
+          <button class="preset-btn hs-spd" type="button" data-spd="2">2×</button>
+        </div>
+      </div>
+      <div class="hs-legend">
+        <span><i class="hs-sw" style="background:#d63031"></i>高温（ベース）</span>
+        <span><i class="hs-sw" style="background:#fdcb6e"></i>中温</span>
+        <span><i class="hs-sw" style="background:#4aa3ff"></i>低温（先端）</span>
+        <span><i class="hs-sw" style="background:#74e0ff"></i>空気の流れ</span>
+      </div>
+    </div>
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
       <div class="stat-card">
@@ -403,6 +456,9 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="heat-sink.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -445,6 +501,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   </div>
 </section>
 <!-- codex-static-related-tools:end -->
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4320036395?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4320036395.09._SCMZZZZZZ_.jpg" alt="熱力学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">熱力学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
@@ -561,6 +627,207 @@ function onConvChange(){
   el.style.setProperty('--pct', pct + '%');
 });
 compute();
+</script>
+
+<script>
+/* ===== Heat-sink cooling hero animation (self-contained IIFE) ===== */
+(function(){
+  "use strict";
+  const cv = document.getElementById('hsHero');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const matK = { '6061':167, '1050':229, 'copper':400, 'brass':109 };
+  const L = {
+    tj:'T_j 接合部', ts:'T_base ベース', tip:'T_tip 先端', rsa:'θ_s-a', h:'h 対流',
+    base:'ベース（高温）', chip:'チップ', air:'空気', forced:'強制対流', natural:'自然対流',
+    cooler:'低R_sa＝冷却', play:'<i class="fas fa-play"></i> 再生', pause:'<i class="fas fa-pause"></i> 一時停止'
+  };
+  function el(id){ return document.getElementById(id); }
+  function num(id){ const e=el(id); return e?parseFloat(e.value):0; }
+
+  // independent thermal solve mirroring the calculator
+  function solve(){
+    const k = matK[(el('matSel')||{}).value] || 167;
+    const Q = num('qSlider'), Ta = num('taSlider');
+    const Hf = num('hfSlider')/1000, N = Math.round(num('nfSlider'));
+    const tf = num('tfSlider')/1000, W = num('wbSlider')/1000, hc = num('hcSlider');
+    const Rjc = num('rjcSlider'), Rcs = num('rcsSlider');
+    const m = Math.sqrt(hc*2*(tf+W)/(k*tf*W));
+    const mH = m*Hf;
+    const eta_fin = mH>0.001 ? Math.tanh(mH)/mH : 1.0;
+    const A_fin_one = 2*Hf*W;
+    const S = (W - N*tf)/(N-1+1e-9);
+    const A_bu = (N-1)*S*W;
+    const A_total = N*A_fin_one + A_bu;
+    const eta_o = 1 - (N*A_fin_one/A_total)*(1-eta_fin);
+    const R_sa = 1/(eta_o*hc*A_total);
+    const R_total = Rjc + Rcs + R_sa;
+    const Tj = Ta + Q*R_total;
+    const Tbase = Ta + Q*R_sa;          // heat-sink base temp above ambient via R_sa
+    const Ttip = Ta + (Tbase-Ta)*eta_fin; // tip cooler by fin efficiency
+    const forced = (el('convSel')||{}).value !== 'natural';
+    return { Q, Ta, N:Math.max(2,N), hc, Tj, Tbase, Ttip, R_sa, eta_fin, mH, forced };
+  }
+
+  // temperature -> color (blue cool -> yellow -> red hot)
+  function tcolor(t, lo, hi){
+    let f = (t-lo)/((hi-lo)||1); f = Math.max(0, Math.min(1, f));
+    let r,g,b;
+    if (f<0.5){ const u=f/0.5; r=Math.round(74+ (253-74)*u); g=Math.round(163+(203-163)*u); b=Math.round(255+(110-255)*u); }
+    else { const u=(f-0.5)/0.5; r=Math.round(253+(214-253)*u); g=Math.round(203+(48-203)*u); b=Math.round(110+(49-110)*u); }
+    return 'rgb('+r+','+g+','+b+')';
+  }
+
+  let particles = [];
+  function initParticles(n){
+    particles = [];
+    for (let i=0;i<n;i++) particles.push({ lane:Math.random(), y:Math.random(), v:0 });
+  }
+  initParticles(90);
+
+  let cssW=0, cssH=360;
+  function resize(){
+    const rect = cv.parentElement.getBoundingClientRect();
+    cssW = Math.max(280, Math.floor(rect.width - 28));
+    cssH = 360;
+    const dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    cv.style.width = cssW+'px'; cv.style.height = cssH+'px';
+    cv.width = Math.round(cssW*dpr); cv.height = Math.round(cssH*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function draw(st){
+    resize();
+    const W = cssW, H = cssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+    const N = st.N;
+    const marginX = 36, baseY = H-70, baseH = 26;
+    const finTop = 50, finBottom = baseY;
+    const finH = finBottom - finTop;
+    const usableW = W - marginX*2;
+    const slot = usableW / N;
+    const finW = Math.max(3, Math.min(slot*0.55, 26));
+    const gap = slot - finW;
+    const lo = Math.min(st.Ttip, st.Ta), hi = Math.max(st.Tbase, st.Tj);
+
+    // air particles flowing up between fins (convection)
+    const spd = (st.forced ? 1.0 : 0.32) * (st.hc/60 + 0.4);
+    ctx.lineWidth = 2;
+    for (const p of particles){
+      const laneIdx = Math.floor(p.lane*N);
+      const cx = marginX + laneIdx*slot + finW + gap*0.5 + (Math.sin(p.y*7+laneIdx)*gap*0.12);
+      const py = finBottom - p.y*finH;
+      const alpha = 0.18 + 0.5*p.y;
+      ctx.strokeStyle = 'rgba(116,224,255,'+alpha.toFixed(2)+')';
+      ctx.beginPath(); ctx.moveTo(cx, py); ctx.lineTo(cx, py+8); ctx.stroke();
+    }
+
+    // fins with vertical temperature gradient (hot base -> cool tip)
+    for (let i=0;i<N;i++){
+      const fx = marginX + i*slot + gap*0.5;
+      const grad = ctx.createLinearGradient(0, finTop, 0, finBottom);
+      grad.addColorStop(0, tcolor(st.Ttip, lo, hi));
+      grad.addColorStop(1, tcolor(st.Tbase, lo, hi));
+      ctx.fillStyle = grad;
+      ctx.fillRect(fx, finTop, finW, finH);
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth=0.6; ctx.strokeRect(fx, finTop, finW, finH);
+    }
+
+    // hot base plate
+    ctx.fillStyle = tcolor(st.Tbase, lo, hi);
+    ctx.fillRect(marginX-4, baseY, usableW+8, baseH);
+    ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1; ctx.strokeRect(marginX-4, baseY, usableW+8, baseH);
+
+    // chip (component) under base
+    const chipW = Math.min(usableW*0.34, 140), chipX = W/2 - chipW/2, chipY = baseY+baseH, chipH = 24;
+    ctx.fillStyle = tcolor(st.Tj, lo, hi);
+    ctx.fillRect(chipX, chipY, chipW, chipH);
+    ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1; ctx.strokeRect(chipX, chipY, chipW, chipH);
+    ctx.fillStyle='#fff'; ctx.font='bold 12px Roboto Mono'; ctx.textAlign='center';
+    ctx.fillText(L.chip+'  T_j='+st.Tj.toFixed(0)+'℃', W/2, chipY+16);
+
+    // labels
+    ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='11px Noto Sans JP'; ctx.textAlign='left';
+    ctx.fillText(st.forced? ('↑ '+L.forced):('↑ '+L.natural), marginX, 22);
+    ctx.textAlign='right';
+    ctx.fillStyle='rgba(116,224,255,0.95)';
+    ctx.fillText(L.air+' ↑', W-marginX, 22);
+    ctx.textAlign='left';
+    ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='10px Roboto Mono';
+    ctx.fillText(L.tip+' '+st.Ttip.toFixed(0)+'℃', marginX, finTop-6);
+    ctx.fillText(L.base+' '+st.Tbase.toFixed(0)+'℃', marginX, baseY-6);
+  }
+
+  function readouts(st){
+    const r = el('hsReadouts'); if (!r) return;
+    r.innerHTML =
+      '<div class="hs-ro hot"><div class="rv">'+st.Tj.toFixed(1)+'</div><div class="rl">'+L.tj+' [℃]</div></div>'+
+      '<div class="hs-ro"><div class="rv">'+st.Tbase.toFixed(1)+'</div><div class="rl">'+L.ts+' [℃]</div></div>'+
+      '<div class="hs-ro cool"><div class="rv">'+st.Ttip.toFixed(1)+'</div><div class="rl">'+L.tip+' [℃]</div></div>'+
+      '<div class="hs-ro"><div class="rv">'+st.R_sa.toFixed(3)+'</div><div class="rl">'+L.rsa+' [K/W]</div></div>'+
+      '<div class="hs-ro"><div class="rv">'+st.hc.toFixed(0)+'</div><div class="rl">'+L.h+' [W/m²K]</div></div>';
+  }
+
+  let playing = true, animId = null, speed = 1, last = 0;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function frame(ts){
+    if (!playing){ animId=null; return; }
+    if (!last) last = ts;
+    const dt = Math.min(0.05, (ts-last)/1000); last = ts;
+    const st = solve();
+    const spd = (st.forced ? 1.0 : 0.34) * (st.hc/60 + 0.4) * speed;
+    for (const p of particles){
+      p.y += dt*spd*0.9;
+      if (p.y > 1){ p.y = 0; p.lane = Math.random(); }
+    }
+    draw(st); readouts(st);
+    animId = requestAnimationFrame(frame);
+  }
+
+  function start(){ if(reduce) return; playing=true; last=0; el('hsPlay').innerHTML=L.pause; if(!animId) animId=requestAnimationFrame(frame); }
+  function stop(){ playing=false; if(animId){cancelAnimationFrame(animId);animId=null;} el('hsPlay').innerHTML=L.play; }
+  function refresh(){ const st=solve(); draw(st); readouts(st); }
+
+  el('hsPlay').addEventListener('click', ()=> playing?stop():start());
+  el('hsReset').addEventListener('click', ()=>{ initParticles(90); refresh(); });
+  cv.addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); playing?stop():start(); } });
+
+  document.querySelectorAll('.hs-spd').forEach(b=>{
+    b.addEventListener('click', ()=>{ speed=parseFloat(b.dataset.spd); document.querySelectorAll('.hs-spd').forEach(x=>x.classList.remove('active')); b.classList.add('active'); });
+  });
+
+  // presets adjust the existing calculator sliders, then recompute both
+  const PRE = {
+    passive: { q:35, n:14, hf:35, conv:'natural', hc:9 },
+    fan:     { q:65, n:20, hf:30, conv:'forced',  hc:60 },
+    high:    { q:200, n:30, hf:50, conv:'forced', hc:120 },
+    natural: { q:25, n:8, hf:40, conv:'natural',  hc:8 }
+  };
+  function setSlider(id, v){ const e=el(id); if(!e) return; e.value=v; if(typeof updateSlider==='function'){ try{ updateSlider(e); }catch(_){} } }
+  document.querySelectorAll('[data-hp]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const P = PRE[b.dataset.hp]; if(!P) return;
+      const cs = el('convSel'); if(cs){ cs.value = P.conv; if(typeof onConvChange==='function'){ try{ onConvChange(); }catch(_){} } }
+      setSlider('qSlider', P.q); setSlider('nfSlider', P.n); setSlider('hfSlider', P.hf); setSlider('hcSlider', P.hc);
+      ['qValNum','nfValNum','hfValNum','hcValNum'].forEach((nid,i)=>{ const e=el(nid); if(e) e.value=[P.q,P.n,P.hf,P.hc][i]; });
+      if (typeof compute==='function'){ try{ compute(); }catch(_){} }
+      refresh();
+    });
+  });
+
+  // sync hero whenever any calculator input changes
+  document.querySelectorAll('.main input, .main select').forEach(e=>{
+    e.addEventListener('input', refresh); e.addEventListener('change', refresh);
+  });
+  window.addEventListener('resize', refresh);
+
+  refresh();
+  if (reduce){ el('hsPlay').innerHTML = L.play; playing=false; }
+  else start();
+})();
 </script>
 
 <script>

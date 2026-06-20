@@ -40,7 +40,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "反応拡散シミュレーター",
       "description": "Gray-Scottモデルによる反応拡散シミュレーター。斑点・縞・泡・珊瑚などのチューリングパターンをリアルタイム生成。",
       "url": "https://novasolver.jp/tools/reaction-diffusion.html",
@@ -50,7 +50,7 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["Gray-Scottモデルのリアルタイムシミュレーション","斑点・縞・泡・珊瑚のプリセット","拡散係数・フィード率・消滅率の調整"],
       "keywords": "反応拡散,Gray-Scott,チューリングパターン,自己組織化,パターン形成,CAEシミュレーター",
       "datePublished": "2026-04-08",
@@ -128,6 +128,26 @@ details.cae-note>summary{font-size:0.85rem;font-weight:600;}
 details.theory-box>summary .expand-icon,details.cae-note>summary .expand-icon{font-size:0.6rem;color:var(--muted,#6c757d);transition:transform .2s;margin-left:6px;vertical-align:middle;}
 details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .expand-icon{transform:rotate(180deg);}
 
+/* ===== v2 reaction-diffusion ===== */
+.live-readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.live-ro{background:linear-gradient(135deg,#0a1628,#102a4c);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:9px 6px;text-align:center}
+.live-ro .rv{font-family:'Roboto Mono',monospace;font-size:1rem;font-weight:700;color:#fff;line-height:1.1}
+.live-ro .rl{font-size:0.6rem;color:rgba(255,255,255,.62);margin-top:4px;letter-spacing:.02em}
+.live-ro.accent .rv{color:#ffd54a}
+@media(max-width:600px){.live-readouts{grid-template-columns:repeat(2,1fr)}}
+.canvas-wrap{position:relative;width:100%;aspect-ratio:1/1;cursor:crosshair;touch-action:none}
+#rdCanvas{width:100%;height:100%;border-radius:8px;display:block;background:#0a1628}
+#rdCanvas:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.seed-hint{position:absolute;left:8px;bottom:8px;background:rgba(10,22,40,.7);color:rgba(255,255,255,.85);font-size:.68rem;padding:3px 8px;border-radius:6px;pointer-events:none}
+.play-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.preset-row3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px}
+.speed-wrap{display:flex;gap:4px;margin-left:auto}
+.map-wrap{position:relative;width:100%;max-width:280px;margin:0 auto}
+#fkMap{width:100%;height:auto;border-radius:8px;display:block;background:#0a1628;border:1px solid var(--border)}
+.map-cap{font-size:.7rem;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5}
+.anno-box{background:rgba(0,180,216,.06);border:1px solid rgba(0,180,216,.25);border-radius:8px;padding:11px 13px;font-size:.8rem;line-height:1.6;color:var(--text);margin-top:12px}
+.anno-box strong{color:var(--accent2)}
+/* end v2 additions */
 </style>
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://novasolver.jp/tools/reaction-diffusion.html">
@@ -161,223 +181,319 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
   <div class="panel">
     <h2>パラメータ</h2>
 
+    <h3 style="margin-bottom:8px;">プリセット（古典的レジーム）</h3>
+    <div class="preset-row3">
+      <button class="preset-btn active" data-preset="spots" onclick="applyPreset('spots',this)">斑点</button>
+      <button class="preset-btn" data-preset="stripes" onclick="applyPreset('stripes',this)">縞</button>
+      <button class="preset-btn" data-preset="maze" onclick="applyPreset('maze',this)">迷路</button>
+      <button class="preset-btn" data-preset="mitosis" onclick="applyPreset('mitosis',this)">分裂</button>
+      <button class="preset-btn" data-preset="coral" onclick="applyPreset('coral',this)">珊瑚</button>
+      <button class="preset-btn" data-preset="waves" onclick="applyPreset('waves',this)">波</button>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">F（フィード率）<div class="num-wrap"><input type="number" class="num-input" id="valF" value="0.037" min="0.010" max="0.090" step="0.001" oninput="syncFromNum('slF','valF')"><span class="num-unit"></span></div></div>
+      <input type="range" id="slF" min="0.010" max="0.090" step="0.001" value="0.037" aria-label="フィード率 F">
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">k（消滅率）<div class="num-wrap"><input type="number" class="num-input" id="valK" value="0.060" min="0.040" max="0.070" step="0.001" oninput="syncFromNum('slK','valK')"><span class="num-unit"></span></div></div>
+      <input type="range" id="slK" min="0.040" max="0.070" step="0.001" value="0.060" aria-label="消滅率 k">
+    </div>
     <div class="ctrl-group">
       <div class="ctrl-label">Du（U拡散係数）<div class="num-wrap"><input type="number" class="num-input" id="valDu" value="0.20" min="0.10" max="0.30" step="0.01" oninput="syncFromNum('slDu','valDu')"><span class="num-unit"></span></div></div>
-      <input type="range" id="slDu" min="0.10" max="0.30" step="0.01" value="0.20" oninput="syncToNum('slDu','valDu')">
+      <input type="range" id="slDu" min="0.10" max="0.30" step="0.01" value="0.20" aria-label="U拡散係数 Du">
     </div>
     <div class="ctrl-group">
-      <div class="ctrl-label">Dv（V拡散係数）<div class="num-wrap"><input type="number" class="num-input" id="valDv" value="0.05" min="0.04" max="0.08" step="0.002" oninput="syncFromNum('slDv','valDv')"><span class="num-unit"></span></div></div>
-      <input type="range" id="slDv" min="0.04" max="0.08" step="0.002" value="0.05" oninput="syncToNum('slDv','valDv')">
+      <div class="ctrl-label">Dv（V拡散係数）<div class="num-wrap"><input type="number" class="num-input" id="valDv" value="0.10" min="0.04" max="0.14" step="0.005" oninput="syncFromNum('slDv','valDv')"><span class="num-unit"></span></div></div>
+      <input type="range" id="slDv" min="0.04" max="0.14" step="0.005" value="0.10" aria-label="V拡散係数 Dv">
     </div>
     <div class="ctrl-group">
-      <div class="ctrl-label">F（フィード率）<div class="num-wrap"><input type="number" class="num-input" id="valF" value="0.035" min="0.010" max="0.100" step="0.001" oninput="syncFromNum('slF','valF')"><span class="num-unit"></span></div></div>
-      <input type="range" id="slF" min="0.010" max="0.100" step="0.001" value="0.035" oninput="syncToNum('slF','valF')">
-    </div>
-    <div class="ctrl-group">
-      <div class="ctrl-label">k（消滅率）<div class="num-wrap"><input type="number" class="num-input" id="valK" value="0.065" min="0.040" max="0.070" step="0.001" oninput="syncFromNum('slK','valK')"><span class="num-unit"></span></div></div>
-      <input type="range" id="slK" min="0.040" max="0.070" step="0.001" value="0.065" oninput="syncToNum('slK','valK')">
-    </div>
-    <div class="ctrl-group">
-      <div class="ctrl-label">速度<div class="num-wrap"><input type="number" class="num-input" id="valSpeed" value="5" min="1" max="20" step="1" oninput="syncFromNum('slSpeed','valSpeed')"><span class="num-unit"></span></div></div>
-      <input type="range" id="slSpeed" min="1" max="20" step="1" value="5" oninput="syncToNum('slSpeed','valSpeed')">
+      <div class="ctrl-label">速度（フレームあたりステップ）<div class="num-wrap"><input type="number" class="num-input" id="valSpeed" value="8" min="1" max="20" step="1" oninput="syncFromNum('slSpeed','valSpeed')"><span class="num-unit"></span></div></div>
+      <input type="range" id="slSpeed" min="1" max="20" step="1" value="8" aria-label="シミュレーション速度">
     </div>
 
-    <h3 style="margin-top:14px;">プリセット</h3>
-    <div class="preset-row">
-      <button class="preset-btn active" onclick="applyPreset('spots')">斑点</button>
-      <button class="preset-btn" onclick="applyPreset('stripes')">縞</button>
-      <button class="preset-btn" onclick="applyPreset('bubbles')">泡</button>
-      <button class="preset-btn" onclick="applyPreset('coral')">珊瑚</button>
+    <div class="play-row">
+      <button class="btn btn-primary" type="button" id="btnPlay" onclick="togglePlay()"><i class="fas fa-pause"></i> 一時停止</button>
+      <button class="btn btn-secondary" type="button" onclick="resetSim()"><i class="fas fa-redo"></i> 最初から</button>
+      <button class="btn btn-secondary" type="button" onclick="perturb()"><i class="fas fa-bolt"></i> 摂動</button>
     </div>
 
-    <div class="btn-row">
-      <button class="btn btn-primary" onclick="resetSim()"><i class="fas fa-redo"></i> リセット</button>
-      <button class="btn btn-secondary" onclick="randomize()">ランダム</button>
-      <button class="btn btn-secondary" onclick="perturb()">摂動</button>
+    <h3 style="margin-top:16px;">F–k パターンマップ</h3>
+    <div class="map-wrap">
+      <canvas id="fkMap" width="260" height="200" role="img" aria-label="フィード率Fと消滅率kのパターンマップ。現在位置を表示します。"></canvas>
     </div>
+    <p class="map-cap">横軸=k、縦軸=F。マーカーが現在のレジーム。<br>クリックすると F・k をその点へ移動します。</p>
 
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-val" id="statStep">0</div><div class="stat-lbl">ステップ</div></div>
-      <div class="stat-card"><div class="stat-val" id="statPattern">斑点</div><div class="stat-lbl">パターン</div></div>
-      <div class="stat-card"><div class="stat-val" id="statFps">0</div><div class="stat-lbl">FPS</div></div>
-      <div class="stat-card"><div class="stat-val" id="statUavg">—</div><div class="stat-lbl">U平均</div></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-gauge-high"></i> ライブ数値</div>
+    <div class="live-readouts">
+      <div class="live-ro accent"><div class="rv" id="statPattern">斑点</div><div class="rl">パターン型</div></div>
+      <div class="live-ro"><div class="rv" id="roF">0.037</div><div class="rl">フィード率 F</div></div>
+      <div class="live-ro"><div class="rv" id="roK">0.060</div><div class="rl">消滅率 k</div></div>
+      <div class="live-ro"><div class="rv" id="statStep">0</div><div class="rl">ステップ数</div></div>
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 反応拡散パターン</div><canvas id="rdCanvas"></canvas></div>
-  
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> リアルタイム・チューリングパターン（Gray–Scott）</div>
+      <div class="canvas-wrap">
+        <canvas id="rdCanvas" tabindex="0" role="img" aria-label="Gray-Scottモデルの反応拡散シミュレーション。クリックまたはタップで撹乱の種をまけます。"></canvas>
+        <div class="seed-hint"><i class="fas fa-hand-pointer"></i> クリック／タップで種まき</div>
+      </div>
+      <div class="anno-box"><strong>これは「設計された絵」ではありません。</strong> 各セルが行うのは隣との<strong>拡散</strong>と局所的な<strong>反応</strong>（U+2V→3V、Vは消滅）だけ。にもかかわらず、斑点・縞・迷路・分裂が自発的に湧き出します。これがチューリングの形態形成＝自己組織化です。</div>
+    </div>
+
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
-</p>
       <p>$$\frac{\partial u}{\partial t}=D_u\nabla^2 u - uv^2+F(1-u)$$</p>
       <p>$$\frac{\partial v}{\partial t}=D_v\nabla^2 v + uv^2-(F+k)v$$</p>
-      <p style="margin-top:6px;color:var(--muted);font-size:0.78rem;">U（青=0, 黄=1）の濃度を疑似カラーで表示。F・kの組み合わせで多彩なパターンが出現します。</p>
-    
+      <p style="margin-top:6px;color:var(--muted);font-size:0.78rem;">V（活性化子）の濃度を疑似カラー（青=0 → 黄=高）で表示。Fは新鮮なUの供給、kはVの消滅。9点ラプラシアン・前進オイラー（dt=1, Δx=1）で安定に積分しています。F・kの組み合わせがパターンのレジームを決めます。</p>
 </div>
 </div>
 </div>
 
 <script>
-function __novaCanvasCssW(canvas){ return parseFloat(canvas.dataset.cssW) || canvas.clientWidth || canvas.width / Math.min(window.devicePixelRatio || 1, 2.5); }
-function __novaCanvasCssH(canvas){ return parseFloat(canvas.dataset.cssH) || canvas.clientHeight || canvas.height / Math.min(window.devicePixelRatio || 1, 2.5); }
-function __novaHiDpiCanvas(canvas, cssW, cssH, ctx){
-  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.setAttribute('data-ux-no-scale', '1');
-  var w = Math.max(1, Math.round(cssW || canvas.clientWidth || canvas.width || 600));
-  var h = Math.max(1, Math.round(cssH || canvas.clientHeight || canvas.height || 320));
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  canvas.dataset.cssW = String(w);
-  canvas.dataset.cssH = String(h);
-  if (ctx && ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: w, h: h, dpr: dpr };
-}
-
-const N = 150;
+"use strict";
+const N = 200;
 let u = new Float32Array(N*N);
 let v = new Float32Array(N*N);
 let nu = new Float32Array(N*N);
 let nv = new Float32Array(N*N);
 let step = 0;
 let running = true;
-let lastTime = 0;
-let fps = 0;
-let fpsCount = 0;
-let fpsTimer = 0;
-const canvas = document.getElementById('rdCanvas');
-const ctx = canvas.getContext('2d');
-var __novaW = N;
-var __novaH = N;
-var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-canvas.style.width = __novaW + 'px';
-canvas.style.height = __novaH + 'px';
-__novaHiDpiCanvas(canvas, Math.round(__novaW * __novaDpr), Math.round(__novaH * __novaDpr), ctx);
-canvas.dataset.cssW = String(__novaW);
-canvas.dataset.cssH = String(__novaH);
-var __novaCtx = canvas.getContext && canvas.getContext('2d');
-if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
+let fps = 0, fpsCount = 0, fpsTimer = 0;
 
-const presets = {
-  spots:   {Du:0.20, Dv:0.05, F:0.035, k:0.065},
-  stripes:{Du:0.19, Dv:0.05, F:0.060, k:0.062},
-  bubbles:{Du:0.16, Dv:0.08, F:0.025, k:0.055},
-  coral:{Du:0.21, Dv:0.05, F:0.055, k:0.062}
+const canvas = document.getElementById('rdCanvas');
+const ctx = canvas.getContext('2d', { alpha:false });
+const img = ctx.createImageData(N, N);
+// offscreen buffer at grid resolution, scaled up to display size
+const off = document.createElement('canvas'); off.width = N; off.height = N;
+const offCtx = off.getContext('2d');
+
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const PR = {
+  spots:   {Du:0.20, Dv:0.10, F:0.037, k:0.060},
+  stripes: {Du:0.20, Dv:0.10, F:0.022, k:0.051},
+  maze:    {Du:0.19, Dv:0.09, F:0.029, k:0.057},
+  mitosis: {Du:0.20, Dv:0.10, F:0.026, k:0.061},
+  coral:   {Du:0.21, Dv:0.10, F:0.058, k:0.062},
+  waves:   {Du:0.20, Dv:0.10, F:0.014, k:0.045}
 };
-const presetNames ={spots:'斑点',stripes:'縞',bubbles:'泡',coral:'珊瑚'};
+const presetNames = {spots:'斑点',stripes:'縞',maze:'迷路',mitosis:'分裂',coral:'珊瑚',waves:'波',chaos:'カオス',uniform:'均一'};
 let currentPreset = 'spots';
 
+function el(id){ return document.getElementById(id); }
+function getNum(id){ return parseFloat(el(id).value); }
 function getParams(){
-  return {
-    Du: parseFloat(document.getElementById('slDu').value),
-    Dv: parseFloat(document.getElementById('slDv').value),
-    F:  parseFloat(document.getElementById('slF').value),
-    k:  parseFloat(document.getElementById('slK').value),
-    speed: parseInt(document.getElementById('slSpeed').value)
-  };
-}function initField(){
-  for(let i=0;i<N*N;i++){u[i]=1;v[i]=0;}for(let cy=0;cy<N;cy+=N/4){
-    for(let cx=0;cx<N;cx+=N/4){
-      for(let dy=-4;dy<=4;dy++){
-        for(let dx=-4;dx<=4;dx++){
-          const x=(cx+dx+N)%N, y=(cy+dy+N)%N;
-          u[y*N+x]=0.5+0.1*(Math.random()-0.5);
-          v[y*N+x]=0.25+0.05*(Math.random()-0.5);
-        }
-      }
+  return { Du:getNum('slDu'), Dv:getNum('slDv'), F:getNum('slF'), k:getNum('slK'), speed:parseInt(el('slSpeed').value)||1 };
+}
+
+/* classify regime from F,k (for the live readout) */
+function classify(F,k){
+  if (F < 0.02 && k < 0.05) return 'waves';
+  if (F < 0.028 && k < 0.058) return 'mitosis';
+  if (F < 0.035 && k >= 0.057 && k < 0.063) return 'maze';
+  if (F < 0.03) return 'stripes';
+  if (F >= 0.05 && k < 0.063) return 'coral';
+  if (k >= 0.06) return 'spots';
+  return 'chaos';
+}
+
+function seed(cx, cy, r){
+  for(let dy=-r; dy<=r; dy++){
+    for(let dx=-r; dx<=r; dx++){
+      if(dx*dx+dy*dy>r*r) continue;
+      const x=(cx+dx+N)%N, y=(cy+dy+N)%N;
+      v[y*N+x]=0.5+0.1*(Math.random()-0.5);
+      u[y*N+x]=0.25+0.05*(Math.random()-0.5);
     }
+  }
+}
+
+function initField(){
+  for(let i=0;i<N*N;i++){ u[i]=1; v[i]=0; }
+  // scatter several square seeds plus light noise so patterns emerge anywhere
+  for(let cy=N/8; cy<N; cy+=N/4){
+    for(let cx=N/8; cx<N; cx+=N/4){ seed(cx|0, cy|0, 6); }
   }
   step=0;
-}function stepSim(Du,Dv,F,k){
-  const dt=1.0;
+}
+
+function stepSim(Du,Dv,F,k){
   for(let y=0;y<N;y++){
+    const ym=((y-1+N)%N)*N, yp=((y+1)%N)*N, yc=y*N;
     for(let x=0;x<N;x++){
-      const i=y*N+x;
-      const xp=(x+1)%N, xm=(x-1+N)%N;
-      const yp=(y+1)%N, ym=(y-1+N)%N;
-      const lapU = u[y*N+xp]+u[y*N+xm]+u[yp*N+x]+u[ym*N+x]-4*u[i];
-      const lapV = v[y*N+xp]+v[y*N+xm]+v[yp*N+x]+v[ym*N+x]-4*v[i];
+      const i=yc+x;
+      const xm=(x-1+N)%N, xp=(x+1)%N;
+      // 9-point (isotropic) Laplacian
+      const lapU = (u[yc+xm]+u[yc+xp]+u[ym+x]+u[yp+x])*0.2
+                 + (u[ym+xm]+u[ym+xp]+u[yp+xm]+u[yp+xp])*0.05 - u[i];
+      const lapV = (v[yc+xm]+v[yc+xp]+v[ym+x]+v[yp+x])*0.2
+                 + (v[ym+xm]+v[ym+xp]+v[yp+xm]+v[yp+xp])*0.05 - v[i];
       const uvv = u[i]*v[i]*v[i];
-      nu[i] = u[i]+dt*(Du*lapU - uvv + F*(1-u[i]));
-      nv[i] = v[i]+dt*(Dv*lapV + uvv - (F+k)*v[i]);
-      if(nu[i]<0)nu[i]=0; if(nu[i]>1)nu[i]=1;
-      if(nv[i]<0)nv[i]=0; if(nv[i]>1)nv[i]=1;
+      let a = u[i] + (Du*lapU - uvv + F*(1-u[i]));
+      let b = v[i] + (Dv*lapV + uvv - (F+k)*v[i]);
+      nu[i] = a<0?0:a>1?1:a;
+      nv[i] = b<0?0:b>1?1:b;
     }
   }
-  let tmp=u;u=nu;nu=tmp; tmp=v;v=nv;nv=tmp;
+  let t=u;u=nu;nu=t; t=v;v=nv;nv=t;
   step++;
-}function draw(){
-  const imgData = ctx.createImageData(N,N);
-  let usum=0;
+}
+
+function draw(){
+  const d = img.data;
   for(let i=0;i<N*N;i++){
-    const val=u[i];
-    usum+=val;
-    const t=Math.max(0,Math.min(1,val));
-    let r,g,b;
-    if(t<0.25){r=0;g=Math.round(t*4*100);b=Math.round(150+t*4*105);}else if(t<0.5){r=0;g=Math.round(100+(t-0.25)*4*155);b=Math.round(255-(t-0.25)*4*255);}else if(t<0.75){r=Math.round((t-0.5)*4*255);g=255;b=0;}else{r=255;g=Math.round(255-(t-0.75)*4*255);b=0;}
-    const p=i*4;
-    imgData.data[p]=r;imgData.data[p+1]=g;imgData.data[p+2]=b;imgData.data[p+3]=255;
+    let t = v[i]*3.2; if(t>1) t=1; // emphasise V
+    let r,g,bl;
+    if(t<0.25){ r=8; g=(t*4*90)|0; bl=(40+t*4*120)|0; }
+    else if(t<0.5){ r=8; g=(90+(t-0.25)*4*150)|0; bl=(160-(t-0.25)*4*120)|0; }
+    else if(t<0.75){ r=((t-0.5)*4*230)|0; g=240; bl=(40-(t-0.5)*4*40)|0; }
+    else { r=(230+(t-0.75)*4*25)|0; g=(240-(t-0.75)*4*120)|0; bl=10; }
+    const p=i*4; d[p]=r; d[p+1]=g; d[p+2]=bl; d[p+3]=255;
   }
-  ctx.putImageData(imgData,0,0);
-  document.getElementById('statStep').textContent=step;
-  document.getElementById('statUavg').textContent=(usum/(N*N)).toFixed(3);
-}function loop(ts){
-  if(!running){requestAnimationFrame(loop);return;}const p=getParams();
-  for(let i=0;i<p.speed;i++) stepSim(p.Du,p.Dv,p.F,p.k);
+  offCtx.putImageData(img,0,0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
+}
+
+/* HiDPI: keep display square sized to container width */
+function resizeCanvas(){
+  const wrap = canvas.parentElement;
+  const cssW = Math.max(160, Math.floor(wrap.clientWidth));
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssW + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssW * dpr);
   draw();
-  fpsCount++;
-  if(ts-fpsTimer>1000){fps=fpsCount;fpsCount=0;fpsTimer=ts;document.getElementById('statFps').textContent=fps;}
-  requestAnimationFrame(loop);
-}function applyPreset(name){
-  const p=presets[name];
-  document.getElementById('slDu').value=p.Du; document.getElementById('valDu').value=p.Du.toFixed(2);
-  document.getElementById('slDv').value=p.Dv; document.getElementById('valDv').value=p.Dv.toFixed(2);
-  document.getElementById('slF').value=p.F;   document.getElementById('valF').value=p.F.toFixed(4);
-  document.getElementById('slK').value=p.k;   document.getElementById('valK').value=p.k.toFixed(4);
-  currentPreset=name;
-  document.getElementById('statPattern').textContent=presetNames[name];
-  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
-  event.target.classList.add('active');
-  resetSim();
-}function resetSim(){initField();}function randomize(){
-  document.getElementById('slF').value=(Math.random()*0.09+0.01).toFixed(3);
-  document.getElementById('slK').value=(Math.random()*0.03+0.04).toFixed(3);
-  syncSliders();
-  resetSim();
-}function perturb(){
-  for(let i=0;i<N*N;i++){
-    u[i]=Math.max(0,Math.min(1,u[i]+(Math.random()-0.5)*0.1));
-    v[i]=Math.max(0,Math.min(1,v[i]+(Math.random()-0.5)*0.05));
+}
+window.addEventListener('resize', resizeCanvas);
+
+function updateReadouts(p){
+  el('roF').textContent = p.F.toFixed(3);
+  el('roK').textContent = p.K!==undefined ? p.K.toFixed(3) : p.k.toFixed(3);
+  el('statStep').textContent = step;
+  const reg = classify(p.F, p.k);
+  el('statPattern').textContent = presetNames[reg] || '—';
+}
+
+function loop(ts){
+  if(running){
+    const p=getParams();
+    for(let i=0;i<p.speed;i++) stepSim(p.Du,p.Dv,p.F,p.k);
+    draw();
+    updateReadouts(p);
+    fpsCount++;
+    if(ts-fpsTimer>1000){ fps=fpsCount; fpsCount=0; fpsTimer=ts; }
   }
-}function syncSliders(){
-  ['Du','Dv','F','K'].forEach(id=>{
-    const sl=document.getElementById('sl'+id);
-    const val=document.getElementById('val'+id);
-    if(sl&&val){
-      const num=parseFloat(sl.value);
-      val.textContent=num<0.01?num.toFixed(4):num<0.1?num.toFixed(4):num.toFixed(2);
-    }
-  });
-}['slDu','slDv','slF','slK','slSpeed'].forEach(id=>{
-  const sl=document.getElementById(id);
-  sl.addEventListener('input',()=>{
-    const valId='val'+id.replace('sl','');
-    const el=document.getElementById(valId);
-    if(el){
-      const v=parseFloat(sl.value);
-      el.textContent=v<0.01?v.toFixed(4):v<0.1?v.toFixed(4):v.toFixed(2);
-    }
-  });
+  requestAnimationFrame(loop);
+}
+
+function togglePlay(){
+  running=!running;
+  const b=el('btnPlay');
+  b.innerHTML = running ? '<i class="fas fa-pause"></i> 一時停止' : '<i class="fas fa-play"></i> 再生';
+}
+function resetSim(){ initField(); draw(); updateReadouts(getParams()); }
+function perturb(){
+  for(let i=0;i<N*N;i++){
+    v[i]=Math.max(0,Math.min(1,v[i]+(Math.random()-0.5)*0.15));
+  }
+}
+
+function setVal(id,val,dec){ el('sl'+id).value=val; el('val'+id).value=(+val).toFixed(dec); }
+function applyPreset(name, btnEl){
+  const p=PR[name]; if(!p) return;
+  setVal('Du',p.Du,2); setVal('Dv',p.Dv,3); setVal('F',p.F,3); setVal('K',p.k,3);
+  currentPreset=name;
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  if(btnEl) btnEl.classList.add('active');
+  drawMap();
+  resetSim();
+}
+
+/* sync number<->range both directions */
+function syncToNum(slId,numId){ const s=el(slId), n=el(numId); n.value=s.value; afterParam(); }
+function syncFromNum(slId,numId){ const s=el(slId), n=el(numId); s.value=n.value; afterParam(); }
+['slDu','slDv','slF','slK'].forEach(id=>{
+  el(id).addEventListener('input',()=>{ const n=el('val'+id.slice(2)); if(n){ n.value=el(id).value; } afterParam(); });
 });
-document.getElementById('slSpeed').addEventListener('input',()=>{
-  document.getElementById('valSpeed').value=document.getElementById('slSpeed').value;
+el('slSpeed').addEventListener('input',()=>{ el('valSpeed').value=el('slSpeed').value; });
+function afterParam(){ drawMap(); updateReadouts(getParams()); }
+
+/* ===== F-k pattern map ===== */
+const fkMap = document.getElementById('fkMap');
+const mctx = fkMap.getContext('2d');
+const K_MIN=0.040, K_MAX=0.070, F_MIN=0.010, F_MAX=0.090;
+const regionColors = { spots:'#ffd54a', stripes:'#00B4D8', maze:'#7e57c2', mitosis:'#26c6da', coral:'#ff7043', waves:'#42a5f5', chaos:'#90a4ae' };
+function mapX(k){ return (k-K_MIN)/(K_MAX-K_MIN)*fkMap.width; }
+function mapY(F){ return fkMap.height-(F-F_MIN)/(F_MAX-F_MIN)*fkMap.height; }
+function drawMap(){
+  const W=fkMap.width, H=fkMap.height;
+  // paint regime field
+  const im=mctx.createImageData(W,H);
+  for(let py=0;py<H;py++){
+    const F = F_MIN + (1-py/H)*(F_MAX-F_MIN);
+    for(let px=0;px<W;px++){
+      const k = K_MIN + (px/W)*(K_MAX-K_MIN);
+      const c = regionColors[classify(F,k)] || '#607d8b';
+      const r=parseInt(c.slice(1,3),16), g=parseInt(c.slice(3,5),16), b=parseInt(c.slice(5,7),16);
+      const o=(py*W+px)*4; im.data[o]=r; im.data[o+1]=g; im.data[o+2]=b; im.data[o+3]=160;
+    }
+  }
+  mctx.putImageData(im,0,0);
+  // current marker
+  const F=getNum('slF'), k=getNum('slK');
+  const x=mapX(k), y=mapY(F);
+  mctx.beginPath(); mctx.arc(x,y,6,0,7); mctx.fillStyle='#fff'; mctx.fill();
+  mctx.lineWidth=2; mctx.strokeStyle='#001F3F'; mctx.stroke();
+  mctx.beginPath(); mctx.arc(x,y,2.5,0,7); mctx.fillStyle='#001F3F'; mctx.fill();
+}
+fkMap.addEventListener('click',(e)=>{
+  const r=fkMap.getBoundingClientRect();
+  const px=(e.clientX-r.left)/r.width*fkMap.width;
+  const py=(e.clientY-r.top)/r.height*fkMap.height;
+  const k=K_MIN+(px/fkMap.width)*(K_MAX-K_MIN);
+  const F=F_MIN+(1-py/fkMap.height)*(F_MAX-F_MIN);
+  setVal('K',Math.max(K_MIN,Math.min(K_MAX,k)),3);
+  setVal('F',Math.max(F_MIN,Math.min(F_MAX,F)),3);
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  afterParam();
 });
 
+/* ===== click / tap to seed disturbances ===== */
+function seedAt(clientX, clientY){
+  const r=canvas.getBoundingClientRect();
+  const gx=Math.floor((clientX-r.left)/r.width*N);
+  const gy=Math.floor((clientY-r.top)/r.height*N);
+  seed(gx, gy, 8);
+}
+canvas.addEventListener('mousedown',(e)=>{ seedAt(e.clientX,e.clientY); });
+canvas.addEventListener('touchstart',(e)=>{ if(e.touches[0]){ seedAt(e.touches[0].clientX,e.touches[0].clientY); e.preventDefault(); } }, {passive:false});
+canvas.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){ seed((N/2)|0,(N/2)|0,10); e.preventDefault(); } });
+
+/* ===== init ===== */
 initField();
+resizeCanvas();
+drawMap();
+updateReadouts(getParams());
+if(reduceMotion){
+  // honor reduced motion: start paused with a static evolved frame
+  for(let i=0;i<400;i++) stepSim(0.20,0.10,0.037,0.060);
+  draw();
+  running=false;
+  el('btnPlay').innerHTML='<i class="fas fa-play"></i> 再生';
+}
 requestAnimationFrame(loop);
 </script>
 
@@ -411,7 +527,7 @@ requestAnimationFrame(loop);
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">拡散係数DuとDvの比率はどのように設定すれば模様が変わりますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
-    <div class="faq-a">一般的にDvをDuより大きく（例：Du=0.1, Dv=0.05）設定すると斑点模様が、Dvをさらに大きくすると縞模様や珊瑚状のパターンが現れやすくなります。比率を変えながら試すと多彩なチューリングパターンが得られます。</div>
+    <div class="faq-a">一般的にDuをDvより大きく（例：Du=0.16, Dv=0.08）設定すると斑点模様が、Du/Dv比を変えると縞模様や珊瑚状のパターンが現れやすくなります。比率を変えながら試すと多彩なチューリングパターンが得られます。</div>
   </div>
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">フィード率Fと消滅率kの役割の違いは何ですか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -439,6 +555,9 @@ requestAnimationFrame(loop);
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="reaction-diffusion.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -500,7 +619,7 @@ requestAnimationFrame(loop);
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>Du=0.16、Dv=0.08、F=0.055、K=0.062の条件でシミュレーション開始時、初期濃度はU=1.0、V=0.5に設定。反応式∂U/∂t=Du∇²U-UV²+F(1-U)、∂V/∂t=Dv∇²V+UV²-(K+F)Vにより、約5000ステップ後に200×200格子上に六角形スポットパターンが形成。F=0.03、K=0.055に変更するとストライプパターンへ遷移し、パターン波長は約30ピクセルに減少。</p>
+<p>Du=0.16、Dv=0.08、F=0.055、K=0.062の条件でシミュレーション開始時、初期濃度はU=1.0、V=0.5に設定。反応式∂U/∂t=Du∇²U-UV²+F(1-U)、∂V/∂t=Dv∇²V+UV²-(K+F)Vにより、約5000ステップ後に150×150格子上に六角形スポットパターンが形成。F=0.03、K=0.055に変更するとストライプパターンへ遷移し、パターン波長は約30ピクセルに減少。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -510,6 +629,16 @@ requestAnimationFrame(loop);
 <li>数値安定性：格子間隔Δx=1に対しタイムステップΔt=0.1以下に設定し、CFL条件を満たさない場合は数値振動が発生</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4092592310?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4092592310.09._SCMZZZZZZ_.jpg" alt="工学全般の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">工学全般 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

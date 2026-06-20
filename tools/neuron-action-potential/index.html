@@ -32,7 +32,7 @@ MathJax = { tex: { inlineMath: [['$','$']] }, options: { skipHtmlTags: ['script'
 {
   "@context": "https://schema.org",
   "@graph": [
-    { "@type": "SoftwareApplication", "name": "ニューロン・活動電位シミュレーター", "applicationCategory": "EducationalApplication", "operatingSystem": "Any", "url": "https://novasolver.jp/tools/neuron-action-potential.html", "offers": { "@type": "Offer", "price": "0" }, "inLanguage": "ja" },
+    { "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html", "name": "ニューロン・活動電位シミュレーター", "applicationCategory": "EducationalApplication", "operatingSystem": "Any", "url": "https://novasolver.jp/tools/neuron-action-potential.html", "offers": { "@type": "Offer", "price": "0" }, "inLanguage": "ja" },
     { "@type": "FAQPage", "mainEntity": [
       { "@type": "Question", "name": "活動電位とは何ですか？", "acceptedAnswer": { "@type": "Answer", "text": "ニューロン（神経細胞）の細胞膜電位が急激に変化する現象です。通常の静止膜電位（約−70mV）からNa⁺チャネルが開いて+40mVまで上昇し、K⁺チャネルが開いて元に戻ります。「発火」とも呼ばれます。" } },
       { "@type": "Question", "name": "ホジキン-ハクスレーモデルとは何ですか？", "acceptedAnswer": { "@type": "Answer", "text": "1952年にノーベル賞（1963年）を受賞したHodgkin-Huxleyが発表した、イカの巨大軸索での活動電位を記述する数学モデルです。膜電流をNa⁺・K⁺・リーク電流の和として記述し、電位依存性チャネルをゲート変数m,h,nで表現します。" } },
@@ -178,10 +178,32 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
 
     <button class="sim-btn primary" onclick="runSim()">▶ シミュレーション実行</button>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4816367659?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816367659.09._SCMZZZZZZ_.jpg" alt="バイオメカニクスの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">バイオメカニクス の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-bolt"></i> 活動電位ライブ・アニメーション</div>
+      <div style="position:relative"><canvas id="ap-anim" style="width:100%;display:block;border-radius:10px;background:#0a1428"></canvas></div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="sim-btn primary" id="anim-play" style="width:auto;flex:1;min-width:120px;margin:0" onclick="apToggle()">⏸ 一時停止</button>
+        <button class="sim-btn secondary" id="anim-restart" style="width:auto;flex:1;min-width:120px;margin:0" onclick="apRestart()">↻ 最初から</button>
+      </div>
+      <div class="stats-grid" style="margin-top:12px">
+        <div class="stat-card"><div class="stat-label">膜電位 Vm</div><div class="stat-value sv" id="live-vm">—</div><div class="stat-unit">mV</div></div>
+        <div class="stat-card"><div class="stat-label">フェーズ</div><div class="stat-value sv" id="live-phase" style="font-size:.82rem">—</div><div class="stat-unit">&nbsp;</div></div>
+        <div class="stat-card"><div class="stat-label">Na⁺コンダクタンス gNa</div><div class="stat-value sv" id="live-gna">—</div><div class="stat-unit">mS/cm²</div></div>
+        <div class="stat-card"><div class="stat-label">K⁺コンダクタンス gK</div><div class="stat-value sv" id="live-gk">—</div><div class="stat-unit">mS/cm²</div></div>
+      </div>
+    </div>
+
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">最大膜電位</div><div class="stat-value" id="vmax-val">—</div><div class="stat-unit">mV</div></div>
@@ -260,179 +282,379 @@ $C_m \frac{dV}{dt} = -g_{Na}m^3h(V-E_{Na})$<br>
     </div>
 
 <script>
-// Hodgkin-Huxley Model
-const E_Na = 50, E_K = -77, E_L = -54.4;
-const g_L = 0.3;
+(function(){
+'use strict';
+/* ===== Hodgkin-Huxley Model (squid axon, classic HH convention V=Vm) ===== */
+var E_Na = 50, E_K = -77, E_L = -54.4, g_L = 0.3, V_REST = -65;
+function alphaM(V){ var dv = V+40; return Math.abs(dv) < 1e-7 ? 1 : 0.1*dv/(1-Math.exp(-dv/10)); }
+function betaM(V){ return 4*Math.exp(-(V+65)/18); }
+function alphaH(V){ return 0.07*Math.exp(-(V+65)/20); }
+function betaH(V){ return 1/(1+Math.exp(-(V+35)/10)); }
+function alphaN(V){ var dv = V+55; return Math.abs(dv) < 1e-7 ? 0.1 : 0.01*dv/(1-Math.exp(-dv/10)); }
+function betaN(V){ return 0.125*Math.exp(-(V+65)/80); }
 
-function alphaM(V) { const dv = V+40; return Math.abs(dv) < 1e-7 ? 1 : 0.1*dv/(1-Math.exp(-dv/10)); }
-function betaM(V) { return 4*Math.exp(-(V+65)/18); }
-function alphaH(V) { return 0.07*Math.exp(-(V+65)/20); }
-function betaH(V) { return 1/(1+Math.exp(-(V+35)/10)); }
-function alphaN(V) { const dv = V+55; return Math.abs(dv) < 1e-7 ? 0.1 : 0.01*dv/(1-Math.exp(-dv/10)); }
-function betaN(V) { return 0.125*Math.exp(-(V+65)/80); }
+function params(){
+  return {
+    I_ext: parseFloat(document.getElementById('iext-slider').value),
+    t_on:  parseFloat(document.getElementById('ton-slider').value),
+    t_stim:parseFloat(document.getElementById('tstim-slider').value),
+    Cm:    parseFloat(document.getElementById('cm-slider').value),
+    gNa:   parseFloat(document.getElementById('gna-slider').value),
+    gK:    parseFloat(document.getElementById('gk-slider').value)
+  };
+}
 
-let activeTab = 0;
-let vmChart = null, gateChart = null, ionChart = null;
-let simData = null;
+/* ===== Full-trace solver (drives Chart.js result panels) ===== */
+var activeTab = 0;
+var vmChart = null, gateChart = null, ionChart = null;
+var simData = null;
 
-function runSim() {
-  const I_ext = parseFloat(document.getElementById('iext-slider').value);
-  const t_on = parseFloat(document.getElementById('ton-slider').value);
-  const t_stim = parseFloat(document.getElementById('tstim-slider').value);
-  const Cm = parseFloat(document.getElementById('cm-slider').value);
-  const gNa_max = parseFloat(document.getElementById('gna-slider').value);
-  const gK_max = parseFloat(document.getElementById('gk-slider').value);
-
-  const dt = 0.01, T = 40;
-  const steps = Math.round(T / dt);
-  const ts = [], Vs = [], ms = [], hs = [], ns = [], I_Nas = [], I_Ks = [];
-
-  let V = -65, m = alphaM(V)/(alphaM(V)+betaM(V));
-  let h = alphaH(V)/(alphaH(V)+betaH(V));
-  let n = alphaN(V)/(alphaN(V)+betaN(V));
-
-  let vmax = V, nfire = 0;
-  let prevV = V;
-
-  for (let i = 0; i <= steps; i++) {
-    const t = i * dt;
-    const I = (t >= t_on && t <= t_on + t_stim) ? I_ext : 0;
-
-    const I_Na = gNa_max * m*m*m * h * (V - E_Na);
-    const I_K = gK_max * n*n*n*n * (V - E_K);
-    const I_Lk = g_L * (V - E_L);
-
-    const dV = (I - I_Na - I_K - I_Lk) / Cm;
-    const dm = alphaM(V)*(1-m) - betaM(V)*m;
-    const dh = alphaH(V)*(1-h) - betaH(V)*h;
-    const dn = alphaN(V)*(1-n) - betaN(V)*n;
-
-    V += dV * dt; m += dm * dt; h += dh * dt; n += dn * dt;
-
-    if (i % 5 === 0) {
-      ts.push(t.toFixed(2));
-      Vs.push(V);
-      ms.push(m);
-      hs.push(h);
-      ns.push(n);
-      I_Nas.push(-I_Na);
-      I_Ks.push(-I_K);
+function runSim(){
+  var p = params();
+  var dt = 0.01, T = 40;
+  var steps = Math.round(T / dt);
+  var ts=[], Vs=[], ms=[], hs=[], ns=[], I_Nas=[], I_Ks=[];
+  var V = V_REST;
+  var m = alphaM(V)/(alphaM(V)+betaM(V));
+  var h = alphaH(V)/(alphaH(V)+betaH(V));
+  var n = alphaN(V)/(alphaN(V)+betaN(V));
+  var vmax = V, nfire = 0, prevV = V;
+  for (var i=0;i<=steps;i++){
+    var t = i*dt;
+    var I = (t >= p.t_on && t <= p.t_on + p.t_stim) ? p.I_ext : 0;
+    var I_Na = p.gNa * m*m*m * h * (V - E_Na);
+    var I_K  = p.gK  * n*n*n*n   * (V - E_K);
+    var I_Lk = g_L * (V - E_L);
+    var dV = (I - I_Na - I_K - I_Lk) / p.Cm;
+    var dm = alphaM(V)*(1-m) - betaM(V)*m;
+    var dh = alphaH(V)*(1-h) - betaH(V)*h;
+    var dn = alphaN(V)*(1-n) - betaN(V)*n;
+    V += dV*dt; m += dm*dt; h += dh*dt; n += dn*dt;
+    if (i % 5 === 0){
+      ts.push(t.toFixed(2)); Vs.push(V); ms.push(m); hs.push(h); ns.push(n);
+      I_Nas.push(-I_Na); I_Ks.push(-I_K);
     }
-
     if (V > vmax) vmax = V;
     if (prevV < 0 && V >= 0) nfire++;
     prevV = V;
   }
-
-  simData = { ts, Vs, ms, hs, ns, I_Nas, I_Ks };
-
+  simData = { ts:ts, Vs:Vs, ms:ms, hs:hs, ns:ns, I_Nas:I_Nas, I_Ks:I_Ks };
   document.getElementById('vmax-val').textContent = vmax.toFixed(1);
   document.getElementById('nfire-val').textContent = nfire;
-  const apAbove = Vs.filter(v => v > 0).length;
+  var apAbove = Vs.filter(function(v){ return v > 0; }).length;
   document.getElementById('apwidth-val').textContent = (apAbove * 0.01 * 5).toFixed(2);
-
   if (activeTab === 0) drawVmChart();
   else if (activeTab === 1) drawGateChart();
   else drawIonChart();
+  apRestart(); /* re-run the live animation with new params */
 }
 
-function switchTab(i) {
+function switchTab(i){
   activeTab = i;
-  document.querySelectorAll('.tab-btn').forEach((b,j) => b.classList.toggle('active', i===j));
-  ['tab0','tab1','tab2'].forEach((id,j) => document.getElementById(id).style.display = i===j ? '' : 'none');
+  document.querySelectorAll('.tab-btn').forEach(function(b,j){ b.classList.toggle('active', i===j); });
+  ['tab0','tab1','tab2'].forEach(function(id,j){ document.getElementById(id).style.display = i===j ? '' : 'none'; });
   if (!simData) return;
   if (i === 0) drawVmChart();
   else if (i === 1) drawGateChart();
   else drawIonChart();
 }
 
-function drawVmChart() {
+function drawVmChart(){
   if (!simData) return;
-  const ctx = document.getElementById('vm-chart').getContext('2d');
-  if (vmChart) {
-    vmChart.data.labels = simData.ts;
-    vmChart.data.datasets[0].data = simData.Vs;
-    vmChart.update('none');
-    return;
-  }
-  vmChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: simData.ts,
-      datasets: [{ label: '膜電位 V (mV)', data: simData.Vs, borderColor: '#00ff88', borderWidth: 2, pointRadius: 0, fill: false }]
-    },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false, resizeDelay: 50,
-      scales: {
-        x: { title: { display: true, text: '時間 (ms)' }, ticks: { maxTicksLimit: 8 } },
-        y: { title: { display: true, text: 'V (mV)' } }
-      },
-      plugins: { legend: { position: 'top' } }
-    }
-  });
+  var ctx = document.getElementById('vm-chart').getContext('2d');
+  if (vmChart){ vmChart.data.labels = simData.ts; vmChart.data.datasets[0].data = simData.Vs; vmChart.update('none'); return; }
+  vmChart = new Chart(ctx, { type:'line',
+    data:{ labels:simData.ts, datasets:[{ label:'膜電位 V (mV)', data:simData.Vs, borderColor:'#00ff88', borderWidth:2, pointRadius:0, fill:false }] },
+    options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:50,
+      scales:{ x:{ title:{display:true,text:'時間 (ms)'}, ticks:{maxTicksLimit:8} }, y:{ title:{display:true,text:'V (mV)'} } },
+      plugins:{ legend:{position:'top'} } } });
 }
 
-function drawGateChart() {
+function drawGateChart(){
   if (!simData) return;
-  const ctx = document.getElementById('gate-chart').getContext('2d');
-  if (gateChart) {
-    gateChart.data.labels = simData.ts;
-    gateChart.data.datasets[0].data = simData.ms;
-    gateChart.data.datasets[1].data = simData.hs;
-    gateChart.data.datasets[2].data = simData.ns;
-    gateChart.update('none');
-    return;
-  }
-  gateChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: simData.ts,
-      datasets: [
-        { label: 'm (Na活性化)', data: simData.ms, borderColor: '#ff4444', borderWidth: 1.5, pointRadius: 0, fill: false },
-        { label: 'h (Na不活性)', data: simData.hs, borderColor: '#ff8844', borderWidth: 1.5, pointRadius: 0, fill: false },
-        { label: 'n (K活性化)', data: simData.ns, borderColor: '#4488ff', borderWidth: 1.5, pointRadius: 0, fill: false }
-      ]
-    },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false, resizeDelay: 50,
-      scales: {
-        x: { title: { display: true, text: '時間 (ms)' }, ticks: { maxTicksLimit: 8 } },
-        y: { title: { display: true, text: 'ゲート変数 (0〜1)' }, min: 0, max: 1 }
-      }
-    }
-  });
+  var ctx = document.getElementById('gate-chart').getContext('2d');
+  if (gateChart){ gateChart.data.labels=simData.ts; gateChart.data.datasets[0].data=simData.ms; gateChart.data.datasets[1].data=simData.hs; gateChart.data.datasets[2].data=simData.ns; gateChart.update('none'); return; }
+  gateChart = new Chart(ctx, { type:'line',
+    data:{ labels:simData.ts, datasets:[
+      { label:'m (Na活性化)', data:simData.ms, borderColor:'#ff4444', borderWidth:1.5, pointRadius:0, fill:false },
+      { label:'h (Na不活性)', data:simData.hs, borderColor:'#ff8844', borderWidth:1.5, pointRadius:0, fill:false },
+      { label:'n (K活性化)', data:simData.ns, borderColor:'#4488ff', borderWidth:1.5, pointRadius:0, fill:false } ] },
+    options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:50,
+      scales:{ x:{ title:{display:true,text:'時間 (ms)'}, ticks:{maxTicksLimit:8} }, y:{ title:{display:true,text:'ゲート変数 (0〜1)'}, min:0, max:1 } } } });
 }
 
-function drawIonChart() {
+function drawIonChart(){
   if (!simData) return;
-  const ctx = document.getElementById('ion-chart').getContext('2d');
-  if (ionChart) {
-    ionChart.data.labels = simData.ts;
-    ionChart.data.datasets[0].data = simData.I_Nas;
-    ionChart.data.datasets[1].data = simData.I_Ks;
-    ionChart.update('none');
-    return;
-  }
-  ionChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: simData.ts,
-      datasets: [
-        { label: 'Na⁺内向き電流', data: simData.I_Nas, borderColor: '#ff4444', borderWidth: 1.5, pointRadius: 0 },
-        { label: 'K⁺外向き電流', data: simData.I_Ks, borderColor: '#4488ff', borderWidth: 1.5, pointRadius: 0 }
-      ]
-    },
-    options: {
-      responsive: true, animation: false, maintainAspectRatio: false, resizeDelay: 50,
-      scales: {
-        x: { title: { display: true, text: '時間 (ms)' }, ticks: { maxTicksLimit: 8 } },
-        y: { title: { display: true, text: 'イオン電流 (μA/cm²)' } }
-      }
-    }
-  });
+  var ctx = document.getElementById('ion-chart').getContext('2d');
+  if (ionChart){ ionChart.data.labels=simData.ts; ionChart.data.datasets[0].data=simData.I_Nas; ionChart.data.datasets[1].data=simData.I_Ks; ionChart.update('none'); return; }
+  ionChart = new Chart(ctx, { type:'line',
+    data:{ labels:simData.ts, datasets:[
+      { label:'Na⁺内向き電流', data:simData.I_Nas, borderColor:'#ff4444', borderWidth:1.5, pointRadius:0 },
+      { label:'K⁺外向き電流', data:simData.I_Ks, borderColor:'#4488ff', borderWidth:1.5, pointRadius:0 } ] },
+    options:{ responsive:true, animation:false, maintainAspectRatio:false, resizeDelay:50,
+      scales:{ x:{ title:{display:true,text:'時間 (ms)'}, ticks:{maxTicksLimit:8} }, y:{ title:{display:true,text:'イオン電流 (μA/cm²)'} } } } });
 }
 
-window.addEventListener('load', () => runSim());
+/* ===== V2 live hero animation: the action potential you can SEE ===== */
+var canvas = document.getElementById('ap-anim');
+var actx = canvas ? canvas.getContext('2d') : null;
+var cssW = 0, cssH = 0;
+var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function resizeAnim(){
+  if (!canvas) return;
+  var rect = canvas.parentElement.getBoundingClientRect();
+  cssW = Math.max(280, Math.floor(rect.width));
+  cssH = Math.round(Math.min(360, Math.max(300, cssW * 0.62)));
+  var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  actx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+/* live integrator state */
+var st = null;        // {V,m,h,n,t}
+var hist = [];        // recent {t,V}
+var T_WIN = 40;       // ms shown on scope
+var DT = 0.01;        // integration step (ms)
+var animId = null, playing = true, lastTs = 0;
+var ionParticles = [];
+
+function resetState(){
+  var V = V_REST;
+  st = { V:V, m:alphaM(V)/(alphaM(V)+betaM(V)), h:alphaH(V)/(alphaH(V)+betaH(V)), n:alphaN(V)/(alphaN(V)+betaN(V)), t:0 };
+  hist = [];
+  ionParticles = [];
+}
+
+function phaseName(V, dVdt, stim){
+  if (V > 10) return '脱分極ピーク';
+  if (dVdt > 8) return '脱分極 (Na⁺流入)';
+  if (V < V_REST - 2 && dVdt > -2) return '過分極アンダーシュート';
+  if (dVdt < -8) return '再分極 (K⁺流出)';
+  if (stim && V < -50) return '刺激入力';
+  return '静止';
+}
+
+/* advance the live model by `ms` of model-time */
+function stepModel(ms){
+  var p = params();
+  var nstep = Math.max(1, Math.round(ms / DT));
+  var dVdt = 0;
+  for (var k=0;k<nstep;k++){
+    var stim = (st.t >= p.t_on && st.t <= p.t_on + p.t_stim) ? p.I_ext : 0;
+    var I_Na = p.gNa * st.m*st.m*st.m * st.h * (st.V - E_Na);
+    var I_K  = p.gK  * st.n*st.n*st.n*st.n * (st.V - E_K);
+    var I_Lk = g_L * (st.V - E_L);
+    dVdt = (stim - I_Na - I_K - I_Lk) / p.Cm;
+    st.V += dVdt*DT;
+    st.m += (alphaM(st.V)*(1-st.m) - betaM(st.V)*st.m)*DT;
+    st.h += (alphaH(st.V)*(1-st.h) - betaH(st.V)*st.h)*DT;
+    st.n += (alphaN(st.V)*(1-st.n) - betaN(st.V)*st.n)*DT;
+    st.t += DT;
+    hist.push({ t: st.t, V: st.V });
+  }
+  while (hist.length && hist[0].t < st.t - T_WIN) hist.shift();
+  return { dVdt:dVdt };
+}
+
+function vToY(V, top, h){
+  // map -90..+50 mV to canvas y
+  var vmin = -95, vmax = 55;
+  return top + h - (V - vmin)/(vmax - vmin) * h;
+}
+
+function drawAnim(info){
+  if (!actx) return;
+  if (!st) resetState();
+  var W = cssW, H = cssH;
+  var p = params();
+  actx.clearRect(0,0,W,H);
+
+  /* layout: left = membrane cell view, right = oscilloscope */
+  var memW = Math.min(W*0.40, 220);
+  var scopeX = memW + 14, scopeW = W - scopeX - 10;
+  var top = 34, plotH = H - top - 30;
+
+  /* --- conductance bars (top strip) --- */
+  var gNaNow = p.gNa * st.m*st.m*st.m * st.h;
+  var gKNow  = p.gK  * st.n*st.n*st.n*st.n;
+  var stim = (st.t >= p.t_on && st.t <= p.t_on + p.t_stim) ? p.I_ext : 0;
+
+  /* ===== membrane panel ===== */
+  var midY = top + plotH*0.5;
+  var memCx = memW*0.5 + 6;
+  // extracellular (top) / intracellular (bottom) shading
+  actx.fillStyle = 'rgba(80,140,220,0.10)';
+  actx.fillRect(6, top, memW, plotH*0.42);
+  actx.fillStyle = 'rgba(220,120,80,0.10)';
+  actx.fillRect(6, top+plotH*0.58, memW, plotH*0.42);
+  // membrane bilayer
+  actx.fillStyle = '#13243f';
+  actx.fillRect(6, midY-9, memW, 18);
+  actx.strokeStyle = 'rgba(255,255,255,0.25)';
+  actx.lineWidth = 1;
+  actx.strokeRect(6, midY-9, memW, 18);
+  actx.fillStyle = 'rgba(255,255,255,0.55)';
+  actx.font = '10px Roboto Mono';
+  actx.textAlign = 'left';
+  actx.fillText('細胞外 (Na⁺ 多)', 8, top+12);
+  actx.fillText('細胞内 (K⁺ 多)', 8, top+plotH-6);
+
+  // Na channel (left) and K channel (right)
+  var naX = memCx - memW*0.22, kX = memCx + memW*0.22;
+  var naOpen = st.m*st.m*st.m*st.h;       // 0..1 open fraction
+  var kOpen  = st.n*st.n*st.n*st.n;
+  drawChannel(naX, midY, naOpen, '#ff5a5a', 'Na⁺');
+  drawChannel(kX, midY, kOpen, '#4d9bff', 'K⁺');
+
+  /* ion particles: Na+ in (downward) on upstroke, K+ out (upward) on downstroke */
+  if (!reduceMotion){
+    if (naOpen > 0.12 && Math.random() < naOpen){ ionParticles.push({x:naX+(Math.random()-0.5)*10, y:midY-9, vy:-1.1-naOpen*1.4, c:'#ff7a7a', dir:1}); }
+    if (kOpen > 0.10 && Math.random() < kOpen){ ionParticles.push({x:kX+(Math.random()-0.5)*10, y:midY+9, vy:1.0+kOpen*1.3, c:'#7ab8ff', dir:-1}); }
+  }
+  for (var i=ionParticles.length-1;i>=0;i--){
+    var pt = ionParticles[i];
+    pt.y -= pt.vy; // dir handled by sign of vy seed
+    actx.beginPath();
+    actx.arc(pt.x, pt.y, 3, 0, 6.283);
+    actx.fillStyle = pt.c;
+    actx.fill();
+    if (pt.y < top+4 || pt.y > top+plotH-4) ionParticles.splice(i,1);
+  }
+  if (ionParticles.length > 160) ionParticles.splice(0, ionParticles.length-160);
+
+  // conductance mini-bars under membrane panel
+  var barY = top+plotH+6;
+  actx.fillStyle='rgba(255,90,90,0.85)';
+  actx.fillRect(8, barY, (gNaNow/p.gNa)*(memW*0.42), 6);
+  actx.fillStyle='rgba(77,155,255,0.85)';
+  actx.fillRect(8+memW*0.5, barY, (gKNow/p.gK)*(memW*0.42), 6);
+
+  /* ===== oscilloscope panel ===== */
+  // threshold + rest reference lines
+  var yThresh = vToY(-55, top, plotH), yRest = vToY(V_REST, top, plotH), yZero = vToY(0, top, plotH);
+  actx.strokeStyle='rgba(255,255,255,0.10)'; actx.lineWidth=1;
+  [50,0,-55,-65,-90].forEach(function(vv){
+    var yy = vToY(vv, top, plotH);
+    actx.beginPath(); actx.moveTo(scopeX, yy); actx.lineTo(scopeX+scopeW, yy); actx.stroke();
+    actx.fillStyle='rgba(255,255,255,0.4)'; actx.textAlign='right'; actx.font='9px Roboto Mono';
+    actx.fillText(vv+'', scopeX-2, yy+3);
+  });
+  // threshold dashed
+  actx.save(); actx.setLineDash([4,3]); actx.strokeStyle='rgba(255,210,80,0.6)';
+  actx.beginPath(); actx.moveTo(scopeX, yThresh); actx.lineTo(scopeX+scopeW, yThresh); actx.stroke();
+  actx.restore();
+  actx.fillStyle='rgba(255,210,80,0.85)'; actx.textAlign='left'; actx.font='9px Roboto Mono';
+  actx.fillText('閾値 ≈ -55', scopeX+4, yThresh-3);
+
+  // trace
+  var t0 = Math.max(0, st.t - T_WIN);
+  actx.beginPath();
+  for (var j=0;j<hist.length;j++){
+    var hx = scopeX + ((hist[j].t - t0)/T_WIN)*scopeW;
+    var hy = vToY(hist[j].V, top, plotH);
+    if (j===0) actx.moveTo(hx, hy); else actx.lineTo(hx, hy);
+  }
+  actx.strokeStyle='#00ff88'; actx.lineWidth=2; actx.stroke();
+  // moving head dot
+  if (hist.length){
+    var last = hist[hist.length-1];
+    var hxL = scopeX + ((last.t - t0)/T_WIN)*scopeW;
+    var hyL = vToY(last.V, top, plotH);
+    actx.beginPath(); actx.arc(hxL, hyL, 4, 0, 6.283); actx.fillStyle='#aaffcc'; actx.fill();
+  }
+
+  /* titles + phase */
+  actx.fillStyle='rgba(255,255,255,0.9)'; actx.font='bold 12px Roboto Mono'; actx.textAlign='left';
+  actx.fillText('膜 (チャネル/イオン)', 8, 20);
+  actx.fillText('Vm スコープ (mV vs ms)', scopeX, 20);
+  var ph = phaseName(st.V, info ? info.dVdt : 0, stim>0);
+  actx.fillStyle = stim>0 ? '#ffd24d' : '#9fe8c2';
+  actx.font='bold 12px Roboto Mono'; actx.textAlign='right';
+  actx.fillText(ph, scopeX+scopeW, 20);
+
+  /* live stat-card numbers */
+  setText('live-vm', st.V.toFixed(1));
+  setText('live-phase', ph);
+  setText('live-gna', gNaNow.toFixed(1));
+  setText('live-gk', gKNow.toFixed(1));
+}
+
+function drawChannel(cx, midY, openFrac, color, label){
+  // gate opening visualized as a gap; pore width grows with openFrac
+  var gap = 4 + openFrac*12;
+  actx.fillStyle = '#0a1428';
+  actx.fillRect(cx-9, midY-9, 18, 18);
+  actx.strokeStyle = color; actx.lineWidth = 2;
+  actx.strokeRect(cx-9, midY-9, 18, 18);
+  // pore (open channel = bright fill)
+  actx.fillStyle = 'rgba('+(color==='#ff5a5a'?'255,90,90':'77,155,255')+','+(0.25+openFrac*0.6)+')';
+  actx.fillRect(cx-gap/2, midY-9, gap, 18);
+  actx.fillStyle = color; actx.font='9px Roboto Mono'; actx.textAlign='center';
+  actx.fillText(label, cx, midY-13);
+  actx.fillStyle='rgba(255,255,255,0.6)';
+  actx.fillText((openFrac*100).toFixed(0)+'%', cx, midY+22);
+}
+
+function setText(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; }
+
+function frame(ts){
+  if (!playing){ animId = null; return; }
+  if (!lastTs) lastTs = ts;
+  var dtReal = Math.min(60, ts - lastTs);
+  lastTs = ts;
+  // slow-mo: ~36 ms model-time per real second so the ~2 ms spike is clearly visible
+  var modelMs = dtReal * 0.036;
+  var info = stepModel(modelMs);
+  // loop the window
+  if (st.t > T_WIN + 6){ resetState(); }
+  drawAnim(info);
+  animId = requestAnimationFrame(frame);
+}
+
+function apToggle(){
+  playing = !playing;
+  var btn = document.getElementById('anim-play');
+  if (btn) btn.textContent = playing ? '⏸ 一時停止' : '▶ 再生';
+  if (playing){ lastTs = 0; if (!animId) animId = requestAnimationFrame(frame); }
+}
+
+function apRestart(){
+  resetState();
+  if (reduceMotion){ drawStaticAP(); return; }
+  lastTs = 0;
+  if (playing && !animId) animId = requestAnimationFrame(frame);
+  if (!playing){ drawAnim({dVdt:0}); }
+}
+
+/* prefers-reduced-motion: render one full AP trace, no animation */
+function drawStaticAP(){
+  if (!actx) return;
+  playing = false;
+  var p = params();
+  // integrate a full window into hist
+  resetState();
+  var steps = Math.round((T_WIN+5) / DT);
+  for (var i=0;i<steps;i++){ stepModel(DT); }
+  // map onto scope using whole window
+  drawAnim({dVdt:0});
+}
+
+/* ===== wiring ===== */
+window.runSim = runSim;
+window.switchTab = switchTab;
+window.apToggle = apToggle;
+window.apRestart = apRestart;
+
+window.addEventListener('resize', function(){ resizeAnim(); if (reduceMotion) drawStaticAP(); else drawAnim({dVdt:0}); });
+window.addEventListener('load', function(){
+  resizeAnim();
+  runSim();              // populates Chart.js panels AND (via apRestart) starts the live animation
+});
+})();
 </script>
 <script src="/assets/sidebar-inject.v9.js" defer></script>
 <script src="/tools/related-tools.js" defer></script>
@@ -478,6 +700,9 @@ $$
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="neuron-action-potential.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -532,16 +757,16 @@ $$
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>刺激電流値(iextNum)を0.1～10μA/cm²の範囲で設定し、スライダーで微調整する</li>
-<li>刺激開始時刻(tonNum)を0～50msで指定して活動電位の発火タイミングを決定する</li>
+<li>刺激電流値(iextNum)を0～50μA/cm²の範囲で設定し、スライダーで微調整する（閾値は約7μA/cm²）</li>
+<li>刺激開始時刻(tonNum)を0～10msで指定して活動電位の発火タイミングを決定する</li>
 <li>刺激パルス幅(tstimNum)を0.1～5msで入力し、Na⁺チャネルとK⁺チャネルの開閉動態を観察する</li>
-<li>膜容量(cmNum)を0.8～1.2μF/cm²の範囲で変更してイオンチャネル電流に対する応答性を比較する</li>
+<li>膜容量(cmNum)を0.5～3μF/cm²の範囲で変更してイオンチャネル電流に対する応答性を比較する</li>
 <li>計算開始ボタンをクリックすると、ホジキン-ハクスレー方程式によるV_m、m、h、n値が0.01ms刻みで算出される</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>ウシガエル巨大軸索(直径1mm)を対象に、iext=7.0μA/cm²、ton=10ms、tstim=1.0msで刺激した場合、V_m初期値-65mVから約13ms時点でNa⁺内流により-30mVの閾値に達し、活動電位が発生する。このときm値(Na⁺活性化)は0.05から0.8に急上昇し、h値(Na⁺不活性化)は0.6から0.1に低下する。その後K⁺外流によりV_mは-90mVへ再分極し、n値が増加して過分極が生じる。刺激がない場合、V_mは-65mVの静止膜電位に収束する。</p>
+<p>イカ巨大軸索(squid giant axon)のHHパラメータを対象に、iext=7.0μA/cm²、ton=10ms、tstim=1.0msで刺激した場合、V_m初期値-65mVから刺激後まもなくNa⁺内流により-30mV付近の閾値に達し、活動電位が発生してピークは約+40mVに到達する。このときm値(Na⁺活性化)は約0.05から0.99近くまで急上昇し、h値(Na⁺不活性化)は約0.6から0.1未満に低下する。その後K⁺外流によりV_mは約-76mVまで再分極（後過分極）し、n値が増加する。刺激がない場合、V_mは-65mVの静止膜電位に収束する。</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -552,6 +777,16 @@ $$
 <li>本シミュレーターはスクイド軸索データに基づいているため、脊椎動物ニューロンへの適用時は各種チャネルコンダクタンス値の再設定が必要</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4816367659?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4816367659.09._SCMZZZZZZ_.jpg" alt="バイオメカニクスの参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">バイオメカニクス の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

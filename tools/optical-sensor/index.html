@@ -41,14 +41,14 @@ window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "光センサー・フォトディテクター設計シミュレーター",
       "description": "フォトディテクターの応答度・NEP・比検出率D*・SNR・ショット雑音・熱雑音を計算するインタラクティブ設計ツール。",
       "applicationCategory": "EngineeringApplication",
       "operatingSystem": "Web",
       "url": "https://novasolver.jp/tools/optical-sensor.html",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp" },
+      "publisher":{ "@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"] },
       "inLanguage": "ja",
       "isAccessibleForFree": true,
       "featureList": ["応答度計算", "雑音等価電力NEP", "比検出率D*", "SNR計算", "ショット雑音", "熱雑音（Johnson雑音）"]
@@ -254,7 +254,16 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
       </div>
       <input type="range" id="sPinc" min="0.001" max="1000" step="0.001" value="1" oninput="syncToNum('sPinc','sPincNum');updateSlider(this);compute()">
     </div>
-</div>
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+  </div>
 <div class="viz-panel">
     <div class="chart-card"><div class="chart-title"><i class="fas fa-calculator"></i> 計算結果</div>
     <div class="stat-cards">
@@ -283,6 +292,11 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
         <div class="sl">最小検出信号 [pW]</div>
       </div>
     </div>
+    </div>
+
+    <div class="chart-card" style="margin-top:16px">
+      <div class="chart-title"><i class="fas fa-bolt"></i> 光→電流変換ライブ可視化（I = R·P）</div>
+      <canvas id="heroCanvas" style="width:100%;height:300px;display:block"></canvas>
     </div>
 
 
@@ -432,6 +446,156 @@ function getParams(){
   setSlider('sPinc',q.P,'vPinc',3,'μW');
   compute();
 }window.addEventListener('load', () => compute());
+
+/* ===== v2 hero animation: photons -> photocurrent (I = R*P) ===== */
+(function(){
+  var cv = document.getElementById('heroCanvas');
+  if(!cv) return;
+  var L = {
+    src:'光源', det:'検出器', amp:'出力電流',
+    R:'応答度 R', I:'光電流', snr:'SNR', lam:'波長', P:'入射光',
+    absorbed:'吸収 (η)', current:'光電流 I(t)'
+  };
+  var ctx = cv.getContext('2d');
+  var QE=1.602e-19, HP=6.626e-34, CC=3e8;
+  function gv(id){ var el=document.getElementById(id); return el?parseFloat(el.value):0; }
+  function physics(){
+    var eta=gv('sEta'), lamnm=gv('sLamD'), Bw=gv('sBW')*1e9;
+    var Id=gv('sIdark')*1e-9, RL=gv('sRL'), T=gv('sTemp'), Pw=gv('sPinc')*1e-6;
+    var lam=lamnm*1e-9, nu=CC/lam;
+    var R=eta*QE/(HP*nu);
+    var Iph=R*Pw;
+    var ish2=2*QE*(Iph+Id)*Bw, ith2=4*1.38e-23*T*Bw/RL;
+    var sig2=(R*Pw)*(R*Pw);
+    var snr=sig2/(ish2+ith2);
+    var snrdb=10*Math.log10(Math.max(snr,1e-30));
+    return {eta:eta,lamnm:lamnm,R:R,Iph:Iph,Pw:Pw,snrdb:snrdb,snr:snr};
+  }
+  var dpr=Math.max(1,window.devicePixelRatio||1), W=0,H=0;
+  function resize(){
+    var w=cv.clientWidth||cv.offsetWidth||600, h=cv.clientHeight||300;
+    W=w; H=h; cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  // wavelength (nm) -> approximate RGB for visible; IR rendered deep red
+  function wlColor(nm){
+    var r=0,g=0,b=0;
+    if(nm<440){r=-(nm-440)/(440-380);g=0;b=1;}
+    else if(nm<490){r=0;g=(nm-440)/(490-440);b=1;}
+    else if(nm<510){r=0;g=1;b=-(nm-510)/(510-490);}
+    else if(nm<580){r=(nm-510)/(580-510);g=1;b=0;}
+    else if(nm<645){r=1;g=-(nm-645)/(645-580);b=0;}
+    else {r=1;g=0;b=0;}
+    if(nm>700){ r=1; g=0.15; b=0.15; } // near-IR -> deep red proxy
+    return 'rgb('+Math.round(r*255)+','+Math.round(g*255)+','+Math.round(b*255)+')';
+  }
+  var photons=[], electrons=[], trace=[], spawnAcc=0, lastT=0;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function fmtCur(I){
+    var a=Math.abs(I);
+    if(a>=1e-3) return (I*1e3).toFixed(2)+' mA';
+    if(a>=1e-6) return (I*1e6).toFixed(2)+' μA';
+    if(a>=1e-9) return (I*1e9).toFixed(2)+' nA';
+    return (I*1e12).toFixed(2)+' pA';
+  }
+  function draw(now){
+    var p=physics();
+    var col=wlColor(p.lamnm);
+    var dt = lastT? Math.min(0.05,(now-lastT)/1000):0.016; lastT=now;
+    var detX=W*0.5, detW=Math.max(34,W*0.06), detTop=H*0.16, detBot=H*0.62;
+    // background
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a1226'; ctx.fillRect(0,0,W,H);
+    // detector slab
+    var grad=ctx.createLinearGradient(detX-detW/2,0,detX+detW/2,0);
+    grad.addColorStop(0,'#13315c'); grad.addColorStop(1,'#1b4a86');
+    ctx.fillStyle=grad;
+    ctx.fillRect(detX-detW/2,detTop,detW,detBot-detTop);
+    ctx.strokeStyle='#3fa9ff'; ctx.lineWidth=2;
+    ctx.strokeRect(detX-detW/2,detTop,detW,detBot-detTop);
+    ctx.fillStyle='rgba(255,255,255,.75)'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(L.det, detX, detBot+16);
+    // source marker (left)
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(W*0.06,H*0.39,9,0,6.2832); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.textAlign='left';
+    ctx.fillText(L.src, W*0.02, H*0.39-16);
+    // output meter (right)
+    ctx.strokeStyle='rgba(0,184,148,.8)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(detX+detW/2,H*0.39); ctx.lineTo(W*0.86,H*0.39); ctx.stroke();
+    ctx.fillStyle='rgba(0,184,148,.18)';
+    ctx.fillRect(W*0.86,H*0.30,W*0.10,H*0.18);
+    ctx.strokeStyle='#00b894'; ctx.strokeRect(W*0.86,H*0.30,W*0.10,H*0.18);
+    ctx.fillStyle='#00b894'; ctx.textAlign='center';
+    ctx.fillText('A', W*0.91, H*0.41);
+    // spawn photons proportional to log optical power
+    var rate = 4 + 26*(Math.log10(Math.max(p.Pw,1e-9))+9)/12; // photons/frame scale
+    if(reduce) rate=0;
+    spawnAcc += rate*dt*30;
+    while(spawnAcc>=1){
+      spawnAcc-=1;
+      photons.push({x:W*0.07,y:H*0.39+(Math.random()-0.5)*(detBot-detTop)*0.8,
+        vx:(W*0.45)/ (0.9+Math.random()*0.4), seed:Math.random()});
+    }
+    // move + draw photons
+    ctx.fillStyle=col;
+    for(var i=photons.length-1;i>=0;i--){
+      var ph=photons[i];
+      ph.x+=ph.vx*dt;
+      ctx.globalAlpha=0.9;
+      ctx.beginPath(); ctx.arc(ph.x,ph.y,3,0,6.2832); ctx.fill();
+      if(ph.x>=detX-detW/2){
+        photons.splice(i,1);
+        if(ph.seed<p.eta){ // absorbed -> electron generated
+          electrons.push({x:detX,y:ph.y,vx:(W*0.34)/0.8});
+        }
+      }
+    }
+    ctx.globalAlpha=1;
+    // electrons flow to meter
+    ctx.fillStyle='#7CFFB2';
+    for(var j=electrons.length-1;j>=0;j--){
+      var el=electrons[j];
+      el.x+=el.vx*dt;
+      ctx.beginPath(); ctx.arc(el.x,el.y>H*0.39?H*0.39:el.y, 2.5,0,6.2832);
+      // nudge electrons toward the wire line
+      el.y += (H*0.39-el.y)*Math.min(1,dt*6);
+      ctx.fill();
+      if(el.x>=W*0.86) electrons.splice(j,1);
+    }
+    // live current trace with noise jitter (bottom strip)
+    var baseY=H*0.82, ampY=H*0.13;
+    var noiseAmp = ampY*Math.min(1, 1/Math.max(p.snr,0.01)*4);
+    var sample = baseY - ampY - (reduce?0:(Math.random()-0.5)*2*noiseAmp);
+    trace.push(sample);
+    var maxN=Math.floor(W*0.9);
+    while(trace.length>maxN) trace.shift();
+    ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(W*0.05,baseY); ctx.lineTo(W*0.95,baseY); ctx.stroke();
+    ctx.strokeStyle='#00b894'; ctx.lineWidth=1.5; ctx.beginPath();
+    for(var k=0;k<trace.length;k++){
+      var tx=W*0.05+k*(W*0.9/maxN), ty=trace[k];
+      if(k===0) ctx.moveTo(tx,ty); else ctx.lineTo(tx,ty);
+    }
+    ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.55)'; ctx.textAlign='left'; ctx.font='10px sans-serif';
+    ctx.fillText(L.current, W*0.05, baseY+14);
+    // live numbers overlay
+    ctx.textAlign='left'; ctx.font='12px monospace'; ctx.fillStyle='#cfe8ff';
+    ctx.fillText(L.lam+' = '+p.lamnm.toFixed(0)+' nm', 10, 18);
+    ctx.fillText(L.P+' = '+(p.Pw*1e6).toFixed(3)+' μW', 10, 34);
+    ctx.fillStyle='#9CFFD0';
+    ctx.fillText(L.R+' = '+p.R.toFixed(3)+' A/W', W*0.40, 18);
+    ctx.fillText(L.I+' = '+fmtCur(p.Iph), W*0.40, 34);
+    ctx.fillStyle='#FFD27A';
+    ctx.fillText(L.snr+' = '+p.snrdb.toFixed(1)+' dB', W*0.72, 18);
+    ctx.fillText(L.absorbed+' = '+(p.eta*100).toFixed(0)+'%', W*0.72, 34);
+    if(!reduce) requestAnimationFrame(draw);
+  }
+  function start(){ resize(); if(reduce){ draw(0); } else { requestAnimationFrame(draw); } }
+  window.addEventListener('resize', function(){ resize(); if(reduce) draw(0); });
+  if(document.readyState==='complete'||document.readyState==='interactive') start();
+  else window.addEventListener('load', start);
+})();
 </script>
 
 <section class="explanation">
@@ -493,6 +657,9 @@ function getParams(){
 
 </section>
 
+
+
+
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="optical-sensor.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
  <h2 style="font-size:1.05rem;line-height:1.35;margin:0 0 14px;color:#102033;display:flex;align-items:center;gap:8px"><i class="fas fa-diagram-project" style="color:#007BFF"></i>関連ツール</h2>
@@ -532,14 +699,14 @@ function getParams(){
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>量子効率η(0～1.0)と波長λ(300～1700nm)を入力して応答度Rを決定する。例えばシリコンフォトダイオードでη=0.8、λ=850nmの場合、R≈0.68A/Wとなる</li>
+<li>量子効率η(0.01～1.0)と波長λ(400～2000nm)を入力して応答度Rを決定する。例えばシリコンフォトダイオードでη=0.8、λ=850nmの場合、R≈0.55A/Wとなる</li>
 <li>検出面積A(mm²)と帯域幅BW(Hz)を設定し、ショット雑音と熱雑音を計算する。ショット雑音電流は i_shot=√(2eI_ph×BW)で、I_phは光電流</li>
 <li>NEP(雑音等価電力)とD*(比検出率)を確認し、入力光パワーに対するSNRと最小検出信号を評価する。D*が高いほど微弱光検出に適している</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>InGaAs APD(η=0.85、λ=1550nm)で検出面積100μm²、帯域幅1MHzの場合を想定する。応答度R=1.35A/W、光電流I_ph=13.5μA(入力10μW)となる。ショット雑音i_shot=58.7nA/√Hz、熱雑音(R_eq=100MΩ)が加わるとNEP≈0.8pW/√Hzに低下する。一方、D*≈2.1×10¹¹cm√Hz/Wと極めて高く、最小検出信号は約5pWレベルで達成される。APDの利得を3倍に増やすとSNRは3dB向上する</p>
+<p>InGaAs APD(η=0.85、λ=1550nm)で検出面積100μm²、帯域幅1MHzの場合を想定する。応答度R=1.06A/W、光電流I_ph=10.6μA(入力10μW)となる。ショット雑音i_shot≈2.1pA/√Hz、熱雑音(R_L=1kΩ)が加わるとNEPは数pW/√Hzレベルとなる。D*も高く、微弱光検出に適する。負荷抵抗R_Lを大きくするほど熱雑音が下がりSNRが改善する</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -547,9 +714,19 @@ function getParams(){
 <li>波長による量子効率の急低下に注意。例えばSiPDはIR域(1100nm超)で極端に効率低下し、この領域ではInGaAs系デバイスが必須</li>
 <li>帯域幅を大きくするとNEPが悪化する(√BW特性)。低速計測では1kHz程度に制限してS/N比を確保すること</li>
 <li>検出面積拡大でD*が低下する傾向。空間分解能とSNRのトレードオフを考慮し、用途に応じて100μm²～1mm²の範囲で最適化すること</li>
-<li>タランスインピーダンス回路での熱雑音は帰還抵抗R_eqに依存。R_eq=1GΩでもNEP100pW/√Hzレベルに悪化するため、増幅段の設計が重要</li>
+<li>トランスインピーダンス回路の熱雑音は負荷抵抗R_Lに依存。本ツールのR_L(最大10kΩ)を大きくするほど熱雑音は低下するため、低雑音増幅段の設計が重要</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4254131518?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4254131518.09._SCMZZZZZZ_.jpg" alt="光学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">光学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>

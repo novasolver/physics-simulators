@@ -42,7 +42,7 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "SoftwareApplication",
+      "@type": "SoftwareApplication","publishingPrinciples":"https://novasolver.jp/about/methodology.html",
       "name": "フィン熱伝達シミュレーター",
       "description": "フィン方程式を解いてフィン効率ηと温度分布をリアルタイム可視化。矩形・三角形・環状フィン、フィンアレイの最適間隔設計を計算。",
       "url": "https://novasolver.jp/tools/fin-heat-transfer.html",
@@ -52,7 +52,7 @@
       "browserRequirements": "Requires JavaScript",
       "isAccessibleForFree": true,
       "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp"},
+      "publisher":{"@type": "Organization", "name": "NovaSolver Project", "url": "https://novasolver.jp","sameAs":["https://github.com/novasolver"]},
       "featureList": ["フィン方程式の解析解によるリアルタイム計算","温度分布のカラーグラデーション可視化","フィン効率 vs mL曲線のインタラクティブプロット"],
       "keywords": "フィン,熱伝達,フィン効率,温度分布,放熱フィン,ヒートシンク,熱設計,CAE",
       "datePublished": "2026-04-08",
@@ -228,7 +228,15 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 
     <div class="divider"></div>
     <div class="panel-title">計算結果</div>
-
+  
+    <aside class="panel-ad">
+  <div class="panel-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="panel-ad-book" href="https://www.amazon.co.jp/dp/4888983372?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983372.09._SCMZZZZZZ_.jpg" alt="伝熱工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="panel-ad-book-cat">伝熱工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="panel-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
   </div>
 
   <div class="viz-panel">
@@ -243,8 +251,19 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
     </div>
     </div>
 
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> フィン</div><canvas id="finCanvas" height="200"></canvas></div>
-    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 温度</div><canvas class="ux-chartjs-canvas" id="tempChart"></canvas></div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-fire"></i> 単一フィンの熱伝達ライブ可視化</div>
+      <canvas id="finCanvas" height="240" role="img" aria-label="高温の根元から先端へ温度が減衰する単一フィンと、表面から逃げる対流熱のアニメーション"></canvas>
+      <div class="finlegend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:#6c757d;margin-top:8px">
+        <span><i style="display:inline-block;width:18px;height:8px;border-radius:2px;background:linear-gradient(90deg,#ff3b30,#ffd54a,#4aa3ff);vertical-align:middle"></i> 温度マップ θ(x)</span>
+        <span><i style="display:inline-block;width:14px;height:3px;background:#00B4D8;vertical-align:middle"></i> 表面から逃げる対流熱</span>
+        <span><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#ffec80;vertical-align:middle"></i> 根元→先端へ伝わる熱</span>
+      </div>
+      <div class="play-row" style="display:flex;gap:8px;align-items:center;margin-top:10px">
+        <button class="preset-btn" type="button" id="finPlay">⏸ 一時停止</button>
+        <span style="font-size:.72rem;color:#6c757d" id="finHint">スライダーで L・h・k・T_b を動かすと温度減衰がリアルタイムに変化します</span>
+      </div>
+    </div>
+    <div class="chart-card"><div class="chart-title"><i class="fas fa-chart-line"></i> 温度分布 T(x)</div><canvas class="ux-chartjs-canvas" id="tempChart"></canvas></div>
   
 <div class="chart-card"><div class="chart-title"><i class="fas fa-square-root-alt"></i> 理論・主要公式</div>
 
@@ -256,207 +275,294 @@ details.theory-box[open]>summary .expand-icon,details.cae-note[open]>summary .ex
 </div>
 
 <script>
+(function(){
+  "use strict";
+  var T = {
+    base: 'ベース', tipLabel: '先端', heatLabel: '熱流', play: '⏸ 一時停止', pause: '▶ 再生',
+    tempChart: 'T(x) 温度分布 [°C]', xAxis: 'フィン位置 x (mm)', yAxis: '温度 T (°C)', fins: '枚'
+  };
+  var canvas = document.getElementById('finCanvas');
+  if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var chart = null;
+  var finType = 'rect';
+  var materials = { aluminum: 200, copper: 400, steel: 50 };
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var playing = !reduce;
+  var particles = [];        // convection heat leaving the surface
+  var conductFront = 0;      // 0..1 marching pulse from base to tip
+  var lastTs = 0;
+  var cur = null;            // current physics state
 
-const canvas = document.getElementById('finCanvas');
-const ctx = canvas.getContext('2d');
-let chart;
-let finType = 'rect';
+  function el(id){ return document.getElementById(id); }
 
-const materials = {
-  aluminum: 200,
-  copper:   400,
-  steel:    50
-};
-
-function setFinType(t, btn){
-  finType = t;
-  document.querySelectorAll('#ftRect,#ftTri,#ftAnn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  update();
-}function setMaterial(m, btn){
-  document.querySelectorAll('#matAl,#matCu,#matSt').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('sk').value = materials[m];
-  update();
-}function tempColor(ratio){
-  // 0 = cold (blue), 1 = hot (red)
-  const r = Math.round(30 + ratio * 225);
-  const g = Math.round(50 + (1-Math.abs(ratio-0.5)*2) * 120);
-  const b = Math.round(230 - ratio * 210);
-  return `rgb(${r},${g},${b})`;
-}function update(){
-  ['sL','st','sW','sk','sh','sTb','sTinf','sN'].forEach(updateSlider);
-
-  const L = parseFloat(document.getElementById('sL').value) * 1e-3;
-  const t = parseFloat(document.getElementById('st').value) * 1e-3;
-  const W = parseFloat(document.getElementById('sW').value) * 1e-3;
-  const k = parseFloat(document.getElementById('sk').value);
-  const h = parseFloat(document.getElementById('sh').value);
-  const Tb = parseFloat(document.getElementById('sTb').value);
-  const Tinf = parseFloat(document.getElementById('sTinf').value);
-  const N  = parseInt(document.getElementById('sN').value);
-
-  (function(){var _e=document.getElementById('vLNum');if(_e){if(_e.tagName==='INPUT')_e.value=(L*1e3).toFixed(0);else _e.textContent=(L*1e3).toFixed(0)+' mm';}})();
-  (function(){var _e=document.getElementById('vtNum');if(_e){if(_e.tagName==='INPUT')_e.value=(t*1e3).toFixed(1);else _e.textContent=(t*1e3).toFixed(1)+' mm';}})();
-  (function(){var _e=document.getElementById('vWNum');if(_e){if(_e.tagName==='INPUT')_e.value=(W*1e3).toFixed(0);else _e.textContent=(W*1e3).toFixed(0)+' mm';}})();
-  (function(){var _e=document.getElementById('vkNum');if(_e){if(_e.tagName==='INPUT')_e.value=k.toFixed(0);else _e.textContent=k.toFixed(0)+' W/mK';}})();
-  (function(){var _e=document.getElementById('vhNum');if(_e){if(_e.tagName==='INPUT')_e.value=h.toFixed(0);else _e.textContent=h.toFixed(0)+' W/m²K';}})();
-  (function(){var _e=document.getElementById('vTbNum');if(_e){if(_e.tagName==='INPUT')_e.value=Tb.toFixed(0);else _e.textContent=Tb.toFixed(0)+' °C';}})();
-  (function(){var _e=document.getElementById('vTinfNum');if(_e){if(_e.tagName==='INPUT')_e.value=Tinf.toFixed(0);else _e.textContent=Tinf.toFixed(0)+' °C';}})();
-  (function(){var _e=document.getElementById('sNNum');if(_e){if(_e.tagName==='INPUT')_e.value=N;else _e.textContent=N+' 枚';}})();
-
-  // Fin geometry
-  const P = 2 * (W + t);  // perimeter
-  const A = W * t;         // cross-section area
-
-  const m = Math.sqrt(h * P / (k * A));
-  const mL = m * L;
-  const eta = Math.tanh(mL) / mL;
-  const theta_b = Tb - Tinf;
-
-  // Heat transfer: Q = eta * h * As * theta_b  where As = P*L
-  const As = P * L;
-  const Q_single = eta * h * As * theta_b;
-  const Q_no_fin = h * A * theta_b; // without fin (just base area)
-  const Q_total = N * Q_single;
-  const enhance = Q_single / (Q_no_fin || 0.001);
-  const T_tip = Tinf + theta_b / Math.cosh(mL);
-
-  document.getElementById('statEta').textContent = (eta*100).toFixed(1) + '%';
-  document.getElementById('statmL').textContent = mL.toFixed(3);
-  document.getElementById('statQ').textContent = Q_single.toFixed(3) + ' W';
-  document.getElementById('statQtot').textContent = Q_total.toFixed(2) + ' W';
-  document.getElementById('statEnhance').textContent = enhance.toFixed(1) + '×';
-  document.getElementById('statTtip').textContent = T_tip.toFixed(1) + ' °C';
-
-  drawFin(L, t, W, m, mL, Tb, Tinf, theta_b);
-  updateChart(m, L, mL, Tb, Tinf, theta_b);
-}function drawFin(L, t, W, m, mL, Tb, Tinf, theta_b){
-  const cW = canvas.offsetWidth, cH = 200;
-  var __novaW = cW;
-  var __novaH = cH;
-  var __novaDpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  canvas.style.width = __novaW + 'px';
-  canvas.style.height = __novaH + 'px';
-  canvas.width = Math.round(__novaW * __novaDpr);
-  canvas.height = Math.round(__novaH * __novaDpr);
-  canvas.dataset.cssW = String(__novaW);
-  canvas.dataset.cssH = String(__novaH);
-  var __novaCtx = canvas.getContext && canvas.getContext('2d');
-  if (__novaCtx) __novaCtx.setTransform(__novaDpr, 0, 0, __novaDpr, 0, 0);
-  const c = ctx;
-  c.clearRect(0,0,cW,cH);
-  c.fillStyle = '#f8f9fa';
-  c.fillRect(0,0,cW,cH);
-
-  const margin = 30;
-  const finDrawW = cW - 2*margin - 40;
-  const finDrawH = Math.max(30, Math.min(80, cH * 0.5));
-  const baseX = margin + 30;
-  const finTopY = cH/2 - finDrawH/2;
-
-  // Draw base plate
-  c.fillStyle = '#aab4be';
-  c.fillRect(margin, finTopY - 10, 30, finDrawH + 20);
-  c.fillStyle = '#8899aa';
-  c.font = '11px Noto Sans JP';
-  c.textAlign = 'center';
-  c.fillText('ベース', margin+15, finTopY - 14);
-
-  // Draw fin with gradient
-  const NX = 60;
-  for (let i = 0; i < NX; i++) {
-    const xi = i/NX;
-    const x = i/NX;
-    const theta_ratio = Math.cosh(m*(L*(1-x))) / Math.cosh(mL);
-    const T = Tinf + theta_b * theta_ratio;
-    const ratio = (T - Tinf) / (theta_b || 1);
-    const fw = finDrawW / NX + 1;
-    let fh = finDrawH;
-    if (finType === 'tri') fh = finDrawH * (1 - xi * 0.85);
-    const fy = cH/2 - fh/2;
-    c.fillStyle = tempColor(ratio);
-    c.fillRect(baseX + xi*finDrawW, fy, fw, fh);
-  }// Outline
-  c.strokeStyle = 'rgba(0,0,0,0.15)';
-  c.lineWidth = 1;
-  c.strokeRect(baseX, finTopY, finDrawW, finDrawH);
-
-  // Arrows for convection
-  for (let i = 0; i < 5; i++){
-    const ax = baseX + (i+0.5) * finDrawW/5;
-    c.strokeStyle = 'rgba(0,123,255,0.4)';
-    c.lineWidth = 1.2;
-    c.beginPath();
-    c.moveTo(ax, finTopY - 5);
-    c.lineTo(ax, finTopY - 20);
-    c.stroke();
-    c.beginPath();
-    c.moveTo(ax, finTopY - 20);
-    c.lineTo(ax-4, finTopY - 14);
-    c.moveTo(ax, finTopY - 20);
-    c.lineTo(ax+4, finTopY - 14);
-    c.stroke();
-  }// Labels
-  c.fillStyle = '#1a1a2e';
-  c.font = '11px Roboto Mono, monospace';
-  c.textAlign = 'left';
-  c.fillText(`T_b = ${Tb}°C`, baseX + 2, cH - 8);
-  c.textAlign = 'right';
-  c.fillText(`T_tip ≈ ${(Tinf + theta_b/Math.cosh(mL)).toFixed(1)}°C`, baseX + finDrawW, cH - 8);
-
-  // Color bar (temperature scale)
-  const cbX = cW - 24, cbY = 15, cbH = cH - 30;
-  for (let i = 0; i < cbH; i++){
-    c.fillStyle = tempColor(1 - i/cbH);
-    c.fillRect(cbX, cbY + i, 12, 1);
+  // ---- physics for the current input set ----
+  function physics(){
+    var L = parseFloat(el('sL').value) * 1e-3;
+    var t = parseFloat(el('st').value) * 1e-3;
+    var W = parseFloat(el('sW').value) * 1e-3;
+    var k = parseFloat(el('sk').value);
+    var h = parseFloat(el('sh').value);
+    var Tb = parseFloat(el('sTb').value);
+    var Tinf = parseFloat(el('sTinf').value);
+    var N = parseInt(el('sN').value, 10);
+    var P = 2 * (W + t);          // perimeter
+    var A = W * t;                // cross-section area
+    var m = Math.sqrt(h * P / (k * A));
+    var mL = m * L;
+    var thetaB = Tb - Tinf;
+    var eta = Math.tanh(mL) / mL;
+    // exact fin heat rate: q = sqrt(hPkA)*thetaB*tanh(mL)  ( = eta*h*(P*L)*thetaB )
+    var q = Math.sqrt(h * P * k * A) * thetaB * Math.tanh(mL);
+    var qNoFin = h * A * thetaB;  // bare base patch
+    var qTotal = N * q;
+    var eff = q / (qNoFin || 1e-9);   // fin effectiveness
+    var Ttip = Tinf + thetaB / Math.cosh(mL);
+    return { L:L, t:t, W:W, k:k, h:h, Tb:Tb, Tinf:Tinf, N:N, P:P, A:A,
+             m:m, mL:mL, thetaB:thetaB, eta:eta, q:q, qTotal:qTotal, eff:eff, Ttip:Ttip };
   }
-  c.fillStyle = '#555';
-  c.font = '9px monospace';
-  c.textAlign = 'left';
-  c.fillText(Tb+'°', cbX + 14, cbY + 8);
-  c.fillText(Tinf+'°', cbX + 14, cbY + cbH);
-}function updateChart(m, L, mL, Tb, Tinf, theta_b){
-  const N = 80;
-  const labels = [], dTemp = [], dEta = [];
-  for (let i = 0; i <= N; i++) {
-    const x = (i/N) * L;
-    const xi = x/L;
-    labels.push((x*1e3).toFixed(1));
-    const T = Tinf + theta_b * Math.cosh(m*(L-x)) / Math.cosh(mL);
-    dTemp.push(T);
-  }// Efficiency vs mL curve (secondary)
-  const mLarr = [], etaArr = [];
-  for (let i = 1; i <= 50; i++){
-    const ml = i * 0.1;
-    mLarr.push(ml.toFixed(1));
-    etaArr.push(Math.tanh(ml) / ml * 100);
-  }if (chart){
+
+  function thetaRatio(p, xi){ // xi in 0..1 along fin
+    return Math.cosh(p.mL * (1 - xi)) / Math.cosh(p.mL);
+  }
+
+  // temperature -> color (cool blue .. hot red)
+  function tempColor(r){
+    r = Math.max(0, Math.min(1, r));
+    var R = Math.round(40 + r * 215);
+    var G = Math.round(60 + (1 - Math.abs(r - 0.55) * 1.9) * 150);
+    var B = Math.round(235 - r * 205);
+    return 'rgb(' + R + ',' + Math.max(40, Math.min(220, G)) + ',' + Math.max(20, B) + ')';
+  }
+
+  function writeStats(p){
+    el('statEta').textContent = (p.eta * 100).toFixed(1) + '%';
+    el('statmL').textContent = p.mL.toFixed(3);
+    el('statQ').textContent = p.q.toFixed(3) + ' W';
+    el('statQtot').textContent = p.qTotal.toFixed(2) + ' W';
+    el('statEnhance').textContent = p.eff.toFixed(1) + '×';
+    el('statTtip').textContent = p.Ttip.toFixed(1) + ' °C';
+  }
+
+  function syncNumbers(p){
+    function set(id, v){ var e = el(id); if(e){ if(e.tagName==='INPUT') e.value = v; else e.textContent = v; } }
+    set('vLNum', (p.L*1e3).toFixed(0)); set('vtNum', (p.t*1e3).toFixed(1)); set('vWNum', (p.W*1e3).toFixed(0));
+    set('vkNum', p.k.toFixed(0)); set('vhNum', p.h.toFixed(0)); set('vTbNum', p.Tb.toFixed(0)); set('vTinfNum', p.Tinf.toFixed(0));
+    var sn = el('sNNum'); if(sn){ if(sn.tagName==='INPUT') sn.value = p.N; else sn.textContent = p.N + ' ' + T.fins; }
+    ['sL','st','sW','sk','sh','sTb','sTinf','sN'].forEach(function(id){ if(typeof updateSlider==='function') updateSlider(id); });
+  }
+
+  // ---- HiDPI sizing ----
+  var cssW = 0, cssH = 0;
+  function resize(){
+    cssW = Math.max(260, Math.floor(canvas.offsetWidth || canvas.parentElement.offsetWidth - 4));
+    cssH = 240;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ---- draw one frame of the single-fin heat field ----
+  function drawFin(p, anim){
+    resize();
+    var W = cssW, H = cssH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0b1c34';
+    ctx.fillRect(0,0,W,H);
+
+    var marginL = 70, marginR = 34, marginT = 46, marginB = 34;
+    var finW = W - marginL - marginR;
+    var baseFinH = Math.min(78, Math.max(34, H * 0.34));
+    var midY = (marginT + (H - marginB)) / 2;
+    var baseX = marginL;
+
+    // base plate (hot block)
+    var bpW = 22;
+    var bg = ctx.createLinearGradient(baseX - bpW, 0, baseX, 0);
+    bg.addColorStop(0, '#7a8696'); bg.addColorStop(1, tempColor(1));
+    ctx.fillStyle = bg;
+    ctx.fillRect(baseX - bpW, midY - baseFinH/2 - 12, bpW, baseFinH + 24);
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.font = '11px Noto Sans JP'; ctx.textAlign = 'center';
+    ctx.fillText(T.base, baseX - bpW/2, midY - baseFinH/2 - 16);
+
+    // fin body, column by column, colored by local temperature
+    var NX = 90;
+    for (var i = 0; i < NX; i++){
+      var xi = i / (NX - 1);
+      var r = thetaRatio(p, xi); // 0..1
+      var fh = baseFinH;
+      if (finType === 'tri') fh = baseFinH * (1 - xi * 0.82);
+      else if (finType === 'ann') fh = baseFinH * (0.55 + 0.45 * Math.cos(xi * 0.9));
+      var fx = baseX + xi * finW;
+      var fw = finW / NX + 1.2;
+      ctx.fillStyle = tempColor(r);
+      ctx.fillRect(fx, midY - fh/2, fw, fh);
+    }
+    // fin outline
+    ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 1;
+    ctx.strokeRect(baseX, midY - baseFinH/2, finW, baseFinH);
+
+    // conduction pulse: bright band travelling base->tip, fading with theta
+    if (anim){
+      var fxp = baseX + conductFront * finW;
+      var rr = thetaRatio(p, conductFront);
+      var grad = ctx.createRadialGradient(fxp, midY, 1, fxp, midY, 26);
+      grad.addColorStop(0, 'rgba(255,236,128,' + (0.55 * rr + 0.15).toFixed(3) + ')');
+      grad.addColorStop(1, 'rgba(255,236,128,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(fxp - 26, midY - baseFinH/2 - 6, 52, baseFinH + 12);
+    }
+
+    // convection arrows + rising heat particles along the surface
+    var topY = midY - baseFinH/2;
+    var nArrow = 7;
+    for (var a = 0; a < nArrow; a++){
+      var ax = baseX + (a + 0.5) * finW / nArrow;
+      var axi = (a + 0.5) / nArrow;
+      var rA = thetaRatio(p, axi);
+      var alpha = 0.15 + 0.55 * rA;       // more heat where hotter
+      ctx.strokeStyle = 'rgba(0,180,216,' + alpha.toFixed(3) + ')';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(ax, topY - 4); ctx.lineTo(ax, topY - 17); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ax, topY - 17); ctx.lineTo(ax - 3.5, topY - 11);
+      ctx.moveTo(ax, topY - 17); ctx.lineTo(ax + 3.5, topY - 11);
+      ctx.stroke();
+    }
+
+    // particles (shimmering heat leaving surface)
+    for (var pi = 0; pi < particles.length; pi++){
+      var pt = particles[pi];
+      var px = baseX + pt.xi * finW;
+      var py = topY - pt.age * (38 + 26 * pt.spd);
+      var pa = (1 - pt.age) * (0.3 + 0.5 * thetaRatio(p, pt.xi));
+      if (pa <= 0) continue;
+      ctx.fillStyle = 'rgba(255,196,120,' + pa.toFixed(3) + ')';
+      ctx.beginPath(); ctx.arc(px + pt.wob * Math.sin(pt.age*6), py, 1.8, 0, 7); ctx.fill();
+    }
+
+    // temperature color bar
+    var cbX = W - 16, cbY = marginT - 6, cbH = (H - marginB) - cbY;
+    for (var ci = 0; ci < cbH; ci++){
+      ctx.fillStyle = tempColor(1 - ci / cbH);
+      ctx.fillRect(cbX, cbY + ci, 10, 1);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '9px Roboto Mono'; ctx.textAlign = 'right';
+    ctx.fillText(p.Tb.toFixed(0) + '°', cbX - 2, cbY + 8);
+    ctx.fillText(p.Tinf.toFixed(0) + '°', cbX - 2, cbY + cbH);
+
+    // labels
+    ctx.fillStyle = '#ffd54a'; ctx.font = 'bold 11px Roboto Mono'; ctx.textAlign = 'left';
+    ctx.fillText('T_b = ' + p.Tb.toFixed(0) + '°C', baseX + 2, topY - 24);
+    ctx.fillStyle = tempColor((p.Ttip - p.Tinf) / (p.thetaB || 1));
+    ctx.textAlign = 'right';
+    ctx.fillText('T_tip = ' + p.Ttip.toFixed(1) + '°C', baseX + finW, midY + baseFinH/2 + 22);
+    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '10px Noto Sans JP'; ctx.textAlign = 'left';
+    ctx.fillText('mL = ' + p.mL.toFixed(2) + ' , η = ' + (p.eta*100).toFixed(0) + '%', baseX + 2, midY + baseFinH/2 + 22);
+  }
+
+  function stepParticles(dt, p){
+    // spawn rate scales with convection strength h and base excess
+    var rate = Math.min(1, p.h / 250) * (0.4 + 0.6 * Math.min(1, p.thetaB / 80));
+    if (Math.random() < rate * dt * 60){
+      var xi = Math.random();
+      // bias spawning toward hotter (base) region
+      xi = xi * xi;
+      particles.push({ xi: xi, age: 0, spd: 0.5 + Math.random(), wob: (Math.random()-0.5)*5 });
+    }
+    for (var i = particles.length - 1; i >= 0; i--){
+      particles[i].age += dt * (0.5 + 0.4 * particles[i].spd);
+      if (particles[i].age >= 1) particles.splice(i, 1);
+    }
+    if (particles.length > 160) particles.splice(0, particles.length - 160);
+  }
+
+  // ---- Chart.js temperature curve ----
+  function buildChart(){
+    var cv = el('tempChart'); if(!cv || typeof Chart === 'undefined') return;
+    chart = new Chart(cv.getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: T.tempChart, data: [], borderColor: '#e74c3c', borderWidth: 2.5, pointRadius: 0, tension: 0.35,
+          fill: { target: 'origin', above: 'rgba(231,76,60,.08)' } }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, resizeDelay: 100, animation: false,
+        plugins: { legend: { labels: { color: '#6c757d', font: { size: 11 } } } },
+        scales: {
+          x: { ticks: { color:'#6c757d', maxTicksLimit:8, font:{size:10} }, grid:{ color:'rgba(0,0,0,.05)' }, title:{ display:true, text:T.xAxis, color:'#6c757d', font:{size:11} } },
+          y: { ticks: { color:'#6c757d', font:{size:10} }, grid:{ color:'rgba(0,0,0,.05)' }, title:{ display:true, text:T.yAxis, color:'#6c757d', font:{size:11} } }
+        }
+      }
+    });
+  }
+  function updateChart(p){
+    if(!chart) return;
+    var n = 80, labels = [], data = [];
+    for (var i = 0; i <= n; i++){
+      var xi = i / n;
+      labels.push((xi * p.L * 1e3).toFixed(1));
+      data.push(p.Tinf + p.thetaB * thetaRatio(p, xi));
+    }
     chart.data.labels = labels;
-    chart.data.datasets[0].data = dTemp;
+    chart.data.datasets[0].data = data;
     chart.update('none');
   }
-}function initChart(){
-  const ctx2 = document.getElementById('tempChart').getContext('2d');
-  chart = new Chart(ctx2, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        { label: 'T(x) 温度分布 [°C]', data: [], borderColor: '#e74c3c', borderWidth: 2.5, pointRadius: 0, tension: 0.4, fill: { target: 'origin', above: 'rgba(231,76,60,.08)' } }
-      ]
-    },
-    options:{
-      responsive: true, maintainAspectRatio: false,resizeDelay:100, animation: false,
-      plugins: { legend: { labels: { color: '#6c757d', font:{size:11} } } },
-      scales:{
-        x: { ticks:{color:'#6c757d',maxTicksLimit:8,font:{size:10}}, grid:{color:'rgba(0,0,0,.05)'}, title:{display:true,text:'フィン位置 x (mm)',color:'#6c757d',font:{size:11}} },
-        y:{ ticks:{color:'#6c757d',font:{size:10}}, grid:{color:'rgba(0,0,0,.05)'}, title:{display:true,text:'温度 T (°C)',color:'#6c757d',font:{size:11}} }
-      }
-    }
-  });
-}initChart();
-update();
+
+  // ---- main update on any input change ----
+  window.update = function(){
+    cur = physics();
+    syncNumbers(cur);
+    writeStats(cur);
+    updateChart(cur);
+    if (reduce){ drawFin(cur, false); }   // static frame
+  };
+  window.setFinType = function(t, btn){
+    finType = t;
+    var ids = ['ftRect','ftTri','ftAnn'];
+    ids.forEach(function(id){ var b=el(id); if(b) b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
+    window.update();
+  };
+  window.setMaterial = function(mat, btn){
+    ['matAl','matCu','matSt'].forEach(function(id){ var b=el(id); if(b) b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
+    el('sk').value = materials[mat];
+    window.update();
+  };
+
+  // ---- animation loop ----
+  function frame(ts){
+    if (!playing){ lastTs = ts; return; }
+    var dt = Math.min(0.05, (ts - lastTs) / 1000 || 0.016);
+    lastTs = ts;
+    if (!cur) cur = physics();
+    conductFront += dt * 0.35;
+    if (conductFront > 1) conductFront -= 1;
+    stepParticles(dt, cur);
+    drawFin(cur, true);
+    requestAnimationFrame(frame);
+  }
+
+  var playBtn = el('finPlay');
+  if (playBtn){
+    if (reduce) playBtn.textContent = T.pause;
+    playBtn.addEventListener('click', function(){
+      playing = !playing;
+      playBtn.textContent = playing ? T.play : T.pause;
+      if (playing){ lastTs = 0; requestAnimationFrame(function(ts){ lastTs = ts; requestAnimationFrame(frame); }); }
+    });
+  }
+
+  window.addEventListener('resize', function(){ if (cur) drawFin(cur, false); });
+
+  buildChart();
+  window.update();
+  if (!reduce){ requestAnimationFrame(function(ts){ lastTs = ts; requestAnimationFrame(frame); }); }
+})();
 </script>
 
 <section class="explanation">
@@ -481,7 +587,31 @@ update();
       <div class="bub">良い質問だ！フィンを詰めすぎると、フィン同士の間の空気の流れが悪くなって、かえって放熱性能が落ちてしまうんだ。このシミュレーターの「フィン枚数 N」と「フィン幅 W」を調整すると、伝熱増強比が計算されるよ。現場では、強制対流か自然対流かで最適間隔が大きく変わるから、条件を変えてシミュレーションしてみるのが設計の第一歩だ。</div>
     </div>
   </div>
-  <h2>よくある質問</h2>
+  <h2>フィンの温度分布と放熱量</h2>
+<div class="fblock">
+<p>フィン（放熱フィン）は伝熱面積を増やして放熱を促進する突起です。根元温度 $T_b$、周囲温度 $T_\infty$ として、温度超過 $\theta = T-T_\infty$ の分布は1次元フィン方程式から求まります。重要なパラメータは<strong>フィン定数 $m$</strong> です。</p>
+<p style="text-align:center">$m = \sqrt{\dfrac{hP}{k A_c}}, \qquad \theta(x)=\theta_b\dfrac{\cosh m(L-x)}{\cosh mL}\ \text{（先端断熱）}$</p>
+<p>ここで $h$ は対流熱伝達係数、$P$ はフィン断面の周長、$k$ は熱伝導率、$A_c$ はフィン断面積です。先端断熱の場合、フィン全体からの<strong>放熱量</strong>は次式になります。</p>
+<p style="text-align:center">$Q_{fin}=\sqrt{hPkA_c}\;\theta_b\tanh(mL)$</p>
+<p>$mL$ が大きいほど先端まで温度が下がり、フィンを長くしても放熱量は頭打ち（$\tanh\to1$）になります。一般に $mL\approx 1\sim2$ あたりが実用的な目安です。</p>
+</div>
+
+<h2>フィン効率とフィン有効度</h2>
+<div class="fblock">
+<p>フィンの性能は2つの無次元量で評価します。</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:.92em">
+<thead><tr><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">指標</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">式</th><th style="border:1px solid #d0d7de;padding:6px 8px;background:#f3f6fa;text-align:left">意味</th></tr></thead>
+<tbody>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">フィン効率 $\eta_f$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\dfrac{Q_{fin}}{h A_{fin}\theta_b}=\dfrac{\tanh mL}{mL}$（先端断熱）</td><td style="border:1px solid #d0d7de;padding:6px 8px">実放熱量 ÷ 全面が根元温度なら出る最大放熱量</td></tr>
+<tr><td style="border:1px solid #d0d7de;padding:6px 8px">フィン有効度 $\varepsilon_f$</td><td style="border:1px solid #d0d7de;padding:6px 8px">$\dfrac{Q_{fin}}{h A_c\theta_b}$</td><td style="border:1px solid #d0d7de;padding:6px 8px">フィン有り ÷ フィン無し。$\ge 2$ で設置価値あり</td></tr>
+</tbody>
+</table>
+</div>
+<p>フィン効率は $mL$ が小さい（短い・熱伝導が良い・対流が弱い）ほど1に近づきます。長くしすぎると先端が周囲温度に近づき、効率が下がります。<strong>設計の指針</strong>は、熱伝導率 $k$ の高い材料（アルミ・銅）を使い、薄く本数を増やして表面積を稼ぎつつ、フィン間の対流が阻害されない間隔を保つことです。本シミュレーターでフィン長さ・厚さ・枚数・材料を変え、放熱量と効率のトレードオフを確認できます。</p>
+</div>
+
+<h2>よくある質問</h2>
 <div class="faq-section">
   <div class="faq-item">
     <button class="faq-q" onclick="toggleFaq(this)">フィンパラメータmの値を大きくすると温度分布はどう変化しますか？ <span class="arrow"><i class="fas fa-chevron-down"></i></span></button>
@@ -516,6 +646,9 @@ update();
 </div>
 
 </section>
+
+
+
 
 <!-- codex-static-related-tools:start -->
 <section class="related-section static-related-tools" aria-label="関連ツール" data-related-source="fin-heat-transfer.html" style="max-width:1100px;margin:32px auto 0;padding:0 24px">
@@ -563,16 +696,16 @@ update();
 <div class="howto-card howto-guide">
 <h3>使い方ガイド</h3>
 <ol>
-<li>フィン材質（アルミニウム：k=237 W/m·K、銅：k=401 W/m·K）とフィン長さ（25～150mm）を設定</li>
+<li>フィン材質プリセット（アルミ k=200、銅 k=400、鋼 k=50 W/mK）またはスライダーで熱伝導率 k を設定し、フィン長さ（5～200mm）を入力</li>
 <li>フィン厚さ（1～5mm）とフィン間隔（5～20mm）を入力し、アレイ本数（4～16本）を指定</li>
-<li>環境温度（20～80℃）と基部温度（100～200℃）を設定して「シミュレーション実行」をクリック</li>
+<li>環境温度 T∞（0～60℃）と根元温度 T_b（30～200℃）を設定すると、スライダー操作に応じて結果がリアルタイム更新されます</li>
 <li>リアルタイムで温度分布、フィン効率η（通常0.6～0.95）、先端温度、総放熱量を可視化</li>
 <li>パラメータを変更して最適な設計条件を探索</li>
 </ol>
 </div>
 <div class="howto-card howto-example">
 <h3>具体的な計算例</h3>
-<p>厚さ2mm・長さ80mmのアルミニウム矩形フィン（k=237 W/m·K）、基部温度150℃、環境温度25℃、自然対流h=15 W/m²·Kの条件：mL値=1.34（m=√(2h/kt)）、フィン効率η=0.82、単フィン放熱量≈24W、8本アレイで総放熱量≈192W。間隔を10mmから8mmに狭めると伝熱増強比は1.8倍に向上し総放熱量≈340Wへ増加</p>
+<p>厚さ2mm・長さ80mmのアルミニウム矩形フィン（k=237 W/m·K）、基部温度150℃、環境温度25℃、自然対流h=15 W/m²·Kの条件：mL値≈0.65（m=√(hP/kA)、W=50mm）、フィン効率η≈0.88、単フィン放熱量≈13.7W、8本アレイで総放熱量≈110W。フィンを長くするとmLが増えてηは下がり、長さと効率のトレードオフが生じます</p>
 </div>
 <div class="howto-card howto-notes">
 <h3>実務での注意点</h3>
@@ -583,6 +716,16 @@ update();
 <li>先端温度が基部の80%未満なら効率が顕著に低下：M値（基部から先端への温度低下）を監視し、M≦0.3を目安に設計</li>
 </ul>
 </div>
+
+<aside class="mobile-bottom-ad">
+  <div class="mobile-bottom-ad-label">📚 Sponsored — 関連書籍</div>
+  <a class="mobile-bottom-ad-book" href="https://www.amazon.co.jp/dp/4888983372?tag=novasolver-22" target="_blank" rel="sponsored noopener nofollow">
+    <img src="https://images-na.ssl-images-amazon.com/images/P/4888983372.09._SCMZZZZZZ_.jpg" alt="伝熱工学の参考書" loading="lazy" onerror="this.style.display='none'">
+    <div class="mobile-bottom-ad-book-cat">伝熱工学 の参考書を Amazon で見る →</div>
+  </a>
+  <div class="mobile-bottom-ad-disclosure">Amazonのアソシエイトとして、NovaSolverは適格販売により収入を得ています</div>
+</aside>
+
 <footer style="background:#001F3F;color:rgba(255,255,255,.7);padding:24px;margin-top:32px;text-align:center">
 <div style="max-width:1200px;margin:0 auto">
   <div style="font-weight:700;color:#fff;margin-bottom:8px">NovaSolver Project</div>
