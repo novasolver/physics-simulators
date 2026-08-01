@@ -141,7 +141,7 @@
         g.appendChild(el("circle", { cx: p.x, cy: p.y, r: 6.5, fill: col,
                                      stroke: "#fff", "stroke-width": 1.5 }));
         var t = el("text", { x: p.x + 10, y: p.y - 8, fill: col, class: "restxt" });
-        t.textContent = T.toFixed(1) + "°C";
+        t.textContent = T.toFixed(1) + (root.NS1D.unit || "°C");
         g.appendChild(t);
         self.layerOverlay.appendChild(g);
       });

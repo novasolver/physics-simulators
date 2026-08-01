@@ -5,8 +5,10 @@ library is a **thermal network (thermal circuit) solver**: wire up thermal resis
 capacitances, heat sources, convection and radiation like a circuit schematic, and every
 node temperature is computed as you edit.
 
-**Live app:** https://novasolver.jp/en/1d/thermal-network.html
-(日本語版: https://novasolver.jp/1d/thermal-network.html)
+**Live apps:**
+- Thermal network: https://novasolver.jp/en/1d/thermal-network.html
+- Piping network: https://novasolver.jp/en/1d/fluid-network.html
+(日本語版: https://novasolver.jp/1d/thermal-network.html / fluid-network.html)
 
 No install, no signup, no server round-trips — all computation happens on your device
 and the model never leaves it.
@@ -22,8 +24,10 @@ library that knows how to *stamp* its residual and Jacobian contributions.
 |---|---|
 | `js/solver.js` | Numerical core. Pure functions, no DOM. Newton's method on a residual + Jacobian formulation, dense LU with partial pivoting, backward Euler for transients. Public API: `solveSteady(sys, opt)` / `solveTransient(sys, opt)`. |
 | `js/lib-thermal.js` | Thermal component library: R (conduction), h·A (convection), ε·A (radiation, nonlinear T⁴), C (capacitance), P (heat source), T (fixed temperature via row replacement). Adding a new domain = adding another file like this one. |
+| `js/lib-fluid.js` | Fluid (piping network) component library: pipes (Darcy–Weisbach, automatic laminar/turbulent switching with Swamee–Jain friction and a blended transition band), local losses (ζ valves/bends), near-ideal fixed-Δp pumps, flow sources, fixed-pressure nodes. Nonlinear dp(Q) laws are inverted by a guarded local Newton inside each stamp; the tangent conductance dQ/ddp feeds the global Jacobian. |
 | `js/model.js` | Schematic data model: components + wires, node derivation via union-find, undo/redo, JSON I/O, pre-solve diagnostics. |
 | `js/editor.js` | SVG schematic editor: drag-and-drop placement, pin-to-pin wiring (drag or click-click), rotation, pan/zoom. Re-solves on every edit — there is no "run" button. |
+| `js/verify-fluid.js` | Four fluid verification cases (Hagen–Poiseuille, series, parallel split, turbulent-branch mass conservation). `node js/verify-fluid.js` → `ALL PASS (4)`. |
 | `js/verify.js` | Six verification cases against analytic solutions (series/parallel resistance, convective boundary, lumped-capacitance transient, energy conservation, radiation equilibrium). Runs headless: `node js/verify.js` → `ALL PASS (6)`. Also re-run in the browser on every page load and displayed to the user. |
 | `js/app.js` | Application shell: palette, parameter panel, transient plot, energy-balance table, examples. UI strings are bilingual (JA/EN) via `window.NS1D_LANG`. |
 
@@ -64,8 +68,8 @@ This solves **lumped-parameter (1D) networks** — it will not give you temperat
 fields inside a part or resolve a flow field. It is meant for the system-level sizing
 you do *before* committing to 3D CFD/FEA.
 
-Roadmap: fluid branch (piping networks, Darcy–Weisbach), thermal–fluid coupling
-(cooling loops), electrical branch, sparse solver for large models.
+Roadmap: pump performance curves (Q–H), thermal–fluid coupling (cooling loops),
+electrical branch, transient fluid analysis, sparse solver for large models.
 
 ## License
 
